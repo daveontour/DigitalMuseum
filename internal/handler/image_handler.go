@@ -52,6 +52,7 @@ func (h *ImageHandler) RegisterRoutes(r chi.Router) {
 	// to avoid chi treating "images" as an album_id value.
 	r.Get("/facebook/albums/images/{image_id}", h.GetAlbumImageContent)
 	r.Get("/facebook/albums/{album_id}/images", h.GetAlbumImages)
+	r.Get("/facebook/places", h.GetFacebookPlaces)
 }
 
 // ── /images/search ────────────────────────────────────────────────────────────
@@ -186,6 +187,20 @@ func (h *ImageHandler) GetTags(w http.ResponseWriter, r *http.Request) {
 		tags = []string{}
 	}
 	writeJSON(w, map[string]any{"tags": tags})
+}
+
+// ── /facebook/places ──────────────────────────────────────────────────────────
+
+func (h *ImageHandler) GetFacebookPlaces(w http.ResponseWriter, r *http.Request) {
+	places, err := h.svc.GetFacebookPlaces(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving Facebook places: %s", err))
+		return
+	}
+	if places == nil {
+		places = []model.FacebookPlaceItem{}
+	}
+	writeJSON(w, map[string]any{"places": places})
 }
 
 // ── /getLocations ─────────────────────────────────────────────────────────────

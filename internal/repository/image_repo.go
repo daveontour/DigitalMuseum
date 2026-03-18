@@ -244,6 +244,29 @@ func (r *ImageRepo) GetLocations(ctx context.Context) ([]*model.MediaItem, error
 	return scanMediaItems(rows)
 }
 
+// GetFacebookPlaces returns all locations with source='facebook'.
+func (r *ImageRepo) GetFacebookPlaces(ctx context.Context) ([]model.FacebookPlaceItem, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, name, description, address, latitude, longitude, region, source_reference
+		FROM locations
+		WHERE source = 'facebook'
+		ORDER BY name ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("GetFacebookPlaces: %w", err)
+	}
+	defer rows.Close()
+
+	var places []model.FacebookPlaceItem
+	for rows.Next() {
+		var p model.FacebookPlaceItem
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Address, &p.Latitude, &p.Longitude, &p.Region, &p.SourceReference); err != nil {
+			return nil, fmt.Errorf("GetFacebookPlaces scan: %w", err)
+		}
+		places = append(places, p)
+	}
+	return places, rows.Err()
+}
+
 // ── Write / delete ────────────────────────────────────────────────────────────
 
 // UpdateTags updates the tags column for a media item (merge: append to existing).

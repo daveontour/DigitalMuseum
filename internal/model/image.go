@@ -158,6 +158,18 @@ type FacebookPostMediaItem struct {
 	CreatedAt   *string `json:"created_at"`
 }
 
+// FacebookPlaceItem is the shape returned by GET /facebook/places.
+type FacebookPlaceItem struct {
+	ID              int64    `json:"id"`
+	Name            string   `json:"name"`
+	Description     *string  `json:"description"`
+	Address         *string  `json:"address"`
+	Latitude        *float64 `json:"latitude"`
+	Longitude       *float64 `json:"longitude"`
+	Region          *string  `json:"region"`
+	SourceReference *string  `json:"source_reference"`
+}
+
 // AlbumImageItem is the shape returned by GET /facebook/albums/{id}/images.
 type AlbumImageItem struct {
 	ID        int64   `json:"id"`

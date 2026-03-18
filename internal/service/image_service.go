@@ -49,6 +49,11 @@ func (s *ImageService) GetMetadata(ctx context.Context, id int64) (*model.MediaM
 	return &resp, nil
 }
 
+// GetFacebookPlaces returns all Facebook-sourced locations.
+func (s *ImageService) GetFacebookPlaces(ctx context.Context) ([]model.FacebookPlaceItem, error) {
+	return s.repo.GetFacebookPlaces(ctx)
+}
+
 // GetDistinctYears returns distinct non-null years from media_items.
 func (s *ImageService) GetDistinctYears(ctx context.Context) ([]int, error) {
 	return s.repo.GetDistinctYears(ctx)
