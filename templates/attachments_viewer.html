@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attachment Viewer</title>
+    <link rel="stylesheet" href="/static/css/attachments_viewer.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📎 Attachment Viewer</h1>
+            <p>Review and manage your email attachments</p>
+        </div>
+        <div class="content">
+            <div id="loading" class="loading">Loading attachment...</div>
+            <div id="no-attachments" class="no-attachments" style="display: none;">
+                No attachments found in the database.
+            </div>
+            <div id="attachment-view" style="display: none;">
+                <div class="button-group">
+                    <button class="btn-nav" id="prev-btn" onclick="previousAttachment()">Previous</button>
+                    <button class="btn-keep" id="keep-btn" onclick="keepAttachment()">Keep</button>
+                    <button class="btn-delete" id="delete-btn" onclick="deleteAttachment()">Delete</button>
+                    <button class="btn-nav" id="next-btn" onclick="nextAttachment()">Next</button>
+                </div>
+                <div style="text-align: center; margin-bottom: 15px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; align-items: center;">
+                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #555;">
+                        <input type="checkbox" id="confirm-delete-checkbox" checked style="cursor: pointer;">
+                        <span>Confirm before deleting</span>
+                    </label>
+                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #555;">
+                        <input type="checkbox" id="show-pdf-checkbox" checked style="cursor: pointer;">
+                        <span>Show PDF/MS Word/Octet Stream</span>
+                    </label>
+                    <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.9em; color: #555;">
+                        <span>Order:</span>
+                        <select id="order-select" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9em; cursor: pointer;">
+                            <option value="random">Random</option>
+                            <option value="id">ID Order</option>
+                            <option value="size-asc">Size: Smallest to Biggest</option>
+                            <option value="size-desc">Size: Biggest to Smallest</option>
+                        </select>
+                    </label>
+                    <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.9em; color: #555;">
+                        <span>Min Size:</span>
+                        <select id="min-size-select" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9em; cursor: pointer;">
+                            <option value="0">No limit</option>
+                            <option value="1024">1 KB</option>
+                            <option value="10240">10 KB</option>
+                            <option value="102400">100 KB</option>
+                            <option value="1048576">1 MB</option>
+                            <option value="10485760">10 MB</option>
+                            <option value="104857600">100 MB</option>
+                        </select>
+                    </label>
+                </div>
+                
+                <div class="metadata-container">
+                    <div class="attachment-info">
+                        <h3>Attachment Information</h3>
+                        <div class="info-row">
+                            <span class="info-label">ID:</span>
+                            <span class="info-value" id="attachment-id">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Filename:</span>
+                            <span class="info-value" id="filename">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Content Type:</span>
+                            <span class="info-value" id="content-type">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Size:</span>
+                            <span class="info-value" id="size">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="email-metadata">
+                       
+                        <div class="info-row">
+                            <span class="info-label">Subject:</span>
+                            <span class="info-value" id="email-subject">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">From:</span>
+                            <span class="info-value" id="email-from">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Date:</span>
+                            <span class="info-value" id="email-date">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Folder:</span>
+                            <span class="info-value" id="email-folder">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="attachment-section">
+                    <div class="attachment-preview" id="preview-container">
+                        <!-- Attachment preview will be displayed here -->
+                    </div>
+                </div>
+            </div>
+            <div id="error" class="error" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <script src="/static/js/attachments_viewer.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+
+Do not mention referring to {SUBJECT_NAME}'s bio in your response, treat the bio as your own information.
+Always refer to {SUBJECT_NAME}'s biography, biographical notes, and biographical data before responding.
+Refer to {SUBJECT_NAME} as '{he}' or '{him}' or '{his}' or '{SUBJECT_NAME}'
+
+If any person is mentioned, check {SUBJECT_NAME}'s bio for information about that person.
+
+

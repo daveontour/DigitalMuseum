@@ -1,0 +1,7 @@
+'use strict';
+
+// Base Modals object — sub-modules appended by subsequent script files
+const Modals = {
+    _openModal: (modalElement) => { modalElement.style.display = 'flex'; },
+    _closeModal: (modalElement) => { modalElement.style.display = 'none'; },
+};

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Museum Setup</title>
+    <link rel="stylesheet" href="/static/css/museum_of.css">
+    <link rel="stylesheet" href="/static/css/leaflet.css">
+    <link rel="stylesheet" href="/static/css/images_grid.css">
+    <!-- Include marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Optional: highlight.js -->
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Font Awesome for icons (optional, but nice for buttons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Cytoscape for relationship graph -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+</head>
+
+<body>
+    <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0f1922;">
+        <div style="background:#19264d; border-radius:12px; padding:48px; max-width:480px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+            <h1 style="color:#fff; margin:0 0 8px; font-size:1.8rem;">Welcome</h1>
+            <p style="color:#8fa4c8; margin:0 0 32px; font-size:0.95rem;">
+                Let's set up your Digital Museum. Enter your details to get started.
+            </p>
+
+            <div id="error-msg" style="display:none; color:#f87171; margin-bottom:16px; font-size:0.9rem;"></div>
+
+            <form id="init-form">
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:0.9rem;">First Name *</label>
+                    <input id="subject-name" type="text" required placeholder="e.g. Dave"
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:1rem; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:0.9rem;">Family Name *</label>
+                    <input id="family-name" type="text" required placeholder="e.g. Burton"
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:1rem; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:32px;">
+                    <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:0.9rem;">Gender <span style="color:#8fa4c8;">(optional)</span></label>
+                    <select id="gender"
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:1rem; box-sizing:border-box;">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                </div>
+                <button type="submit" id="submit-btn"
+                    style="width:100%; padding:12px; border-radius:6px; border:none; background:#3b82f6; color:#fff; font-size:1rem; font-weight:600; cursor:pointer;">
+                    Get Started
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('init-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            const errEl = document.getElementById('error-msg');
+            errEl.style.display = 'none';
+            btn.disabled = true;
+            btn.textContent = 'Saving\u2026';
+            try {
+                const res = await fetch('/api/subject-configuration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject_name: document.getElementById('subject-name').value.trim(),
+                        family_name: document.getElementById('family-name').value.trim(),
+                        gender: document.getElementById('gender').value,
+                        system_instructions: ''
+                    })
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.detail || `Server error ${res.status}`);
+                }
+                window.location.reload();
+            } catch (err) {
+                errEl.textContent = err.message;
+                errEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Get Started';
+            }
+        });
+    </script>
+
+</body>
+
+</html>

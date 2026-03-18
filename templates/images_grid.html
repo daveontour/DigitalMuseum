@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Grid Viewer</title>
+    <link rel="stylesheet" href="/static/css/images_grid.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖼️ Attachments Image Grid Viewer</h1>
+            <p>View and manage images (50 per page)</p>
+        </div>
+        <div class="content">
+            <div class="controls">
+                <div class="sort-controls">
+                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #555;">
+                        <input type="checkbox" id="show-all-types-checkbox" onchange="syncTopControls(); changeSortOrder();" style="cursor: pointer;">
+                        <span>Show all file types</span>
+                    </label>
+                    <label style="font-size: 0.9em; color: #555;">Sort by:</label>
+                    <select id="sort-order-select" onchange="syncTopControls(); changeSortOrder();">
+                        <option value="id">ID</option>
+                        <option value="size">Size</option>
+                        <option value="date">Date</option>
+                    </select>
+                    <select id="sort-direction-select" onchange="syncTopControls(); changeSortOrder();">
+                        <option value="asc">Ascending</option>
+                        <option value="desc">Descending</option>
+                    </select>
+                </div>
+                <div class="pagination">
+                    <button id="prev-page-btn" onclick="previousPage()">Previous</button>
+                    <span id="page-info">Page 1 of 1</span>
+                    <button id="next-page-btn" onclick="nextPage()">Next</button>
+                </div>
+                <button class="delete-selected-btn" id="delete-selected-btn" onclick="deleteSelected()" disabled>Delete Selected</button>
+            </div>
+            
+            <div id="images-grid" class="images-grid" style="display: none;"></div>
+            
+            <div class="controls" id="bottom-controls">
+                <div class="sort-controls">
+                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #555;">
+                        <input type="checkbox" id="show-all-types-checkbox-bottom" onchange="syncBottomControls(); changeSortOrder();" style="cursor: pointer;">
+                        <span>Show all file types</span>
+                    </label>
+                    <label style="font-size: 0.9em; color: #555;">Sort by:</label>
+                    <select id="sort-order-select-bottom" onchange="syncBottomControls(); changeSortOrder();">
+                        <option value="id">ID</option>
+                        <option value="size">Size</option>
+                        <option value="date">Date</option>
+                    </select>
+                    <select id="sort-direction-select-bottom" onchange="syncBottomControls(); changeSortOrder();">
+                        <option value="asc">Ascending</option>
+                        <option value="desc">Descending</option>
+                    </select>
+                </div>
+                <div class="pagination">
+                    <button id="prev-page-btn-bottom" onclick="previousPage()">Previous</button>
+                    <span id="page-info-bottom">Page 1 of 1</span>
+                    <button id="next-page-btn-bottom" onclick="nextPage()">Next</button>
+                </div>
+                <button class="delete-selected-btn" id="delete-selected-btn-bottom" onclick="deleteSelected()" disabled>Delete Selected</button>
+            </div>
+            
+            <div id="image-modal" class="image-modal" onclick="closeModal()">
+                <span class="close-modal">&times;</span>
+                <img class="image-modal-content" id="modal-image" style="display: none;">
+                <iframe class="pdf-modal-content" id="modal-pdf" style="display: none;"></iframe>
+            </div>
+            
+            <div id="metadata-modal" class="metadata-modal" onclick="closeMetadataModal(event)">
+                <div class="metadata-modal-content" onclick="event.stopPropagation()">
+                    <span class="close-metadata-modal" onclick="closeMetadataModal(event)">&times;</span>
+                    <div id="metadata-content"></div>
+                </div>
+            </div>
+            
+            <div id="email-modal" class="email-modal" onclick="closeEmailModal(event)">
+                <div class="email-modal-content" onclick="event.stopPropagation()">
+                    <span class="close-email-modal" onclick="closeEmailModal(event)">&times;</span>
+                    <h2 style="color: #667eea; margin-bottom: 15px;">Email Content</h2>
+                    <div id="email-metadata-display" style="margin-bottom: 20px;"></div>
+                    <div id="email-content" class="email-content"></div>
+                </div>
+            </div>
+            
+            <div id="loading" class="loading">Loading images...</div>
+            <div id="error" class="error" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <script src="/static/js/images_grid.js"></script>
+</body>
+</html>

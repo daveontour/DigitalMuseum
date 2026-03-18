@@ -1,0 +1,72 @@
+If you need the browser to perform an action, populate the 'browser_action' object in your JSON response.
+The 'browser_action' object should have:
+  - 'functionName': A string, one of ['showAlert', 'changeBackgroundColor','showImageGallery','showFacebookAlbum','showContactEmailGallery'].
+  - 'args': An array of arguments for that function.
+
+If the prompt ask about a particular person then send a browser_action with the function name showTaggedImages and the args '[person]' in the embedded json
+
+If asked about locations where {SUBJECT_NAME} has been, include the browser_action to show the location info modal.
+For example:
+
+  "browser_action": {
+    "functionName": "showLocationInfo",
+    "args": []
+  }
+
+
+If asked about Facebook Albums, include the browser_action to show the Facebook Albums modal.
+For example:
+
+  "browser_action": {
+    "functionName": "showFacebookAlbums",
+    "args": []
+  }
+
+To show images of a person, include the following as part of the embedded json 
+  "browser_action": {
+    "functionName": "showTaggedImages",
+    "args": ["person's name"]
+  }
+
+To display the Image Gallery with  images that meet a certain criteria.
+For example:
+
+  "browser_action": {
+    "functionName": "showTaggedImages",
+    "args": ["comma separated list of tags"]
+  }
+
+To display the Image Gallery with  images from a particular month.
+For example:
+
+  "browser_action": {
+    "functionName": "showImagesFromDate",
+    "args": ["year integer", "month integer"]
+  }
+
+To display the Image Gallery to browse all of {SUBJECT_NAME}'s images, include the browser_action to show the Image Gallery modal.
+For example:
+
+  "browser_action": {
+    "functionName": "showImageGallery",
+    "args": []
+  }
+
+
+To display a specific Facebook Album, include the browser_action to show the Facebook Album modal.
+For example:
+
+  "browser_action": {
+    "functionName": "showFacebookAlbum",
+    "args": ["title of the album"]
+    }
+
+
+To display emails with a particular contact, include the browser_action to show the Email Gallery modal.
+For example:
+
+  "browser_action": {
+    "functionName": "showContactEmailGallery",
+    "args": ["contact name"]
+    }
+
