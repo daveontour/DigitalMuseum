@@ -98,7 +98,6 @@ func (r *ContactRepo) ListShort(ctx context.Context, p ContactListParams) ([]*mo
 	if strings.ToLower(p.Order) == "desc" {
 		dir = "DESC NULLS LAST"
 	}
-
 	q := fmt.Sprintf("SELECT %s FROM contacts%s ORDER BY %s %s", cols, where, col, dir)
 	if p.Limit > 0 {
 		args = append(args, p.Limit)
@@ -126,7 +125,11 @@ func (r *ContactRepo) ListShort(ctx context.Context, p ContactListParams) ([]*mo
 		}
 		out = append(out, &c)
 	}
-	return out, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return out, total, nil
 }
 
 // ListNames returns all contacts as (id, name) pairs for the light endpoint.

@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const maxSourceRefLen = 500
 
 const facebookAlbumSource = "facebook_album"
 
@@ -102,6 +105,32 @@ func (s *FacebookAlbumStorage) SaveAlbumImagesBatch(ctx context.Context, items [
 
 	imported := 0
 	for _, item := range items {
+		// Unique key per photo so re-imports do not duplicate (album_id:uri).
+		sourceRef := albumPhotoSourceRef(item.AlbumID, item.URI)
+
+		var mediaItemID int64
+		err = tx.QueryRow(ctx, `SELECT id FROM media_items WHERE source = $1 AND source_reference = $2 LIMIT 1`,
+			facebookAlbumSource, sourceRef).Scan(&mediaItemID)
+		if err == nil {
+			// Photo already exists from a previous import; ensure album_media link exists.
+			var linkCount int
+			if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM album_media WHERE album_id = $1 AND media_item_id = $2`,
+				item.AlbumID, mediaItemID).Scan(&linkCount); err != nil {
+				return imported, fmt.Errorf("failed to check album_media for %s: %w", item.URI, err)
+			}
+			if linkCount == 0 {
+				_, err = tx.Exec(ctx, `INSERT INTO album_media (album_id, media_item_id) VALUES ($1, $2)`, item.AlbumID, mediaItemID)
+				if err != nil {
+					return imported, fmt.Errorf("failed to link existing media item to album for %s: %w", item.URI, err)
+				}
+			}
+			imported++
+			continue
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return imported, fmt.Errorf("failed to check existing media item for %s: %w", item.URI, err)
+		}
+
 		var blobID int64
 		if len(item.ImageData) > 0 {
 			err = tx.QueryRow(ctx, `INSERT INTO media_blobs (image_data, thumbnail_data) VALUES ($1, $2) RETURNING id`,
@@ -127,8 +156,6 @@ func (s *FacebookAlbumStorage) SaveAlbumImagesBatch(ctx context.Context, items [
 			displayTitle = item.Filename
 		}
 
-		sourceRef := strconv.FormatInt(item.AlbumID, 10)
-		var mediaItemID int64
 		err = tx.QueryRow(ctx, `INSERT INTO media_items (
 			media_blob_id, tags, source, source_reference, title, description,
 			media_type, year, month, latitude, longitude, altitude, has_gps,
@@ -163,4 +190,13 @@ func (s *FacebookAlbumStorage) SaveAlbumImagesBatch(ctx context.Context, items [
 		return 0, fmt.Errorf("failed to commit: %w", err)
 	}
 	return imported, nil
+}
+
+// albumPhotoSourceRef returns a unique key for a Facebook album photo so re-imports can skip duplicates.
+func albumPhotoSourceRef(albumID int64, uri string) string {
+	s := strconv.FormatInt(albumID, 10) + ":" + strings.TrimSpace(uri)
+	if len(s) > maxSourceRefLen {
+		return s[:maxSourceRefLen]
+	}
+	return s
 }

@@ -8,10 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
+	"runtime"
+
 	"strings"
 	"sync"
 
+	contactsimport "github.com/daveontour/digitalmuseum/internal/import/contacts"
 	facebookimport "github.com/daveontour/digitalmuseum/internal/import/facebook"
 	facebookalbumsimport "github.com/daveontour/digitalmuseum/internal/import/facebookalbums"
 	facebookallimport "github.com/daveontour/digitalmuseum/internal/import/facebookall"
@@ -57,12 +59,12 @@ var (
 		"emails_processed": 0, "current_label": nil, "total_labels": 0,
 	})
 
-	facebookMessengerJob = importer.NewImportJob("Facebook Messenger import", map[string]any{
-		"status": "idle", "status_line": nil, "error_message": nil,
-		"conversations": 0, "messages_imported": 0, "messages_created": 0,
-		"messages_updated": 0, "attachments_found": 0, "attachments_missing": 0,
-		"missing_attachment_filenames": []string{}, "errors": 0,
-	})
+	// facebookMessengerJob = importer.NewImportJob("Facebook Messenger import", map[string]any{
+	// 	"status": "idle", "status_line": nil, "error_message": nil,
+	// 	"conversations": 0, "messages_imported": 0, "messages_created": 0,
+	// 	"messages_updated": 0, "attachments_found": 0, "attachments_missing": 0,
+	// 	"missing_attachment_filenames": []string{}, "errors": 0,
+	// })
 
 	filesystemJob = importer.NewImportJob("Filesystem images import", map[string]any{
 		"status": "idle", "status_line": nil, "current_file": nil,
@@ -71,25 +73,25 @@ var (
 		"errors": 0, "error_messages": []string{},
 	})
 
-	facebookAlbumsJob = importer.NewImportJob("Facebook Albums import", map[string]any{
-		"status": "idle", "status_line": nil, "current_album": nil,
-		"albums_processed": 0, "total_albums": 0, "albums_imported": 0,
-		"images_imported": 0, "images_found": 0, "images_missing": 0,
-		"missing_image_filenames": []string{},
-		"errors":                  0, "error_message": nil,
-	})
+	// facebookAlbumsJob = importer.NewImportJob("Facebook Albums import", map[string]any{
+	// 	"status": "idle", "status_line": nil, "current_album": nil,
+	// 	"albums_processed": 0, "total_albums": 0, "albums_imported": 0,
+	// 	"images_imported": 0, "images_found": 0, "images_missing": 0,
+	// 	"missing_image_filenames": []string{},
+	// 	"errors":                  0, "error_message": nil,
+	// })
 
-	facebookPostsJob = importer.NewImportJob("Facebook Posts import", map[string]any{
-		"status": "idle", "status_line": nil, "error_message": nil,
-		"posts_processed": 0, "posts_imported": 0, "posts_updated": 0,
-		"with_media": 0, "images_imported": 0, "images_found": 0,
-		"images_missing": 0, "errors": 0,
-	})
+	// facebookPostsJob = importer.NewImportJob("Facebook Posts import", map[string]any{
+	// 	"status": "idle", "status_line": nil, "error_message": nil,
+	// 	"posts_processed": 0, "posts_imported": 0, "posts_updated": 0,
+	// 	"with_media": 0, "images_imported": 0, "images_found": 0,
+	// 	"images_missing": 0, "errors": 0,
+	// })
 
-	facebookPlacesJob = importer.NewImportJob("Facebook Places import", map[string]any{
-		"status": "idle", "status_line": nil, "error_message": nil,
-		"places_imported": 0, "places_created": 0, "places_updated": 0,
-	})
+	// facebookPlacesJob = importer.NewImportJob("Facebook Places import", map[string]any{
+	// 	"status": "idle", "status_line": nil, "error_message": nil,
+	// 	"places_imported": 0, "places_created": 0, "places_updated": 0,
+	// })
 
 	facebookAllJob = importer.NewImportJob("Facebook All import", map[string]any{
 		"status": "idle", "status_line": nil, "error_message": nil,
@@ -170,22 +172,22 @@ func (h *ImporterHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/images/process-thumbnails/status", h.ThumbnailsStatus)
 
 	// Facebook Albums
-	r.Post("/facebook/albums/import", h.FacebookAlbumsStart)
-	r.Get("/facebook/albums/import/stream", h.FacebookAlbumsStream)
-	r.Post("/facebook/albums/import/cancel", h.FacebookAlbumsCancel)
-	r.Get("/facebook/albums/import/status", h.FacebookAlbumsStatus)
+	// r.Post("/facebook/albums/import", h.FacebookAlbumsStart)
+	// r.Get("/facebook/albums/import/stream", h.FacebookAlbumsStream)
+	// r.Post("/facebook/albums/import/cancel", h.FacebookAlbumsCancel)
+	// r.Get("/facebook/albums/import/status", h.FacebookAlbumsStatus)
 
-	// Facebook Posts
-	r.Post("/facebook/posts/import", h.FacebookPostsStart)
-	r.Get("/facebook/posts/import/stream", h.FacebookPostsStream)
-	r.Post("/facebook/posts/import/cancel", h.FacebookPostsCancel)
-	r.Get("/facebook/posts/import/status", h.FacebookPostsStatus)
+	// // Facebook Posts
+	// r.Post("/facebook/posts/import", h.FacebookPostsStart)
+	// r.Get("/facebook/posts/import/stream", h.FacebookPostsStream)
+	// r.Post("/facebook/posts/import/cancel", h.FacebookPostsCancel)
+	// r.Get("/facebook/posts/import/status", h.FacebookPostsStatus)
 
-	// Facebook Places
-	r.Post("/facebook/import-places", h.FacebookPlacesStart)
-	r.Get("/facebook/import-places/stream", h.FacebookPlacesStream)
-	r.Post("/facebook/import-places/cancel", h.FacebookPlacesCancel)
-	r.Get("/facebook/import-places/status", h.FacebookPlacesStatus)
+	// // Facebook Places
+	// r.Post("/facebook/import-places", h.FacebookPlacesStart)
+	// r.Get("/facebook/import-places/stream", h.FacebookPlacesStream)
+	// r.Post("/facebook/import-places/cancel", h.FacebookPlacesCancel)
+	// r.Get("/facebook/import-places/status", h.FacebookPlacesStatus)
 
 	// Facebook All
 	r.Post("/facebook/all/import", h.FacebookAllStart)
@@ -230,10 +232,10 @@ func (h *ImporterHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/instagram/import/status", h.InstagramStatus)
 
 	// Facebook Messenger (standalone)
-	r.Post("/facebook/import", h.FacebookMessengerStart)
-	r.Get("/facebook/import/stream", h.FacebookMessengerStream)
-	r.Post("/facebook/import/cancel", h.FacebookMessengerCancel)
-	r.Get("/facebook/import/status", h.FacebookMessengerStatus)
+	// r.Post("/facebook/import", h.FacebookMessengerStart)
+	// r.Get("/facebook/import/stream", h.FacebookMessengerStream)
+	// r.Post("/facebook/import/cancel", h.FacebookMessengerCancel)
+	// r.Get("/facebook/import/status", h.FacebookMessengerStatus)
 
 	// Email (Gmail) process — stub: Gmail OAuth is not implemented in Go; use /imap/process
 	r.Post("/emails/process", h.EmailProcessStart)
@@ -247,32 +249,6 @@ func (h *ImporterHandler) RegisterRoutes(r chi.Router) {
 func dirExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
-}
-
-func runJob(job *importer.ImportJob, args []string, onComplete func(stdout string)) {
-	go func() {
-		stdout, rc, err := importer.RunSubprocess(job, args)
-		if err != nil || job.IsCancelled() {
-			if job.IsCancelled() {
-				job.UpdateState(map[string]any{"status": "cancelled", "status_line": "Import cancelled."})
-				job.Broadcast("cancelled", job.GetState())
-			} else {
-				msg := fmt.Sprintf("subprocess error: %s", err)
-				job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
-				job.Broadcast("error", job.GetState())
-			}
-		} else if rc != 0 {
-			msg := strings.TrimSpace(stdout)
-			if msg == "" {
-				msg = fmt.Sprintf("process exited with code %d", rc)
-			}
-			job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
-			job.Broadcast("error", job.GetState())
-		} else {
-			onComplete(stdout)
-		}
-		job.Finish()
-	}()
 }
 
 // runThumbnailsAfterImportIfIdle starts thumbnail processing if the thumbnails job is idle.
@@ -548,152 +524,152 @@ func (h *ImporterHandler) ThumbnailsStatus(w http.ResponseWriter, r *http.Reques
 
 // ── Facebook Albums ───────────────────────────────────────────────────────────
 
-func (h *ImporterHandler) FacebookAlbumsStart(w http.ResponseWriter, r *http.Request) {
-	if err := facebookAlbumsJob.AssertNotRunning(); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	var req struct {
-		DirectoryPath string `json:"directory_path"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
-	if !dirExists(req.DirectoryPath) {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("directory does not exist: %s", req.DirectoryPath))
-		return
-	}
+// func (h *ImporterHandler) FacebookAlbumsStart(w http.ResponseWriter, r *http.Request) {
+// 	if err := facebookAlbumsJob.AssertNotRunning(); err != nil {
+// 		writeError(w, http.StatusBadRequest, err.Error())
+// 		return
+// 	}
+// 	var req struct {
+// 		DirectoryPath string `json:"directory_path"`
+// 	}
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+// 		return
+// 	}
+// 	if !dirExists(req.DirectoryPath) {
+// 		writeError(w, http.StatusBadRequest, fmt.Sprintf("directory does not exist: %s", req.DirectoryPath))
+// 		return
+// 	}
 
-	facebookAlbumsJob.Start()
-	facebookAlbumsJob.UpdateState(map[string]any{
-		"status": "in_progress", "status_line": "Starting import-processor...",
-		"albums_processed": 0, "total_albums": 0, "albums_imported": 0,
-		"images_imported": 0, "images_found": 0, "images_missing": 0,
-		"missing_image_filenames": []string{}, "errors": 0,
-	})
-	facebookAlbumsJob.Broadcast("status", map[string]any{"status_line": "Starting import-processor..."})
+// 	facebookAlbumsJob.Start()
+// 	facebookAlbumsJob.UpdateState(map[string]any{
+// 		"status": "in_progress", "status_line": "Starting import-processor...",
+// 		"albums_processed": 0, "total_albums": 0, "albums_imported": 0,
+// 		"images_imported": 0, "images_found": 0, "images_missing": 0,
+// 		"missing_image_filenames": []string{}, "errors": 0,
+// 	})
+// 	facebookAlbumsJob.Broadcast("status", map[string]any{"status_line": "Starting import-processor..."})
 
-	runJob(facebookAlbumsJob, []string{"facebook-albums", "--path", req.DirectoryPath}, func(stdout string) {
-		ap, ai, ii, ifound, imiss, errs, missing, msg := parseFacebookAlbumsStdout(stdout)
-		facebookAlbumsJob.UpdateState(map[string]any{
-			"status": "completed", "status_line": msg,
-			"albums_processed": ap, "total_albums": ap, "albums_imported": ai,
-			"images_imported": ii, "images_found": ifound, "images_missing": imiss,
-			"missing_image_filenames": missing, "errors": errs,
-		})
-		runThumbnailsAfterImportIfIdle(h.pool)
-		facebookAlbumsJob.Broadcast("completed", facebookAlbumsJob.GetState())
-	})
+// 	runJob(facebookAlbumsJob, []string{"facebook-albums", "--path", req.DirectoryPath}, func(stdout string) {
+// 		ap, ai, ii, ifound, imiss, errs, missing, msg := parseFacebookAlbumsStdout(stdout)
+// 		facebookAlbumsJob.UpdateState(map[string]any{
+// 			"status": "completed", "status_line": msg,
+// 			"albums_processed": ap, "total_albums": ap, "albums_imported": ai,
+// 			"images_imported": ii, "images_found": ifound, "images_missing": imiss,
+// 			"missing_image_filenames": missing, "errors": errs,
+// 		})
+// 		runThumbnailsAfterImportIfIdle(h.pool)
+// 		facebookAlbumsJob.Broadcast("completed", facebookAlbumsJob.GetState())
+// 	})
 
-	writeJSON(w, map[string]any{"message": "Facebook Albums import started", "directory_path": req.DirectoryPath})
-}
+// 	writeJSON(w, map[string]any{"message": "Facebook Albums import started", "directory_path": req.DirectoryPath})
+// }
 
-func (h *ImporterHandler) FacebookAlbumsStream(w http.ResponseWriter, r *http.Request) {
-	facebookAlbumsJob.ServeSSE(w, r)
-}
-func (h *ImporterHandler) FacebookAlbumsCancel(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, facebookAlbumsJob.Cancel())
-}
-func (h *ImporterHandler) FacebookAlbumsStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, facebookAlbumsJob.Status())
-}
+// func (h *ImporterHandler) FacebookAlbumsStream(w http.ResponseWriter, r *http.Request) {
+// 	facebookAlbumsJob.ServeSSE(w, r)
+// }
+// func (h *ImporterHandler) FacebookAlbumsCancel(w http.ResponseWriter, r *http.Request) {
+// 	writeJSON(w, facebookAlbumsJob.Cancel())
+// }
+// func (h *ImporterHandler) FacebookAlbumsStatus(w http.ResponseWriter, r *http.Request) {
+// 	writeJSON(w, facebookAlbumsJob.Status())
+// }
 
-// ── Facebook Posts ────────────────────────────────────────────────────────────
+// // ── Facebook Posts ────────────────────────────────────────────────────────────
 
-func (h *ImporterHandler) FacebookPostsStart(w http.ResponseWriter, r *http.Request) {
-	if err := facebookPostsJob.AssertNotRunning(); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	var req struct {
-		DirectoryPath string `json:"directory_path"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
-	if !dirExists(req.DirectoryPath) {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("directory does not exist: %s", req.DirectoryPath))
-		return
-	}
+// func (h *ImporterHandler) FacebookPostsStart(w http.ResponseWriter, r *http.Request) {
+// 	if err := facebookPostsJob.AssertNotRunning(); err != nil {
+// 		writeError(w, http.StatusBadRequest, err.Error())
+// 		return
+// 	}
+// 	var req struct {
+// 		DirectoryPath string `json:"directory_path"`
+// 	}
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+// 		return
+// 	}
+// 	if !dirExists(req.DirectoryPath) {
+// 		writeError(w, http.StatusBadRequest, fmt.Sprintf("directory does not exist: %s", req.DirectoryPath))
+// 		return
+// 	}
 
-	facebookPostsJob.Start()
-	facebookPostsJob.UpdateState(map[string]any{
-		"status": "in_progress", "status_line": "Starting import-processor...",
-		"posts_processed": 0, "posts_imported": 0, "posts_updated": 0,
-		"with_media": 0, "images_imported": 0, "images_found": 0, "images_missing": 0, "errors": 0,
-	})
-	facebookPostsJob.Broadcast("status", map[string]any{"status_line": "Starting import-processor..."})
+// 	facebookPostsJob.Start()
+// 	facebookPostsJob.UpdateState(map[string]any{
+// 		"status": "in_progress", "status_line": "Starting import-processor...",
+// 		"posts_processed": 0, "posts_imported": 0, "posts_updated": 0,
+// 		"with_media": 0, "images_imported": 0, "images_found": 0, "images_missing": 0, "errors": 0,
+// 	})
+// 	facebookPostsJob.Broadcast("status", map[string]any{"status_line": "Starting import-processor..."})
 
-	runJob(facebookPostsJob, []string{"facebook-posts", "--path", req.DirectoryPath}, func(stdout string) {
-		stats := parseFacebookPostsStdout(stdout)
-		stats["status"] = "completed"
-		stats["status_line"] = "Import completed"
-		facebookPostsJob.UpdateState(stats)
-		runThumbnailsAfterImportIfIdle(h.pool)
-		facebookPostsJob.Broadcast("completed", facebookPostsJob.GetState())
-	})
+// 	runJob(facebookPostsJob, []string{"facebook-posts", "--path", req.DirectoryPath}, func(stdout string) {
+// 		stats := parseFacebookPostsStdout(stdout)
+// 		stats["status"] = "completed"
+// 		stats["status_line"] = "Import completed"
+// 		facebookPostsJob.UpdateState(stats)
+// 		runThumbnailsAfterImportIfIdle(h.pool)
+// 		facebookPostsJob.Broadcast("completed", facebookPostsJob.GetState())
+// 	})
 
-	writeJSON(w, map[string]any{"message": "Facebook Posts import started", "directory_path": req.DirectoryPath})
-}
+// 	writeJSON(w, map[string]any{"message": "Facebook Posts import started", "directory_path": req.DirectoryPath})
+// }
 
-func (h *ImporterHandler) FacebookPostsStream(w http.ResponseWriter, r *http.Request) {
-	facebookPostsJob.ServeSSE(w, r)
-}
-func (h *ImporterHandler) FacebookPostsCancel(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, facebookPostsJob.Cancel())
-}
-func (h *ImporterHandler) FacebookPostsStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, facebookPostsJob.Status())
-}
+// func (h *ImporterHandler) FacebookPostsStream(w http.ResponseWriter, r *http.Request) {
+// 	facebookPostsJob.ServeSSE(w, r)
+// }
+// func (h *ImporterHandler) FacebookPostsCancel(w http.ResponseWriter, r *http.Request) {
+// 	writeJSON(w, facebookPostsJob.Cancel())
+// }
+// func (h *ImporterHandler) FacebookPostsStatus(w http.ResponseWriter, r *http.Request) {
+// 	writeJSON(w, facebookPostsJob.Status())
+// }
 
-// ── Facebook Places ───────────────────────────────────────────────────────────
+// // ── Facebook Places ───────────────────────────────────────────────────────────
 
-func (h *ImporterHandler) FacebookPlacesStart(w http.ResponseWriter, r *http.Request) {
-	if err := facebookPlacesJob.AssertNotRunning(); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	var req struct {
-		DirectoryPath string `json:"directory_path"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
-	if !dirExists(req.DirectoryPath) {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("directory does not exist: %s", req.DirectoryPath))
-		return
-	}
+// func (h *ImporterHandler) FacebookPlacesStart(w http.ResponseWriter, r *http.Request) {
+// 	if err := facebookPlacesJob.AssertNotRunning(); err != nil {
+// 		writeError(w, http.StatusBadRequest, err.Error())
+// 		return
+// 	}
+// 	var req struct {
+// 		DirectoryPath string `json:"directory_path"`
+// 	}
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+// 		return
+// 	}
+// 	if !dirExists(req.DirectoryPath) {
+// 		writeError(w, http.StatusBadRequest, fmt.Sprintf("directory does not exist: %s", req.DirectoryPath))
+// 		return
+// 	}
 
-	facebookPlacesJob.Start()
-	facebookPlacesJob.UpdateState(map[string]any{
-		"status": "in_progress", "status_line": "Starting import-processor...",
-		"places_imported": 0, "places_created": 0, "places_updated": 0,
-	})
-	facebookPlacesJob.Broadcast("status", map[string]any{"status_line": "Starting import-processor..."})
+// 	facebookPlacesJob.Start()
+// 	facebookPlacesJob.UpdateState(map[string]any{
+// 		"status": "in_progress", "status_line": "Starting import-processor...",
+// 		"places_imported": 0, "places_created": 0, "places_updated": 0,
+// 	})
+// 	facebookPlacesJob.Broadcast("status", map[string]any{"status_line": "Starting import-processor..."})
 
-	runJob(facebookPlacesJob, []string{"facebook-places", "--path", req.DirectoryPath}, func(stdout string) {
-		stats := parseFacebookPlacesStdout(stdout)
-		stats["status"] = "completed"
-		stats["status_line"] = "Import completed"
-		facebookPlacesJob.UpdateState(stats)
-		facebookPlacesJob.Broadcast("completed", facebookPlacesJob.GetState())
-	})
+// 	runJob(facebookPlacesJob, []string{"facebook-places", "--path", req.DirectoryPath}, func(stdout string) {
+// 		stats := parseFacebookPlacesStdout(stdout)
+// 		stats["status"] = "completed"
+// 		stats["status_line"] = "Import completed"
+// 		facebookPlacesJob.UpdateState(stats)
+// 		facebookPlacesJob.Broadcast("completed", facebookPlacesJob.GetState())
+// 	})
 
-	writeJSON(w, map[string]any{"message": "Facebook Places import started", "directory_path": req.DirectoryPath})
-}
+// 	writeJSON(w, map[string]any{"message": "Facebook Places import started", "directory_path": req.DirectoryPath})
+// }
 
-func (h *ImporterHandler) FacebookPlacesStream(w http.ResponseWriter, r *http.Request) {
-	facebookPlacesJob.ServeSSE(w, r)
-}
-func (h *ImporterHandler) FacebookPlacesCancel(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, facebookPlacesJob.Cancel())
-}
-func (h *ImporterHandler) FacebookPlacesStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, facebookPlacesJob.Status())
-}
+// func (h *ImporterHandler) FacebookPlacesStream(w http.ResponseWriter, r *http.Request) {
+// 	facebookPlacesJob.ServeSSE(w, r)
+// }
+// func (h *ImporterHandler) FacebookPlacesCancel(w http.ResponseWriter, r *http.Request) {
+// 	writeJSON(w, facebookPlacesJob.Cancel())
+// }
+// func (h *ImporterHandler) FacebookPlacesStatus(w http.ResponseWriter, r *http.Request) {
+// 	writeJSON(w, facebookPlacesJob.Status())
+// }
 
 // ── Facebook All ──────────────────────────────────────────────────────────────
 
@@ -758,19 +734,49 @@ func (h *ImporterHandler) ContactsExtractStart(w http.ResponseWriter, r *http.Re
 
 	contactsExtractJob.Start()
 	contactsExtractJob.UpdateState(map[string]any{
-		"status": "in_progress", "status_line": "Starting import-processor...",
+		"status": "in_progress", "status_line": "Starting contacts extract...",
 		"contacts_processed": 0, "contacts_merged": 0, "contacts_created": 0,
 	})
-	contactsExtractJob.Broadcast("status", map[string]any{"status_line": "Starting import-processor..."})
+	contactsExtractJob.Broadcast("status", map[string]any{"status_line": "Starting contacts extract..."})
 
-	runJob(contactsExtractJob, []string{"contacts"}, func(stdout string) {
-		contactsExtractJob.UpdateState(map[string]any{
-			"status": "completed", "status_line": strings.TrimSpace(stdout),
-		})
-		contactsExtractJob.Broadcast("completed", contactsExtractJob.GetState())
-	})
+	go runContactsExtractInProcess(h.pool, contactsExtractJob)
 
 	writeJSON(w, map[string]any{"message": "Contacts extract started", "status": "started"})
+}
+
+func runContactsExtractInProcess(pool *pgxpool.Pool, job *importer.ImportJob) {
+	ctx := context.Background()
+	defer job.Finish()
+
+	progressFunc := func(msg string) {
+		job.UpdateState(map[string]any{"status_line": msg})
+		job.Broadcast("progress", job.GetState())
+	}
+
+	opts := contactsimport.RunOptions{
+		Workers:           runtime.NumCPU(),
+		ContactsDB:        pool,
+		RelationshipQuery: os.Getenv("CONTACTS_RELATIONSHIP_QUERY"),
+		ProgressFunc:      progressFunc,
+	}
+
+	if err := contactsimport.RunContactsNormalise(ctx, opts); err != nil {
+		if job.IsCancelled() {
+			job.UpdateState(map[string]any{"status": "cancelled", "status_line": "Contacts extract cancelled."})
+			job.Broadcast("cancelled", job.GetState())
+			return
+		}
+		msg := fmt.Sprintf("contacts extract error: %s", err)
+		job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
+		job.Broadcast("error", job.GetState())
+		return
+	}
+
+	job.UpdateState(map[string]any{
+		"status":      "completed",
+		"status_line": "Contacts extract completed successfully.",
+	})
+	job.Broadcast("completed", job.GetState())
 }
 
 func (h *ImporterHandler) ContactsExtractStream(w http.ResponseWriter, r *http.Request) {
@@ -1364,108 +1370,108 @@ func (h *ImporterHandler) InstagramStatus(w http.ResponseWriter, r *http.Request
 
 // ── Facebook Messenger (standalone) ───────────────────────────────────────────
 
-func (h *ImporterHandler) FacebookMessengerStart(w http.ResponseWriter, r *http.Request) {
-	if err := facebookMessengerJob.AssertNotRunning(); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	var req struct {
-		DirectoryPath string  `json:"directory_path"`
-		UserName      *string `json:"user_name"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
-	if !dirExists(req.DirectoryPath) {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("directory does not exist: %s", req.DirectoryPath))
-		return
-	}
-	if h.pool == nil || h.subjectConfigRepo == nil {
-		writeError(w, http.StatusServiceUnavailable, "Facebook Messenger import not configured")
-		return
-	}
+// func (h *ImporterHandler) FacebookMessengerStart(w http.ResponseWriter, r *http.Request) {
+// 	if err := facebookMessengerJob.AssertNotRunning(); err != nil {
+// 		writeError(w, http.StatusBadRequest, err.Error())
+// 		return
+// 	}
+// 	var req struct {
+// 		DirectoryPath string  `json:"directory_path"`
+// 		UserName      *string `json:"user_name"`
+// 	}
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+// 		return
+// 	}
+// 	if !dirExists(req.DirectoryPath) {
+// 		writeError(w, http.StatusBadRequest, fmt.Sprintf("directory does not exist: %s", req.DirectoryPath))
+// 		return
+// 	}
+// 	if h.pool == nil || h.subjectConfigRepo == nil {
+// 		writeError(w, http.StatusServiceUnavailable, "Facebook Messenger import not configured")
+// 		return
+// 	}
 
-	facebookMessengerJob.Start()
-	facebookMessengerJob.UpdateState(map[string]any{
-		"status": "in_progress", "status_line": "Starting Facebook Messenger import...",
-		"conversations": 0, "messages_imported": 0, "messages_created": 0,
-		"messages_updated": 0, "attachments_found": 0, "attachments_missing": 0,
-		"missing_attachment_filenames": []string{}, "errors": 0,
-	})
-	facebookMessengerJob.Broadcast("status", map[string]any{"status_line": "Starting Facebook Messenger import..."})
+// 	facebookMessengerJob.Start()
+// 	facebookMessengerJob.UpdateState(map[string]any{
+// 		"status": "in_progress", "status_line": "Starting Facebook Messenger import...",
+// 		"conversations": 0, "messages_imported": 0, "messages_created": 0,
+// 		"messages_updated": 0, "attachments_found": 0, "attachments_missing": 0,
+// 		"missing_attachment_filenames": []string{}, "errors": 0,
+// 	})
+// 	facebookMessengerJob.Broadcast("status", map[string]any{"status_line": "Starting Facebook Messenger import..."})
 
-	userName := ""
-	if req.UserName != nil && *req.UserName != "" {
-		userName = *req.UserName
-	}
-	go runFacebookInProcess(h.pool, h.subjectConfigRepo, facebookMessengerJob, req.DirectoryPath, userName, "")
+// 	userName := ""
+// 	if req.UserName != nil && *req.UserName != "" {
+// 		userName = *req.UserName
+// 	}
+// 	go runFacebookInProcess(h.pool, h.subjectConfigRepo, facebookMessengerJob, req.DirectoryPath, userName, "")
 
-	writeJSON(w, map[string]any{"message": "Facebook Messenger import started", "directory_path": req.DirectoryPath})
-}
+// 	writeJSON(w, map[string]any{"message": "Facebook Messenger import started", "directory_path": req.DirectoryPath})
+// }
 
-func runFacebookInProcess(pool *pgxpool.Pool, subjectRepo *repository.SubjectConfigRepo, job *importer.ImportJob, directoryPath, userName, exportRoot string) {
-	ctx := context.Background()
-	defer job.Finish()
+// func runFacebookInProcess(pool *pgxpool.Pool, subjectRepo *repository.SubjectConfigRepo, job *importer.ImportJob, directoryPath, userName, exportRoot string) {
+// 	ctx := context.Background()
+// 	defer job.Finish()
 
-	storage := importstorage.NewMessageStorage(ctx, pool, subjectRepo)
+// 	storage := importstorage.NewMessageStorage(ctx, pool, subjectRepo)
 
-	progressCallback := func(stats facebookimport.ImportStats) {
-		statusLine := ""
-		if stats.TotalConversations > 0 {
-			statusLine = fmt.Sprintf("Processing conversation %d of %d: %s | Messages: %d (%d created, %d updated) | Attachments: %d found, %d missing | Errors: %d",
-				stats.ConversationsProcessed, stats.TotalConversations, stats.CurrentConversation,
-				stats.MessagesImported, stats.MessagesCreated, stats.MessagesUpdated,
-				stats.AttachmentsFound, stats.AttachmentsMissing, stats.Errors)
-		}
-		job.UpdateState(map[string]any{
-			"conversations":                stats.ConversationsProcessed,
-			"messages_imported":            stats.MessagesImported,
-			"messages_created":             stats.MessagesCreated,
-			"messages_updated":             stats.MessagesUpdated,
-			"attachments_found":            stats.AttachmentsFound,
-			"attachments_missing":          stats.AttachmentsMissing,
-			"missing_attachment_filenames": stats.MissingAttachmentFilenames,
-			"errors":                       stats.Errors,
-			"status_line":                  statusLine,
-		})
-		job.Broadcast("progress", job.GetState())
-	}
+// 	progressCallback := func(stats facebookimport.ImportStats) {
+// 		statusLine := ""
+// 		if stats.TotalConversations > 0 {
+// 			statusLine = fmt.Sprintf("Processing conversation %d of %d: %s | Messages: %d (%d created, %d updated) | Attachments: %d found, %d missing | Errors: %d",
+// 				stats.ConversationsProcessed, stats.TotalConversations, stats.CurrentConversation,
+// 				stats.MessagesImported, stats.MessagesCreated, stats.MessagesUpdated,
+// 				stats.AttachmentsFound, stats.AttachmentsMissing, stats.Errors)
+// 		}
+// 		job.UpdateState(map[string]any{
+// 			"conversations":                stats.ConversationsProcessed,
+// 			"messages_imported":            stats.MessagesImported,
+// 			"messages_created":             stats.MessagesCreated,
+// 			"messages_updated":             stats.MessagesUpdated,
+// 			"attachments_found":            stats.AttachmentsFound,
+// 			"attachments_missing":          stats.AttachmentsMissing,
+// 			"missing_attachment_filenames": stats.MissingAttachmentFilenames,
+// 			"errors":                       stats.Errors,
+// 			"status_line":                  statusLine,
+// 		})
+// 		job.Broadcast("progress", job.GetState())
+// 	}
 
-	cancelledCheck := func() bool { return job.IsCancelled() }
+// 	cancelledCheck := func() bool { return job.IsCancelled() }
 
-	stats, err := facebookimport.ImportFacebookFromDirectory(ctx, storage, directoryPath, progressCallback, cancelledCheck, exportRoot, userName)
+// 	stats, err := facebookimport.ImportFacebookFromDirectory(ctx, storage, directoryPath, progressCallback, cancelledCheck, exportRoot, userName)
 
-	if job.IsCancelled() {
-		job.UpdateState(map[string]any{"status": "cancelled", "status_line": "Import cancelled."})
-		job.Broadcast("cancelled", job.GetState())
-		return
-	}
-	if err != nil {
-		msg := fmt.Sprintf("import error: %s", err)
-		job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
-		job.Broadcast("error", job.GetState())
-		return
-	}
+// 	if job.IsCancelled() {
+// 		job.UpdateState(map[string]any{"status": "cancelled", "status_line": "Import cancelled."})
+// 		job.Broadcast("cancelled", job.GetState())
+// 		return
+// 	}
+// 	if err != nil {
+// 		msg := fmt.Sprintf("import error: %s", err)
+// 		job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
+// 		job.Broadcast("error", job.GetState())
+// 		return
+// 	}
 
-	statusLine := fmt.Sprintf("Completed: %d conversations, %d messages (%d created, %d updated), %d attachments found, %d missing",
-		stats.ConversationsProcessed, stats.MessagesImported, stats.MessagesCreated, stats.MessagesUpdated,
-		stats.AttachmentsFound, stats.AttachmentsMissing)
-	job.UpdateState(map[string]any{
-		"status":                       "completed",
-		"status_line":                  statusLine,
-		"conversations":                stats.ConversationsProcessed,
-		"messages_imported":            stats.MessagesImported,
-		"messages_created":             stats.MessagesCreated,
-		"messages_updated":             stats.MessagesUpdated,
-		"attachments_found":            stats.AttachmentsFound,
-		"attachments_missing":          stats.AttachmentsMissing,
-		"missing_attachment_filenames": stats.MissingAttachmentFilenames,
-		"errors":                       stats.Errors,
-	})
-	runThumbnailsAfterImportIfIdle(pool)
-	job.Broadcast("completed", job.GetState())
-}
+// 	statusLine := fmt.Sprintf("Completed: %d conversations, %d messages (%d created, %d updated), %d attachments found, %d missing",
+// 		stats.ConversationsProcessed, stats.MessagesImported, stats.MessagesCreated, stats.MessagesUpdated,
+// 		stats.AttachmentsFound, stats.AttachmentsMissing)
+// 	job.UpdateState(map[string]any{
+// 		"status":                       "completed",
+// 		"status_line":                  statusLine,
+// 		"conversations":                stats.ConversationsProcessed,
+// 		"messages_imported":            stats.MessagesImported,
+// 		"messages_created":             stats.MessagesCreated,
+// 		"messages_updated":             stats.MessagesUpdated,
+// 		"attachments_found":            stats.AttachmentsFound,
+// 		"attachments_missing":          stats.AttachmentsMissing,
+// 		"missing_attachment_filenames": stats.MissingAttachmentFilenames,
+// 		"errors":                       stats.Errors,
+// 	})
+// 	runThumbnailsAfterImportIfIdle(pool)
+// 	job.Broadcast("completed", job.GetState())
+// }
 
 func runFacebookAllInProcess(pool *pgxpool.Pool, subjectRepo *repository.SubjectConfigRepo, job *importer.ImportJob, directoryPath, userName string) {
 	ctx := context.Background()
@@ -1658,15 +1664,15 @@ func runFacebookAllInProcess(pool *pgxpool.Pool, subjectRepo *repository.Subject
 	job.Broadcast("completed", job.GetState())
 }
 
-func (h *ImporterHandler) FacebookMessengerStream(w http.ResponseWriter, r *http.Request) {
-	facebookMessengerJob.ServeSSE(w, r)
-}
-func (h *ImporterHandler) FacebookMessengerCancel(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, facebookMessengerJob.Cancel())
-}
-func (h *ImporterHandler) FacebookMessengerStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, facebookMessengerJob.Status())
-}
+// func (h *ImporterHandler) FacebookMessengerStream(w http.ResponseWriter, r *http.Request) {
+// 	facebookMessengerJob.ServeSSE(w, r)
+// }
+// func (h *ImporterHandler) FacebookMessengerCancel(w http.ResponseWriter, r *http.Request) {
+// 	writeJSON(w, facebookMessengerJob.Cancel())
+// }
+// func (h *ImporterHandler) FacebookMessengerStatus(w http.ResponseWriter, r *http.Request) {
+// 	writeJSON(w, facebookMessengerJob.Status())
+// }
 
 // ── Email (Gmail) process — stub ──────────────────────────────────────────────
 // Gmail import uses OAuth and is not implemented in Go.
@@ -1690,171 +1696,171 @@ func (h *ImporterHandler) EmailProcessStatus(w http.ResponseWriter, r *http.Requ
 
 var reInt = regexp.MustCompile(`\d+`)
 
-// parseMessageStdout parses the shared stdout format used by whatsapp, imessage,
-// and instagram import commands. Pass includeAttachments=true for whatsapp/imessage.
-func parseMessageStdout(s string, includeAttachments bool) map[string]any {
-	reConvs := regexp.MustCompile(`Processed (\d+) conversation`)
-	reImported := regexp.MustCompile(`Imported (\d+) message.*\((\d+) created, (\d+) updated\)`)
-	reAttach := regexp.MustCompile(`Found (\d+) attachment.*?, (\d+) missing`)
-	reSkipped := regexp.MustCompile(`Skipped invalid messages.*?:\s*(\d+)`)
+// // parseMessageStdout parses the shared stdout format used by whatsapp, imessage,
+// // and instagram import commands. Pass includeAttachments=true for whatsapp/imessage.
+// func parseMessageStdout(s string, includeAttachments bool) map[string]any {
+// 	reConvs := regexp.MustCompile(`Processed (\d+) conversation`)
+// 	reImported := regexp.MustCompile(`Imported (\d+) message.*\((\d+) created, (\d+) updated\)`)
+// 	reAttach := regexp.MustCompile(`Found (\d+) attachment.*?, (\d+) missing`)
+// 	reSkipped := regexp.MustCompile(`Skipped invalid messages.*?:\s*(\d+)`)
 
-	stats := map[string]any{
-		"conversations":     0,
-		"messages_imported": 0,
-		"messages_created":  0,
-		"messages_updated":  0,
-		"errors":            0,
-	}
-	if includeAttachments {
-		stats["attachments_found"] = 0
-		stats["attachments_missing"] = 0
-		stats["missing_attachment_filenames"] = []string{}
-	}
+// 	stats := map[string]any{
+// 		"conversations":     0,
+// 		"messages_imported": 0,
+// 		"messages_created":  0,
+// 		"messages_updated":  0,
+// 		"errors":            0,
+// 	}
+// 	if includeAttachments {
+// 		stats["attachments_found"] = 0
+// 		stats["attachments_missing"] = 0
+// 		stats["missing_attachment_filenames"] = []string{}
+// 	}
 
-	var missingFiles []string
-	inMissing := false
-	for _, line := range strings.Split(s, "\n") {
-		if m := reConvs.FindStringSubmatch(line); len(m) > 1 {
-			n, _ := strconv.Atoi(m[1])
-			stats["conversations"] = n
-		} else if m := reImported.FindStringSubmatch(line); len(m) > 3 {
-			total, _ := strconv.Atoi(m[1])
-			created, _ := strconv.Atoi(m[2])
-			updated, _ := strconv.Atoi(m[3])
-			stats["messages_imported"] = total
-			stats["messages_created"] = created
-			stats["messages_updated"] = updated
-		} else if includeAttachments {
-			if m := reAttach.FindStringSubmatch(line); len(m) > 2 {
-				found, _ := strconv.Atoi(m[1])
-				missing, _ := strconv.Atoi(m[2])
-				stats["attachments_found"] = found
-				stats["attachments_missing"] = missing
-			}
-			if strings.TrimSpace(line) == "Missing attachment files:" {
-				inMissing = true
-				continue
-			}
-			if inMissing && strings.HasPrefix(line, "  - ") {
-				missingFiles = append(missingFiles, strings.TrimPrefix(line, "  - "))
-			} else if inMissing && !strings.HasPrefix(line, "  ") {
-				inMissing = false
-			}
-		}
-		if m := reSkipped.FindStringSubmatch(line); len(m) > 1 {
-			n, _ := strconv.Atoi(m[1])
-			stats["errors"] = n
-		}
-	}
-	if includeAttachments && missingFiles != nil {
-		stats["missing_attachment_filenames"] = missingFiles
-	}
-	return stats
-}
+// 	var missingFiles []string
+// 	inMissing := false
+// 	for _, line := range strings.Split(s, "\n") {
+// 		if m := reConvs.FindStringSubmatch(line); len(m) > 1 {
+// 			n, _ := strconv.Atoi(m[1])
+// 			stats["conversations"] = n
+// 		} else if m := reImported.FindStringSubmatch(line); len(m) > 3 {
+// 			total, _ := strconv.Atoi(m[1])
+// 			created, _ := strconv.Atoi(m[2])
+// 			updated, _ := strconv.Atoi(m[3])
+// 			stats["messages_imported"] = total
+// 			stats["messages_created"] = created
+// 			stats["messages_updated"] = updated
+// 		} else if includeAttachments {
+// 			if m := reAttach.FindStringSubmatch(line); len(m) > 2 {
+// 				found, _ := strconv.Atoi(m[1])
+// 				missing, _ := strconv.Atoi(m[2])
+// 				stats["attachments_found"] = found
+// 				stats["attachments_missing"] = missing
+// 			}
+// 			if strings.TrimSpace(line) == "Missing attachment files:" {
+// 				inMissing = true
+// 				continue
+// 			}
+// 			if inMissing && strings.HasPrefix(line, "  - ") {
+// 				missingFiles = append(missingFiles, strings.TrimPrefix(line, "  - "))
+// 			} else if inMissing && !strings.HasPrefix(line, "  ") {
+// 				inMissing = false
+// 			}
+// 		}
+// 		if m := reSkipped.FindStringSubmatch(line); len(m) > 1 {
+// 			n, _ := strconv.Atoi(m[1])
+// 			stats["errors"] = n
+// 		}
+// 	}
+// 	if includeAttachments && missingFiles != nil {
+// 		stats["missing_attachment_filenames"] = missingFiles
+// 	}
+// 	return stats
+// }
 
-func parseInt(s string) int {
-	m := reInt.FindString(s)
-	if m == "" {
-		return 0
-	}
-	n, _ := strconv.Atoi(m)
-	return n
-}
+// func parseInt(s string) int {
+// 	m := reInt.FindString(s)
+// 	if m == "" {
+// 		return 0
+// 	}
+// 	n, _ := strconv.Atoi(m)
+// 	return n
+// }
 
-func parseFacebookAlbumsStdout(s string) (albumsProcessed, albumsImported, imagesImported, imagesFound, imagesMissing, errs int, missing []string, msg string) {
-	reAlbums := regexp.MustCompile(`Processed (\d+) album\(s\)`)
-	reAlbumsImported := regexp.MustCompile(`Albums imported: (\d+)`)
-	reImages := regexp.MustCompile(`Images imported: (\d+) \(found: (\d+), missing: (\d+)\)`)
-	reErrors := regexp.MustCompile(`Errors: (\d+)`)
+// func parseFacebookAlbumsStdout(s string) (albumsProcessed, albumsImported, imagesImported, imagesFound, imagesMissing, errs int, missing []string, msg string) {
+// 	reAlbums := regexp.MustCompile(`Processed (\d+) album\(s\)`)
+// 	reAlbumsImported := regexp.MustCompile(`Albums imported: (\d+)`)
+// 	reImages := regexp.MustCompile(`Images imported: (\d+) \(found: (\d+), missing: (\d+)\)`)
+// 	reErrors := regexp.MustCompile(`Errors: (\d+)`)
 
-	if m := reAlbums.FindStringSubmatch(s); len(m) > 1 {
-		albumsProcessed, _ = strconv.Atoi(m[1])
-	}
-	if m := reAlbumsImported.FindStringSubmatch(s); len(m) > 1 {
-		albumsImported, _ = strconv.Atoi(m[1])
-	}
-	if m := reImages.FindStringSubmatch(s); len(m) > 3 {
-		imagesImported, _ = strconv.Atoi(m[1])
-		imagesFound, _ = strconv.Atoi(m[2])
-		imagesMissing, _ = strconv.Atoi(m[3])
-	}
-	if m := reErrors.FindStringSubmatch(s); len(m) > 1 {
-		errs, _ = strconv.Atoi(m[1])
-	}
-	inMissing := false
-	for _, line := range strings.Split(s, "\n") {
-		if strings.TrimSpace(line) == "Missing image files:" {
-			inMissing = true
-			continue
-		}
-		if inMissing && strings.HasPrefix(line, "  - ") {
-			missing = append(missing, strings.TrimPrefix(line, "  - "))
-		}
-	}
+// 	if m := reAlbums.FindStringSubmatch(s); len(m) > 1 {
+// 		albumsProcessed, _ = strconv.Atoi(m[1])
+// 	}
+// 	if m := reAlbumsImported.FindStringSubmatch(s); len(m) > 1 {
+// 		albumsImported, _ = strconv.Atoi(m[1])
+// 	}
+// 	if m := reImages.FindStringSubmatch(s); len(m) > 3 {
+// 		imagesImported, _ = strconv.Atoi(m[1])
+// 		imagesFound, _ = strconv.Atoi(m[2])
+// 		imagesMissing, _ = strconv.Atoi(m[3])
+// 	}
+// 	if m := reErrors.FindStringSubmatch(s); len(m) > 1 {
+// 		errs, _ = strconv.Atoi(m[1])
+// 	}
+// 	inMissing := false
+// 	for _, line := range strings.Split(s, "\n") {
+// 		if strings.TrimSpace(line) == "Missing image files:" {
+// 			inMissing = true
+// 			continue
+// 		}
+// 		if inMissing && strings.HasPrefix(line, "  - ") {
+// 			missing = append(missing, strings.TrimPrefix(line, "  - "))
+// 		}
+// 	}
 
-	parts := []string{"Import completed"}
-	if albumsProcessed > 0 {
-		parts = append(parts, fmt.Sprintf("Processed %d album(s)", albumsProcessed))
-	}
-	if albumsImported > 0 {
-		parts = append(parts, fmt.Sprintf("Imported %d album(s) with %d image(s)", albumsImported, imagesImported))
-	}
-	msg = strings.Join(parts, ". ")
-	return
-}
+// 	parts := []string{"Import completed"}
+// 	if albumsProcessed > 0 {
+// 		parts = append(parts, fmt.Sprintf("Processed %d album(s)", albumsProcessed))
+// 	}
+// 	if albumsImported > 0 {
+// 		parts = append(parts, fmt.Sprintf("Imported %d album(s) with %d image(s)", albumsImported, imagesImported))
+// 	}
+// 	msg = strings.Join(parts, ". ")
+// 	return
+// }
 
-func parseFacebookPostsStdout(s string) map[string]any {
-	stats := map[string]any{}
-	for _, line := range strings.Split(s, "\n") {
-		if strings.HasPrefix(line, "POSTS_COMPLETE: ") {
-			for _, part := range strings.Fields(line[len("POSTS_COMPLETE: "):]) {
-				kv := strings.SplitN(part, "=", 2)
-				if len(kv) == 2 {
-					n, _ := strconv.Atoi(kv[1])
-					switch kv[0] {
-					case "posts":
-						stats["posts_processed"] = n
-					case "new":
-						stats["posts_imported"] = n
-					case "updated":
-						stats["posts_updated"] = n
-					case "with_media":
-						stats["with_media"] = n
-					case "images":
-						stats["images_imported"] = n
-					case "found":
-						stats["images_found"] = n
-					case "missing":
-						stats["images_missing"] = n
-					case "errors":
-						stats["errors"] = n
-					}
-				}
-			}
-		}
-	}
-	return stats
-}
+// func parseFacebookPostsStdout(s string) map[string]any {
+// 	stats := map[string]any{}
+// 	for _, line := range strings.Split(s, "\n") {
+// 		if strings.HasPrefix(line, "POSTS_COMPLETE: ") {
+// 			for _, part := range strings.Fields(line[len("POSTS_COMPLETE: "):]) {
+// 				kv := strings.SplitN(part, "=", 2)
+// 				if len(kv) == 2 {
+// 					n, _ := strconv.Atoi(kv[1])
+// 					switch kv[0] {
+// 					case "posts":
+// 						stats["posts_processed"] = n
+// 					case "new":
+// 						stats["posts_imported"] = n
+// 					case "updated":
+// 						stats["posts_updated"] = n
+// 					case "with_media":
+// 						stats["with_media"] = n
+// 					case "images":
+// 						stats["images_imported"] = n
+// 					case "found":
+// 						stats["images_found"] = n
+// 					case "missing":
+// 						stats["images_missing"] = n
+// 					case "errors":
+// 						stats["errors"] = n
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return stats
+// }
 
-func parseFacebookPlacesStdout(s string) map[string]any {
-	stats := map[string]any{}
-	for _, line := range strings.Split(s, "\n") {
-		if strings.HasPrefix(line, "PLACES_COMPLETE: ") {
-			for _, part := range strings.Fields(line[len("PLACES_COMPLETE: "):]) {
-				kv := strings.SplitN(part, "=", 2)
-				if len(kv) == 2 {
-					n, _ := strconv.Atoi(kv[1])
-					switch kv[0] {
-					case "places":
-						stats["places_imported"] = n
-					case "created":
-						stats["places_created"] = n
-					case "updated":
-						stats["places_updated"] = n
-					}
-				}
-			}
-		}
-	}
-	return stats
-}
+// func parseFacebookPlacesStdout(s string) map[string]any {
+// 	stats := map[string]any{}
+// 	for _, line := range strings.Split(s, "\n") {
+// 		if strings.HasPrefix(line, "PLACES_COMPLETE: ") {
+// 			for _, part := range strings.Fields(line[len("PLACES_COMPLETE: "):]) {
+// 				kv := strings.SplitN(part, "=", 2)
+// 				if len(kv) == 2 {
+// 					n, _ := strconv.Atoi(kv[1])
+// 					switch kv[0] {
+// 					case "places":
+// 						stats["places_imported"] = n
+// 					case "created":
+// 						stats["places_created"] = n
+// 					case "updated":
+// 						stats["places_updated"] = n
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return stats
+// }

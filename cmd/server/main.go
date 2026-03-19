@@ -58,6 +58,16 @@ func run() error {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 
+	if err := database.SeedEmailExclusionsFromJSON(migrateCtx, db.Pool, "static/data/exclusions.json"); err != nil {
+		return fmt.Errorf("seed email exclusions: %w", err)
+	}
+	if err := database.SeedEmailMatchesFromJSON(migrateCtx, db.Pool, "static/data/email_matches.json"); err != nil {
+		return fmt.Errorf("seed email matches: %w", err)
+	}
+	if err := database.SeedEmailClassificationsFromJSON(migrateCtx, db.Pool, "static/data/email_classifications.json"); err != nil {
+		return fmt.Errorf("seed email classifications: %w", err)
+	}
+
 	// ── AI document keyring seat provisioning ─────────────────────────────────
 	if cfg.AI.DocumentPassword != "" {
 		pepper := cfg.Crypto.KeyringPepper

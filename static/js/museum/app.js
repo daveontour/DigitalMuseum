@@ -640,6 +640,21 @@ const App = (() => {
             });
         });
 
+        // Manage Contacts inner tabs: switch table (Email Matches / Exclusions / Classifications)
+        document.querySelectorAll('.manage-contacts-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.getAttribute('data-manage-contacts-tab');
+                if (!tabName) return;
+                const container = document.getElementById('manage-contacts-tab');
+                if (!container) return;
+                container.querySelectorAll('.manage-contacts-tab-btn').forEach(b => b.classList.remove('active'));
+                container.querySelectorAll('.manage-contacts-tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                const content = document.getElementById(`${tabName}-tab-content`);
+                if (content) content.classList.add('active');
+            });
+        });
+
         // Dashboard: load stats and render. prefix: '' for config modal, 'stats-' for Statistics modal
         async function loadDashboard(prefix) {
             prefix = prefix || '';
@@ -1466,6 +1481,38 @@ const App = (() => {
             }
         }
 
+        const autoContactsExtractImports = new Set([
+            'whatsapp',
+            'imessage',
+            'instagram',
+            'facebook_all',
+            'facebook',
+            'email_processing',
+            'imap_processing'
+        ]);
+
+        async function maybeAutoRunContactsExtract(finishedImportType) {
+            if (!autoContactsExtractImports.has(finishedImportType)) return;
+            if (finishedImportType === 'contacts') return;
+            if (importInProgress) return;
+
+            try {
+                const res = await fetch('/contacts/extract/status');
+                if (!res.ok) return;
+                const status = await res.json();
+                if (status && status.in_progress) return;
+            } catch (e) {
+                console.warn('Auto contacts extract status check failed:', e);
+                return;
+            }
+
+            try {
+                await runImport('contacts', {});
+            } catch (e) {
+                console.warn('Auto contacts extract start failed:', e);
+            }
+        }
+
         function finishImport(importType, success, message) {
             importInProgress = false;
             currentImportType = null;
@@ -1473,6 +1520,8 @@ const App = (() => {
             closeCurrentEventSource();
             setImportStatus(message, !success);
             if (typeof loadImportControlLastRun === 'function') loadImportControlLastRun();
+            // Auto-refresh contacts after message/email imports complete (success, error, or cancel).
+            void maybeAutoRunContactsExtract(importType);
         }
 
         const importConfigs = {

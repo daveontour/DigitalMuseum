@@ -642,119 +642,122 @@
                     </section>
                 </div>
                 <div class="config-tab-content" id="manage-contacts-tab">
-                    <section class="config-section">
-                        <h1>Email Matches</h1>
-                        <div class="setting-group">
-                            <p style="color: #666; margin-bottom: 10px;">
-                                Manage email matches used to merge duplicate contacts. Each row maps an email address to a primary contact name.
-                            </p>
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
-                                <input type="text" id="email-matches-filter" placeholder="Filter by primary name..." style="padding: 6px 10px; width: 220px; border: 1px solid #bfc9da; border-radius: 4px;">
-                                <button type="button" id="email-matches-refresh-btn" class="modal-btn modal-btn-secondary">
-                                    <i class="fas fa-sync-alt"></i> Refresh
-                                </button>
-                                <button type="button" id="email-matches-create-btn" class="modal-btn modal-btn-primary">
-                                    <i class="fas fa-plus"></i> Add Match
-                                </button>
+                    <section class="config-section" style="display: flex; flex-direction: column; height: 100%; min-height: 0;">
+                        <div class="manage-contacts-tabs" style="display: flex; flex-direction: row; border-bottom: 2px solid #bfc9da; margin-bottom: 0.5em; flex-shrink: 0;">
+                            <button type="button" class="manage-contacts-tab-btn active" data-manage-contacts-tab="email-matches">Email Matches</button>
+                            <button type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="email-exclusions">Email Exclusions</button>
+                            <button type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="email-classifications">Email Classifications</button>
+                        </div>
+                        <div id="email-matches-tab-content" class="manage-contacts-tab-content active" style="flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
+                            <div class="setting-group" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                                <p style="color: #666; margin-bottom: 10px; flex-shrink: 0;">
+                                    Manage email matches used to merge duplicate contacts. Each row maps an email address to a primary contact name.
+                                </p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
+                                    <input type="text" id="email-matches-filter" placeholder="Filter by primary name..." style="padding: 6px 10px; width: 220px; border: 1px solid #bfc9da; border-radius: 4px;">
+                                    <button type="button" id="email-matches-refresh-btn" class="modal-btn modal-btn-secondary">
+                                        <i class="fas fa-sync-alt"></i> Refresh
+                                    </button>
+                                    <button type="button" id="email-matches-create-btn" class="modal-btn modal-btn-primary">
+                                        <i class="fas fa-plus"></i> Add Match
+                                    </button>
+                                </div>
+                                <div id="email-matches-loading" style="padding: 1em; text-align: center; color: #666; display: none; flex-shrink: 0;">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading...
+                                </div>
+                                <div id="email-matches-table-container" style="overflow: auto; flex: 1; min-height: 0;">
+                                    <table class="contacts-table" id="email-matches-table" style="width: 100%; margin-top: 0;">
+                                        <thead>
+                                            <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                                <th style="padding: 8px; text-align: left;">Primary Name</th>
+                                                <th style="padding: 8px; text-align: left;">Email</th>
+                                                <th style="padding: 8px; text-align: center; width: 160px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="email-matches-tbody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p id="email-matches-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center; flex-shrink: 0;">No email matches. Add one to map emails to a primary contact name.</p>
                             </div>
-                            <div id="email-matches-loading" style="padding: 1em; text-align: center; color: #666; display: none;">
-                                <i class="fas fa-spinner fa-spin"></i> Loading...
+                        </div>
+                        <div id="email-exclusions-tab-content" class="manage-contacts-tab-content" style="flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
+                            <div class="setting-group" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                                <p style="color: #666; margin-bottom: 10px; flex-shrink: 0;">
+                                    Manage email and name exclusions used to filter out contacts during import. Email patterns exclude by email substring; name patterns by name; name+email pairs exclude a specific name when paired with a specific email.
+                                </p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
+                                    <input type="text" id="email-exclusions-filter" placeholder="Filter by email or name..." style="padding: 6px 10px; width: 220px; border: 1px solid #bfc9da; border-radius: 4px;">
+                                    <select id="email-exclusions-type-filter" style="padding: 6px 10px; border: 1px solid #bfc9da; border-radius: 4px;">
+                                        <option value="">All types</option>
+                                        <option value="email">Email pattern</option>
+                                        <option value="name">Name pattern</option>
+                                        <option value="name_email">Name+Email pair</option>
+                                    </select>
+                                    <button type="button" id="email-exclusions-refresh-btn" class="modal-btn modal-btn-secondary">
+                                        <i class="fas fa-sync-alt"></i> Refresh
+                                    </button>
+                                    <button type="button" id="email-exclusions-create-btn" class="modal-btn modal-btn-primary">
+                                        <i class="fas fa-plus"></i> Add Exclusion
+                                    </button>
+                                </div>
+                                <div id="email-exclusions-loading" style="padding: 1em; text-align: center; color: #666; display: none; flex-shrink: 0;">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading...
+                                </div>
+                                <div id="email-exclusions-table-container" style="overflow: auto; flex: 1; min-height: 0;">
+                                    <table class="contacts-table" id="email-exclusions-table" style="width: 100%; margin-top: 0;">
+                                        <thead>
+                                            <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                                <th style="padding: 8px; text-align: left;">Email</th>
+                                                <th style="padding: 8px; text-align: left;">Name</th>
+                                                <th style="padding: 8px; text-align: left;">Type</th>
+                                                <th style="padding: 8px; text-align: center; width: 160px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="email-exclusions-tbody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p id="email-exclusions-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center; flex-shrink: 0;">No email exclusions. Add one to exclude emails or names during contact import.</p>
                             </div>
-                            <div id="email-matches-table-container" style="overflow-x: auto; max-height: 50vh; overflow-y: auto;">
-                                <table class="contacts-table" id="email-matches-table" style="width: 100%; margin-top: 0;">
-                                    <thead>
-                                        <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
-                                            <th style="padding: 8px; text-align: left;">Primary Name</th>
-                                            <th style="padding: 8px; text-align: left;">Email</th>
-                                            <th style="padding: 8px; text-align: center; width: 160px;">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="email-matches-tbody">
-                                    </tbody>
-                                </table>
+                        </div>
+                        <div id="email-classifications-tab-content" class="manage-contacts-tab-content" style="flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
+                            <div class="setting-group" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                                <p style="color: #666; margin-bottom: 10px; flex-shrink: 0;">
+                                    Manage contact classifications (friend, family, colleague, etc.) used to categorise contacts.
+                                </p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
+                                    <input type="text" id="email-classifications-filter" placeholder="Filter by name..." style="padding: 6px 10px; width: 220px; border: 1px solid #bfc9da; border-radius: 4px;">
+                                    <select id="email-classifications-type-filter" style="padding: 6px 10px; border: 1px solid #bfc9da; border-radius: 4px;">
+                                        <option value="">All types</option>
+                                    </select>
+                                    <button type="button" id="email-classifications-refresh-btn" class="modal-btn modal-btn-secondary">
+                                        <i class="fas fa-sync-alt"></i> Refresh
+                                    </button>
+                                    <button type="button" id="email-classifications-create-btn" class="modal-btn modal-btn-primary">
+                                        <i class="fas fa-plus"></i> Add Classification
+                                    </button>
+                                </div>
+                                <div id="email-classifications-loading" style="padding: 1em; text-align: center; color: #666; display: none; flex-shrink: 0;">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading...
+                                </div>
+                                <div id="email-classifications-table-container" style="overflow: auto; flex: 1; min-height: 0;">
+                                    <table class="contacts-table" id="email-classifications-table" style="width: 100%; margin-top: 0;">
+                                        <thead>
+                                            <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                                <th style="padding: 8px; text-align: left;">Name</th>
+                                                <th style="padding: 8px; text-align: left;">Classification</th>
+                                                <th style="padding: 8px; text-align: center; width: 160px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="email-classifications-tbody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p id="email-classifications-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center; flex-shrink: 0;">No email classifications. Add one to assign a contact to a classification.</p>
                             </div>
-                            <p id="email-matches-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center;">No email matches. Add one to map emails to a primary contact name.</p>
                         </div>
                     </section>
-                    <section class="config-section" style="margin-top: 2rem;">
-                        <h1>Email Exclusions</h1>
-                        <div class="setting-group">
-                            <p style="color: #666; margin-bottom: 10px;">
-                                Manage email and name exclusions used to filter out contacts during import. Email patterns exclude by email substring; name patterns by name; name+email pairs exclude a specific name when paired with a specific email.
-                            </p>
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
-                                <input type="text" id="email-exclusions-filter" placeholder="Filter by email or name..." style="padding: 6px 10px; width: 220px; border: 1px solid #bfc9da; border-radius: 4px;">
-                                <select id="email-exclusions-type-filter" style="padding: 6px 10px; border: 1px solid #bfc9da; border-radius: 4px;">
-                                    <option value="">All types</option>
-                                    <option value="email">Email pattern</option>
-                                    <option value="name">Name pattern</option>
-                                    <option value="name_email">Name+Email pair</option>
-                                </select>
-                                <button type="button" id="email-exclusions-refresh-btn" class="modal-btn modal-btn-secondary">
-                                    <i class="fas fa-sync-alt"></i> Refresh
-                                </button>
-                                <button type="button" id="email-exclusions-create-btn" class="modal-btn modal-btn-primary">
-                                    <i class="fas fa-plus"></i> Add Exclusion
-                                </button>
-                            </div>
-                            <div id="email-exclusions-loading" style="padding: 1em; text-align: center; color: #666; display: none;">
-                                <i class="fas fa-spinner fa-spin"></i> Loading...
-                            </div>
-                            <div id="email-exclusions-table-container" style="overflow-x: auto; max-height: 50vh; overflow-y: auto;">
-                                <table class="contacts-table" id="email-exclusions-table" style="width: 100%; margin-top: 0;">
-                                    <thead>
-                                        <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
-                                            <th style="padding: 8px; text-align: left;">Email</th>
-                                            <th style="padding: 8px; text-align: left;">Name</th>
-                                            <th style="padding: 8px; text-align: left;">Type</th>
-                                            <th style="padding: 8px; text-align: center; width: 160px;">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="email-exclusions-tbody">
-                                    </tbody>
-                                </table>
-                            </div>
-                            <p id="email-exclusions-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center;">No email exclusions. Add one to exclude emails or names during contact import.</p>
-                        </div>
-                    </section>
-                    <section class="config-section" style="margin-top: 2rem;">
-                        <h1>Email Classifications</h1>
-                        <div class="setting-group">
-                            <p style="color: #666; margin-bottom: 10px;">
-                                Manage contact classifications (friend, family, colleague, etc.) used to categorise contacts.
-                            </p>
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
-                                <input type="text" id="email-classifications-filter" placeholder="Filter by name..." style="padding: 6px 10px; width: 220px; border: 1px solid #bfc9da; border-radius: 4px;">
-                                <select id="email-classifications-type-filter" style="padding: 6px 10px; border: 1px solid #bfc9da; border-radius: 4px;">
-                                    <option value="">All types</option>
-                                </select>
-                                <button type="button" id="email-classifications-refresh-btn" class="modal-btn modal-btn-secondary">
-                                    <i class="fas fa-sync-alt"></i> Refresh
-                                </button>
-                                <button type="button" id="email-classifications-create-btn" class="modal-btn modal-btn-primary">
-                                    <i class="fas fa-plus"></i> Add Classification
-                                </button>
-                            </div>
-                            <div id="email-classifications-loading" style="padding: 1em; text-align: center; color: #666; display: none;">
-                                <i class="fas fa-spinner fa-spin"></i> Loading...
-                            </div>
-                            <div id="email-classifications-table-container" style="overflow-x: auto; max-height: 50vh; overflow-y: auto;">
-                                <table class="contacts-table" id="email-classifications-table" style="width: 100%; margin-top: 0;">
-                                    <thead>
-                                        <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
-                                            <th style="padding: 8px; text-align: left;">Name</th>
-                                            <th style="padding: 8px; text-align: left;">Classification</th>
-                                            <th style="padding: 8px; text-align: center; width: 160px;">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="email-classifications-tbody">
-                                    </tbody>
-                                </table>
-                            </div>
-                            <p id="email-classifications-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center;">No email classifications. Add one to assign a contact to a classification.</p>
-                        </div>
-                    </section>
-
                 </div>
                 <div class="config-tab-content" id="images-grid-tab">
                     <div class="images-grid-viewer">
@@ -945,26 +948,6 @@
                                     <div class="import-tile-title">Contacts Merge</div>
                                     <div id="import-last-run-contacts" data-import-last-run="contacts" class="import-tile-last-run"></div>
                                     <div class="import-tile-explanation">Merge and normalise contacts from the database using the import-processor.</div>
-                                </div>
-                                <div class="import-control-tile" data-import="facebook" title="Click to run">
-                                    <div class="import-tile-title">Facebook Messenger Import</div>
-                                    <div data-import-last-run="facebook" class="import-tile-last-run"></div>
-                                    <div class="import-tile-explanation">Import Facebook Messenger conversations from a Meta data export directory.</div>
-                                </div>
-                                <div class="import-control-tile" data-import="facebook_albums" title="Click to run">
-                                    <div class="import-tile-title">Facebook Albums Import</div>
-                                    <div data-import-last-run="facebook_albums" class="import-tile-last-run"></div>
-                                    <div class="import-tile-explanation">Import photos from Facebook albums in a Meta data export (posts folder).</div>
-                                </div>
-                                <div class="import-control-tile" data-import="facebook_posts" title="Click to run">
-                                    <div class="import-tile-title">Facebook Posts Import</div>
-                                    <div data-import-last-run="facebook_posts" class="import-tile-last-run"></div>
-                                    <div class="import-tile-explanation">Import Facebook status updates, shared links, and attached photos/videos</div>
-                                </div>
-                                <div class="import-control-tile" data-import="facebook_places" title="Click to run">
-                                    <div class="import-tile-title">Facebook Places Import</div>
-                                    <div data-import-last-run="facebook_places" class="import-tile-last-run"></div>
-                                    <div class="import-tile-explanation">Import check-ins and place data from a Facebook posts JSON file.</div>
                                 </div>
                                 <div style="grid-column: 1 / -1; height: 15px;"></div>
                                 <div class="import-control-tile" data-import="reference_import" title="Click to run">
