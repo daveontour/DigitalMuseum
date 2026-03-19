@@ -3253,14 +3253,38 @@ Modals.AppConfig = (() => {
         try {
             setStatus('Loading…');
             const res = await fetch('/api/configuration');
-            if (!res.ok) throw new Error(await res.text());
-            const rows = await res.json();
+            const rawText = await res.text();
+            if (!res.ok) {
+                let detail = rawText;
+                try {
+                    const j = JSON.parse(rawText);
+                    if (j && j.detail) detail = j.detail;
+                } catch (_) { /* use raw */ }
+                throw new Error(detail || `HTTP ${res.status}`);
+            }
+            let rows;
+            try {
+                rows = JSON.parse(rawText);
+            } catch (e) {
+                throw new Error('Invalid JSON from /api/configuration');
+            }
+            if (!Array.isArray(rows)) {
+                console.error('AppConfig.load: expected array, got', typeof rows, rows);
+                throw new Error('Server returned non-array JSON');
+            }
             rows.sort((a, b) => (b.is_mandatory ? 1 : 0) - (a.is_mandatory ? 1 : 0));
             const tbody = document.getElementById('cfg-table-body');
-            if (!tbody) return;
+            if (!tbody) {
+                setStatus('Configuration table not found in page.', '#c00');
+                return;
+            }
             tbody.innerHTML = '';
             rows.forEach(cfg => tbody.appendChild(_renderRow(cfg)));
-            setStatus(`${rows.length} key(s) loaded.`);
+            if (rows.length === 0) {
+                setStatus('No keys in database yet — use “Seed from .env” to add known keys, or add a row above.', '#666');
+            } else {
+                setStatus(`${rows.length} key(s) loaded.`);
+            }
             loaded = true;
         } catch (e) {
             setStatus('Error loading configuration: ' + e.message, '#c00');

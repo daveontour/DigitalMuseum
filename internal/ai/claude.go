@@ -248,6 +248,15 @@ func claudePost(ctx context.Context, apiKey string, body map[string]any) (map[st
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("Request body:")
+	var prettyJSON bytes.Buffer
+	if err := json.Indent(&prettyJSON, b, "", "  "); err == nil {
+		fmt.Println(prettyJSON.String())
+	} else {
+		fmt.Println(string(b))
+	}
+
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, claudeMessagesURL, bytes.NewReader(b))
 	if err != nil {
 		return nil, err

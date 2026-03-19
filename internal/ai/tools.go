@@ -12,11 +12,13 @@ import (
 	"time"
 
 	appcrypto "github.com/daveontour/digitalmuseum/internal/crypto"
+	"github.com/daveontour/digitalmuseum/internal/keystore"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // NewToolExecutor creates a ToolExecutor backed by the provided pool.
-func NewToolExecutor(pool *pgxpool.Pool, subjectName, tavilyKey, pepper, documentPassword string) ToolExecutor {
+// ramMaster holds the sensitive keyring master password after browser unlock; used to decrypt encrypted reference documents for AI tools.
+func NewToolExecutor(pool *pgxpool.Pool, subjectName, tavilyKey, pepper string, ramMaster *keystore.MemoryMasterKey) ToolExecutor {
 	return func(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
 		switch name {
 		case "get_current_time":
@@ -50,6 +52,8 @@ func NewToolExecutor(pool *pgxpool.Pool, subjectName, tavilyKey, pepper, documen
 			return getAllFacebookPosts(ctx, pool)
 		case "get_user_interests":
 			return getUserInterests(ctx, pool)
+		case "get_available_reference_documents":
+			return getAvailableReferenceDocuments(ctx, pool)
 		case "get_reference_document":
 			idsRaw, _ := args["document_ids"].([]any)
 			var ids []int64
@@ -61,11 +65,39 @@ func NewToolExecutor(pool *pgxpool.Pool, subjectName, tavilyKey, pepper, documen
 					ids = append(ids, x)
 				}
 			}
-			return getReferenceDocuments(ctx, pool, ids, pepper, documentPassword)
+			return getReferenceDocuments(ctx, pool, ids, pepper, ramMaster)
 		default:
 			return nil, fmt.Errorf("unknown tool: %s", name)
 		}
 	}
+}
+
+// tool to get the title, description, id and tags of all reference documents
+func getAvailableReferenceDocuments(ctx context.Context, pool *pgxpool.Pool) (map[string]any, error) {
+	rows, err := pool.Query(ctx, `SELECT id, title, description, tags FROM reference_documents WHERE available_for_task = TRUE`)
+	if err != nil {
+		return map[string]any{"error": err.Error(), "documents": []any{}}, nil
+	}
+	defer rows.Close()
+	var documents []map[string]any
+
+	for rows.Next() {
+		var id int64
+		var title, description, tags *string
+		if err := rows.Scan(&id, &title, &description, &tags); err != nil {
+			continue
+		}
+		documents = append(documents, map[string]any{
+			"id":          id,
+			"title":       title,
+			"description": description,
+			"tags":        tags,
+		})
+	}
+	if documents == nil {
+		documents = []map[string]any{}
+	}
+	return map[string]any{"documents": documents}, nil
 }
 
 func getMessagesByChatSession(ctx context.Context, pool *pgxpool.Pool, chatSession string) (map[string]any, error) {
@@ -203,14 +235,14 @@ func getAllMessagesByContact(ctx context.Context, pool *pgxpool.Pool, name strin
 	messagesJSON, _ := json.Marshal(messages)
 	emailsJSON, _ := json.Marshal(emails)
 	return map[string]any{
-		"contact_name":       name,
+		"contact_name":        name,
 		"relationshipSummary": fmt.Sprintf("Messages: %s\nEmails: %s", string(messagesJSON), string(emailsJSON)),
 	}, nil
 }
 
 func getUniqueTagsCount(ctx context.Context, pool *pgxpool.Pool) (map[string]any, error) {
 	mediaTags := map[string]struct{}{}
-	rows, err := pool.Query(ctx, `SELECT tags FROM media_metadata WHERE tags IS NOT NULL AND tags != ''`)
+	rows, err := pool.Query(ctx, `SELECT tags FROM media_items WHERE tags IS NOT NULL AND tags != ''`)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -373,7 +405,11 @@ func getUserInterests(ctx context.Context, pool *pgxpool.Pool) (map[string]any, 
 	return map[string]any{"interests": interests, "count": len(interests)}, nil
 }
 
-func getReferenceDocuments(ctx context.Context, pool *pgxpool.Pool, ids []int64, pepper, documentPassword string) (map[string]any, error) {
+func getReferenceDocuments(ctx context.Context, pool *pgxpool.Pool, ids []int64, pepper string, ramMaster *keystore.MemoryMasterKey) (map[string]any, error) {
+	masterPassword, haveMaster := "", false
+	if ramMaster != nil {
+		masterPassword, haveMaster = ramMaster.Get()
+	}
 	var results []map[string]any
 	for _, id := range ids {
 		var title, filename, contentType *string
@@ -392,11 +428,11 @@ func getReferenceDocuments(ctx context.Context, pool *pgxpool.Pool, ids []int64,
 		}
 		displayTitle := strVal(title, strVal(filename, ""))
 		if isEncrypted {
-			if documentPassword == "" {
-				results = append(results, map[string]any{"id": id, "title": displayTitle, "content": "[encrypted — AI_DOCUMENT_PASSWORD not configured]"})
+			if !haveMaster || masterPassword == "" {
+				results = append(results, map[string]any{"id": id, "title": displayTitle, "content": "[encrypted — master key not unlocked in this session]"})
 				continue
 			}
-			plain, err := appcrypto.DecryptDocumentData(ctx, pool, documentPassword, data, pepper)
+			plain, err := appcrypto.DecryptDocumentData(ctx, pool, masterPassword, data, pepper)
 			if err != nil || len(plain) == 0 {
 				results = append(results, map[string]any{"id": id, "title": displayTitle, "content": "[encrypted — decryption failed]"})
 				continue

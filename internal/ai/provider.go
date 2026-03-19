@@ -118,11 +118,11 @@ func toolDefinitions() []map[string]any {
 				"required": []string{"keyword"},
 			},
 		},
-		{
-			"name":        "get_all_facebook_posts",
-			"description": "Retrieve the complete set of all Facebook posts.",
-			"parameters":  map[string]any{"type": "object", "properties": map[string]any{}, "required": []string{}},
-		},
+		// {
+		// 	"name":        "get_all_facebook_posts",
+		// 	"description": "Retrieve the complete set of all Facebook posts.",
+		// 	"parameters":  map[string]any{"type": "object", "properties": map[string]any{}, "required": []string{}},
+		// },
 		{
 			"name":        "search_facebook_posts",
 			"description": "Search Facebook posts where the post description partially matches the input.",
@@ -158,6 +158,11 @@ func toolDefinitions() []map[string]any {
 				},
 				"required": []string{"document_ids"},
 			},
+		},
+		{
+			"name":        "get_available_reference_documents",
+			"description": "Get the title, description, id and tags of all reference documents that are available for task.",
+			"parameters":  map[string]any{"type": "object", "properties": map[string]any{}, "required": []string{}},
 		},
 	}
 }

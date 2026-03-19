@@ -1990,6 +1990,9 @@ Modals.EmailEditor = (() => {
             if (DOM.configPage) {
                 DOM.configPage.style.display = 'flex';
                 if (DOM.chatMain) DOM.chatMain.style.display = 'none';
+                if (typeof Modals !== 'undefined' && Modals.AppConfig && Modals.AppConfig.load) {
+                    void Modals.AppConfig.load();
+                }
             }
             const tabBtn = document.querySelector('.config-tab-button[data-tab="email-editor"]');
             const tabContent = document.getElementById('email-editor-tab');

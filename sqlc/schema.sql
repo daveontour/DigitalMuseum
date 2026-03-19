@@ -485,10 +485,24 @@ CREATE TABLE IF NOT EXISTS master_keys (
 -- sensitive_keyring
 -- ============================================================
 CREATE TABLE IF NOT EXISTS sensitive_keyring (
-    id            SERIAL PRIMARY KEY,
-    encrypted_dek BYTEA   NOT NULL,
-    is_master     BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at    TIMESTAMP DEFAULT NOW()
+    id                   SERIAL PRIMARY KEY,
+    encrypted_dek        BYTEA   NOT NULL,
+    encrypted_master_dek BYTEA,
+    is_master            BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at           TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================================
+-- private_store
+-- Key-value pairs encrypted with the master-only private DEK.
+-- Only the master password can read or write these entries.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS private_store (
+    id               SERIAL PRIMARY KEY,
+    key              TEXT    NOT NULL UNIQUE,
+    encrypted_value  BYTEA   NOT NULL,
+    created_at       TIMESTAMP DEFAULT NOW(),
+    updated_at       TIMESTAMP DEFAULT NOW()
 );
 
 -- ============================================================

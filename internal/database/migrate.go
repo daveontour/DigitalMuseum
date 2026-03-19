@@ -57,6 +57,17 @@ END$$`); err != nil {
 		slog.Warn("could not add encryption columns to reference_documents", "err", err)
 	}
 
+	// ── sensitive_keyring master private DEK column ───────────────────────────
+	if _, err := conn.Exec(ctx, `DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='sensitive_keyring' AND column_name='encrypted_master_dek') THEN
+    ALTER TABLE sensitive_keyring ADD COLUMN encrypted_master_dek BYTEA;
+  END IF;
+END$$`); err != nil {
+		slog.Warn("could not add encrypted_master_dek column to sensitive_keyring", "err", err)
+	}
+
 	// ── Full-text search index for emails.plain_text ───────────────────────────
 	var ftsSql string
 	if pgTrgmAvailable {
@@ -125,7 +136,7 @@ func schemaDDL() []string {
 		)`,
 
 		// ── media_blobs ─────────────────────────────────────────────────────────
-		// Binary blob table shared by both media_items and media_metadata.
+		// Binary blob storage referenced by media_items.
 		`CREATE TABLE IF NOT EXISTS media_blobs (
 			id              SERIAL PRIMARY KEY,
 			image_data      BYTEA,
@@ -133,23 +144,6 @@ func schemaDDL() []string {
 			created_at      TIMESTAMP DEFAULT NOW(),
 			updated_at      TIMESTAMP DEFAULT NOW()
 		)`,
-
-		// ── media_metadata ───────────────────────────────────────────────────────
-		// Lightweight attachment metadata used by the attachment viewer.
-		// Each row links a source (e.g. 'email_attachment') + source_reference to a blob.
-		`CREATE TABLE IF NOT EXISTS media_metadata (
-			id                SERIAL PRIMARY KEY,
-			source            VARCHAR(255),
-			source_reference  VARCHAR(500),
-			title             VARCHAR(500),
-			media_type        VARCHAR(255),
-			media_blob_id     INTEGER REFERENCES media_blobs(id) ON DELETE SET NULL,
-			created_at        TIMESTAMP DEFAULT NOW(),
-			updated_at        TIMESTAMP DEFAULT NOW()
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_media_metadata_source     ON media_metadata (source)`,
-		`CREATE INDEX IF NOT EXISTS idx_media_metadata_source_ref ON media_metadata (source_reference)`,
-		`CREATE INDEX IF NOT EXISTS idx_media_metadata_blob_id    ON media_metadata (media_blob_id)`,
 
 		// ── media_items ─────────────────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS media_items (
@@ -506,10 +500,20 @@ func schemaDDL() []string {
 
 		// ── sensitive_keyring ────────────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS sensitive_keyring (
-			id            SERIAL PRIMARY KEY,
-			encrypted_dek BYTEA   NOT NULL,
-			is_master     BOOLEAN NOT NULL DEFAULT FALSE,
-			created_at    TIMESTAMP DEFAULT NOW()
+			id                   SERIAL PRIMARY KEY,
+			encrypted_dek        BYTEA   NOT NULL,
+			encrypted_master_dek BYTEA,
+			is_master            BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at           TIMESTAMP DEFAULT NOW()
+		)`,
+
+		// ── private_store ────────────────────────────────────────────────────────
+		`CREATE TABLE IF NOT EXISTS private_store (
+			id               SERIAL PRIMARY KEY,
+			key              TEXT    NOT NULL UNIQUE,
+			encrypted_value  BYTEA   NOT NULL,
+			created_at       TIMESTAMP DEFAULT NOW(),
+			updated_at       TIMESTAMP DEFAULT NOW()
 		)`,
 
 		// ── email_classifications ───────────────────────────────────────────────
@@ -581,6 +585,9 @@ func schemaDDL() []string {
 			created_at   TIMESTAMP DEFAULT NOW(),
 			updated_at   TIMESTAMP DEFAULT NOW()
 		)`,
+
+		// Legacy table removed — email attachments live in media_items (source='email_attachment').
+		`DROP TABLE IF EXISTS media_metadata`,
 	}
 }
 

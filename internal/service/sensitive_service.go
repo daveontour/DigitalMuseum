@@ -42,6 +42,11 @@ func (s *SensitiveService) KeyCount(ctx context.Context) (int64, error) {
 	return n, err
 }
 
+// VerifyMasterPassword returns true if masterPassword decrypts the master (is_master) keyring row.
+func (s *SensitiveService) VerifyMasterPassword(ctx context.Context, masterPassword string) (bool, error) {
+	return appcrypto.CheckSensitiveMasterPassword(ctx, s.pool, masterPassword, s.pepper)
+}
+
 // ListAll returns all sensitive records. If password is empty details are redacted.
 func (s *SensitiveService) ListAll(ctx context.Context, password string) ([]model.SensitiveDataResponse, error) {
 	docs, err := s.docRepo.ListSensitive(ctx)

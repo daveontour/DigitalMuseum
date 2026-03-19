@@ -2444,6 +2444,29 @@
             </div>
         </div>
 
+        <!-- Master key unlock: validated against keyring; password kept in server RAM only (not on disk) -->
+        <div id="master-key-unlock-modal" class="modal" style="display:none; z-index:4200; align-items:center; justify-content:center;">
+            <div class="modal-content confirmation-modal-content" style="max-width:440px;" onclick="event.stopPropagation()">
+                <div class="confirmation-modal-header">
+                    <h2>Unlock master key</h2>
+                </div>
+                <div class="confirmation-modal-body">
+                    <p style="color:#555; margin-bottom:12px; font-size:0.95rem; line-height:1.45;">
+                        Enter your master key to enable sensitive data, encrypted reference documents, and the private store.
+                        The app still works if you skip, but those features stay unavailable until you unlock here or send the key with each request.
+                    </p>
+                    <div id="master-key-unlock-error" style="display:none; color:#b91c1c; margin-bottom:10px; font-size:0.9rem;"></div>
+                    <label for="master-key-unlock-input" style="display:block; margin-bottom:6px; font-weight:500;">Master key</label>
+                    <input type="password" id="master-key-unlock-input" class="modal-input" autocomplete="off"
+                        style="width:100%; padding:10px 12px; border-radius:6px; border:1px solid #bfc9da; box-sizing:border-box;" />
+                </div>
+                <div class="confirmation-modal-buttons" style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+                    <button type="button" id="master-key-unlock-skip" class="modal-btn modal-btn-secondary">Skip for now</button>
+                    <button type="button" id="master-key-unlock-submit" class="modal-btn modal-btn-primary">Unlock</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Today's Thing: Add First Interest Modal -->
         <div id="todays-thing-add-interest-modal" class="modal" style="display: none;">
             <div class="modal-content" style="max-width: 450px; padding: 0;" onclick="event.stopPropagation()">
@@ -2840,7 +2863,7 @@
                 <button class="modal-close-btn" id="close-add-doc-key-modal">&times;</button>
             </div>
             <div class="sensitive-data-hints-body">
-                <p style="margin-bottom: 1rem;">Add a new keyring seat so a user (or the AI via <code>AI_DOCUMENT_PASSWORD</code>) can decrypt encrypted documents. Requires the master password.</p>
+                <p style="margin-bottom: 1rem;">Add a new keyring seat so a user can decrypt encrypted documents with that password. Requires the master password. The AI uses the same master key after you unlock it in this session.</p>
                 <label class="artefact-field-label">User Password</label>
                 <input type="password" id="add-doc-key-user-password" class="new-image-gallery-input"
                        placeholder="Password for the new key"

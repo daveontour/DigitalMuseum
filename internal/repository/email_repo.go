@@ -259,15 +259,17 @@ func (r *EmailRepo) SoftDelete(ctx context.Context, id int64) (bool, error) {
 	if tag.RowsAffected() == 0 {
 		return false, nil
 	}
-	// Orphan-clean media blobs attached to this email
+	// Remove email_attachment media_items for this email; delete blobs no longer referenced.
+	ref := fmt.Sprintf("%d", id)
 	_, _ = r.pool.Exec(ctx, `
-		DELETE FROM media_blobs
-		WHERE id IN (
-			SELECT mb.id
-			FROM media_blobs mb
-			LEFT JOIN media_metadata mm ON mm.blob_id = mb.id
-			WHERE mm.id IS NULL
-		)`)
+		WITH deleted AS (
+			DELETE FROM media_items
+			WHERE source = 'email_attachment' AND source_reference = $1
+			RETURNING media_blob_id
+		)
+		DELETE FROM media_blobs b
+		WHERE b.id IN (SELECT DISTINCT media_blob_id FROM deleted WHERE media_blob_id IS NOT NULL)
+		  AND NOT EXISTS (SELECT 1 FROM media_items m WHERE m.media_blob_id = b.id)`, ref)
 	return true, nil
 }
 
@@ -290,15 +292,19 @@ func (r *EmailRepo) BulkSoftDelete(ctx context.Context, ids []int64) (int64, err
 	if err != nil {
 		return 0, fmt.Errorf("email BulkSoftDelete: %w", err)
 	}
-	// Orphan-clean
+	refs := make([]string, len(ids))
+	for i, id := range ids {
+		refs[i] = fmt.Sprintf("%d", id)
+	}
 	_, _ = r.pool.Exec(ctx, `
-		DELETE FROM media_blobs
-		WHERE id IN (
-			SELECT mb.id
-			FROM media_blobs mb
-			LEFT JOIN media_metadata mm ON mm.blob_id = mb.id
-			WHERE mm.id IS NULL
-		)`)
+		WITH deleted AS (
+			DELETE FROM media_items
+			WHERE source = 'email_attachment' AND source_reference = ANY($1::text[])
+			RETURNING media_blob_id
+		)
+		DELETE FROM media_blobs b
+		WHERE b.id IN (SELECT DISTINCT media_blob_id FROM deleted WHERE media_blob_id IS NOT NULL)
+		  AND NOT EXISTS (SELECT 1 FROM media_items m WHERE m.media_blob_id = b.id)`, refs)
 	return tag.RowsAffected(), nil
 }
 

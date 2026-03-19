@@ -8,6 +8,7 @@ import (
 	appai "github.com/daveontour/digitalmuseum/internal/ai"
 	"github.com/daveontour/digitalmuseum/internal/config"
 	"github.com/daveontour/digitalmuseum/internal/handler"
+	"github.com/daveontour/digitalmuseum/internal/keystore"
 	"github.com/daveontour/digitalmuseum/internal/middleware"
 	"github.com/daveontour/digitalmuseum/internal/repository"
 	"github.com/daveontour/digitalmuseum/internal/service"
@@ -40,6 +41,18 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 	emailSvc := service.NewEmailService(emailRepo)
 	emailHandler := handler.NewEmailHandler(emailSvc)
 	emailHandler.RegisterRoutes(r)
+
+	// ── Shared: documents / sensitive / private store / RAM master key ───────
+	documentRepo := repository.NewDocumentRepo(pool)
+	documentSvc := service.NewDocumentService(documentRepo, pool, cfg.Crypto.KeyringPepper)
+	sensitiveSvc := service.NewSensitiveService(documentRepo, pool, cfg.Crypto.KeyringPepper)
+	ramMasterKey := &keystore.MemoryMasterKey{}
+	privateStoreRepo := repository.NewPrivateStoreRepo(pool)
+	privateStoreSvc := service.NewPrivateStoreService(privateStoreRepo, pool, cfg.Crypto.KeyringPepper)
+
+	// ── Import dialog saved settings (private_store, RAM master key) ────────────
+	importDialogSettingsHandler := handler.NewImportDialogSettingsHandler(privateStoreSvc, ramMasterKey)
+	importDialogSettingsHandler.RegisterRoutes(r)
 
 	// ── IMAP ──────────────────────────────────────────────────────────────────
 	imapHandler := handler.NewIMAPHandler(pool)
@@ -75,13 +88,17 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 	templateHandler.RegisterRoutes(r)
 
 	// ── Reference documents & sensitive data (shared keyring) ────────────────
-	documentRepo := repository.NewDocumentRepo(pool)
-	documentSvc := service.NewDocumentService(documentRepo, pool, cfg.Crypto.KeyringPepper)
-	sensitiveSvc := service.NewSensitiveService(documentRepo, pool, cfg.Crypto.KeyringPepper)
-	sensitiveHandler := handler.NewSensitiveHandler(sensitiveSvc, cfg.App.AssetStaticDir)
+	sensitiveHandler := handler.NewSensitiveHandler(sensitiveSvc, cfg.App.AssetStaticDir, ramMasterKey)
 	sensitiveHandler.RegisterRoutes(r)
-	documentHandler := handler.NewDocumentHandler(documentSvc, sensitiveSvc)
+	documentHandler := handler.NewDocumentHandler(documentSvc, sensitiveSvc, ramMasterKey)
 	documentHandler.RegisterRoutes(r)
+
+	sessionHandler := handler.NewSessionHandler(sensitiveSvc, ramMasterKey)
+	sessionHandler.RegisterRoutes(r)
+
+	// ── Private key-value store (master-only DEK) ─────────────────────────────
+	privateStoreHandler := handler.NewPrivateStoreHandler(privateStoreSvc, ramMasterKey)
+	privateStoreHandler.RegisterRoutes(r)
 
 	// ── Artefacts ─────────────────────────────────────────────────────────────
 	artefactRepo := repository.NewArtefactRepo(pool)
@@ -156,7 +173,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 		cfg.App.AssetStaticDir,
 		cfg.AI.TavilyAPIKey,
 		cfg.Crypto.KeyringPepper,
-		cfg.AI.DocumentPassword,
+		ramMasterKey,
 	)
 	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo)
 	chatHandler.RegisterRoutes(r)

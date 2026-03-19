@@ -239,15 +239,19 @@ const App = (() => {
             });
         }
 
-        // Hamburger menu for config page
-        DOM.hamburgerMenu.addEventListener('click', () => {
-            DOM.configPage.style.display = 'flex';
-            loadControlDefaults();
-            if (Modals.AppConfig && Modals.AppConfig.load) Modals.AppConfig.load();
-        });
-        DOM.closeConfigBtn.addEventListener('click', () => {
-            DOM.configPage.style.display = 'none';
-        });
+        // Hamburger menu for config page (guard — if these elements are missing, do not skip the rest of init)
+        if (DOM.hamburgerMenu && DOM.configPage) {
+            DOM.hamburgerMenu.addEventListener('click', () => {
+                DOM.configPage.style.display = 'flex';
+                loadControlDefaults();
+                if (Modals.AppConfig && Modals.AppConfig.load) void Modals.AppConfig.load();
+            });
+        }
+        if (DOM.closeConfigBtn && DOM.configPage) {
+            DOM.closeConfigBtn.addEventListener('click', () => {
+                DOM.configPage.style.display = 'none';
+            });
+        }
         if (DOM.configPage) {
             DOM.configPage.addEventListener('click', (e) => {
                 if (e.target === DOM.configPage) DOM.configPage.style.display = 'none';
@@ -1711,15 +1715,90 @@ const App = (() => {
             const foldersSelect = document.getElementById('imap-modal-folders');
             const newOnlyCb = document.getElementById('imap-modal-new-only');
 
-            if (typeof getControlValue === 'function') {
-                const defs = typeof controlDefaults !== 'undefined' ? controlDefaults : {};
-                hostEl.value = getControlValue('imap_host', defs.imap_host || '') || '';
-                portEl.value = getControlValue('imap_port', defs.imap_port || '993') || '993';
-                useSslEl.checked = getControlValue('imap_use_ssl', defs.imap_use_ssl !== undefined ? defs.imap_use_ssl : true) !== false;
-                usernameEl.value = getControlValue('imap_username', defs.imap_username || '') || '';
-                allFoldersCb.checked = !!(getControlValue('imap_all_folders', false));
-                newOnlyCb.checked = !!(getControlValue('imap_new_only', defs.imap_new_only !== undefined ? defs.imap_new_only : true));
+            function imapCollectPayload() {
+                const host = hostEl.value.trim();
+                const port = parseInt(portEl.value, 10) || 993;
+                const username = usernameEl.value.trim();
+                const password = passwordEl.value;
+                const use_ssl = useSslEl.checked;
+                const all_folders = allFoldersCb.checked;
+                const new_only = newOnlyCb.checked;
+                const folder_options = Array.from(foldersSelect.options).map(function (o) { return o.value; });
+                const folders = all_folders ? [] : Array.from(foldersSelect.selectedOptions).map(function (o) { return o.value; }).filter(Boolean);
+                return { host: host, port: port, username: username, password: password, use_ssl: use_ssl, all_folders: all_folders, new_only: new_only, folders: folders, folder_options: folder_options };
             }
+
+            async function imapSaveToPrivateStore() {
+                try {
+                    const body = imapCollectPayload();
+                    const res = await fetch('/api/import-saved-settings/imap', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    if (!res.ok && res.status !== 403) {
+                        console.warn('IMAP settings not saved to private store:', res.status);
+                    }
+                } catch (e) {
+                    console.warn('IMAP settings private store save failed:', e);
+                }
+            }
+
+            async function imapLoadFromPrivateStore() {
+                let appliedServer = false;
+                try {
+                    const res = await fetch('/api/import-saved-settings/imap');
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (data.ok && data.saved && data.settings) {
+                        var s = data.settings;
+                        hostEl.value = s.host || '';
+                        portEl.value = String(s.port != null ? s.port : 993);
+                        useSslEl.checked = s.use_ssl !== false;
+                        usernameEl.value = s.username || '';
+                        passwordEl.value = s.password || '';
+                        allFoldersCb.checked = !!s.all_folders;
+                        newOnlyCb.checked = s.new_only !== false;
+                        if (Array.isArray(s.folder_options) && s.folder_options.length) {
+                            foldersSelect.innerHTML = '';
+                            var selectedSet = {};
+                            (Array.isArray(s.folders) ? s.folders : []).forEach(function (n) { selectedSet[n] = true; });
+                            s.folder_options.forEach(function (f) {
+                                var opt = document.createElement('option');
+                                opt.value = f;
+                                opt.textContent = f;
+                                if (selectedSet[f]) opt.selected = true;
+                                foldersSelect.appendChild(opt);
+                            });
+                            if (!allFoldersCb.checked) foldersWrap.style.display = 'block';
+                        } else if (Array.isArray(s.folders) && s.folders.length) {
+                            foldersSelect.innerHTML = '';
+                            s.folders.forEach(function (f) {
+                                var opt = document.createElement('option');
+                                opt.value = f;
+                                opt.textContent = f;
+                                opt.selected = true;
+                                foldersSelect.appendChild(opt);
+                            });
+                            if (!allFoldersCb.checked) foldersWrap.style.display = 'block';
+                        }
+                        appliedServer = true;
+                    }
+                } catch (e) {
+                    console.debug('IMAP saved-settings load skipped:', e);
+                }
+                if (!appliedServer && typeof getControlValue === 'function') {
+                    var defs = typeof controlDefaults !== 'undefined' ? controlDefaults : {};
+                    hostEl.value = getControlValue('imap_host', defs.imap_host || '') || '';
+                    portEl.value = getControlValue('imap_port', defs.imap_port || '993') || '993';
+                    useSslEl.checked = getControlValue('imap_use_ssl', defs.imap_use_ssl !== undefined ? defs.imap_use_ssl : true) !== false;
+                    usernameEl.value = getControlValue('imap_username', defs.imap_username || '') || '';
+                    allFoldersCb.checked = !!(getControlValue('imap_all_folders', false));
+                    newOnlyCb.checked = !!(getControlValue('imap_new_only', defs.imap_new_only !== undefined ? defs.imap_new_only : true));
+                }
+            }
+
+            await imapLoadFromPrivateStore();
 
             allFoldersCb.addEventListener('change', () => {
                 foldersWrap.style.display = (!allFoldersCb.checked && foldersSelect.options.length > 0) ? 'block' : 'none';
@@ -1765,6 +1844,7 @@ const App = (() => {
                     fetchStatus.textContent = `${folders.length} folder(s) loaded`;
                     fetchStatus.style.color = '#27ae60';
                     if (!allFoldersCb.checked) foldersWrap.style.display = 'block';
+                    void imapSaveToPrivateStore();
                 } catch (e) {
                     fetchStatus.textContent = 'Connection error: ' + e.message;
                     fetchStatus.style.color = '#c0392b';
@@ -1796,6 +1876,7 @@ const App = (() => {
                     saveControlValue('imap_all_folders', all_folders);
                     saveControlValue('imap_new_only', new_only);
                 }
+                void imapSaveToPrivateStore();
                 importInputModal.style.display = 'none';
                 onSubmit({ host, port, username, password, use_ssl, all_folders, folders, new_only });
             };
@@ -1805,7 +1886,45 @@ const App = (() => {
             importInputModal.onclick = (e) => { if (e.target === importInputModal) importInputModal.style.display = 'none'; };
         }
 
-        function showImportModal(importType, onSubmit) {
+        const IMPORT_SAVED_SETTINGS_BASE = '/api/import-saved-settings';
+        const IMPORT_DIALOG_PRIVATE_KINDS = {
+            imessage: 'imessage',
+            whatsapp: 'whatsapp',
+            facebook_all: 'facebook_all',
+            instagram: 'instagram',
+            filesystem: 'filesystem'
+        };
+
+        async function importDialogLoadPrivateStore(kind) {
+            try {
+                const res = await fetch(`${IMPORT_SAVED_SETTINGS_BASE}/${encodeURIComponent(kind)}`);
+                if (!res.ok) return null;
+                const data = await res.json();
+                if (data.ok && data.saved && data.settings && typeof data.settings === 'object') {
+                    return data.settings;
+                }
+            } catch (e) {
+                console.debug('import saved-settings load skipped:', e);
+            }
+            return null;
+        }
+
+        async function importDialogSavePrivateStore(kind, settingsObj) {
+            try {
+                const res = await fetch(`${IMPORT_SAVED_SETTINGS_BASE}/${encodeURIComponent(kind)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settingsObj)
+                });
+                if (!res.ok && res.status !== 403) {
+                    console.warn('Import dialog settings not saved to private store:', kind, res.status);
+                }
+            } catch (e) {
+                console.warn('Import dialog private store save failed:', e);
+            }
+        }
+
+        async function showImportModal(importType, onSubmit) {
             const cfg = importConfigs[importType];
             if (!cfg || !cfg.needsInput) { onSubmit({}); return; }
             importInputModalTitle.textContent = cfg.title;
@@ -1826,6 +1945,24 @@ const App = (() => {
                     }
                 }
             });
+
+            const privKind = IMPORT_DIALOG_PRIVATE_KINDS[importType];
+            if (privKind) {
+                const s = await importDialogLoadPrivateStore(privKind);
+                if (s) {
+                    cfg.fields.forEach(f => {
+                        const el = document.getElementById(`import-modal-${f.id}`);
+                        if (!el || !Object.prototype.hasOwnProperty.call(s, f.id)) return;
+                        const v = s[f.id];
+                        if (f.type === 'checkbox') {
+                            el.checked = !!v;
+                        } else {
+                            el.value = v != null && v !== undefined ? String(v) : '';
+                        }
+                    });
+                }
+            }
+
             importInputModal.style.display = 'flex';
             importInputModal.style.alignItems = 'center';
             importInputModal.style.justifyContent = 'center';
@@ -1846,6 +1983,7 @@ const App = (() => {
                     }
                 });
                 if (!valid && cfg.fields.some(f => f.required)) return;
+                if (privKind) void importDialogSavePrivateStore(privKind, vals);
                 importInputModal.style.display = 'none';
                 onSubmit(vals);
             };
@@ -1914,19 +2052,19 @@ const App = (() => {
             }
         }
 
-        function triggerImport(importType) {
+        async function triggerImport(importType) {
             if (importInProgress) return;
             if (importType === 'email_processing') {
                 showEmailProcessingModal((vals) => runImport(importType, vals));
             } else if (importType === 'imap_processing') {
                 showImapModal((vals) => runImport(importType, vals));
             } else {
-                showImportModal(importType, (vals) => runImport(importType, vals));
+                await showImportModal(importType, (vals) => runImport(importType, vals));
             }
         }
 
         document.querySelectorAll('.import-execute-btn').forEach(btn => {
-            btn.addEventListener('click', () => triggerImport(btn.getAttribute('data-import')));
+            btn.addEventListener('click', () => { void triggerImport(btn.getAttribute('data-import')); });
         });
 
         document.querySelectorAll('.import-control-tile').forEach(tile => {
@@ -1961,10 +2099,13 @@ const App = (() => {
                         if (tabBtn) {
                             tabBtn.click();
                         }
+                        if (openTab === 'settings' && Modals.AppConfig && Modals.AppConfig.load) {
+                            void Modals.AppConfig.load();
+                        }
                     }
                     return;
                 }
-                triggerImport(tile.getAttribute('data-import'));
+                void triggerImport(tile.getAttribute('data-import'));
             });
         });
 
@@ -2276,6 +2417,47 @@ const App = (() => {
         }
     }
 
+    function closeMasterKeyUnlockModal() {
+        const modal = document.getElementById('master-key-unlock-modal');
+        const input = document.getElementById('master-key-unlock-input');
+        const errEl = document.getElementById('master-key-unlock-error');
+        const submitBtn = document.getElementById('master-key-unlock-submit');
+        if (modal) modal.style.display = 'none';
+        if (input) input.value = '';
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Unlock';
+        }
+    }
+
+    /** After welcome info box: offer master key unlock if keyring exists and server RAM has no key yet. */
+    function maybePromptMasterKeyUnlock() {
+        (async () => {
+            try {
+                const kc = await fetch('/sensitive-data/key-count');
+                if (!kc.ok) return;
+                const kj = await kc.json();
+                if (!kj.count) return;
+                const st = await fetch('/api/session/master-key/status');
+                if (!st.ok) return;
+                const sj = await st.json();
+                if (sj.unlocked) return;
+                const modal = document.getElementById('master-key-unlock-modal');
+                const input = document.getElementById('master-key-unlock-input');
+                if (!modal || !input) return;
+                closeMasterKeyUnlockModal();
+                modal.style.display = 'flex';
+                input.focus();
+            } catch (e) {
+                console.warn('Master key prompt check failed:', e);
+            }
+        })();
+    }
+
     function init() {
         // Info box modal: set up close first (before other inits that might throw)
         window.closeInfoBoxModal = function() {
@@ -2293,6 +2475,7 @@ const App = (() => {
                     undefined
                 );
             }
+            maybePromptMasterKeyUnlock();
         };
         const infoBoxModal = document.getElementById('info-box-modal');
         if (infoBoxModal) {
@@ -2309,8 +2492,68 @@ const App = (() => {
         Modals.initAll();
         //SSE.init();
         //InterviewerMode.init(); // Initialize interviewer mode
-        initEventListeners(); // Attach main app event listeners
+        try {
+            initEventListeners(); // Attach main app event listeners
+        } catch (e) {
+            console.error('initEventListeners failed (some UI may be broken):', e);
+        }
         loadLLMProviderAvailability();
+        try {
+            if (Modals.AppConfig && Modals.AppConfig.load) void Modals.AppConfig.load();
+        } catch (e) {
+            console.warn('Application configuration preload failed:', e);
+        }
+
+        const mkSkip = document.getElementById('master-key-unlock-skip');
+        const mkSubmit = document.getElementById('master-key-unlock-submit');
+        if (mkSkip) mkSkip.addEventListener('click', closeMasterKeyUnlockModal);
+        if (mkSubmit) {
+            mkSubmit.addEventListener('click', async function masterKeyUnlockSubmit() {
+                const input = document.getElementById('master-key-unlock-input');
+                const errEl = document.getElementById('master-key-unlock-error');
+                const pw = (input && input.value || '').trim();
+                if (!pw) {
+                    if (errEl) {
+                        errEl.textContent = 'Enter your master key or choose Skip for now.';
+                        errEl.style.display = 'block';
+                    }
+                    return;
+                }
+                if (errEl) errEl.style.display = 'none';
+                mkSubmit.disabled = true;
+                mkSubmit.textContent = 'Checking\u2026';
+                try {
+                    const res = await fetch('/api/session/master-key/unlock', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: pw })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.valid) {
+                        if (errEl) {
+                            errEl.textContent = data.detail || 'That key does not match the keyring. Try again or skip.';
+                            errEl.style.display = 'block';
+                        }
+                        mkSubmit.disabled = false;
+                        mkSubmit.textContent = 'Unlock';
+                        if (input) {
+                            input.value = '';
+                            input.focus();
+                        }
+                        return;
+                    }
+                    closeMasterKeyUnlockModal();
+                } catch (e) {
+                    if (errEl) {
+                        errEl.textContent = e.message || 'Request failed';
+                        errEl.style.display = 'block';
+                    }
+                    mkSubmit.disabled = false;
+                    mkSubmit.textContent = 'Unlock';
+                }
+            });
+        }
+
         window.onbeforeunload = () => { SSE.close(); };
     }
     return { init, processFormSubmit, processQuestionSubmit, processAnswerSubmit };

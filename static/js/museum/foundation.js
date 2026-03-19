@@ -524,14 +524,20 @@ const UI = (() => {
 // --- Configuration Module ---
 const Config = (() => {
     function applySettings() {
-        document.documentElement.style.setProperty('--message-font-size', `${DOM.messageFontSize.value}px`);
-        DOM.messageFontSize.nextElementSibling.textContent = `${DOM.messageFontSize.value}px`;
+        if (DOM.messageFontSize) {
+            document.documentElement.style.setProperty('--message-font-size', `${DOM.messageFontSize.value}px`);
+            if (DOM.messageFontSize.nextElementSibling) {
+                DOM.messageFontSize.nextElementSibling.textContent = `${DOM.messageFontSize.value}px`;
+            }
+        }
         // Apply audio tag visibility directly (CSS might be better for this)
-        document.body.classList.toggle('hide-audio-tags', !DOM.showAudioTags.checked);
+        if (DOM.showAudioTags) {
+            document.body.classList.toggle('hide-audio-tags', !DOM.showAudioTags.checked);
+        }
 
         // Apply creativity level text
-        if (DOM.creativityLevel.nextElementSibling) {
-             DOM.creativityLevel.nextElementSibling.textContent = DOM.creativityLevel.value;
+        if (DOM.creativityLevel && DOM.creativityLevel.nextElementSibling) {
+            DOM.creativityLevel.nextElementSibling.textContent = DOM.creativityLevel.value;
         }
     }
 

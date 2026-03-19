@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// AttachmentRepo accesses email_attachment media items.
+// AttachmentRepo accesses email_attachment rows in media_items.
 type AttachmentRepo struct {
 	pool *pgxpool.Pool
 }
@@ -18,8 +18,7 @@ func NewAttachmentRepo(pool *pgxpool.Pool) *AttachmentRepo {
 	return &AttachmentRepo{pool: pool}
 }
 
-// attachmentInfoQuery is a base query joining media_metadata with emails.
-// It selects only email_attachment source items.
+// attachmentInfoCols joins media_items to emails (source_reference holds string email id).
 const attachmentInfoCols = `
 	mm.id AS attachment_id,
 	COALESCE(mm.title, 'attachment') AS filename,
@@ -43,7 +42,7 @@ func scanAttachmentInfo(row interface{ Scan(...any) error }) (*model.AttachmentI
 func (r *AttachmentRepo) GetRandom(ctx context.Context) (*model.AttachmentInfo, error) {
 	a, err := scanAttachmentInfo(r.pool.QueryRow(ctx, `
 		SELECT `+attachmentInfoCols+`
-		FROM media_metadata mm
+		FROM media_items mm
 		JOIN emails e ON e.id = mm.source_reference::bigint
 		WHERE mm.source = 'email_attachment'
 		ORDER BY RANDOM()
@@ -57,11 +56,11 @@ func (r *AttachmentRepo) GetRandom(ctx context.Context) (*model.AttachmentInfo, 
 	return a, nil
 }
 
-// GetByIDOrder returns an attachment ordered by media_metadata.id with an offset.
+// GetByIDOrder returns an attachment ordered by media_items.id with an offset.
 func (r *AttachmentRepo) GetByIDOrder(ctx context.Context, offset int) (*model.AttachmentInfo, error) {
 	a, err := scanAttachmentInfo(r.pool.QueryRow(ctx, `
 		SELECT `+attachmentInfoCols+`
-		FROM media_metadata mm
+		FROM media_items mm
 		JOIN emails e ON e.id = mm.source_reference::bigint
 		WHERE mm.source = 'email_attachment'
 		ORDER BY mm.id ASC
@@ -84,14 +83,13 @@ func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset i
 	}
 	q := fmt.Sprintf(`
 		SELECT `+attachmentInfoCols+`, octet_length(mb.image_data) AS sz
-		FROM media_metadata mm
+		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		JOIN emails e ON e.id = mm.source_reference::bigint
 		WHERE mm.source = 'email_attachment'
 		ORDER BY octet_length(mb.image_data) %s
 		OFFSET $1
 		LIMIT 1`, dir)
-	// sz is selected but discarded in the scan helper; add a dummy
 	var a model.AttachmentInfo
 	var sz *int64
 	err := r.pool.QueryRow(ctx, q, offset).Scan(
@@ -112,16 +110,27 @@ func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset i
 // Count returns the total number of email_attachment media items.
 func (r *AttachmentRepo) Count(ctx context.Context) (int64, error) {
 	var n int64
-	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM media_metadata WHERE source='email_attachment'`).Scan(&n)
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM media_items WHERE source='email_attachment'`).Scan(&n)
 	return n, err
 }
+
+// attachmentInfoColsGetInfo uses COALESCE(e.id, 0) so LEFT JOIN emails never yields NULL email_id into int64.
+const attachmentInfoColsGetInfo = `
+	mm.id AS attachment_id,
+	COALESCE(mm.title, 'attachment') AS filename,
+	COALESCE(mm.media_type, 'application/octet-stream') AS content_type,
+	COALESCE(e.id, 0) AS email_id,
+	e.subject AS email_subject,
+	e.from_address AS email_from,
+	e.date AS email_date,
+	e.folder AS email_folder`
 
 // GetInfo returns metadata for a single attachment.
 func (r *AttachmentRepo) GetInfo(ctx context.Context, id int64) (*model.AttachmentInfo, error) {
 	a, err := scanAttachmentInfo(r.pool.QueryRow(ctx, `
-		SELECT `+attachmentInfoCols+`
-		FROM media_metadata mm
-		JOIN emails e ON e.id = mm.source_reference::bigint
+		SELECT `+attachmentInfoColsGetInfo+`
+		FROM media_items mm
+		LEFT JOIN emails e ON e.id = mm.source_reference::bigint
 		WHERE mm.source = 'email_attachment' AND mm.id = $1`, id))
 	if err != nil {
 		if isNoRows(err) {
@@ -136,7 +145,7 @@ func (r *AttachmentRepo) GetInfo(ctx context.Context, id int64) (*model.Attachme
 func (r *AttachmentRepo) GetData(ctx context.Context, id int64) (data, thumbnail []byte, mediaType string, filename string, err error) {
 	err = r.pool.QueryRow(ctx, `
 		SELECT mb.image_data, mb.thumbnail_data, COALESCE(mm.media_type,'application/octet-stream'), COALESCE(mm.title,'attachment')
-		FROM media_metadata mm
+		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		WHERE mm.source = 'email_attachment' AND mm.id = $1`, id).
 		Scan(&data, &thumbnail, &mediaType, &filename)
@@ -150,12 +159,11 @@ func (r *AttachmentRepo) GetData(ctx context.Context, id int64) (data, thumbnail
 	return
 }
 
-// Delete removes a media_metadata row and its blob (if no other rows reference it).
+// Delete removes a media_items row and its blob if no other media_items reference it.
 func (r *AttachmentRepo) Delete(ctx context.Context, id int64) (bool, error) {
-	// Find blob ID
 	var blobID *int64
 	err := r.pool.QueryRow(ctx,
-		`SELECT media_blob_id FROM media_metadata WHERE id=$1 AND source='email_attachment'`, id).
+		`SELECT media_blob_id FROM media_items WHERE id=$1 AND source='email_attachment'`, id).
 		Scan(&blobID)
 	if err != nil {
 		if isNoRows(err) {
@@ -164,15 +172,13 @@ func (r *AttachmentRepo) Delete(ctx context.Context, id int64) (bool, error) {
 		return false, err
 	}
 
-	// Delete media_metadata row
-	if _, err := r.pool.Exec(ctx, `DELETE FROM media_metadata WHERE id=$1`, id); err != nil {
+	if _, err := r.pool.Exec(ctx, `DELETE FROM media_items WHERE id=$1`, id); err != nil {
 		return false, err
 	}
 
-	// Delete blob if no other references
 	if blobID != nil {
 		var refs int
-		if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM media_metadata WHERE media_blob_id=$1`, *blobID).Scan(&refs); err == nil && refs == 0 {
+		if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM media_items WHERE media_blob_id=$1`, *blobID).Scan(&refs); err == nil && refs == 0 {
 			_, _ = r.pool.Exec(ctx, `DELETE FROM media_blobs WHERE id=$1`, *blobID)
 		}
 	}
@@ -213,7 +219,7 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 	var total int64
 	if err := r.pool.QueryRow(ctx, fmt.Sprintf(`
 		SELECT COUNT(*)
-		FROM media_metadata mm
+		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		JOIN emails e ON e.id = mm.source_reference::bigint
 		WHERE mm.source = 'email_attachment'%s`, typeFilter)).Scan(&total); err != nil {
@@ -224,7 +230,7 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 		SELECT mm.id, COALESCE(mm.title,'attachment'), COALESCE(mm.media_type,'application/octet-stream'),
 		       e.id, e.subject, e.from_address, e.date, e.folder,
 		       octet_length(mb.image_data) AS sz
-		FROM media_metadata mm
+		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		JOIN emails e ON e.id = mm.source_reference::bigint
 		WHERE mm.source = 'email_attachment'%s

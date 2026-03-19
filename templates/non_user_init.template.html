@@ -22,9 +22,14 @@
 <body>
     <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0f1922;">
         <div style="background:#19264d; border-radius:12px; padding:48px; max-width:480px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
-            <h1 style="color:#fff; margin:0 0 8px; font-size:1.8rem;">Welcome</h1>
-            <p style="color:#8fa4c8; margin:0 0 32px; font-size:0.95rem;">
+            <h1 style="color:#fff; margin:0 0 8px; font-size:1.8rem;">Welcome to the Digital Museum</h1>
+            <p style="color:#8fa4c8; margin:0 0 20px; font-size:0.95rem;">
                 Let's set up your Digital Museum. Enter your details to get started.
+            </p>
+            <p style="color:#fbbf24; margin:0 0 24px; font-size:0.85rem; line-height:1.5;">
+                You must choose a <strong>master key</strong> to protect sensitive data. This key is
+                <strong>never stored in plain text and cannot be recovered</strong>. If you forget it,
+                any encrypted data will be permanently inaccessible. Store it somewhere safe.
             </p>
 
             <div id="error-msg" style="display:none; color:#f87171; margin-bottom:16px; font-size:0.9rem;"></div>
@@ -40,13 +45,31 @@
                     <input id="family-name" type="text" required placeholder="e.g. Burton"
                         style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:1rem; box-sizing:border-box;">
                 </div>
-                <div style="margin-bottom:32px;">
+                <div style="margin-bottom:20px;">
                     <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:0.9rem;">Gender <span style="color:#8fa4c8;">(optional)</span></label>
                     <select id="gender"
                         style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:1rem; box-sizing:border-box;">
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                     </select>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:0.9rem;">
+                        Master Key *
+                    </label>
+                    <input id="master-key" type="password" required
+                        autocomplete="new-password"
+                        placeholder="Choose a strong passphrase"
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:1rem; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:28px;">
+                    <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:0.9rem;">
+                        Confirm Master Key *
+                    </label>
+                    <input id="master-key-confirm" type="password" required
+                        autocomplete="new-password"
+                        placeholder="Re-enter the master key"
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:1rem; box-sizing:border-box;">
                 </div>
                 <button type="submit" id="submit-btn"
                     style="width:100%; padding:12px; border-radius:6px; border:none; background:#3b82f6; color:#fff; font-size:1rem; font-weight:600; cursor:pointer;">
@@ -65,6 +88,15 @@
             btn.disabled = true;
             btn.textContent = 'Saving\u2026';
             try {
+                const masterKey = document.getElementById('master-key').value;
+                const masterKeyConfirm = document.getElementById('master-key-confirm').value;
+                if (!masterKey || !masterKeyConfirm) {
+                    throw new Error('Master key and confirmation are required.');
+                }
+                if (masterKey !== masterKeyConfirm) {
+                    throw new Error('Master key and confirmation do not match.');
+                }
+
                 const res = await fetch('/api/subject-configuration', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -79,6 +111,25 @@
                     const data = await res.json().catch(() => ({}));
                     throw new Error(data.detail || `Server error ${res.status}`);
                 }
+
+                // Initialise the sensitive keyring with the supplied master key.
+                const keyRes = await fetch('/sensitive-data/master-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: masterKey })
+                });
+                if (!keyRes.ok) {
+                    const data = await keyRes.json().catch(() => ({}));
+                    throw new Error(data.detail || data.message || `Keyring error ${keyRes.status}`);
+                }
+
+                // Store validated master key in server RAM so the main app does not re-prompt immediately.
+                await fetch('/api/session/master-key/unlock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: masterKey })
+                });
+
                 window.location.reload();
             } catch (err) {
                 errEl.textContent = err.message;

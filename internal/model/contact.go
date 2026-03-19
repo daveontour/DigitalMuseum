@@ -62,7 +62,7 @@ type EmailClassification struct {
 	UpdatedAt      time.Time
 }
 
-// AttachmentInfo holds a media_items row joined to its email.
+// AttachmentInfo holds an email_attachment media_items row joined to its parent email.
 type AttachmentInfo struct {
 	AttachmentID int64
 	Filename     string

@@ -107,17 +107,6 @@ type AIConfig struct {
 	ClaudeModelName string
 
 	TavilyAPIKey string
-
-	// DocumentPassword is the keyring password used by the AI tool executor to
-	// decrypt encrypted reference_documents. Set via AI_DOCUMENT_PASSWORD env var.
-	// A keyring seat must be registered for this password via POST /reference-documents/add-user.
-	DocumentPassword string
-
-	// KeyringMasterPassword is the master keyring password used at startup to
-	// automatically register AI_DOCUMENT_PASSWORD as a keyring seat if it is not
-	// already present. Set via KEYRING_MASTER_PASSWORD env var.
-	// Optional: if unset, missing seats are logged as warnings but not fatal.
-	KeyringMasterPassword string
 }
 
 // AttachmentConfig holds attachment filtering settings.
@@ -263,9 +252,7 @@ func loadAIConfig() AIConfig {
 		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
 		ClaudeModelName: getenv("CLAUDE_MODEL_NAME", "claude-sonnet-4-6"),
 
-		TavilyAPIKey:          os.Getenv("TAVILY_API_KEY"),
-		DocumentPassword:      os.Getenv("AI_DOCUMENT_PASSWORD"),
-		KeyringMasterPassword: os.Getenv("KEYRING_MASTER_PASSWORD"),
+		TavilyAPIKey: os.Getenv("TAVILY_API_KEY"),
 	}
 }
 

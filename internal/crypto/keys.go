@@ -16,30 +16,108 @@ func DeriveUserKey(password, pepper string) string {
 	return hex.EncodeToString(DeriveKey(password, pepper))
 }
 
-// InitSensitiveKeyring generates a fresh random DEK, truncates sensitive_keyring,
-// and inserts one master seat encrypted under masterPassword.
+// InitSensitiveKeyring generates two fresh random DEKs, truncates sensitive_keyring,
+// and inserts one master seat. The shared DEK (encrypted_dek) is accessible by any
+// valid seat password. The master private DEK (encrypted_master_dek) is encrypted
+// solely under masterPassword and is used for the private_store table.
 // It does NOT truncate sensitive_data — existing records must be migrated separately.
 func InitSensitiveKeyring(ctx context.Context, pool *pgxpool.Pool, masterPassword, pepper string) error {
 	if masterPassword == "" {
 		return fmt.Errorf("master password required")
 	}
+
+	// Shared DEK — wrapped under master password (other seats added later via AddSensitiveKeyringSeat).
 	dek := make([]byte, 32)
 	if _, err := rand.Read(dek); err != nil {
 		return fmt.Errorf("generate DEK: %w", err)
 	}
 	dekHex := hex.EncodeToString(dek)
+
+	// Master private DEK — exclusively for the master; never shared with other seats.
+	masterDek := make([]byte, 32)
+	if _, err := rand.Read(masterDek); err != nil {
+		return fmt.Errorf("generate master private DEK: %w", err)
+	}
+	masterDekHex := hex.EncodeToString(masterDek)
+
 	userKey := DeriveUserKey(masterPassword, pepper)
 
 	if _, err := pool.Exec(ctx, `TRUNCATE TABLE sensitive_keyring`); err != nil {
 		return fmt.Errorf("truncate sensitive_keyring: %w", err)
 	}
+
 	var encDek []byte
 	if err := pool.QueryRow(ctx, `SELECT pgp_sym_encrypt($1, $2)`, dekHex, userKey).Scan(&encDek); err != nil {
 		return fmt.Errorf("encrypt DEK: %w", err)
 	}
+	var encMasterDek []byte
+	if err := pool.QueryRow(ctx, `SELECT pgp_sym_encrypt($1, $2)`, masterDekHex, userKey).Scan(&encMasterDek); err != nil {
+		return fmt.Errorf("encrypt master private DEK: %w", err)
+	}
+
 	_, err := pool.Exec(ctx,
-		`INSERT INTO sensitive_keyring (encrypted_dek, is_master) VALUES ($1, TRUE)`, encDek)
+		`INSERT INTO sensitive_keyring (encrypted_dek, encrypted_master_dek, is_master) VALUES ($1, $2, TRUE)`,
+		encDek, encMasterDek)
 	return err
+}
+
+// GetMasterPrivateDEK returns the hex-encoded master private DEK by decrypting
+// encrypted_master_dek from the is_master=TRUE keyring row using masterPassword.
+// Returns "" if the password is wrong or the column has not been populated.
+func GetMasterPrivateDEK(ctx context.Context, pool *pgxpool.Pool, masterPassword, pepper string) (string, error) {
+	if masterPassword == "" {
+		return "", nil
+	}
+	userKey := DeriveUserKey(masterPassword, pepper)
+	var encMasterDek []byte
+	err := pool.QueryRow(ctx,
+		`SELECT encrypted_master_dek FROM sensitive_keyring WHERE is_master = TRUE LIMIT 1`,
+	).Scan(&encMasterDek)
+	if err != nil {
+		return "", fmt.Errorf("query master private DEK: %w", err)
+	}
+	if len(encMasterDek) == 0 {
+		return "", nil
+	}
+	var dek string
+	if err := pool.QueryRow(ctx, `SELECT pgp_sym_decrypt($1, $2)`, encMasterDek, userKey).Scan(&dek); err != nil {
+		return "", nil // wrong password — return empty, not an error
+	}
+	return dek, nil
+}
+
+// EncryptPrivateValue encrypts plaintext using the master private DEK.
+// Returns pgcrypto-encrypted bytes for storage in private_store.encrypted_value.
+func EncryptPrivateValue(ctx context.Context, pool *pgxpool.Pool, masterPassword, plaintext, pepper string) ([]byte, error) {
+	dek, err := GetMasterPrivateDEK(ctx, pool, masterPassword, pepper)
+	if err != nil {
+		return nil, fmt.Errorf("get master private DEK: %w", err)
+	}
+	if dek == "" {
+		return nil, fmt.Errorf("invalid master password or master private DEK not initialised")
+	}
+	var enc []byte
+	if err := pool.QueryRow(ctx, `SELECT pgp_sym_encrypt($1, $2)`, plaintext, dek).Scan(&enc); err != nil {
+		return nil, fmt.Errorf("pgp_sym_encrypt: %w", err)
+	}
+	return enc, nil
+}
+
+// DecryptPrivateValue decrypts a private_store.encrypted_value using the master private DEK.
+// Returns "" (no error) if masterPassword is wrong or the DEK is not initialised.
+func DecryptPrivateValue(ctx context.Context, pool *pgxpool.Pool, masterPassword string, encValue []byte, pepper string) (string, error) {
+	dek, err := GetMasterPrivateDEK(ctx, pool, masterPassword, pepper)
+	if err != nil {
+		return "", fmt.Errorf("get master private DEK: %w", err)
+	}
+	if dek == "" {
+		return "", nil
+	}
+	var plain string
+	if err := pool.QueryRow(ctx, `SELECT pgp_sym_decrypt($1, $2)`, encValue, dek).Scan(&plain); err != nil {
+		return "", fmt.Errorf("pgp_sym_decrypt: %w", err)
+	}
+	return plain, nil
 }
 
 // GetSensitiveDEK scans all sensitive_keyring rows and returns the hex DEK that decrypts
