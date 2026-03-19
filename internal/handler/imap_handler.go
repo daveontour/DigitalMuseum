@@ -1,15 +1,11 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime"
-	"mime/multipart"
-	"mime/quotedprintable"
 	"net/http"
 	"strings"
 	"time"
@@ -289,7 +285,7 @@ func (h *IMAPHandler) importFolder(c *client.Client, folder string, newOnly bool
 	seqset := new(imap.SeqSet)
 	seqset.AddRange(1, mbox.Messages)
 
-	// Fetch envelope + body[text] + body[header]
+	// Fetch envelope + full message (RFC822 includes all headers, needed to parse MIME Content-Type/boundary)
 	items := []imap.FetchItem{
 		imap.FetchEnvelope,
 		imap.FetchFlags,
@@ -351,20 +347,17 @@ func (h *IMAPHandler) storeEmail(ctx context.Context, folder string, msg *imap.M
 	var rawMsg *string
 	var plainText *string
 	var snippet *string
+	var attachments []imapAttachmentPart
 
-	if body, ok := msg.Body[&imap.BodySectionName{}]; ok {
-		raw, err := io.ReadAll(body)
-		if err == nil && len(raw) > 0 {
-			s := string(raw)
-			rawMsg = &s
-			pt := extractPlainText(raw)
-			if pt != "" {
-				plainText = &pt
-				snip := pt
-				if len(snip) > 200 {
-					snip = snip[:200]
-				}
-				snippet = &snip
+	// Match RFC822 fetch so GetBody finds the stored body (map keys are pointer identity).
+	section, secErr := imap.ParseBodySectionName(imap.FetchRFC822)
+	if secErr == nil {
+		if body := msg.GetBody(section); body != nil {
+			raw, rerr := io.ReadAll(body)
+			if rerr == nil && len(raw) > 0 {
+				parsed := parseIMAPMIMEBody(raw)
+				rawMsg, plainText, snippet = imapEmailStoredFields(parsed)
+				attachments = parsed.Attachments
 			}
 		}
 	}
@@ -374,19 +367,77 @@ func (h *IMAPHandler) storeEmail(ctx context.Context, folder string, msg *imap.M
 		date = time.Now()
 	}
 
-	_, err := h.pool.Exec(ctx, `
+	hasAttach := false
+	for _, att := range attachments {
+		if len(att.Data) > 0 {
+			hasAttach = true
+			break
+		}
+	}
+
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var emailID int64
+	err = tx.QueryRow(ctx, `
 		INSERT INTO emails (uid, folder, subject, from_address, to_addresses, cc_addresses, bcc_addresses,
 		                    date, raw_message, plain_text, snippet, has_attachments,
 		                    user_deleted, is_personal, is_business, is_social, is_promotional,
 		                    is_spam, is_important, use_by_ai)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE)
 		ON CONFLICT (uid, folder) DO UPDATE
 		SET subject=$3, from_address=$4, to_addresses=$5, cc_addresses=$6, bcc_addresses=$7,
-		    date=$8, raw_message=$9, plain_text=$10, snippet=$11`,
+		    date=$8, raw_message=$9, plain_text=$10, snippet=$11, has_attachments=$12,
+		    updated_at=NOW()
+		RETURNING id`,
 		uid, folder, env.Subject, from, to, cc, bcc,
-		date, rawMsg, plainText, snippet,
-	)
-	return err
+		date, rawMsg, plainText, snippet, hasAttach,
+	).Scan(&emailID)
+	if err != nil {
+		return err
+	}
+
+	ref := fmt.Sprintf("%d", emailID)
+	if _, err = tx.Exec(ctx, `DELETE FROM media_items WHERE source = 'email_attachment' AND source_reference = $1`, ref); err != nil {
+		return err
+	}
+
+	for _, att := range attachments {
+		if len(att.Data) == 0 {
+			continue
+		}
+		title := att.Filename
+		if title == "" {
+			title = "attachment"
+		}
+		if len(title) > 1000 {
+			title = title[:1000]
+		}
+		mt := att.MediaType
+		if len(mt) > 255 {
+			mt = mt[:255]
+		}
+		var blobID int64
+		if err = tx.QueryRow(ctx, `INSERT INTO media_blobs (image_data, thumbnail_data) VALUES ($1, NULL) RETURNING id`, att.Data).Scan(&blobID); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `
+			INSERT INTO media_items (
+				media_blob_id, title, media_type, source, source_reference,
+				processed, available_for_task, rating, has_gps, is_referenced,
+				is_personal, is_business, is_social, is_promotional, is_spam, is_important
+			) VALUES ($1, $2, $3, 'email_attachment', $4,
+				FALSE, FALSE, 5, FALSE, FALSE,
+				FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)`,
+			blobID, title, mt, ref); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 // addrList formats a slice of IMAP addresses as a comma-separated string.
@@ -403,72 +454,4 @@ func addrList(addrs []*imap.Address) string {
 		}
 	}
 	return strings.Join(parts, ", ")
-}
-
-// extractPlainText attempts to pull plain-text content from a raw RFC 822 message.
-func extractPlainText(raw []byte) string {
-	// Try to find Content-Type header to detect multipart
-	header, body, found := bytes.Cut(raw, []byte("\r\n\r\n"))
-	if !found {
-		header, body, found = bytes.Cut(raw, []byte("\n\n"))
-		if !found {
-			return strings.TrimSpace(string(raw))
-		}
-	}
-
-	ct := ""
-	for _, line := range strings.Split(string(header), "\n") {
-		if strings.HasPrefix(strings.ToLower(line), "content-type:") {
-			ct = strings.TrimSpace(line[len("content-type:"):])
-			break
-		}
-	}
-
-	mediaType, params, _ := mime.ParseMediaType(ct)
-
-	switch {
-	case strings.HasPrefix(mediaType, "multipart/"):
-		boundary := params["boundary"]
-		if boundary == "" {
-			return ""
-		}
-		mr := multipart.NewReader(bytes.NewReader(body), boundary)
-		for {
-			part, err := mr.NextPart()
-			if err != nil {
-				break
-			}
-			partCT := part.Header.Get("Content-Type")
-			partMedia, _, _ := mime.ParseMediaType(partCT)
-			if strings.HasPrefix(partMedia, "text/plain") {
-				text, _ := io.ReadAll(part)
-				return strings.TrimSpace(decodeTransferEncoding(part.Header.Get("Content-Transfer-Encoding"), text))
-			}
-		}
-		return ""
-	case strings.HasPrefix(mediaType, "text/plain"):
-		enc := ""
-		for _, line := range strings.Split(string(header), "\n") {
-			if strings.HasPrefix(strings.ToLower(line), "content-transfer-encoding:") {
-				enc = strings.TrimSpace(line[len("content-transfer-encoding:"):])
-				break
-			}
-		}
-		return strings.TrimSpace(decodeTransferEncoding(enc, body))
-	default:
-		return ""
-	}
-}
-
-func decodeTransferEncoding(enc string, data []byte) string {
-	switch strings.ToLower(strings.TrimSpace(enc)) {
-	case "quoted-printable":
-		decoded, err := io.ReadAll(quotedprintable.NewReader(bytes.NewReader(data)))
-		if err != nil {
-			return string(data)
-		}
-		return string(decoded)
-	default:
-		return string(data)
-	}
 }
