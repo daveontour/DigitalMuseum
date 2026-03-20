@@ -24,8 +24,9 @@ func DeriveUserKey(password, pepper string) string {
 	return hex.EncodeToString(DeriveKey(NormalizeKeyringPassword(password), pepper))
 }
 
-// InitSensitiveKeyring generates two fresh random DEKs, truncates sensitive_keyring,
-// and inserts one master seat. The shared DEK (encrypted_dek) is accessible by any
+// InitSensitiveKeyring generates two fresh random DEKs, truncates sensitive_keyring
+// (CASCADE clears dependent rows, e.g. visitor_key_hints), and inserts one master seat.
+// The shared DEK (encrypted_dek) is accessible by any
 // valid seat password. The master private DEK (encrypted_master_dek) is encrypted
 // solely under masterPassword and is used for the private_store table.
 func InitSensitiveKeyring(ctx context.Context, pool *pgxpool.Pool, masterPassword, pepper string) error {
@@ -50,7 +51,7 @@ func InitSensitiveKeyring(ctx context.Context, pool *pgxpool.Pool, masterPasswor
 
 	userKey := DeriveUserKey(masterPassword, pepper)
 
-	if _, err := pool.Exec(ctx, `TRUNCATE TABLE sensitive_keyring`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE TABLE sensitive_keyring CASCADE`); err != nil {
 		return fmt.Errorf("truncate sensitive_keyring: %w", err)
 	}
 
