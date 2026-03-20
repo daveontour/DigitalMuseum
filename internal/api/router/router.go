@@ -46,12 +46,12 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 	documentRepo := repository.NewDocumentRepo(pool)
 	documentSvc := service.NewDocumentService(documentRepo, pool, cfg.Crypto.KeyringPepper)
 	sensitiveSvc := service.NewSensitiveService(documentRepo, pool, cfg.Crypto.KeyringPepper)
-	ramMasterKey := &keystore.MemoryMasterKey{}
+	sessionMasterStore := keystore.NewSessionMasterStore(cfg.Server.SessionCookieSecure)
 	privateStoreRepo := repository.NewPrivateStoreRepo(pool)
 	privateStoreSvc := service.NewPrivateStoreService(privateStoreRepo, pool, cfg.Crypto.KeyringPepper)
 
 	// ── Import dialog saved settings (private_store, RAM master key) ────────────
-	importDialogSettingsHandler := handler.NewImportDialogSettingsHandler(privateStoreSvc, ramMasterKey)
+	importDialogSettingsHandler := handler.NewImportDialogSettingsHandler(privateStoreSvc, sessionMasterStore)
 	importDialogSettingsHandler.RegisterRoutes(r)
 
 	// ── IMAP ──────────────────────────────────────────────────────────────────
@@ -84,20 +84,20 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 	dashboardHandler.RegisterRoutes(r)
 
 	// ── Templated endpoints (GET /, suggestions, JS files) ───────────────────
-	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, cfg, ramMasterKey)
+	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, cfg, sessionMasterStore)
 	templateHandler.RegisterRoutes(r)
 
 	// ── Reference documents & sensitive data (shared keyring) ────────────────
-	sensitiveHandler := handler.NewSensitiveHandler(sensitiveSvc, cfg.App.AssetStaticDir, ramMasterKey)
+	sensitiveHandler := handler.NewSensitiveHandler(sensitiveSvc, cfg.App.AssetStaticDir, sessionMasterStore)
 	sensitiveHandler.RegisterRoutes(r)
-	documentHandler := handler.NewDocumentHandler(documentSvc, sensitiveSvc, ramMasterKey)
+	documentHandler := handler.NewDocumentHandler(documentSvc, sensitiveSvc, sessionMasterStore)
 	documentHandler.RegisterRoutes(r)
 
-	sessionHandler := handler.NewSessionHandler(sensitiveSvc, ramMasterKey)
+	sessionHandler := handler.NewSessionHandler(sensitiveSvc, sessionMasterStore)
 	sessionHandler.RegisterRoutes(r)
 
 	// ── Private key-value store (master-only DEK) ─────────────────────────────
-	privateStoreHandler := handler.NewPrivateStoreHandler(privateStoreSvc, ramMasterKey)
+	privateStoreHandler := handler.NewPrivateStoreHandler(privateStoreSvc, sessionMasterStore)
 	privateStoreHandler.RegisterRoutes(r)
 
 	// ── Artefacts ─────────────────────────────────────────────────────────────
@@ -173,9 +173,9 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 		cfg.App.AssetStaticDir,
 		cfg.AI.TavilyAPIKey,
 		cfg.Crypto.KeyringPepper,
-		ramMasterKey,
+		sessionMasterStore,
 	)
-	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo)
+	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo, sessionMasterStore)
 	chatHandler.RegisterRoutes(r)
 
 	return r

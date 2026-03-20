@@ -46,6 +46,9 @@ func (d DatabaseConfig) AdminConnectionString() string {
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
 	Port int
+	// SessionCookieSecure sets the Secure flag on the keyring session cookie.
+	// Enable when serving over HTTPS (e.g. SESSION_COOKIE_SECURE=true).
+	SessionCookieSecure bool
 }
 
 // CryptoConfig holds secrets used for crypto/key-derivation.
@@ -156,8 +159,11 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		DB:     db,
-		Server: ServerConfig{Port: serverPort},
+		DB: db,
+		Server: ServerConfig{
+			Port:                serverPort,
+			SessionCookieSecure: parseBool(getenv("SESSION_COOKIE_SECURE", "false")),
+		},
 		App: AppConfig{
 			PageTitle:      getenv("PAGE_TITLE", "Digital Museum of SUBJECT_NAME"),
 			TemplatesDir:   getenv("TEMPLATES_DIR", "../src/api/templates"),

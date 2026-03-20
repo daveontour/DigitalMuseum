@@ -15,13 +15,13 @@ import (
 // Every endpoint requires the master password because entries are encrypted
 // with the master-only private DEK.
 type PrivateStoreHandler struct {
-	svc       *service.PrivateStoreService
-	ramMaster *keystore.MemoryMasterKey
+	svc          *service.PrivateStoreService
+	sessionStore *keystore.SessionMasterStore
 }
 
 // NewPrivateStoreHandler creates a PrivateStoreHandler.
-func NewPrivateStoreHandler(svc *service.PrivateStoreService, ramMaster *keystore.MemoryMasterKey) *PrivateStoreHandler {
-	return &PrivateStoreHandler{svc: svc, ramMaster: ramMaster}
+func NewPrivateStoreHandler(svc *service.PrivateStoreService, sessionStore *keystore.SessionMasterStore) *PrivateStoreHandler {
+	return &PrivateStoreHandler{svc: svc, sessionStore: sessionStore}
 }
 
 // RegisterRoutes mounts all private-store routes.
@@ -40,7 +40,7 @@ func (h *PrivateStoreHandler) masterPasswordFromRequest(r *http.Request) string 
 	if v := r.Header.Get("X-Master-Password"); strings.TrimSpace(v) != "" {
 		return strings.TrimSpace(v)
 	}
-	return resolvePasswordWithRAMMaster(r.URL.Query().Get("master_password"), h.ramMaster)
+	return resolveMasterPassword(r.URL.Query().Get("master_password"), r, h.sessionStore)
 }
 
 // List handles GET /private-store
@@ -95,7 +95,7 @@ func (h *PrivateStoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "key is required")
 		return
 	}
-	mp := resolvePasswordWithRAMMaster(req.MasterPassword, h.ramMaster)
+	mp := resolveMasterPassword(req.MasterPassword, r, h.sessionStore)
 	if strings.TrimSpace(mp) == "" {
 		mp = h.masterPasswordFromRequest(r)
 	}
@@ -123,7 +123,7 @@ func (h *PrivateStoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	mp := resolvePasswordWithRAMMaster(req.MasterPassword, h.ramMaster)
+	mp := resolveMasterPassword(req.MasterPassword, r, h.sessionStore)
 	if strings.TrimSpace(mp) == "" {
 		mp = h.masterPasswordFromRequest(r)
 	}

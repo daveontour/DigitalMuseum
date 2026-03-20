@@ -11,15 +11,15 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// SessionHandler exposes session-scoped endpoints (in-RAM master key unlock).
+// SessionHandler exposes session-scoped endpoints (per-browser master key unlock).
 type SessionHandler struct {
 	sensitiveSvc *service.SensitiveService
-	ramMaster    *keystore.MemoryMasterKey
+	sessionStore *keystore.SessionMasterStore
 }
 
 // NewSessionHandler constructs a SessionHandler.
-func NewSessionHandler(sensitiveSvc *service.SensitiveService, ram *keystore.MemoryMasterKey) *SessionHandler {
-	return &SessionHandler{sensitiveSvc: sensitiveSvc, ramMaster: ram}
+func NewSessionHandler(sensitiveSvc *service.SensitiveService, sessionStore *keystore.SessionMasterStore) *SessionHandler {
+	return &SessionHandler{sensitiveSvc: sensitiveSvc, sessionStore: sessionStore}
 }
 
 // RegisterRoutes mounts /api/session/* routes.
@@ -50,23 +50,25 @@ func (h *SessionHandler) VisitorKeyHintsList(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, map[string]any{"hints": out})
 }
 
-// MasterKeyClear drops the in-process RAM master key (e.g. after a full page reload of the main app).
+// MasterKeyClear drops this browser's session master key.
 func (h *SessionHandler) MasterKeyClear(w http.ResponseWriter, r *http.Request) {
-	h.ramMaster.Clear()
+	h.sessionStore.Clear(w, r)
 	writeJSON(w, map[string]any{"cleared": true})
 }
 
-// MasterKeyStatus reports whether a keyring exists and whether this process has an unlocked master key in RAM.
+// MasterKeyStatus reports whether a keyring exists and whether this browser session has unlock material.
+// master_unlocked is true only when the owner master key was used (visitor seat unlock sets unlocked but not master_unlocked).
 func (h *SessionHandler) MasterKeyStatus(w http.ResponseWriter, r *http.Request) {
 	n, err := h.sensitiveSvc.KeyCount(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error reading keyring: %s", err))
 		return
 	}
-	_, unlocked := h.ramMaster.Get()
+	unlocked, masterUnlocked := h.sessionStore.SessionStatus(r)
 	writeJSON(w, map[string]any{
 		"keyring_configured": n > 0,
 		"unlocked":           unlocked,
+		"master_unlocked":    masterUnlocked,
 	})
 }
 
@@ -96,7 +98,10 @@ func (h *SessionHandler) MasterKeyUnlock(w http.ResponseWriter, r *http.Request)
 		})
 		return
 	}
-	h.ramMaster.Set(req.Password)
+	if err := h.sessionStore.Put(w, r, req.Password, true); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("session error: %s", err))
+		return
+	}
 	writeJSON(w, map[string]any{"valid": true})
 }
 
@@ -140,6 +145,9 @@ func (h *SessionHandler) MasterKeyUnlockVisitor(w http.ResponseWriter, r *http.R
 		})
 		return
 	}
-	h.ramMaster.Set(req.Password)
+	if err := h.sessionStore.Put(w, r, req.Password, false); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("session error: %s", err))
+		return
+	}
 	writeJSON(w, map[string]any{"valid": true, "visitor": true})
 }

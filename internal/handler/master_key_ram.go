@@ -1,18 +1,20 @@
 package handler
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/daveontour/digitalmuseum/internal/keystore"
 )
 
-// resolvePasswordWithRAMMaster returns primary if non-empty; otherwise the in-RAM master key if set.
-func resolvePasswordWithRAMMaster(primary string, ram *keystore.MemoryMasterKey) string {
+// resolveMasterPassword returns primary if non-empty; otherwise the session-stored
+// master key for this HTTP request, if any.
+func resolveMasterPassword(primary string, r *http.Request, store *keystore.SessionMasterStore) string {
 	if s := strings.TrimSpace(primary); s != "" {
 		return s
 	}
-	if ram != nil {
-		if p, ok := ram.Get(); ok {
+	if store != nil && r != nil {
+		if p, ok := store.Get(r); ok {
 			return p
 		}
 	}

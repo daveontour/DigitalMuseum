@@ -18,12 +18,12 @@ import (
 type DocumentHandler struct {
 	svc          *service.DocumentService
 	sensitiveSvc *service.SensitiveService
-	ramMaster    *keystore.MemoryMasterKey
+	sessionStore *keystore.SessionMasterStore
 }
 
 // NewDocumentHandler creates a DocumentHandler.
-func NewDocumentHandler(svc *service.DocumentService, sensitiveSvc *service.SensitiveService, ramMaster *keystore.MemoryMasterKey) *DocumentHandler {
-	return &DocumentHandler{svc: svc, sensitiveSvc: sensitiveSvc, ramMaster: ramMaster}
+func NewDocumentHandler(svc *service.DocumentService, sensitiveSvc *service.SensitiveService, sessionStore *keystore.SessionMasterStore) *DocumentHandler {
+	return &DocumentHandler{svc: svc, sensitiveSvc: sensitiveSvc, sessionStore: sessionStore}
 }
 
 // RegisterRoutes mounts all reference document routes.
@@ -154,7 +154,7 @@ func (h *DocumentHandler) Download(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("reference document with ID %d not found", id))
 		return
 	}
-	password := resolvePasswordWithRAMMaster(r.URL.Query().Get("password"), h.ramMaster)
+	password := resolveMasterPassword(r.URL.Query().Get("password"), r, h.sessionStore)
 	data, err := h.svc.GetData(r.Context(), id, password)
 	if err != nil {
 		if errors.Is(err, service.ErrPasswordRequired) {
@@ -223,7 +223,7 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("is_sensitive"); v != "" {
 		isSensitive, _ = strconv.ParseBool(v)
 	}
-	masterPassword := resolvePasswordWithRAMMaster(r.FormValue("master_password"), h.ramMaster)
+	masterPassword := resolveMasterPassword(r.FormValue("master_password"), r, h.sessionStore)
 
 	optForm := func(key string) *string {
 		if v := r.FormValue(key); v != "" {
@@ -348,7 +348,7 @@ func (h *DocumentHandler) AddUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "hint is required (plain-text reminder for visitor unlock)")
 		return
 	}
-	mp := resolvePasswordWithRAMMaster(req.MasterPassword, h.ramMaster)
+	mp := resolveMasterPassword(req.MasterPassword, r, h.sessionStore)
 	if err := h.sensitiveSvc.AddUser(r.Context(), req.UserPassword, mp, req.Hint); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error adding user: %s", err))
 		return
@@ -365,7 +365,7 @@ func (h *DocumentHandler) RemoveUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	mp := resolvePasswordWithRAMMaster(req.MasterPassword, h.ramMaster)
+	mp := resolveMasterPassword(req.MasterPassword, r, h.sessionStore)
 	if err := h.sensitiveSvc.RemoveUser(r.Context(), req.UserPassword, mp); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error removing user: %s", err))
 		return
@@ -390,7 +390,7 @@ func (h *DocumentHandler) EncryptExisting(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	pw := resolvePasswordWithRAMMaster(req.Password, h.ramMaster)
+	pw := resolveMasterPassword(req.Password, r, h.sessionStore)
 	if pw == "" {
 		writeError(w, http.StatusBadRequest, "password is required")
 		return

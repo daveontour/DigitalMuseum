@@ -18,12 +18,12 @@ const imapImportDialogLegacyPrivateKey = "imap_import_dialog_v1"
 // in private_store (master-derived DEK; master password only from server RAM).
 type ImportDialogSettingsHandler struct {
 	privateStore *service.PrivateStoreService
-	ramMaster    *keystore.MemoryMasterKey
+	sessionStore *keystore.SessionMasterStore
 }
 
 // NewImportDialogSettingsHandler constructs the handler.
-func NewImportDialogSettingsHandler(privateStore *service.PrivateStoreService, ram *keystore.MemoryMasterKey) *ImportDialogSettingsHandler {
-	return &ImportDialogSettingsHandler{privateStore: privateStore, ramMaster: ram}
+func NewImportDialogSettingsHandler(privateStore *service.PrivateStoreService, sessionStore *keystore.SessionMasterStore) *ImportDialogSettingsHandler {
+	return &ImportDialogSettingsHandler{privateStore: privateStore, sessionStore: sessionStore}
 }
 
 // allowedImportDialogKinds maps URL segment -> private_store key suffix (import_dialog_<kind>_v1).
@@ -46,8 +46,8 @@ func (h *ImportDialogSettingsHandler) RegisterRoutes(r chi.Router) {
 	r.Put("/api/import-saved-settings/{kind}", h.Put)
 }
 
-func (h *ImportDialogSettingsHandler) masterPasswordOrRespond(w http.ResponseWriter, forPut bool) (string, bool) {
-	if h.ramMaster == nil {
+func (h *ImportDialogSettingsHandler) masterPasswordOrRespond(w http.ResponseWriter, r *http.Request, forPut bool) (string, bool) {
+	if h.sessionStore == nil {
 		if forPut {
 			writeError(w, http.StatusForbidden, "Master key is not unlocked in this session.")
 		} else {
@@ -55,7 +55,7 @@ func (h *ImportDialogSettingsHandler) masterPasswordOrRespond(w http.ResponseWri
 		}
 		return "", false
 	}
-	mp, ok := h.ramMaster.Get()
+	mp, ok := h.sessionStore.Get(r)
 	if !ok || mp == "" {
 		if forPut {
 			writeError(w, http.StatusForbidden, "Master key is not unlocked in this session.")
@@ -79,7 +79,7 @@ func (h *ImportDialogSettingsHandler) Get(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusNotFound, "unknown import dialog kind")
 		return
 	}
-	mp, ok := h.masterPasswordOrRespond(w, false)
+	mp, ok := h.masterPasswordOrRespond(w, r, false)
 	if !ok {
 		return
 	}
@@ -120,7 +120,7 @@ func (h *ImportDialogSettingsHandler) Put(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusNotFound, "unknown import dialog kind")
 		return
 	}
-	mp, ok := h.masterPasswordOrRespond(w, true)
+	mp, ok := h.masterPasswordOrRespond(w, r, true)
 	if !ok {
 		return
 	}

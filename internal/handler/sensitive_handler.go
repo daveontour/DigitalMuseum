@@ -18,12 +18,12 @@ import (
 type SensitiveHandler struct {
 	svc             *service.SensitiveService
 	pythonStaticDir string
-	ramMaster       *keystore.MemoryMasterKey
+	sessionStore    *keystore.SessionMasterStore
 }
 
 // NewSensitiveHandler creates a SensitiveHandler.
-func NewSensitiveHandler(svc *service.SensitiveService, pythonStaticDir string, ramMaster *keystore.MemoryMasterKey) *SensitiveHandler {
-	return &SensitiveHandler{svc: svc, pythonStaticDir: pythonStaticDir, ramMaster: ramMaster}
+func NewSensitiveHandler(svc *service.SensitiveService, pythonStaticDir string, sessionStore *keystore.SessionMasterStore) *SensitiveHandler {
+	return &SensitiveHandler{svc: svc, pythonStaticDir: pythonStaticDir, sessionStore: sessionStore}
 }
 
 // RegisterRoutes mounts all sensitive-data routes.
@@ -84,7 +84,7 @@ func (h *SensitiveHandler) GetHints(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SensitiveHandler) ListAll(w http.ResponseWriter, r *http.Request) {
-	password := resolvePasswordWithRAMMaster(r.URL.Query().Get("password"), h.ramMaster)
+	password := resolveMasterPassword(r.URL.Query().Get("password"), r, h.sessionStore)
 	records, err := h.svc.ListAll(r.Context(), password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error listing records: %s", err))
@@ -98,7 +98,7 @@ func (h *SensitiveHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	password := resolvePasswordWithRAMMaster(r.URL.Query().Get("password"), h.ramMaster)
+	password := resolveMasterPassword(r.URL.Query().Get("password"), r, h.sessionStore)
 	record, err := h.svc.GetByID(r.Context(), id, password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error getting record: %s", err))
@@ -210,7 +210,7 @@ func (h *SensitiveHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	pw := resolvePasswordWithRAMMaster(req.Password, h.ramMaster)
+	pw := resolveMasterPassword(req.Password, r, h.sessionStore)
 	if !sensitiveHasPassword(pw) {
 		writeError(w, http.StatusForbidden, "a password is required to create records")
 		return
@@ -239,7 +239,7 @@ func (h *SensitiveHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	pw := resolvePasswordWithRAMMaster(req.Password, h.ramMaster)
+	pw := resolveMasterPassword(req.Password, r, h.sessionStore)
 	if !sensitiveHasPassword(pw) {
 		writeError(w, http.StatusForbidden, "a password is required to update records")
 		return
@@ -256,7 +256,7 @@ func (h *SensitiveHandler) DeleteRecord(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	password := resolvePasswordWithRAMMaster(r.URL.Query().Get("password"), h.ramMaster)
+	password := resolveMasterPassword(r.URL.Query().Get("password"), r, h.sessionStore)
 	if !sensitiveHasPassword(password) {
 		writeError(w, http.StatusForbidden, "a password is required to delete records")
 		return

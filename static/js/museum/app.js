@@ -211,6 +211,87 @@ const App = (() => {
         });
     }
 
+    /** True only when the owner master key was used for this session (visitor unlock does not count). */
+    async function fetchMasterUnlockedForDataImport() {
+        try {
+            const st = await fetch('/api/session/master-key/status', { credentials: 'same-origin' });
+            if (!st.ok) return false;
+            const sj = await st.json();
+            return !!sj.master_unlocked;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async function ensureMasterKeyForDataImport() {
+        if (await fetchMasterUnlockedForDataImport()) return true;
+        if (typeof Modals !== 'undefined' && Modals.ConfirmationModal && Modals.ConfirmationModal.open) {
+            Modals.ConfirmationModal.open(
+                'Owner master key required',
+                'Data Import requires the owner master key. Use Unlock Encryption and choose Unlock with Master Key (a visitor key is not enough).',
+                () => {
+                    const m = document.getElementById('master-key-unlock-modal');
+                    if (m) {
+                        m.style.display = 'flex';
+                        const inp = document.getElementById('master-key-unlock-input');
+                        if (inp) inp.focus();
+                    }
+                }
+            );
+        } else {
+            window.alert('Unlock with the owner master key before opening Data Import (visitor key is not sufficient).');
+        }
+        return false;
+    }
+
+    function refreshDataImportMasterKeyAccessUI() {
+        void (async () => {
+            const masterOk = await fetchMasterUnlockedForDataImport();
+            const sidebarBtn = document.getElementById('data-import-sidebar-btn');
+            const tiles = document.querySelectorAll('.import-data-dialog-tile[data-open-modal="data-import-modal"]');
+            if (sidebarBtn) {
+                sidebarBtn.disabled = !masterOk;
+                sidebarBtn.title = masterOk ? '' : 'Owner master key required — use Unlock with Master Key (visitor key is not enough).';
+                sidebarBtn.style.opacity = masterOk ? '' : '0.55';
+                sidebarBtn.style.cursor = masterOk ? '' : 'not-allowed';
+            }
+            tiles.forEach((tile) => {
+                if (masterOk) {
+                    tile.classList.remove('data-import-entry-blocked');
+                    tile.removeAttribute('aria-disabled');
+                    if (tile.hasAttribute('data-title-when-unlocked')) {
+                        const orig = tile.getAttribute('data-title-when-unlocked');
+                        tile.title = orig || 'Click to open';
+                    }
+                } else {
+                    tile.classList.add('data-import-entry-blocked');
+                    tile.setAttribute('aria-disabled', 'true');
+                    if (!tile.hasAttribute('data-title-when-unlocked')) {
+                        tile.setAttribute('data-title-when-unlocked', tile.getAttribute('title') || 'Click to open');
+                    }
+                    tile.title = 'Owner master key required for Data Import (visitor key is not enough).';
+                }
+            });
+
+            // Settings & Data Import modal: without owner master unlock, only Settings tab is available.
+            const configOverlay = document.getElementById('config-modal-overlay');
+            if (configOverlay) {
+                configOverlay.classList.toggle('config-modal-master-unlock-required', !masterOk);
+            }
+            document.querySelectorAll('.config-sidebar-requires-master').forEach((el) => {
+                el.style.display = masterOk ? '' : 'none';
+            });
+            if (!masterOk) {
+                document.querySelectorAll('.config-tab-button').forEach((btn) => btn.classList.remove('active'));
+                document.querySelectorAll('.config-tab-content').forEach((c) => c.classList.remove('active'));
+                const settingsBtn = document.querySelector('.config-tab-button[data-tab="settings"]');
+                const settingsTab = document.getElementById('settings-tab');
+                if (settingsBtn) settingsBtn.classList.add('active');
+                if (settingsTab) settingsTab.classList.add('active');
+            }
+        })();
+    }
+
     function initEventListeners() {
         DOM.chatForm.addEventListener('submit', (event) => {
             event.preventDefault();
@@ -575,6 +656,10 @@ const App = (() => {
         
         configTabButtons.forEach(button => {
             button.addEventListener('click', () => {
+                if (button.classList.contains('config-sidebar-requires-master')) {
+                    const st = window.getComputedStyle(button);
+                    if (st.display === 'none' || st.visibility === 'hidden') return;
+                }
                 const targetTab = button.getAttribute('data-tab');
                 
                 // Remove active class from all buttons and contents
@@ -2071,13 +2156,21 @@ const App = (() => {
             tile.addEventListener('click', (e) => {
                 const openModal = tile.getAttribute('data-open-modal');
                 if (openModal) {
+                    if (openModal === 'data-import-modal') {
+                        void (async () => {
+                            if (!(await ensureMasterKeyForDataImport())) return;
+                            const modal = document.getElementById(openModal);
+                            if (modal) {
+                                modal.style.display = 'flex';
+                                if (DOM.configPage) DOM.configPage.style.display = 'none';
+                                if (typeof loadControlDefaults === 'function') loadControlDefaults();
+                            }
+                        })();
+                        return;
+                    }
                     const modal = document.getElementById(openModal);
                     if (modal) {
                         modal.style.display = 'flex';
-                        if (openModal === 'data-import-modal') {
-                            if (DOM.configPage) DOM.configPage.style.display = 'none';
-                            if (typeof loadControlDefaults === 'function') loadControlDefaults();
-                        }
                         if (openModal === 'reference-documents-manage-modal') {
                             const dim = document.getElementById('data-import-modal');
                             if (dim) dim.style.display = 'none';
@@ -2280,8 +2373,11 @@ const App = (() => {
         const closeDataImportModalBtn = document.getElementById('close-data-import-modal');
         if (dataImportSidebarBtn && dataImportModal) {
             dataImportSidebarBtn.addEventListener('click', () => {
-                dataImportModal.style.display = 'flex';
-                loadControlDefaults();
+                void (async () => {
+                    if (!(await ensureMasterKeyForDataImport())) return;
+                    dataImportModal.style.display = 'flex';
+                    loadControlDefaults();
+                })();
             });
         }
         const closeDataImportModal = () => {
@@ -2431,7 +2527,7 @@ const App = (() => {
         }
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Unlock';
+            submitBtn.textContent = 'Unlock with Master Key';
         }
         if (visitorBtn) {
             visitorBtn.disabled = false;
@@ -2443,11 +2539,11 @@ const App = (() => {
     function maybePromptMasterKeyUnlock() {
         (async () => {
             try {
-                const kc = await fetch('/sensitive-data/key-count');
+                const kc = await fetch('/sensitive-data/key-count', { credentials: 'same-origin' });
                 if (!kc.ok) return;
                 const kj = await kc.json();
                 if (!kj.count) return;
-                const st = await fetch('/api/session/master-key/status');
+                const st = await fetch('/api/session/master-key/status', { credentials: 'same-origin' });
                 if (!st.ok) return;
                 const sj = await st.json();
                 if (sj.unlocked) return;
@@ -2502,6 +2598,18 @@ const App = (() => {
         } catch (e) {
             console.error('initEventListeners failed (some UI may be broken):', e);
         }
+        refreshDataImportMasterKeyAccessUI();
+        (function observeConfigModalMasterUnlockRefresh() {
+            const el = document.getElementById('config-modal-overlay');
+            if (!el) return;
+            const run = () => {
+                try {
+                    if (window.getComputedStyle(el).display !== 'none') refreshDataImportMasterKeyAccessUI();
+                } catch (e) { /* ignore */ }
+            };
+            const obs = new MutationObserver(run);
+            obs.observe(el, { attributes: true, attributeFilter: ['style'] });
+        })();
         loadLLMProviderAvailability();
         try {
             if (Modals.AppConfig && Modals.AppConfig.load) void Modals.AppConfig.load();
@@ -2538,6 +2646,7 @@ const App = (() => {
                 const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({ password: pw })
                 });
                 const data = await res.json().catch(() => ({}));
@@ -2548,7 +2657,7 @@ const App = (() => {
                     }
                     if (mkSubmit) {
                         mkSubmit.disabled = false;
-                        mkSubmit.textContent = 'Unlock';
+                        mkSubmit.textContent = 'Unlock with Master Key';
                     }
                     if (mkVisitorSubmit) {
                         mkVisitorSubmit.disabled = false;
@@ -2561,6 +2670,7 @@ const App = (() => {
                     return;
                 }
                 closeMasterKeyUnlockModal();
+                refreshDataImportMasterKeyAccessUI();
             } catch (e) {
                 if (errEl) {
                     errEl.textContent = e.message || 'Request failed';
@@ -2568,7 +2678,7 @@ const App = (() => {
                 }
                 if (mkSubmit) {
                     mkSubmit.disabled = false;
-                    mkSubmit.textContent = 'Unlock';
+                    mkSubmit.textContent = 'Unlock with Master Key';
                 }
                 if (mkVisitorSubmit) {
                     mkVisitorSubmit.disabled = false;

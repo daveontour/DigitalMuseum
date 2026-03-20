@@ -27,12 +27,12 @@ type TemplateHandler struct {
 	geminiAvail     bool
 	claudeAvail     bool
 	pageTitle       string
-	ramMaster       *keystore.MemoryMasterKey
+	sessionStore    *keystore.SessionMasterStore
 }
 
 // NewTemplateHandler creates a TemplateHandler.
-// ramMaster is cleared on every GET / so each full HTML load requires unlocking the master key again.
-func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, cfg *config.Config, ramMaster *keystore.MemoryMasterKey) *TemplateHandler {
+// sessionStore is cleared for this client on every GET / so each full HTML load requires unlocking the master key again.
+func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, cfg *config.Config, sessionStore *keystore.SessionMasterStore) *TemplateHandler {
 	return &TemplateHandler{
 		subjectRepo:     subjectRepo,
 		templatesDir:    cfg.App.TemplatesDir,
@@ -40,7 +40,7 @@ func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, cfg *config.C
 		geminiAvail:     cfg.AI.GeminiAPIKey != "",
 		claudeAvail:     cfg.AI.AnthropicAPIKey != "",
 		pageTitle:       cfg.App.PageTitle,
-		ramMaster:       ramMaster,
+		sessionStore:    sessionStore,
 	}
 }
 
@@ -55,7 +55,7 @@ func (h *TemplateHandler) RegisterRoutes(r chi.Router) {
 
 // GetRoot handles GET / → renders index.template.html (or non_user_init.template.html).
 func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
-	h.ramMaster.Clear()
+	h.sessionStore.Clear(w, r)
 
 	ctx := h.buildContext(r)
 

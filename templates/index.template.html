@@ -264,37 +264,37 @@
                 <div class="config-modal-body">
                     <div class="config-tabs-sidebar">
                         <label class="config-tab-label" style="margin-left: 10px; font-weight: bold;margin-top: 10px;;color:cadetblue">App & Subject Settings</label>
-                        <button class="config-tab-button active" data-tab="settings">
+                        <button type="button" class="config-tab-button active" data-tab="settings">
                             <i class="fas fa-cog"></i> Settings
                         </button>
-                        <button class="config-tab-button" data-tab="subject-configuration">
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="subject-configuration">
                             <i class="fas fa-user"></i> Subject Configuration
                         </button>
-                        <button class="config-tab-button" data-tab="system-instructions">
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="system-instructions">
                             <i class="fas fa-file-alt"></i> System Instructions
                         </button>
-                        <button class="config-tab-button" data-tab="custom-voices">
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="custom-voices">
                             <i class="fas fa-microphone-alt"></i> Custom Voices
                         </button>
-                        <label class="config-tab-label" style="margin-left: 10px; font-weight: bold;margin-top: 10px;color:cadetblue">Personal Data</label>
-                        <button class="config-tab-button" data-tab="manage-imported-data">
+                        <label class="config-tab-label config-sidebar-requires-master" style="margin-left: 10px; font-weight: bold;margin-top: 10px;color:cadetblue">Personal Data</label>
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-imported-data">
                             <i class="fas fa-database"></i> Manage Imported Data
                         </button>
-                        <button class="config-tab-button" data-tab="interests">
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="interests">
                             <i class="fas fa-star"></i> Interests
                         </button>
-                        <label class="config-tab-label" style="margin-left: 10px; font-weight: bold;margin-top: 10px;;color:cadetblue">Manage Emails & Contacts</label>
-                        <button class="config-tab-button" data-tab="images-grid">
+                        <label class="config-tab-label config-sidebar-requires-master" style="margin-left: 10px; font-weight: bold;margin-top: 10px;;color:cadetblue">Manage Emails & Contacts</label>
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="images-grid">
                             <i class="fas fa-images"></i> Email Attachments
                         </button>
-                        <button class="config-tab-button" data-tab="email-editor">
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="email-editor">
                             <i class="fas fa-edit"></i> Email Editor
                         </button>
-                        <button class="config-tab-button" data-tab="manage-contacts">
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-contacts">
                             <i class="fas fa-address-book"></i> Manage Contacts
                         </button>
-                        <label class="config-tab-label" style="margin-left: 10px; font-weight: bold;margin-top: 10px;;color:cadetblue">Manage Secure Data Access</label>
-                        <button class="config-tab-button" data-tab="manage-keys">
+                        <label class="config-tab-label config-sidebar-requires-master" style="margin-left: 10px; font-weight: bold;margin-top: 10px;;color:cadetblue">Manage Secure Data Access</label>
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-keys">
                             <i class="fas fa-key"></i> Manage Keys
                         </button>
                     </div>
@@ -2446,27 +2446,32 @@
 
         <!-- Master key unlock: validated against keyring; password kept in server RAM only (not on disk) -->
         <div id="master-key-unlock-modal" class="modal" style="display:none; z-index:4200; align-items:center; justify-content:center;">
-            <div class="modal-content confirmation-modal-content" style="max-width:440px;" onclick="event.stopPropagation()">
+            <div class="modal-content confirmation-modal-content" style="max-width:600px;" onclick="event.stopPropagation()">
                 <div class="confirmation-modal-header">
-                    <h2>Unlock encryption</h2>
+                    <h2>Unlock Encryption</h2>
                 </div>
                 <div class="confirmation-modal-body">
                     <p style="color:#555; margin-bottom:12px; font-size:0.95rem; line-height:1.45;">
-                        Enter the <strong>owner master key</strong> and choose <strong>Unlock</strong> for full access (including the private store).
-                        If the owner gave you a <strong>visitor key</strong> (a separate keyring seat), enter it and choose <strong>Unlock as visitor</strong> — that cannot be the master key.
+                        Enter the <strong>owner's master key</strong> and choose <strong>Unlock with Master Key</strong> for full access (including the private store).
+                        <br/><br/>If the owner gave you a <strong>visitor key</strong> then enter it and choose <strong>Unlock as visitor</strong>
                         Visitor access can decrypt shared sensitive data and reference documents, but not the owner-only private store.
-                        You can skip; those features stay unavailable until you unlock.
+                        <br/>The owner may have left a <strong>visitor key hint</strong> to help you remember or guess the key.
+                        <br/><br/>You can <strong>Skip for now</strong> but some features stay unavailable until you unlock.
                     </p>
                     <div id="master-key-unlock-error" style="display:none; color:#b91c1c; margin-bottom:10px; font-size:0.9rem;"></div>
-                    <label for="master-key-unlock-input" style="display:block; margin-bottom:6px; font-weight:500;">Master or visitor key</label>
+                    <label for="master-key-unlock-input" style="display:block; margin-bottom:6px; font-weight:500;">Master or Visitor key</label>
                     <input type="password" id="master-key-unlock-input" class="modal-input" autocomplete="off"
                         style="width:100%; padding:10px 12px; border-radius:6px; border:1px solid #bfc9da; box-sizing:border-box;" />
                 </div>
-                <div class="confirmation-modal-buttons" style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
-                    <button type="button" id="master-key-unlock-show-hints" class="modal-btn modal-btn-secondary">Show visitor key hints</button>
-                    <button type="button" id="master-key-unlock-skip" class="modal-btn modal-btn-secondary">Skip for now</button>
-                    <button type="button" id="master-key-unlock-visitor-submit" class="modal-btn modal-btn-secondary">Unlock as visitor</button>
-                    <button type="button" id="master-key-unlock-submit" class="modal-btn modal-btn-primary">Unlock</button>
+                <div class="confirmation-modal-buttons master-key-unlock-button-rows" style="display:flex; flex-direction:column; justify-content:flex-start; align-items:stretch; gap:10px; width:100%; box-sizing:border-box;">
+                    <div style="display:flex; gap:10px; width:100%;">
+                        <button type="button" id="master-key-unlock-skip" class="modal-btn modal-btn-secondary" style="flex:1 1 0; min-width:0; width:50%; box-sizing:border-box;">Skip for now</button>
+                        <button type="button" id="master-key-unlock-submit" class="modal-btn modal-btn-primary" style="flex:1 1 0; min-width:0; width:50%; box-sizing:border-box;">Unlock with Master Key</button>
+                    </div>
+                    <div style="display:flex; gap:10px; width:100%;">
+                        <button type="button" id="master-key-unlock-show-hints" class="modal-btn modal-btn-secondary" style="flex:1 1 0; min-width:0; width:50%; box-sizing:border-box;">Show visitor key hints</button>
+                        <button type="button" id="master-key-unlock-visitor-submit" class="modal-btn modal-btn-secondary" style="flex:1 1 0; min-width:0; width:50%; box-sizing:border-box;">Unlock as visitor</button>
+                    </div>
                 </div>
             </div>
         </div>

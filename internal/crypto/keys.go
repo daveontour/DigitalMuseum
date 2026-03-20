@@ -283,29 +283,6 @@ func SensitiveKeyringSeatCount(ctx context.Context, pool *pgxpool.Pool) (int, er
 	return count, err
 }
 
-// EnsureKeyringSeat checks whether userPassword already has a valid keyring seat
-// and adds one if it does not. masterPassword is required to recover the existing DEK;
-// if it is empty or invalid the function returns an error.
-// Returns (true, nil) if the seat already existed, (false, nil) if it was just added.
-func EnsureKeyringSeat(ctx context.Context, pool *pgxpool.Pool, userPassword, masterPassword, pepper string) (alreadyExisted bool, err error) {
-	if userPassword == "" {
-		return false, fmt.Errorf("user password is required")
-	}
-	// Check whether the seat already exists.
-	dek, err := GetSensitiveDEK(ctx, pool, userPassword, pepper)
-	if err != nil {
-		return false, fmt.Errorf("check keyring: %w", err)
-	}
-	if dek != "" {
-		return true, nil
-	}
-	// Seat missing — add it (no visitor hint row; optional path for automation).
-	if _, err := AddSensitiveKeyringSeat(ctx, pool, userPassword, masterPassword, pepper); err != nil {
-		return false, fmt.Errorf("add keyring seat: %w", err)
-	}
-	return false, nil
-}
-
 // EncryptDocumentData encrypts raw bytes using the sensitive_keyring DEK.
 // Returns the pgcrypto-encrypted BYTEA for storage in reference_documents.data.
 func EncryptDocumentData(ctx context.Context, pool *pgxpool.Pool, masterPassword string, data []byte, pepper string) ([]byte, error) {

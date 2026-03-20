@@ -116,6 +116,7 @@
                 const keyRes = await fetch('/sensitive-data/master-key', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({ password: masterKey })
                 });
                 if (!keyRes.ok) {
@@ -127,6 +128,7 @@
                 await fetch('/api/session/master-key/unlock', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({ password: masterKey })
                 });
 

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	appai "github.com/daveontour/digitalmuseum/internal/ai"
+	"github.com/daveontour/digitalmuseum/internal/keystore"
 	"github.com/daveontour/digitalmuseum/internal/model"
 	"github.com/daveontour/digitalmuseum/internal/repository"
 	"github.com/daveontour/digitalmuseum/internal/service"
@@ -16,13 +18,14 @@ import (
 
 // ChatHandler handles all /chat/* endpoints.
 type ChatHandler struct {
-	svc    *service.ChatService
-	cpRepo *repository.CompleteProfileRepo
+	svc          *service.ChatService
+	cpRepo       *repository.CompleteProfileRepo
+	sessionStore *keystore.SessionMasterStore
 }
 
 // NewChatHandler creates a ChatHandler.
-func NewChatHandler(svc *service.ChatService, cpRepo *repository.CompleteProfileRepo) *ChatHandler {
-	return &ChatHandler{svc: svc, cpRepo: cpRepo}
+func NewChatHandler(svc *service.ChatService, cpRepo *repository.CompleteProfileRepo, sessionStore *keystore.SessionMasterStore) *ChatHandler {
+	return &ChatHandler{svc: svc, cpRepo: cpRepo, sessionStore: sessionStore}
 }
 
 // RegisterRoutes mounts the chat endpoints on r.
@@ -68,7 +71,7 @@ func (h *ChatHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		req.Provider = "gemini"
 	}
 
-	resp, err := h.svc.GenerateResponse(r.Context(), req)
+	resp, err := h.svc.GenerateResponse(r.Context(), r, req)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -91,7 +94,7 @@ func (h *ChatHandler) GenerateRandomQuestion(w http.ResponseWriter, r *http.Requ
 		req.Provider = "gemini"
 	}
 
-	resp, err := h.svc.GenerateRandomQuestion(r.Context(), req)
+	resp, err := h.svc.GenerateRandomQuestion(r.Context(), r, req)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -390,9 +393,16 @@ func (h *ChatHandler) CompleteProfileStart(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	provider := strings.TrimSpace(strings.ToLower(req.Provider))
+	var getRAM appai.RAMMasterGetter
+	if h.sessionStore != nil {
+		if p, ok := h.sessionStore.Get(r); ok {
+			pw := p
+			getRAM = func() (string, bool) { return pw, true }
+		}
+	}
 	go func() {
 		ctx := context.Background()
-		if err := h.svc.GenerateCompleteProfile(ctx, name, provider); err != nil {
+		if err := h.svc.GenerateCompleteProfile(ctx, name, provider, getRAM); err != nil {
 			log.Printf("[complete_profile] Error for '%s': %v", name, err)
 		}
 	}()

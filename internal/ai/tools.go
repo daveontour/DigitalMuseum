@@ -12,13 +12,18 @@ import (
 	"time"
 
 	appcrypto "github.com/daveontour/digitalmuseum/internal/crypto"
-	"github.com/daveontour/digitalmuseum/internal/keystore"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// RAMMasterGetter returns the session master password when the browser has unlocked the keyring.
+type RAMMasterGetter func() (password string, ok bool)
+
 // NewToolExecutor creates a ToolExecutor backed by the provided pool.
-// ramMaster holds the sensitive keyring master password after browser unlock; used to decrypt encrypted reference documents for AI tools.
-func NewToolExecutor(pool *pgxpool.Pool, subjectName, tavilyKey, pepper string, ramMaster *keystore.MemoryMasterKey) ToolExecutor {
+// getRAM returns the sensitive keyring password for this HTTP request's session; used to decrypt encrypted reference documents for AI tools.
+func NewToolExecutor(pool *pgxpool.Pool, subjectName, tavilyKey, pepper string, getRAM RAMMasterGetter) ToolExecutor {
+	if getRAM == nil {
+		getRAM = func() (string, bool) { return "", false }
+	}
 	return func(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
 		switch name {
 		case "get_current_time":
@@ -65,7 +70,7 @@ func NewToolExecutor(pool *pgxpool.Pool, subjectName, tavilyKey, pepper string, 
 					ids = append(ids, x)
 				}
 			}
-			return getReferenceDocuments(ctx, pool, ids, pepper, ramMaster)
+			return getReferenceDocuments(ctx, pool, ids, pepper, getRAM)
 		default:
 			return nil, fmt.Errorf("unknown tool: %s", name)
 		}
@@ -405,10 +410,10 @@ func getUserInterests(ctx context.Context, pool *pgxpool.Pool) (map[string]any, 
 	return map[string]any{"interests": interests, "count": len(interests)}, nil
 }
 
-func getReferenceDocuments(ctx context.Context, pool *pgxpool.Pool, ids []int64, pepper string, ramMaster *keystore.MemoryMasterKey) (map[string]any, error) {
+func getReferenceDocuments(ctx context.Context, pool *pgxpool.Pool, ids []int64, pepper string, getRAM RAMMasterGetter) (map[string]any, error) {
 	masterPassword, haveMaster := "", false
-	if ramMaster != nil {
-		masterPassword, haveMaster = ramMaster.Get()
+	if getRAM != nil {
+		masterPassword, haveMaster = getRAM()
 	}
 	var results []map[string]any
 	for _, id := range ids {
