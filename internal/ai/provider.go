@@ -41,12 +41,16 @@ type ToolExecutor func(ctx context.Context, name string, args map[string]any) (m
 // ChatProvider is the interface implemented by both Gemini and Claude.
 type ChatProvider interface {
 	IsAvailable() bool
+	// GenerateResponse runs a tool loop. toolDecls nil means expose all built-in tools (legacy).
+	// Non-nil: use exactly *toolDecls (may be empty — no tools sent to the model).
+	// If executor is nil, tools are not offered to the model (safe for summarisation-only callers).
 	GenerateResponse(
 		ctx context.Context,
 		req GenerateRequest,
 		systemPrompt string,
 		history []ConvTurn,
 		executor ToolExecutor,
+		toolDecls *[]map[string]any,
 	) (GenerateResult, error)
 }
 

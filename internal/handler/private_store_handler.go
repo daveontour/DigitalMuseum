@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	appcrypto "github.com/daveontour/digitalmuseum/internal/crypto"
 	"github.com/daveontour/digitalmuseum/internal/keystore"
 	"github.com/daveontour/digitalmuseum/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -38,7 +39,7 @@ func (h *PrivateStoreHandler) RegisterRoutes(r chi.Router) {
 // ?master_password= query parameter, or the in-RAM unlock from this session.
 func (h *PrivateStoreHandler) masterPasswordFromRequest(r *http.Request) string {
 	if v := r.Header.Get("X-Master-Password"); strings.TrimSpace(v) != "" {
-		return strings.TrimSpace(v)
+		return appcrypto.NormalizeKeyringPassword(v)
 	}
 	return resolveMasterPassword(r.URL.Query().Get("master_password"), r, h.sessionStore)
 }
@@ -149,7 +150,7 @@ func (h *PrivateStoreHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			MasterPassword string `json:"master_password"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
-		mp = req.MasterPassword
+		mp = resolveMasterPassword(req.MasterPassword, r, h.sessionStore)
 	}
 	if strings.TrimSpace(mp) == "" {
 		writeError(w, http.StatusForbidden, "master password is required")

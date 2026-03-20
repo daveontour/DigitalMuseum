@@ -415,8 +415,9 @@ Modals.EmailGallery = (() => {
                 _setupFilters();
 
                 //month equals the current month
-                const currentMonth = new Date().getMonth() + 1;
-                DOM.emailGalleryMonthFilter.value = currentMonth;
+                // const currentMonth = new Date().getMonth() + 1;
+                // DOM.emailGalleryMonthFilter.value = currentMonth;
+                DOM.emailGalleryMonthFilter.value = 0;
                 const currentYear = new Date().getFullYear();
                 DOM.emailGalleryYearFilter.value = currentYear;
 

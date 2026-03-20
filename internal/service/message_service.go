@@ -246,7 +246,7 @@ func (s *MessageService) SummarizeConversation(ctx context.Context, chatSession 
 Conversation:
 %s`, sb.String())
 
-	result, err := s.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil)
+	result, err := s.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
 	if err != nil {
 		return "", fmt.Errorf("AI summarize: %w", err)
 	}

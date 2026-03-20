@@ -174,9 +174,13 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 		cfg.AI.TavilyAPIKey,
 		cfg.Crypto.KeyringPepper,
 		sessionMasterStore,
+		privateStoreSvc,
 	)
 	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo, sessionMasterStore)
 	chatHandler.RegisterRoutes(r)
+
+	llmToolsAccessHandler := handler.NewLLMToolsAccessHandler(privateStoreSvc, sessionMasterStore)
+	llmToolsAccessHandler.RegisterRoutes(r)
 
 	return r
 }

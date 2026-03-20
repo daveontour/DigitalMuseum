@@ -12,6 +12,10 @@ Modals.SensitiveData = (() => {
     let _currentId = null;   // null = new record
     let _password  = null;   // last used password (kept for save/delete)
 
+    function _normKeyringPw(s) {
+        return (s == null ? '' : String(s)).trim().toLowerCase();
+    }
+
     // -------------------------------------------------------------------------
     // Gallery Modal
     // -------------------------------------------------------------------------
@@ -105,7 +109,7 @@ Modals.SensitiveData = (() => {
 
     function _unlock() {
         const pw = document.getElementById('sensitive-data-password-input');
-        const val = pw ? pw.value.trim() : '';
+        const val = _normKeyringPw(pw ? pw.value : '');
         _password = val || null;
         _loadRecords(_password);
     }
@@ -163,8 +167,8 @@ Modals.SensitiveData = (() => {
         const confirmInput = document.getElementById('sensitive-data-master-key-confirm');
         const errorEl = document.getElementById('sensitive-data-no-master-key-error');
         if (!pwInput) return;
-        const password = pwInput.value.trim();
-        const confirm = confirmInput ? confirmInput.value.trim() : '';
+        const password = _normKeyringPw(pwInput.value);
+        const confirm = _normKeyringPw(confirmInput ? confirmInput.value : '');
         if (!password) {
             if (errorEl) {
                 errorEl.textContent = 'Please enter a password.';

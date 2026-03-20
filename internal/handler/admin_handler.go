@@ -149,7 +149,7 @@ func (h *AdminHandler) SummarizeWritingStyle(w http.ResponseWriter, r *http.Requ
 Email samples:
 %s`, sample)
 
-	result, err := h.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil)
+	result, err := h.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("AI error: %s", err))
 		return
@@ -197,7 +197,7 @@ func (h *AdminHandler) SummarizePsychologicalProfile(w http.ResponseWriter, r *h
 Email samples:
 %s`, sample)
 
-	result, err := h.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil)
+	result, err := h.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("AI error: %s", err))
 		return

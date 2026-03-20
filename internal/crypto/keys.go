@@ -5,15 +5,23 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// NormalizeKeyringPassword trims and lowercases passphrases used for the sensitive keyring
+// (owner master and visitor seats) so storage and unlock are case-insensitive.
+func NormalizeKeyringPassword(password string) string {
+	return strings.ToLower(strings.TrimSpace(password))
+}
+
 // DeriveUserKey returns a hex-encoded 32-byte key derived from password+pepper via Argon2id.
 // Used as the pgp_sym_encrypt passphrase when wrapping the keyring DEK.
+// The password is normalised with [NormalizeKeyringPassword] first.
 func DeriveUserKey(password, pepper string) string {
-	return hex.EncodeToString(DeriveKey(password, pepper))
+	return hex.EncodeToString(DeriveKey(NormalizeKeyringPassword(password), pepper))
 }
 
 // InitSensitiveKeyring generates two fresh random DEKs, truncates sensitive_keyring,
@@ -21,6 +29,7 @@ func DeriveUserKey(password, pepper string) string {
 // valid seat password. The master private DEK (encrypted_master_dek) is encrypted
 // solely under masterPassword and is used for the private_store table.
 func InitSensitiveKeyring(ctx context.Context, pool *pgxpool.Pool, masterPassword, pepper string) error {
+	masterPassword = NormalizeKeyringPassword(masterPassword)
 	if masterPassword == "" {
 		return fmt.Errorf("master password required")
 	}
@@ -192,6 +201,7 @@ func CheckSensitiveVisitorSeatPassword(ctx context.Context, pool *pgxpool.Pool, 
 // AddSensitiveKeyringSeatTx adds a new non-master keyring seat inside an open transaction.
 // pool is used read-only for DEK recovery; writes go through tx.
 func AddSensitiveKeyringSeatTx(ctx context.Context, tx pgx.Tx, pool *pgxpool.Pool, newUserPassword, masterPassword, pepper string) (int64, error) {
+	newUserPassword = NormalizeKeyringPassword(newUserPassword)
 	if newUserPassword == "" {
 		return 0, fmt.Errorf("new user password required")
 	}
@@ -274,6 +284,44 @@ func DeleteSensitiveKeyringSeat(ctx context.Context, pool *pgxpool.Pool, userPas
 	}
 	_, err = pool.Exec(ctx, `DELETE FROM sensitive_keyring WHERE id = $1`, matchID)
 	return err
+}
+
+// DeleteAllVisitorKeyringSeats removes every non-master keyring seat (visitor keys).
+// Associated rows in visitor_key_hints are removed via ON DELETE CASCADE.
+// The master seat (is_master = TRUE) is never deleted. masterPassword must decrypt the master row.
+func DeleteAllVisitorKeyringSeats(ctx context.Context, pool *pgxpool.Pool, masterPassword, pepper string) (int64, error) {
+	ok, err := CheckSensitiveMasterPassword(ctx, pool, masterPassword, pepper)
+	if err != nil {
+		return 0, fmt.Errorf("check master password: %w", err)
+	}
+	if !ok {
+		return 0, fmt.Errorf("invalid master password")
+	}
+	ct, err := pool.Exec(ctx, `DELETE FROM sensitive_keyring WHERE is_master = FALSE`)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
+}
+
+// DeleteVisitorKeyringSeatByID removes a single visitor seat by sensitive_keyring.id.
+// Master seats are never removed. masterPassword must decrypt the master row.
+func DeleteVisitorKeyringSeatByID(ctx context.Context, pool *pgxpool.Pool, keyringID int64, masterPassword, pepper string) error {
+	ok, err := CheckSensitiveMasterPassword(ctx, pool, masterPassword, pepper)
+	if err != nil {
+		return fmt.Errorf("check master password: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("invalid master password")
+	}
+	tag, err := pool.Exec(ctx, `DELETE FROM sensitive_keyring WHERE id = $1 AND is_master = FALSE`, keyringID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("visitor keyring seat not found")
+	}
+	return nil
 }
 
 // SensitiveKeyringSeatCount returns the total number of rows in sensitive_keyring.

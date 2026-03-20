@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	appcrypto "github.com/daveontour/digitalmuseum/internal/crypto"
 )
 
 const (
@@ -99,6 +101,10 @@ func (s *SessionMasterStore) Put(w http.ResponseWriter, r *http.Request, passwor
 	if s == nil {
 		return nil
 	}
+	if password == "" {
+		return nil
+	}
+	password = appcrypto.NormalizeKeyringPassword(password)
 	if password == "" {
 		return nil
 	}

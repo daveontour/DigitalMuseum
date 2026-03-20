@@ -32,6 +32,11 @@ func (h *DocumentHandler) RegisterRoutes(r chi.Router) {
 	r.Post("/reference-documents/init-keyring", h.InitKeyring)
 	r.Post("/reference-documents/add-user", h.AddUser)
 	r.Delete("/reference-documents/remove-user", h.RemoveUser)
+	r.Delete("/reference-documents/visitor-keys", h.DeleteAllVisitorKeys)
+	r.Get("/reference-documents/visitor-key-hints", h.ListVisitorKeyHintsAdmin)
+	r.Post("/reference-documents/visitor-key-hints", h.CreateVisitorKeyHint)
+	r.Put("/reference-documents/visitor-key-hints/{hint_id}", h.UpdateVisitorKeyHint)
+	r.Delete("/reference-documents/visitor-key-hints/{hint_id}", h.DeleteVisitorKeyHint)
 	r.Get("/reference-documents/keyring-count", h.KeyringCount)
 	r.Post("/reference-documents/encrypt-existing", h.EncryptExisting)
 
@@ -53,6 +58,41 @@ func parseDocID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func parseHintID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	raw := chi.URLParam(r, "hint_id")
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "hint_id must be an integer")
+		return 0, false
+	}
+	return id, true
+}
+
+// requireOwnerMasterSession returns the verified session master password after checking this browser
+// was unlocked with the owner master key and the password still decrypts the master row.
+func (h *DocumentHandler) requireOwnerMasterSession(w http.ResponseWriter, r *http.Request) (pw string, ok bool) {
+	unlocked, masterUnlocked := h.sessionStore.SessionStatus(r)
+	if !unlocked || !masterUnlocked {
+		writeError(w, http.StatusForbidden, "owner master key unlock required in this browser session")
+		return "", false
+	}
+	pw, have := h.sessionStore.Get(r)
+	if !have || pw == "" {
+		writeError(w, http.StatusForbidden, "session unlock material missing")
+		return "", false
+	}
+	okMaster, err := h.sensitiveSvc.VerifyMasterPassword(r.Context(), pw)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error verifying master key: %s", err))
+		return "", false
+	}
+	if !okMaster {
+		writeError(w, http.StatusForbidden, "session password does not match owner master key")
+		return "", false
+	}
+	return pw, true
 }
 
 type docJSON struct {
@@ -371,6 +411,108 @@ func (h *DocumentHandler) RemoveUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"message": "user removed from keyring"})
+}
+
+// DeleteAllVisitorKeys removes every visitor keyring seat. Requires this browser session to have
+// been unlocked with the owner master key (in-memory isMaster), and re-verifies that the stored
+// password still decrypts the master row before deleting non-master seats only.
+func (h *DocumentHandler) DeleteAllVisitorKeys(w http.ResponseWriter, r *http.Request) {
+	pw, ok := h.requireOwnerMasterSession(w, r)
+	if !ok {
+		return
+	}
+	n, err := h.sensitiveSvc.RemoveAllVisitorKeys(r.Context(), pw)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error removing visitor keys: %s", err))
+		return
+	}
+	writeJSON(w, map[string]any{
+		"message": fmt.Sprintf("Removed %d visitor key seat(s). Owner master key was not changed.", n),
+		"removed": n,
+	})
+}
+
+// ListVisitorKeyHintsAdmin returns visitor hints with keyring IDs plus orphan visitor seat IDs (no hint yet).
+func (h *DocumentHandler) ListVisitorKeyHintsAdmin(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireOwnerMasterSession(w, r); !ok {
+		return
+	}
+	hints, err := h.sensitiveSvc.ListVisitorKeyHints(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error listing visitor hints: %s", err))
+		return
+	}
+	orphans, err := h.sensitiveSvc.ListOrphanVisitorKeyringIDs(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error listing orphan seats: %s", err))
+		return
+	}
+	writeJSON(w, map[string]any{"hints": hints, "orphan_keyring_ids": orphans})
+}
+
+// CreateVisitorKeyHint adds a hint for a visitor seat that has none (repair / legacy).
+func (h *DocumentHandler) CreateVisitorKeyHint(w http.ResponseWriter, r *http.Request) {
+	pw, ok := h.requireOwnerMasterSession(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		KeyringID int64  `json:"keyring_id"`
+		Hint      string `json:"hint"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.KeyringID <= 0 {
+		writeError(w, http.StatusBadRequest, "keyring_id is required")
+		return
+	}
+	if err := h.sensitiveSvc.CreateVisitorKeyHintForOrphanSeat(r.Context(), req.KeyringID, req.Hint, pw); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, map[string]string{"message": "Visitor hint created."})
+}
+
+// UpdateVisitorKeyHint updates hint text for an existing visitor_key_hints row.
+func (h *DocumentHandler) UpdateVisitorKeyHint(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireOwnerMasterSession(w, r); !ok {
+		return
+	}
+	id, ok := parseHintID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Hint string `json:"hint"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := h.sensitiveSvc.UpdateVisitorKeyHint(r.Context(), id, req.Hint); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, map[string]string{"message": "Hint updated."})
+}
+
+// DeleteVisitorKeyHint removes the visitor keyring seat for this hint (not only the hint row).
+func (h *DocumentHandler) DeleteVisitorKeyHint(w http.ResponseWriter, r *http.Request) {
+	pw, ok := h.requireOwnerMasterSession(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseHintID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.sensitiveSvc.DeleteVisitorSeatByHintID(r.Context(), id, pw); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, map[string]string{"message": "Visitor key seat removed."})
 }
 
 func (h *DocumentHandler) KeyringCount(w http.ResponseWriter, r *http.Request) {

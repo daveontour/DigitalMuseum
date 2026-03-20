@@ -51,8 +51,10 @@ type Interest struct {
 // ── Visitor key hints (non-master keyring seats) ─────────────────────────────
 
 // VisitorKeyHint is a row from visitor_key_hints (plain-text hint for unlock UI).
+// KeyringID is set when listing for admin; omitted from the public unlock-dialog JSON.
 type VisitorKeyHint struct {
 	ID        int64     `json:"id"`
+	KeyringID int64     `json:"keyring_id,omitempty"`
 	Hint      string    `json:"hint"`
 	CreatedAt time.Time `json:"created_at"`
 }

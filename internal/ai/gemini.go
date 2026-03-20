@@ -64,17 +64,38 @@ func (p *GeminiProvider) GenerateResponse(
 	systemPrompt string,
 	history []ConvTurn,
 	executor ToolExecutor,
+	toolDecls *[]map[string]any,
 ) (GenerateResult, error) {
-	// Build tool declarations
-	funcDecls := make([]map[string]any, 0, len(toolDefinitions()))
-	for _, td := range toolDefinitions() {
+	// Callers without an executor must not advertise tools (avoids unusable tool calls).
+	if executor == nil {
+		empty := []map[string]any{}
+		toolDecls = &empty
+	}
+	exec := executor
+	if exec == nil {
+		exec = func(_ context.Context, name string, _ map[string]any) (map[string]any, error) {
+			return map[string]any{"error": "tool execution not available: " + name}, nil
+		}
+	}
+
+	var defs []map[string]any
+	if toolDecls == nil {
+		defs = toolDefinitions()
+	} else {
+		defs = *toolDecls
+	}
+	funcDecls := make([]map[string]any, 0, len(defs))
+	for _, td := range defs {
 		funcDecls = append(funcDecls, map[string]any{
 			"name":        td["name"],
 			"description": td["description"],
 			"parameters":  td["parameters"],
 		})
 	}
-	tools := []map[string]any{{"functionDeclarations": funcDecls}}
+	var tools []map[string]any
+	if len(funcDecls) > 0 {
+		tools = []map[string]any{{"functionDeclarations": funcDecls}}
+	}
 
 	contents := buildGeminiContents(req, history)
 	funcCallsMade := []map[string]any{}
@@ -87,10 +108,12 @@ func (p *GeminiProvider) GenerateResponse(
 				"parts": []map[string]any{{"text": systemPrompt}},
 			},
 			"contents": contents,
-			"tools":    tools,
 			"generationConfig": map[string]any{
 				"temperature": req.Temperature,
 			},
+		}
+		if len(tools) > 0 {
+			body["tools"] = tools
 		}
 
 		resp, err := geminiPost(ctx, p.apiKey, p.modelName, body)
@@ -164,7 +187,7 @@ func (p *GeminiProvider) GenerateResponse(
 				"arguments": argsRaw,
 				"iteration": iter + 1,
 			})
-			result, err := executor(ctx, name, argsRaw)
+			result, err := exec(ctx, name, argsRaw)
 			if err != nil {
 				result = map[string]any{"error": err.Error()}
 			}

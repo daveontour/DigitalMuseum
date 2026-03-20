@@ -154,7 +154,7 @@ func (s *SensitiveService) AddUser(ctx context.Context, userPassword, masterPass
 // ListVisitorKeyHints returns hints for non-master keyring seats (for visitor unlock UI).
 func (s *SensitiveService) ListVisitorKeyHints(ctx context.Context) ([]model.VisitorKeyHint, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT h.id, h.hint, h.created_at
+		SELECT h.id, h.keyring_id, h.hint, h.created_at
 		FROM visitor_key_hints h
 		INNER JOIN sensitive_keyring k ON k.id = h.keyring_id AND k.is_master = FALSE
 		ORDER BY h.created_at ASC`)
@@ -165,7 +165,7 @@ func (s *SensitiveService) ListVisitorKeyHints(ctx context.Context) ([]model.Vis
 	var out []model.VisitorKeyHint
 	for rows.Next() {
 		var item model.VisitorKeyHint
-		if err := rows.Scan(&item.ID, &item.Hint, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.KeyringID, &item.Hint, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -173,10 +173,108 @@ func (s *SensitiveService) ListVisitorKeyHints(ctx context.Context) ([]model.Vis
 	return out, rows.Err()
 }
 
+// ListOrphanVisitorKeyringIDs returns visitor seat IDs that have no visitor_key_hints row.
+func (s *SensitiveService) ListOrphanVisitorKeyringIDs(ctx context.Context) ([]int64, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT k.id FROM sensitive_keyring k
+		WHERE k.is_master = FALSE
+		AND NOT EXISTS (SELECT 1 FROM visitor_key_hints h WHERE h.keyring_id = k.id)
+		ORDER BY k.id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// UpdateVisitorKeyHint updates plain-text hint text for a visitor seat (by visitor_key_hints.id).
+func (s *SensitiveService) UpdateVisitorKeyHint(ctx context.Context, hintID int64, hint string) error {
+	hint = strings.TrimSpace(hint)
+	if hint == "" {
+		return fmt.Errorf("hint is required")
+	}
+	if len(hint) > maxVisitorKeyHintLen {
+		return fmt.Errorf("hint exceeds %d characters", maxVisitorKeyHintLen)
+	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE visitor_key_hints SET hint = $1
+		WHERE id = $2
+		AND EXISTS (
+			SELECT 1 FROM sensitive_keyring k
+			WHERE k.id = visitor_key_hints.keyring_id AND k.is_master = FALSE
+		)`, hint, hintID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("visitor hint not found")
+	}
+	return nil
+}
+
+// CreateVisitorKeyHintForOrphanSeat inserts a hint for a visitor keyring seat that has none yet.
+func (s *SensitiveService) CreateVisitorKeyHintForOrphanSeat(ctx context.Context, keyringID int64, hint, masterPassword string) error {
+	ok, err := appcrypto.CheckSensitiveMasterPassword(ctx, s.pool, masterPassword, s.pepper)
+	if err != nil {
+		return fmt.Errorf("check master password: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("invalid master password")
+	}
+	hint = strings.TrimSpace(hint)
+	if hint == "" {
+		return fmt.Errorf("hint is required")
+	}
+	if len(hint) > maxVisitorKeyHintLen {
+		return fmt.Errorf("hint exceeds %d characters", maxVisitorKeyHintLen)
+	}
+	var isMaster bool
+	err = s.pool.QueryRow(ctx, `SELECT is_master FROM sensitive_keyring WHERE id = $1`, keyringID).Scan(&isMaster)
+	if err != nil {
+		return fmt.Errorf("keyring seat not found")
+	}
+	if isMaster {
+		return fmt.Errorf("cannot attach hint to master seat")
+	}
+	var n int64
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM visitor_key_hints WHERE keyring_id = $1`, keyringID).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("hint already exists for this seat")
+	}
+	_, err = s.pool.Exec(ctx, `INSERT INTO visitor_key_hints (keyring_id, hint) VALUES ($1, $2)`, keyringID, hint)
+	return err
+}
+
+// DeleteVisitorSeatByHintID removes the visitor keyring seat linked to visitor_key_hints.id (hint row removed by CASCADE).
+func (s *SensitiveService) DeleteVisitorSeatByHintID(ctx context.Context, hintID int64, masterPassword string) error {
+	var keyringID int64
+	err := s.pool.QueryRow(ctx, `SELECT keyring_id FROM visitor_key_hints WHERE id = $1`, hintID).Scan(&keyringID)
+	if err != nil {
+		return fmt.Errorf("visitor hint not found")
+	}
+	return appcrypto.DeleteVisitorKeyringSeatByID(ctx, s.pool, keyringID, masterPassword, s.pepper)
+}
+
 // RemoveUser removes the keyring seat for userPassword. Requires masterPassword.
 // Master seats cannot be removed.
 func (s *SensitiveService) RemoveUser(ctx context.Context, userPassword, masterPassword string) error {
 	return appcrypto.DeleteSensitiveKeyringSeat(ctx, s.pool, userPassword, masterPassword, s.pepper)
+}
+
+// RemoveAllVisitorKeys deletes every visitor (non-master) keyring seat. Requires masterPassword
+// that decrypts the owner master row. The master seat is preserved.
+func (s *SensitiveService) RemoveAllVisitorKeys(ctx context.Context, masterPassword string) (removed int64, err error) {
+	return appcrypto.DeleteAllVisitorKeyringSeats(ctx, s.pool, masterPassword, s.pepper)
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

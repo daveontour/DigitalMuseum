@@ -120,10 +120,10 @@
                         <i class="fas fa-comment-dots"></i> Messages and Chats
                     </button>
                     <button type="button" class="more-options-btn" id="email-gallery-sidebar-btn">
-                        <i class="fas fa-envelope"></i> Email Gallery
+                        <i class="fas fa-envelope"></i> Emails
                     </button>
                     <button type="button" class="more-options-btn" id="new-image-gallery-sidebar-btn">
-                        <i class="fas fa-images"></i>Image Gallery
+                        <i class="fas fa-images"></i>Images
                     </button>
                     <button type="button" class="more-options-btn" id="fb-albums-sidebar-btn">
                         <i class="fas fa-images"></i> Facebook Albums
@@ -133,6 +133,9 @@
                     </button>
                     <button type="button" class="more-options-btn" id="locations-sidebar-btn">
                         <i class="fas fa-map-marker-alt"></i> Locations
+                    </button>
+                    <button type="button" class="more-options-btn" id="artefacts-sidebar-btn">
+                        <i class="fas fa-box-open"></i> Artefacts
                     </button>
                 </div>
                 <div class="sidebar-spacer" aria-hidden="true"></div>
@@ -212,9 +215,6 @@
             <div class="more-options-section sidebar-right-main">
                 <!-- <h3>Tools &amp; Data</h3> -->
                 <div class="more-options-buttons">
-                    <button type="button" class="more-options-btn" id="statistics-sidebar-btn">
-                        <i class="fas fa-chart-bar"></i> Statistics
-                    </button>
                     <button type="button" class="more-options-btn" id="previous-responses-sidebar-btn">
                         <i class="fas fa-history"></i> Previous Responses
                     </button>
@@ -230,11 +230,11 @@
                     <button type="button" class="more-options-btn" id="relationships-btn">
                         <i class="fas fa-project-diagram"></i> Relationships
                     </button>
-                    <button type="button" class="more-options-btn" id="artefacts-sidebar-btn">
-                        <i class="fas fa-box-open"></i> Artefacts
-                    </button>
                     <button type="button" class="more-options-btn" id="sensitive-data-sidebar-btn">
                         <i class="fas fa-lock"></i> Sensitive &amp; Private Data
+                    </button>
+                    <button type="button" class="more-options-btn" id="statistics-sidebar-btn">
+                        <i class="fas fa-chart-bar"></i> Statistics
                     </button>
                 </div>
                 <div class="sidebar-spacer" aria-hidden="true"></div>
@@ -296,6 +296,9 @@
                         <label class="config-tab-label config-sidebar-requires-master" style="margin-left: 10px; font-weight: bold;margin-top: 10px;;color:cadetblue">Manage Secure Data Access</label>
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-keys">
                             <i class="fas fa-key"></i> Manage Keys
+                        </button>
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tools-access">
+                            <i class="fas fa-wrench"></i> Tools Access
                         </button>
                     </div>
                     <div class="config-content">
@@ -592,52 +595,88 @@
                 </div>
                 <div class="config-tab-content" id="manage-keys-tab">
                     <section class="config-section">
-                        <h1>Trusted Keys</h1>
+                        <h1>Visitor Keys</h1>
                         <div class="setting-group">
                             <p style="color: #666; margin-bottom: 10px;">
-                                Create additional trusted keys or remove keys that are no longer needed. You need the master password to manage keys.<br/>
-                                The master key is used to encrypt and decrypt the sensitive data in the database.<br/>
-                                Trusted keys are used by people you trust to access the sensitive data.<br/>
-                                When creating a trusted key, leave a hint for the user that they will uniquely know, such as:<br/>
-                                "Your wifi password featuring a dog"<br/>
-                                The user doesn't need to be given the password, but they will know it when they see the hint.<br/>
-                            </p>
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                                <button type="button" id="create-trusted-key-btn" class="modal-btn modal-btn-primary">
-                                    <i class="fas fa-plus"></i> Create Trusted Key
-                                </button>
-                                <button type="button" id="delete-trusted-key-btn" class="modal-btn modal-btn-secondary">
-                                    <i class="fas fa-minus"></i> Delete Trusted Key
-                                </button>
-                                <button type="button" id="create-new-master-key-btn" class="modal-btn" style="background-color: #dc3545; color: white;">
-                                    <i class="fas fa-key"></i> Create New Master Key
-                                </button>
-                            </div>
-                            <div id="manage-keys-status" style="margin-top: 10px; padding: 10px; border-radius: 4px; display: none;"></div>
-                        </div>
-                    </section>
-                    <section class="config-section" style="margin-top: 1.5rem;">
-                        <h1>Document Encryption</h1>
-                        <div class="setting-group">
-                            <p style="color: #666; margin-bottom: 10px;">
-                                Manage access to encrypted reference documents. The same keyring is used for both sensitive data and document encryption.<br/>
-                                Add a user key to allow a person (or the AI) to decrypt documents. Remove a key to revoke access.<br/>
-                                Use <strong>Encrypt Existing</strong> to encrypt all currently unencrypted documents with the master key.
+                                Manage access to encrypted information and access to tools.<br/>
+                                Add a visitor key to allow a person (or the AI) to decrypt data and access tools. Remove a key to revoke access.<br/>
+                                <strong>Delete All</strong> removes every visitor key at once.
                             </p>
                             <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
                                 <button type="button" id="add-doc-key-btn" class="modal-btn modal-btn-primary">
-                                    <i class="fas fa-plus"></i> Add Document Key
+                                    <i class="fas fa-plus"></i> Add Visitor Key
                                 </button>
-                                <button type="button" id="remove-doc-key-btn" class="modal-btn modal-btn-secondary">
+                                <!-- <button type="button" id="remove-doc-key-btn" class="modal-btn modal-btn-secondary">
                                     <i class="fas fa-minus"></i> Remove Document Key
-                                </button>
-                                <button type="button" id="encrypt-existing-btn" class="modal-btn" style="background-color: #6c757d; color: white;">
-                                    <i class="fas fa-lock"></i> Encrypt Existing Documents
+                                </button> -->
+                                <button type="button" id="delete-all-visitor-keys-btn" class="modal-btn" style="background-color: #dc3545; color: white;">
+                                    <i class="fas fa-trash-alt"></i> Delete All
                                 </button>
                             </div>
+                            <!-- <div id="manage-keys-status" style="margin-top: 10px; padding: 10px; border-radius: 4px; display: none;"></div>
                             <div id="doc-keyring-count-display" style="color: #666; font-size: 0.9em; display: none;">
                                 Document keyring seats: <strong id="doc-keyring-count-value">—</strong>
+                            </div> -->
+                            <h2 style="font-size: 1.1rem; margin: 1.25rem 0 0.5rem 0;">Visitor key hints</h2>
+                            <p style="color: #666; font-size: 0.9em; margin-bottom: 8px;">
+                                Hints are shown on the unlock screen. They are not the keys themselves.<em>They should allow a someone close to you to recognise the hint and unlock the system</em>
+                                <br/><br/><strong>Edit</strong> updates the hint text only.
+                                <br/><strong>Delete</strong> removes the whole visitor key.
+                                <!-- <br/><strong>Add hint</strong> attaches text to a seat that has no hint yet (unusual); new keys normally use <em>Add Document Key</em>. -->
+                            </p>
+                            <!-- <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
+                                <button type="button" id="visitor-key-hints-refresh-btn" class="modal-btn modal-btn-secondary">
+                                    <i class="fas fa-sync-alt"></i> Refresh hints
+                                </button>
+                                <button type="button" id="create-visitor-key-hint-btn" class="modal-btn modal-btn-primary" title="Only enabled when a visitor seat exists without a hint">
+                                    <i class="fas fa-plus"></i> Add hint (orphan seat)
+                                </button>
+                            </div> -->
+                            <!-- <div id="visitor-key-hints-loading" style="display: none; color: #666; margin-bottom: 8px;"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+                            <div id="visitor-key-hints-error" style="display: none; color: #dc3545; margin-bottom: 8px;"></div> -->
+                            <div style="overflow-x: auto;">
+                                <table class="sensitive-data-table" id="visitor-key-hints-table" style="width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th style="text-align: left;">ID</th>
+                                            <th style="text-align: left;">Keyring</th>
+                                            <th style="text-align: left;">Hint</th>
+                                            <th style="text-align: left;">Created</th>
+                                            <th style="text-align: center; width: 140px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="visitor-key-hints-tbody"></tbody>
+                                </table>
                             </div>
+                            <p id="visitor-key-hints-empty" style="display: none; color: #666; font-size: 0.9em;">No visitor hints yet.</p>
+                        </div>
+                    </section>
+                </div>
+                <div class="config-tab-content" id="tools-access-tab">
+                    <section class="config-section">
+                        <h1>AI Tool Access</h1>
+                        <p style="color:#666; margin-bottom:12px; line-height:1.45;">
+                            The AI can use tools defined within the system to get additional information of perform actions.
+                            <br/>
+                            Choose which kinds of browser session may use each tool type the during chat. If no box is ticked for a tool, it is not available to anyone until you enable it.
+                        </p>
+                        <div id="llm-tools-access-status" style="display:none; margin-bottom:10px; padding:8px 12px; border-radius:4px;"></div>
+                        <div style="overflow-x:auto;">
+                            <table class="sensitive-data-table" id="llm-tools-access-table" style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Tool</th>
+                                        <th>Description</th>
+                                        <th>No key</th>
+                                        <th>Visitor key</th>
+                                        <th>Master key</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="llm-tools-access-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:16px;">
+                            <button type="button" id="llm-tools-access-save" class="modal-btn modal-btn-primary">Save</button>
                         </div>
                     </section>
                 </div>
@@ -1528,7 +1567,7 @@
         <div id="email-gallery-modal" class="modal">
            <div class="modal-content email-gallery-modal-content">
                 <div class="modal-header">
-                    <h2>Email Gallery</h2>
+                    <h2>Emails</h2>
                     <button id="close-email-gallery-modal" class="modal-close-btn">&times;</button>
                 </div>
                 <div class="email-gallery-modal-body">
@@ -1642,7 +1681,7 @@
         <div id="new-image-gallery-modal" class="modal">
            <div class="modal-content new-image-gallery-modal-content">
                 <div class="modal-header">
-                    <h2>Image Gallery</h2>
+                    <h2>Images</h2>
                     <button id="close-new-image-gallery-modal" class="modal-close-btn">&times;</button>
                 </div>
                 <div class="new-image-gallery-modal-body">
@@ -2943,23 +2982,45 @@
         </div>
     </div>
 
-    <!-- ===== ENCRYPT EXISTING DOCUMENTS MODAL ===== -->
-    <div id="encrypt-existing-modal" class="modal" style="display: none;">
-        <div class="modal-content sensitive-data-hints-content" style="max-width: 420px;">
+    <!-- ===== EDIT VISITOR KEY HINT MODAL ===== -->
+    <div id="edit-visitor-key-hint-modal" class="modal" style="display: none;">
+        <div class="modal-content sensitive-data-hints-content" style="max-width: 440px;">
             <div class="sensitive-data-hints-header">
-                <h3>Encrypt Existing Documents</h3>
-                <button class="modal-close-btn" id="close-encrypt-existing-modal">&times;</button>
+                <h3>Edit visitor hint</h3>
+                <button type="button" class="modal-close-btn" id="close-edit-visitor-key-hint-modal">&times;</button>
             </div>
             <div class="sensitive-data-hints-body">
-                <p style="margin-bottom: 1rem;">Encrypt all currently unencrypted (non-sensitive) reference documents using the keyring DEK. Provide the master password to authorise encryption.</p>
-                <label class="artefact-field-label">Master Password</label>
-                <input type="password" id="encrypt-existing-password" class="new-image-gallery-input"
-                       placeholder="Master password"
-                       style="width:100%; margin-bottom: 1rem;"/>
-                <div id="encrypt-existing-error" style="color: #dc3545; margin-bottom: 0.5rem; display: none;"></div>
+                <input type="hidden" id="edit-visitor-key-hint-id" value=""/>
+                <label class="artefact-field-label">Hint (plain text, unlock screen)</label>
+                <textarea id="edit-visitor-key-hint-text" class="new-image-gallery-input" rows="4"
+                    style="width:100%; margin-bottom: 1rem; resize: vertical; box-sizing: border-box;"></textarea>
+                <div id="edit-visitor-key-hint-error" style="color: #dc3545; margin-bottom: 0.5rem; display: none;"></div>
                 <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-                    <button id="encrypt-existing-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
-                    <button id="encrypt-existing-submit" class="modal-btn" style="background-color: #6c757d; color: white;"><i class="fas fa-lock"></i> Encrypt</button>
+                    <button type="button" id="edit-visitor-key-hint-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
+                    <button type="button" id="edit-visitor-key-hint-save" class="modal-btn modal-btn-primary"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== CREATE VISITOR KEY HINT (ORPHAN SEAT) MODAL ===== -->
+    <div id="create-visitor-key-hint-modal" class="modal" style="display: none;">
+        <div class="modal-content sensitive-data-hints-content" style="max-width: 440px;">
+            <div class="sensitive-data-hints-header">
+                <h3>Add hint for existing seat</h3>
+                <button type="button" class="modal-close-btn" id="close-create-visitor-key-hint-modal">&times;</button>
+            </div>
+            <div class="sensitive-data-hints-body">
+                <p style="margin-bottom: 1rem; color: #666;">Choose a visitor keyring seat that has no hint row yet, then enter the text visitors will see on the unlock screen.</p>
+                <label class="artefact-field-label">Keyring seat ID</label>
+                <select id="create-visitor-key-hint-keyring-select" class="new-image-gallery-input" style="width:100%; margin-bottom: 1rem;"></select>
+                <label class="artefact-field-label">Hint (plain text)</label>
+                <textarea id="create-visitor-key-hint-text" class="new-image-gallery-input" rows="3"
+                    style="width:100%; margin-bottom: 1rem; resize: vertical; box-sizing: border-box;"></textarea>
+                <div id="create-visitor-key-hint-error" style="color: #dc3545; margin-bottom: 0.5rem; display: none;"></div>
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <button type="button" id="create-visitor-key-hint-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
+                    <button type="button" id="create-visitor-key-hint-save" class="modal-btn modal-btn-primary"><i class="fas fa-plus"></i> Add hint</button>
                 </div>
             </div>
         </div>

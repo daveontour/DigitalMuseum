@@ -223,6 +223,18 @@ const App = (() => {
         }
     }
 
+    /** True when the session has any keyring unlock (master or visitor). */
+    async function fetchSessionKeyringUnlocked() {
+        try {
+            const st = await fetch('/api/session/master-key/status', { credentials: 'same-origin' });
+            if (!st.ok) return false;
+            const sj = await st.json();
+            return !!sj.unlocked;
+        } catch (e) {
+            return false;
+        }
+    }
+
     async function ensureMasterKeyForDataImport() {
         if (await fetchMasterUnlockedForDataImport()) return true;
         if (typeof Modals !== 'undefined' && Modals.ConfirmationModal && Modals.ConfirmationModal.open) {
@@ -246,14 +258,22 @@ const App = (() => {
 
     function refreshDataImportMasterKeyAccessUI() {
         void (async () => {
-            const masterOk = await fetchMasterUnlockedForDataImport();
+            const [masterOk, keyringUnlocked] = await Promise.all([
+                fetchMasterUnlockedForDataImport(),
+                fetchSessionKeyringUnlocked(),
+            ]);
             const sidebarBtn = document.getElementById('data-import-sidebar-btn');
+            const sensitiveSidebarBtn = document.getElementById('sensitive-data-sidebar-btn');
             const tiles = document.querySelectorAll('.import-data-dialog-tile[data-open-modal="data-import-modal"]');
             if (sidebarBtn) {
-                sidebarBtn.disabled = !masterOk;
+                sidebarBtn.style.display = masterOk ? '' : 'none';
+                sidebarBtn.disabled = false;
                 sidebarBtn.title = masterOk ? '' : 'Owner master key required — use Unlock with Master Key (visitor key is not enough).';
-                sidebarBtn.style.opacity = masterOk ? '' : '0.55';
-                sidebarBtn.style.cursor = masterOk ? '' : 'not-allowed';
+                sidebarBtn.style.opacity = '';
+                sidebarBtn.style.cursor = '';
+            }
+            if (sensitiveSidebarBtn) {
+                sensitiveSidebarBtn.style.display = keyringUnlocked ? '' : 'none';
             }
             tiles.forEach((tile) => {
                 if (masterOk) {
@@ -719,6 +739,9 @@ const App = (() => {
                 }
                 if (targetTab === 'custom-voices') {
                     if (Modals.CustomVoices && Modals.CustomVoices.load) Modals.CustomVoices.load();
+                }
+                if (targetTab === 'tools-access') {
+                    if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.load) void Modals.LLMToolsAccess.load();
                 }
                 // Load system instructions when System Instructions tab is opened
                 if (targetTab === 'system-instructions') {
@@ -2625,7 +2648,8 @@ const App = (() => {
         async function runKeyUnlock(endpoint) {
             const input = document.getElementById('master-key-unlock-input');
             const errEl = document.getElementById('master-key-unlock-error');
-            const pw = (input && input.value || '').trim();
+            const raw = (input && input.value || '').trim();
+            const pw = raw.toLowerCase();
             if (!pw) {
                 if (errEl) {
                     errEl.textContent = 'Enter a key or choose Skip for now.';

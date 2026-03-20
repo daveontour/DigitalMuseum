@@ -88,8 +88,8 @@
             btn.disabled = true;
             btn.textContent = 'Saving\u2026';
             try {
-                const masterKey = document.getElementById('master-key').value;
-                const masterKeyConfirm = document.getElementById('master-key-confirm').value;
+                const masterKey = document.getElementById('master-key').value.trim().toLowerCase();
+                const masterKeyConfirm = document.getElementById('master-key-confirm').value.trim().toLowerCase();
                 if (!masterKey || !masterKeyConfirm) {
                     throw new Error('Master key and confirmation are required.');
                 }

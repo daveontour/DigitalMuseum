@@ -1455,6 +1455,10 @@ Modals.SubjectConfiguration = (() => {
 
 
 Modals.ManageKeys = (() => {
+    function _normKeyringPw(s) {
+        return (s == null ? '' : String(s)).trim().toLowerCase();
+    }
+
     function _showStatus(msg, isError = false) {
         const el = document.getElementById('manage-keys-status');
         if (!el) return;
@@ -1534,8 +1538,8 @@ Modals.ManageKeys = (() => {
         const pwInput = document.getElementById('create-new-master-key-password');
         const confirmInput = document.getElementById('create-new-master-key-confirm');
         const errEl = document.getElementById('create-new-master-key-error');
-        const password = pwInput ? pwInput.value.trim() : '';
-        const confirm = confirmInput ? confirmInput.value.trim() : '';
+        const password = _normKeyringPw(pwInput ? pwInput.value : '');
+        const confirm = _normKeyringPw(confirmInput ? confirmInput.value : '');
         if (!password) {
             if (errEl) { errEl.textContent = 'Please enter a password.'; errEl.style.display = 'block'; }
             return;
@@ -1568,8 +1572,8 @@ Modals.ManageKeys = (() => {
         const masterPw = document.getElementById('create-trusted-key-master-password');
         const hintEl = document.getElementById('create-trusted-key-hint');
         const errEl = document.getElementById('create-trusted-key-error');
-        const userPassword = userPw ? userPw.value.trim() : '';
-        const masterPassword = masterPw ? masterPw.value.trim() : '';
+        const userPassword = _normKeyringPw(userPw ? userPw.value : '');
+        const masterPassword = _normKeyringPw(masterPw ? masterPw.value : '');
         const hint = hintEl ? hintEl.value.trim() : '';
         if (!userPassword) {
             if (errEl) { errEl.textContent = 'User password is required.'; errEl.style.display = 'block'; }
@@ -1616,6 +1620,217 @@ Modals.ManageKeys = (() => {
         }
     }
 
+    let _visitorHintOrphanIds = [];
+
+    async function _loadVisitorKeyHintsTable() {
+        const loading = document.getElementById('visitor-key-hints-loading');
+        const errEl = document.getElementById('visitor-key-hints-error');
+        const tbody = document.getElementById('visitor-key-hints-tbody');
+        const empty = document.getElementById('visitor-key-hints-empty');
+        const createBtn = document.getElementById('create-visitor-key-hint-btn');
+        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+        if (loading) loading.style.display = 'block';
+        try {
+            const resp = await fetch('/reference-documents/visitor-key-hints', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                throw new Error(data.detail || `HTTP ${resp.status}`);
+            }
+            _visitorHintOrphanIds = Array.isArray(data.orphan_keyring_ids) ? data.orphan_keyring_ids : [];
+            const hints = Array.isArray(data.hints) ? data.hints : [];
+            if (tbody) {
+                tbody.textContent = '';
+                hints.forEach(h => {
+                    const tr = document.createElement('tr');
+                    const tdId = document.createElement('td');
+                    tdId.textContent = String(h.id);
+                    const tdKr = document.createElement('td');
+                    tdKr.textContent = h.keyring_id != null ? String(h.keyring_id) : '';
+                    const tdHint = document.createElement('td');
+                    tdHint.textContent = h.hint || '';
+                    tdHint.style.maxWidth = '280px';
+                    tdHint.style.whiteSpace = 'pre-wrap';
+                    tdHint.style.wordBreak = 'break-word';
+                    const tdCreated = document.createElement('td');
+                    tdCreated.textContent = h.created_at ? new Date(h.created_at).toLocaleString() : '';
+                    const tdAct = document.createElement('td');
+                    tdAct.style.textAlign = 'center';
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.className = 'modal-btn modal-btn-secondary';
+                    editBtn.style.padding = '4px 8px';
+                    editBtn.style.fontSize = '0.85em';
+                    editBtn.textContent = 'Edit';
+                    editBtn.addEventListener('click', () => _openEditVisitorKeyHint(h.id, h.hint || ''));
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.className = 'modal-btn';
+                    delBtn.style.padding = '4px 8px';
+                    delBtn.style.fontSize = '0.85em';
+                    delBtn.style.marginLeft = '6px';
+                    delBtn.style.backgroundColor = '#dc3545';
+                    delBtn.style.color = '#fff';
+                    delBtn.textContent = 'Delete';
+                    delBtn.addEventListener('click', () => _deleteVisitorKeyHintRow(h.id));
+                    tdAct.appendChild(editBtn);
+                    tdAct.appendChild(delBtn);
+                    tr.appendChild(tdId);
+                    tr.appendChild(tdKr);
+                    tr.appendChild(tdHint);
+                    tr.appendChild(tdCreated);
+                    tr.appendChild(tdAct);
+                    tbody.appendChild(tr);
+                });
+            }
+            if (empty) empty.style.display = hints.length === 0 ? 'block' : 'none';
+            if (createBtn) {
+                createBtn.disabled = _visitorHintOrphanIds.length === 0;
+                createBtn.style.opacity = _visitorHintOrphanIds.length === 0 ? '0.55' : '1';
+            }
+        } catch (e) {
+            console.error('[ManageKeys] visitor hints load error:', e);
+            if (errEl) {
+                errEl.textContent = e.message || 'Failed to load visitor hints.';
+                errEl.style.display = 'block';
+            }
+            if (tbody) tbody.textContent = '';
+            if (empty) empty.style.display = 'none';
+        } finally {
+            if (loading) loading.style.display = 'none';
+        }
+    }
+
+    function _closeEditVisitorKeyHintModal() {
+        const m = document.getElementById('edit-visitor-key-hint-modal');
+        if (m) m.style.display = 'none';
+        const idEl = document.getElementById('edit-visitor-key-hint-id');
+        const ta = document.getElementById('edit-visitor-key-hint-text');
+        const err = document.getElementById('edit-visitor-key-hint-error');
+        if (idEl) idEl.value = '';
+        if (ta) ta.value = '';
+        if (err) { err.textContent = ''; err.style.display = 'none'; }
+    }
+
+    function _openEditVisitorKeyHint(id, hint) {
+        const m = document.getElementById('edit-visitor-key-hint-modal');
+        const idEl = document.getElementById('edit-visitor-key-hint-id');
+        const ta = document.getElementById('edit-visitor-key-hint-text');
+        if (idEl) idEl.value = String(id);
+        if (ta) ta.value = hint;
+        if (m) m.style.display = 'flex';
+    }
+
+    async function _saveEditVisitorKeyHint() {
+        const idEl = document.getElementById('edit-visitor-key-hint-id');
+        const ta = document.getElementById('edit-visitor-key-hint-text');
+        const err = document.getElementById('edit-visitor-key-hint-error');
+        const id = idEl ? parseInt(idEl.value, 10) : 0;
+        const hint = ta ? ta.value.trim() : '';
+        if (!id || !hint) {
+            if (err) { err.textContent = 'Hint is required.'; err.style.display = 'block'; }
+            return;
+        }
+        if (err) { err.textContent = ''; err.style.display = 'none'; }
+        try {
+            const resp = await fetch(`/reference-documents/visitor-key-hints/${id}`, {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ hint })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            _closeEditVisitorKeyHintModal();
+            _showStatus(data.message || 'Hint updated.');
+            _loadVisitorKeyHintsTable();
+        } catch (e) {
+            console.error('[ManageKeys] update hint error:', e);
+            if (err) { err.textContent = e.message || 'Failed to update.'; err.style.display = 'block'; }
+        }
+    }
+
+    async function _deleteVisitorKeyHintRow(id) {
+        if (!window.confirm('Remove this visitor key seat entirely? The hint and key will be deleted. This cannot be undone.')) return;
+        if (!window.confirm('Final confirmation: delete this visitor key?')) return;
+        try {
+            const resp = await fetch(`/reference-documents/visitor-key-hints/${id}`, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            _showStatus(data.message || 'Visitor key removed.');
+            _loadVisitorKeyHintsTable();
+            _loadDocKeyringCount();
+        } catch (e) {
+            console.error('[ManageKeys] delete hint row error:', e);
+            _showStatus(e.message || 'Failed to delete.', true);
+        }
+    }
+
+    function _closeCreateVisitorKeyHintModal() {
+        const m = document.getElementById('create-visitor-key-hint-modal');
+        if (m) m.style.display = 'none';
+        const ta = document.getElementById('create-visitor-key-hint-text');
+        const err = document.getElementById('create-visitor-key-hint-error');
+        if (ta) ta.value = '';
+        if (err) { err.textContent = ''; err.style.display = 'none'; }
+    }
+
+    function _openCreateVisitorKeyHintModal() {
+        if (_visitorHintOrphanIds.length === 0) return;
+        const sel = document.getElementById('create-visitor-key-hint-keyring-select');
+        const m = document.getElementById('create-visitor-key-hint-modal');
+        if (sel) {
+            sel.textContent = '';
+            _visitorHintOrphanIds.forEach(kid => {
+                const opt = document.createElement('option');
+                opt.value = String(kid);
+                opt.textContent = `Seat ${kid}`;
+                sel.appendChild(opt);
+            });
+        }
+        const err = document.getElementById('create-visitor-key-hint-error');
+        const ta = document.getElementById('create-visitor-key-hint-text');
+        if (ta) ta.value = '';
+        if (err) { err.textContent = ''; err.style.display = 'none'; }
+        if (m) m.style.display = 'flex';
+    }
+
+    async function _saveCreateVisitorKeyHint() {
+        const sel = document.getElementById('create-visitor-key-hint-keyring-select');
+        const ta = document.getElementById('create-visitor-key-hint-text');
+        const err = document.getElementById('create-visitor-key-hint-error');
+        const keyringId = sel ? parseInt(sel.value, 10) : 0;
+        const hint = ta ? ta.value.trim() : '';
+        if (!keyringId || !hint) {
+            if (err) { err.textContent = 'Keyring seat and hint are required.'; err.style.display = 'block'; }
+            return;
+        }
+        if (err) { err.textContent = ''; err.style.display = 'none'; }
+        try {
+            const resp = await fetch('/reference-documents/visitor-key-hints', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ keyring_id: keyringId, hint })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            _closeCreateVisitorKeyHintModal();
+            _showStatus(data.message || 'Hint created.');
+            _loadVisitorKeyHintsTable();
+            _loadDocKeyringCount();
+        } catch (e) {
+            console.error('[ManageKeys] create hint error:', e);
+            if (err) { err.textContent = e.message || 'Failed to create hint.'; err.style.display = 'block'; }
+        }
+    }
+
     function _closeAddDocKeyModal() {
         const modal = document.getElementById('add-doc-key-modal');
         if (modal) modal.style.display = 'none';
@@ -1638,22 +1853,13 @@ Modals.ManageKeys = (() => {
         if (err) { err.textContent = ''; err.style.display = 'none'; }
     }
 
-    function _closeEncryptExistingModal() {
-        const modal = document.getElementById('encrypt-existing-modal');
-        if (modal) modal.style.display = 'none';
-        const pw = document.getElementById('encrypt-existing-password');
-        if (pw) pw.value = '';
-        const err = document.getElementById('encrypt-existing-error');
-        if (err) { err.textContent = ''; err.style.display = 'none'; }
-    }
-
     async function _addDocKey() {
         const userPw = document.getElementById('add-doc-key-user-password');
         const masterPw = document.getElementById('add-doc-key-master-password');
         const hintEl = document.getElementById('add-doc-key-hint');
         const errEl = document.getElementById('add-doc-key-error');
-        const userPassword = userPw ? userPw.value.trim() : '';
-        const masterPassword = masterPw ? masterPw.value.trim() : '';
+        const userPassword = _normKeyringPw(userPw ? userPw.value : '');
+        const masterPassword = _normKeyringPw(masterPw ? masterPw.value : '');
         const hint = hintEl ? hintEl.value.trim() : '';
         if (!userPassword) {
             if (errEl) { errEl.textContent = 'User password is required.'; errEl.style.display = 'block'; }
@@ -1681,6 +1887,7 @@ Modals.ManageKeys = (() => {
             _closeAddDocKeyModal();
             _showStatus(data.message || 'Document key added successfully.');
             _loadDocKeyringCount();
+            _loadVisitorKeyHintsTable();
         } catch (e) {
             console.error('[ManageKeys] add doc key error:', e);
             if (errEl) { errEl.textContent = e.message || 'Failed to add document key.'; errEl.style.display = 'block'; }
@@ -1691,8 +1898,8 @@ Modals.ManageKeys = (() => {
         const userPw = document.getElementById('remove-doc-key-user-password');
         const masterPw = document.getElementById('remove-doc-key-master-password');
         const errEl = document.getElementById('remove-doc-key-error');
-        const userPassword = userPw ? userPw.value.trim() : '';
-        const masterPassword = masterPw ? masterPw.value.trim() : '';
+        const userPassword = _normKeyringPw(userPw ? userPw.value : '');
+        const masterPassword = _normKeyringPw(masterPw ? masterPw.value : '');
         if (!userPassword) {
             if (errEl) { errEl.textContent = 'User password is required.'; errEl.style.display = 'block'; }
             return;
@@ -1715,37 +1922,36 @@ Modals.ManageKeys = (() => {
             _closeRemoveDocKeyModal();
             _showStatus(data.message || 'Document key removed successfully.');
             _loadDocKeyringCount();
+            _loadVisitorKeyHintsTable();
         } catch (e) {
             console.error('[ManageKeys] remove doc key error:', e);
             if (errEl) { errEl.textContent = e.message || 'Failed to remove document key.'; errEl.style.display = 'block'; }
         }
     }
 
-    async function _encryptExisting() {
-        const pw = document.getElementById('encrypt-existing-password');
-        const errEl = document.getElementById('encrypt-existing-error');
-        const password = pw ? pw.value.trim() : '';
-        if (!password) {
-            if (errEl) { errEl.textContent = 'Master password is required.'; errEl.style.display = 'block'; }
+    async function _deleteAllVisitorDocKeys() {
+        if (!window.confirm('Delete ALL visitor document keys?\n\nThe owner master key will stay. Visitor keys and their unlock hints will be removed. This cannot be undone.')) {
             return;
         }
-        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+        if (!window.confirm('Final confirmation: remove every visitor keyring seat now?')) {
+            return;
+        }
         try {
-            const resp = await fetch('/reference-documents/encrypt-existing', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
+            const resp = await fetch('/reference-documents/visitor-keys', {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
             });
             const data = await resp.json().catch(() => ({}));
             if (!resp.ok) {
-                throw new Error(data.error || `HTTP ${resp.status}`);
+                throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
             }
-            _closeEncryptExistingModal();
-            const count = data.encrypted !== undefined ? data.encrypted : '?';
-            _showStatus(`Encryption complete. ${count} document(s) encrypted.`);
+            _showStatus(data.message || 'Visitor keys removed.');
+            _loadDocKeyringCount();
+            _loadVisitorKeyHintsTable();
         } catch (e) {
-            console.error('[ManageKeys] encrypt existing error:', e);
-            if (errEl) { errEl.textContent = e.message || 'Failed to encrypt documents.'; errEl.style.display = 'block'; }
+            console.error('[ManageKeys] delete all visitor keys error:', e);
+            _showStatus(e.message || 'Failed to remove visitor keys.', true);
         }
     }
 
@@ -1753,8 +1959,8 @@ Modals.ManageKeys = (() => {
         const userPw = document.getElementById('delete-trusted-key-user-password');
         const masterPw = document.getElementById('delete-trusted-key-master-password');
         const errEl = document.getElementById('delete-trusted-key-error');
-        const userPassword = userPw ? userPw.value.trim() : '';
-        const masterPassword = masterPw ? masterPw.value.trim() : '';
+        const userPassword = _normKeyringPw(userPw ? userPw.value : '');
+        const masterPassword = _normKeyringPw(masterPw ? masterPw.value : '');
         if (!userPassword) {
             if (errEl) { errEl.textContent = 'User password is required.'; errEl.style.display = 'block'; }
             return;
@@ -1905,11 +2111,8 @@ Modals.ManageKeys = (() => {
             if (modal) modal.style.display = 'flex';
         });
 
-        const encryptExistingBtn = document.getElementById('encrypt-existing-btn');
-        if (encryptExistingBtn) encryptExistingBtn.addEventListener('click', () => {
-            const modal = document.getElementById('encrypt-existing-modal');
-            if (modal) modal.style.display = 'flex';
-        });
+        const deleteAllVisitorKeysBtn = document.getElementById('delete-all-visitor-keys-btn');
+        if (deleteAllVisitorKeysBtn) deleteAllVisitorKeysBtn.addEventListener('click', () => { _deleteAllVisitorDocKeys(); });
 
         const closeAddDocKey = document.getElementById('close-add-doc-key-modal');
         if (closeAddDocKey) closeAddDocKey.addEventListener('click', _closeAddDocKeyModal);
@@ -1917,17 +2120,11 @@ Modals.ManageKeys = (() => {
         const closeRemoveDocKey = document.getElementById('close-remove-doc-key-modal');
         if (closeRemoveDocKey) closeRemoveDocKey.addEventListener('click', _closeRemoveDocKeyModal);
 
-        const closeEncryptExisting = document.getElementById('close-encrypt-existing-modal');
-        if (closeEncryptExisting) closeEncryptExisting.addEventListener('click', _closeEncryptExistingModal);
-
         const cancelAddDocKey = document.getElementById('add-doc-key-cancel');
         if (cancelAddDocKey) cancelAddDocKey.addEventListener('click', _closeAddDocKeyModal);
 
         const cancelRemoveDocKey = document.getElementById('remove-doc-key-cancel');
         if (cancelRemoveDocKey) cancelRemoveDocKey.addEventListener('click', _closeRemoveDocKeyModal);
-
-        const cancelEncryptExisting = document.getElementById('encrypt-existing-cancel');
-        if (cancelEncryptExisting) cancelEncryptExisting.addEventListener('click', _closeEncryptExistingModal);
 
         const submitAddDocKey = document.getElementById('add-doc-key-submit');
         if (submitAddDocKey) submitAddDocKey.addEventListener('click', _addDocKey);
@@ -1935,17 +2132,11 @@ Modals.ManageKeys = (() => {
         const submitRemoveDocKey = document.getElementById('remove-doc-key-submit');
         if (submitRemoveDocKey) submitRemoveDocKey.addEventListener('click', _removeDocKey);
 
-        const submitEncryptExisting = document.getElementById('encrypt-existing-submit');
-        if (submitEncryptExisting) submitEncryptExisting.addEventListener('click', _encryptExisting);
-
         const addDocKeyModal = document.getElementById('add-doc-key-modal');
         if (addDocKeyModal) addDocKeyModal.addEventListener('click', e => { if (e.target === addDocKeyModal) _closeAddDocKeyModal(); });
 
         const removeDocKeyModal = document.getElementById('remove-doc-key-modal');
         if (removeDocKeyModal) removeDocKeyModal.addEventListener('click', e => { if (e.target === removeDocKeyModal) _closeRemoveDocKeyModal(); });
-
-        const encryptExistingModal = document.getElementById('encrypt-existing-modal');
-        if (encryptExistingModal) encryptExistingModal.addEventListener('click', e => { if (e.target === encryptExistingModal) _closeEncryptExistingModal(); });
 
         // Enter key shortcuts for doc key modals
         const addDocKeyEnter = e => { if (e.key === 'Enter') _addDocKey(); };
@@ -1960,14 +2151,148 @@ Modals.ManageKeys = (() => {
         if (removeDocKeyPw) removeDocKeyPw.addEventListener('keydown', removeDocKeyEnter);
         if (removeDocKeyMaster) removeDocKeyMaster.addEventListener('keydown', removeDocKeyEnter);
 
-        const encryptExistingPw = document.getElementById('encrypt-existing-password');
-        if (encryptExistingPw) encryptExistingPw.addEventListener('keydown', e => { if (e.key === 'Enter') _encryptExisting(); });
+        const visitorHintsRefresh = document.getElementById('visitor-key-hints-refresh-btn');
+        if (visitorHintsRefresh) visitorHintsRefresh.addEventListener('click', () => { _loadVisitorKeyHintsTable(); });
+
+        const createVisitorHintBtn = document.getElementById('create-visitor-key-hint-btn');
+        if (createVisitorHintBtn) createVisitorHintBtn.addEventListener('click', () => { _openCreateVisitorKeyHintModal(); });
+
+        const closeEditHint = document.getElementById('close-edit-visitor-key-hint-modal');
+        if (closeEditHint) closeEditHint.addEventListener('click', _closeEditVisitorKeyHintModal);
+        const cancelEditHint = document.getElementById('edit-visitor-key-hint-cancel');
+        if (cancelEditHint) cancelEditHint.addEventListener('click', _closeEditVisitorKeyHintModal);
+        const saveEditHint = document.getElementById('edit-visitor-key-hint-save');
+        if (saveEditHint) saveEditHint.addEventListener('click', () => { _saveEditVisitorKeyHint(); });
+
+        const editHintModal = document.getElementById('edit-visitor-key-hint-modal');
+        if (editHintModal) {
+            editHintModal.addEventListener('click', e => { if (e.target === editHintModal) _closeEditVisitorKeyHintModal(); });
+        }
+
+        const closeCreateHint = document.getElementById('close-create-visitor-key-hint-modal');
+        if (closeCreateHint) closeCreateHint.addEventListener('click', _closeCreateVisitorKeyHintModal);
+        const cancelCreateHint = document.getElementById('create-visitor-key-hint-cancel');
+        if (cancelCreateHint) cancelCreateHint.addEventListener('click', _closeCreateVisitorKeyHintModal);
+        const saveCreateHint = document.getElementById('create-visitor-key-hint-save');
+        if (saveCreateHint) saveCreateHint.addEventListener('click', () => { _saveCreateVisitorKeyHint(); });
+
+        const createHintModal = document.getElementById('create-visitor-key-hint-modal');
+        if (createHintModal) {
+            createHintModal.addEventListener('click', e => { if (e.target === createHintModal) _closeCreateVisitorKeyHintModal(); });
+        }
 
         // Load keyring count on page ready
         _loadDocKeyringCount();
+        _loadVisitorKeyHintsTable();
     }
 
     return { init };
+})();
+
+
+Modals.LLMToolsAccess = (() => {
+    function _status(msg, isErr) {
+        const el = document.getElementById('llm-tools-access-status');
+        if (!el) return;
+        if (!msg) {
+            el.style.display = 'none';
+            el.textContent = '';
+            return;
+        }
+        el.textContent = msg;
+        el.style.display = 'block';
+        el.style.color = isErr ? '#dc3545' : '#1a7f37';
+        el.style.backgroundColor = isErr ? 'rgba(220,53,69,0.1)' : 'rgba(26,127,55,0.1)';
+    }
+
+    async function load() {
+        const tbody = document.getElementById('llm-tools-access-tbody');
+        if (!tbody) return;
+        tbody.replaceChildren();
+        _status('', false);
+        try {
+            const res = await fetch('/api/settings/llm-tools-access', { credentials: 'same-origin' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                _status(data.detail || 'Could not load policy. Unlock the keyring (master or visitor) first.', true);
+                return;
+            }
+            const tools = data.tools || [];
+            for (const t of tools) {
+                const name = String(t.name || '');
+                const tr = document.createElement('tr');
+                const tdName = document.createElement('td');
+                const code = document.createElement('code');
+                code.textContent = name;
+                tdName.appendChild(code);
+                const tdDesc = document.createElement('td');
+                tdDesc.style.maxWidth = '320px';
+                tdDesc.style.fontSize = '0.9em';
+                tdDesc.style.color = '#555';
+                tdDesc.textContent = t.description || '';
+                tr.appendChild(tdName);
+                tr.appendChild(tdDesc);
+                const flags = [
+                    { key: 'no_key', val: !!t.no_key },
+                    { key: 'visitor', val: !!t.visitor },
+                    { key: 'master', val: !!t.master }
+                ];
+                for (const f of flags) {
+                    const td = document.createElement('td');
+                    const inp = document.createElement('input');
+                    inp.type = 'checkbox';
+                    inp.className = 'llm-tool-chk';
+                    inp.dataset.name = name;
+                    inp.dataset.flag = f.key;
+                    inp.checked = f.val;
+                    td.appendChild(inp);
+                    tr.appendChild(td);
+                }
+                tbody.appendChild(tr);
+            }
+        } catch (e) {
+            _status(e.message || 'Load failed', true);
+        }
+    }
+
+    async function save() {
+        const rows = {};
+        document.querySelectorAll('#llm-tools-access-tbody .llm-tool-chk').forEach((chk) => {
+            const name = chk.dataset.name;
+            const flag = chk.dataset.flag;
+            if (!name || !flag) return;
+            if (!rows[name]) {
+                rows[name] = { name: name, no_key: false, visitor: false, master: false };
+            }
+            if (flag === 'no_key') rows[name].no_key = chk.checked;
+            if (flag === 'visitor') rows[name].visitor = chk.checked;
+            if (flag === 'master') rows[name].master = chk.checked;
+        });
+        const tools = Object.values(rows);
+        try {
+            const res = await fetch('/api/settings/llm-tools-access', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tools })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                _status(data.detail || 'Save failed', true);
+                return;
+            }
+            _status(data.message || 'Saved.', false);
+        } catch (e) {
+            _status(e.message || 'Save failed', true);
+        }
+    }
+
+    function init() {
+        const btn = document.getElementById('llm-tools-access-save');
+        if (btn) btn.addEventListener('click', () => void save());
+    }
+
+    return { init, load, save };
 })();
 
 
@@ -1997,6 +2322,7 @@ Modals.initAll = () => {
         Modals.Artefacts.init();
         Modals.SensitiveData.init();
         Modals.ManageKeys.init();
+        if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.init) Modals.LLMToolsAccess.init();
         Modals.Profiles.init();
         if (Modals.EmailMatches && Modals.EmailMatches.init) Modals.EmailMatches.init();
         if (Modals.EmailClassifications && Modals.EmailClassifications.init) Modals.EmailClassifications.init();

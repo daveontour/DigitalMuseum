@@ -35,6 +35,7 @@ type ChatService struct {
 	tavilyKey       string
 	pepper          string
 	sessionStore    *keystore.SessionMasterStore
+	privateStore    *PrivateStoreService
 }
 
 // NewChatService creates a ChatService.
@@ -49,6 +50,7 @@ func NewChatService(
 	tavilyKey string,
 	pepper string,
 	sessionStore *keystore.SessionMasterStore,
+	privateStore *PrivateStoreService,
 ) *ChatService {
 	return &ChatService{
 		chatRepo:        chatRepo,
@@ -61,6 +63,7 @@ func NewChatService(
 		tavilyKey:       tavilyKey,
 		pepper:          pepper,
 		sessionStore:    sessionStore,
+		privateStore:    privateStore,
 	}
 }
 
@@ -71,6 +74,36 @@ func (s *ChatService) perRequestGetRAM(r *http.Request) appai.RAMMasterGetter {
 		}
 		return s.sessionStore.Get(r)
 	}
+}
+
+func (s *ChatService) loadToolAccessPolicy(ctx context.Context, masterPassword string) appai.ToolAccessPolicy {
+	if s.privateStore == nil || strings.TrimSpace(masterPassword) == "" {
+		return nil
+	}
+	rec, err := s.privateStore.GetByKey(ctx, appai.LLMToolsAccessStoreKey, masterPassword)
+	if err != nil || rec == nil || strings.TrimSpace(rec.Value) == "" {
+		return nil
+	}
+	p, err := appai.ParseToolAccessPolicyJSON(rec.Value)
+	if err != nil {
+		return nil
+	}
+	return p
+}
+
+// buildChatTools returns a policy-wrapped executor and filtered tool schemas for the current session tier.
+func (s *ChatService) buildChatTools(ctx context.Context, r *http.Request, subjectName string) (appai.ToolExecutor, *[]map[string]any) {
+	getRAM := s.perRequestGetRAM(r)
+	tier := appai.UnlockTierFromSession(s.sessionStore, r)
+	pw, ok := getRAM()
+	var policy appai.ToolAccessPolicy
+	if ok && pw != "" {
+		policy = s.loadToolAccessPolicy(ctx, pw)
+	}
+	filtered := appai.FilterToolDefinitionsForTier(policy, tier)
+	base := appai.NewToolExecutor(s.pool, subjectName, s.tavilyKey, s.pepper, getRAM)
+	wrapped := appai.WrapToolExecutorWithPolicy(base, policy, tier)
+	return wrapped, &filtered
 }
 
 // GeminiAvailable reports whether the Gemini provider is configured.
@@ -176,8 +209,7 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	}
 
 	// Build tool executor and generation request
-	getRAM := s.perRequestGetRAM(r)
-	executor := appai.NewToolExecutor(s.pool, subjectName, s.tavilyKey, s.pepper, getRAM)
+	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
 	genReq := appai.GenerateRequest{
 		UserInput:     req.Prompt,
 		Temperature:   temperature,
@@ -193,7 +225,7 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 		genReq.WritingStyle = writingStyle
 	}
 
-	result, err := provider.GenerateResponse(ctx, genReq, systemPrompt, history, executor)
+	result, err := provider.GenerateResponse(ctx, genReq, systemPrompt, history, executor, toolDecls)
 	if err != nil {
 		return nil, err
 	}
@@ -342,8 +374,7 @@ func (s *ChatService) GenerateRandomQuestion(ctx context.Context, r *http.Reques
 		" Do not answer the question, just generate it."
 
 	// Build tool executor and generation request
-	getRAM := s.perRequestGetRAM(r)
-	executor := appai.NewToolExecutor(s.pool, subjectName, s.tavilyKey, s.pepper, getRAM)
+	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
 	genReq := appai.GenerateRequest{
 		UserInput:     prompt,
 		Temperature:   temperature,
@@ -360,7 +391,7 @@ func (s *ChatService) GenerateRandomQuestion(ctx context.Context, r *http.Reques
 	// 	genReq.WritingStyle = writingStyle
 	// }
 
-	result, err := provider.GenerateResponse(ctx, genReq, systemPrompt, history, executor)
+	result, err := provider.GenerateResponse(ctx, genReq, systemPrompt, history, executor, toolDecls)
 	if err != nil {
 		return nil, err
 	}
@@ -467,11 +498,14 @@ func (s *ChatService) TurnCount(ctx context.Context, conversationID int64) (int6
 // GenerateCompleteProfile builds a multi-step relationship profile for a contact
 // from messages and emails, using the specified AI provider (gemini or claude) to summarize,
 // and saves it to complete_profiles. Mirrors the Python base_chat_service.get_complete_profile_by_name.
-func (s *ChatService) GenerateCompleteProfile(ctx context.Context, name string, provider string, getRAM appai.RAMMasterGetter) error {
+func (s *ChatService) GenerateCompleteProfile(ctx context.Context, name string, provider string, getRAM appai.RAMMasterGetter, tier appai.UnlockTier) error {
 	if getRAM == nil {
 		getRAM = func() (string, bool) { return "", false }
 	}
-	executor := appai.NewToolExecutor(s.pool, "", s.tavilyKey, s.pepper, getRAM)
+	pw, _ := getRAM()
+	policy := s.loadToolAccessPolicy(ctx, pw)
+	base := appai.NewToolExecutor(s.pool, "", s.tavilyKey, s.pepper, getRAM)
+	executor := appai.WrapToolExecutorWithPolicy(base, policy, tier)
 	msgsRaw, err := executor(ctx, "get_imessages_by_chat_session", map[string]any{"chat_session": name})
 	if err != nil {
 		return fmt.Errorf("get messages: %w", err)

@@ -70,15 +70,35 @@ func (p *ClaudeProvider) GenerateResponse(
 	systemPrompt string,
 	history []ConvTurn,
 	executor ToolExecutor,
+	toolDecls *[]map[string]any,
 ) (GenerateResult, error) {
-	// Build tools in Anthropic format
-	claudeTools := make([]map[string]any, 0, len(toolDefinitions()))
-	for _, td := range toolDefinitions() {
+	if executor == nil {
+		empty := []map[string]any{}
+		toolDecls = &empty
+	}
+	exec := executor
+	if exec == nil {
+		exec = func(_ context.Context, name string, _ map[string]any) (map[string]any, error) {
+			return map[string]any{"error": "tool execution not available: " + name}, nil
+		}
+	}
+
+	var defs []map[string]any
+	if toolDecls == nil {
+		defs = toolDefinitions()
+	} else {
+		defs = *toolDecls
+	}
+	claudeTools := make([]map[string]any, 0, len(defs))
+	for _, td := range defs {
 		claudeTools = append(claudeTools, map[string]any{
 			"name":         td["name"],
 			"description":  td["description"],
 			"input_schema": td["parameters"],
 		})
+	}
+	if len(claudeTools) > 0 {
+		claudeTools[len(claudeTools)-1]["cache_control"] = map[string]any{"type": "ephemeral"}
 	}
 
 	messages := buildClaudeMessages(req, history)
@@ -92,9 +112,17 @@ func (p *ClaudeProvider) GenerateResponse(
 			"model":       p.modelName,
 			"max_tokens":  8096,
 			"temperature": temperature,
-			"system":      systemPrompt,
-			"tools":       claudeTools,
-			"messages":    messages,
+			"system": []map[string]any{
+				{
+					"type":          "text",
+					"text":          systemPrompt,
+					"cache_control": map[string]any{"type": "ephemeral"},
+				},
+			},
+			"messages": messages,
+		}
+		if len(claudeTools) > 0 {
+			body["tools"] = claudeTools
 		}
 
 		resp, err := claudePost(ctx, p.apiKey, body)
@@ -176,7 +204,7 @@ func (p *ClaudeProvider) GenerateResponse(
 				"iteration": iter + 1,
 			})
 
-			result, err := executor(ctx, toolName, toolInput)
+			result, err := exec(ctx, toolName, toolInput)
 			if err != nil {
 				result = map[string]any{"error": err.Error()}
 			}
@@ -186,7 +214,7 @@ func (p *ClaudeProvider) GenerateResponse(
 				"tool_use_id": toolID,
 				"content":     string(resultJSON),
 			}
-			if toolName == "get_reference_documents" {
+			if toolName == "get_reference_document" {
 				toolResult["content"] = []map[string]any{
 					{
 						"type":          "text",

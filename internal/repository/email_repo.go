@@ -76,7 +76,7 @@ func (r *EmailRepo) Search(ctx context.Context, p model.EmailSearchParams) ([]*m
 		add("EXTRACT(year FROM date) = ?", *p.Year)
 	}
 	if p.Subject != nil {
-		add("subject ILIKE ?", "%"+*p.Subject+"%")
+		add("(subject ILIKE ? OR snippet ILIKE ? OR folder ILIKE ?)", "%"+*p.Subject+"%")
 	}
 	if p.ToFrom != nil {
 		parts := splitTrim(*p.ToFrom, ',')

@@ -151,6 +151,7 @@ func (s *EmailService) SummarizeThread(ctx context.Context, participant string) 
 		"You are a helpful assistant that summarises email threads concisely.",
 		nil,
 		nil,
+		nil,
 	)
 	if err != nil {
 		return "", fmt.Errorf("Gemini summarize: %w", err)
