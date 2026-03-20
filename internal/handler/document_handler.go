@@ -338,13 +338,18 @@ func (h *DocumentHandler) AddUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		UserPassword   string `json:"user_password"`
 		MasterPassword string `json:"master_password"`
+		Hint           string `json:"hint"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	if strings.TrimSpace(req.Hint) == "" {
+		writeError(w, http.StatusBadRequest, "hint is required (plain-text reminder for visitor unlock)")
+		return
+	}
 	mp := resolvePasswordWithRAMMaster(req.MasterPassword, h.ramMaster)
-	if err := h.sensitiveSvc.AddUser(r.Context(), req.UserPassword, mp); err != nil {
+	if err := h.sensitiveSvc.AddUser(r.Context(), req.UserPassword, mp, req.Hint); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error adding user: %s", err))
 		return
 	}

@@ -436,36 +436,12 @@ CREATE TABLE IF NOT EXISTS locations (
 );
 
 -- ============================================================
--- sensitive_data
--- ============================================================
-CREATE TABLE IF NOT EXISTS sensitive_data (
-    id            SERIAL PRIMARY KEY,
-    description   VARCHAR(500) NOT NULL,
-    details       TEXT,
-    is_private    BOOLEAN NOT NULL DEFAULT FALSE,
-    is_sensitive  BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at    TIMESTAMP DEFAULT NOW(),
-    updated_at    TIMESTAMP DEFAULT NOW()
-);
-
--- ============================================================
 -- complete_profiles
 -- ============================================================
 CREATE TABLE IF NOT EXISTS complete_profiles (
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(500) NOT NULL,
     profile     TEXT,
-    created_at  TIMESTAMP DEFAULT NOW(),
-    updated_at  TIMESTAMP DEFAULT NOW()
-);
-
--- ============================================================
--- trusted_keys
--- ============================================================
-CREATE TABLE IF NOT EXISTS trusted_keys (
-    id          SERIAL PRIMARY KEY,
-    key         TEXT    NOT NULL,
-    is_master   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMP DEFAULT NOW(),
     updated_at  TIMESTAMP DEFAULT NOW()
 );
@@ -491,6 +467,19 @@ CREATE TABLE IF NOT EXISTS sensitive_keyring (
     is_master            BOOLEAN NOT NULL DEFAULT FALSE,
     created_at           TIMESTAMP DEFAULT NOW()
 );
+
+-- ============================================================
+-- visitor_key_hints (Unlock dialog: list hints for visitor seats)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS visitor_key_hints (
+    id           SERIAL PRIMARY KEY,
+    keyring_id   INTEGER NOT NULL REFERENCES sensitive_keyring(id) ON DELETE CASCADE,
+    hint         TEXT    NOT NULL,
+    created_at   TIMESTAMP DEFAULT NOW(),
+    UNIQUE(keyring_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_visitor_key_hints_keyring_id ON visitor_key_hints (keyring_id);
 
 -- ============================================================
 -- private_store

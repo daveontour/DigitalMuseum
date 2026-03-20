@@ -38,7 +38,6 @@ func (h *SensitiveHandler) RegisterRoutes(r chi.Router) {
 	r.Post("/sensitive-data/master-key", h.GenerateMasterKey)
 	r.Post("/sensitive-data/trusted-key", h.GenerateTrustedKey)
 	r.Delete("/sensitive-data/trusted-key", h.DeleteTrustedKey)
-	r.Post("/sensitive-data/migrate", h.MigrateRecords)
 
 	r.Post("/sensitive-data", h.Create)
 	r.Put("/sensitive-data/{record_id}", h.Update)
@@ -144,6 +143,7 @@ func (h *SensitiveHandler) GenerateTrustedKey(w http.ResponseWriter, r *http.Req
 	var req struct {
 		UserPassword   string `json:"user_password"`
 		MasterPassword string `json:"master_password"`
+		Hint           string `json:"hint"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -157,7 +157,11 @@ func (h *SensitiveHandler) GenerateTrustedKey(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusForbidden, "master password is required")
 		return
 	}
-	if err := h.svc.AddUser(r.Context(), req.UserPassword, req.MasterPassword); err != nil {
+	if strings.TrimSpace(req.Hint) == "" {
+		writeError(w, http.StatusBadRequest, "hint is required (plain-text reminder shown on the unlock screen for visitors)")
+		return
+	}
+	if err := h.svc.AddUser(r.Context(), req.UserPassword, req.MasterPassword, req.Hint); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error adding user: %s", err))
 		return
 	}
@@ -190,35 +194,6 @@ func (h *SensitiveHandler) DeleteTrustedKey(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeJSON(w, map[string]string{"message": "Keyring seat removed"})
-}
-
-// MigrateRecords re-encrypts sensitive_data rows from the old RSA/hybrid format
-// to the new pgcrypto format.
-// Endpoint: POST /sensitive-data/migrate
-// Body: {"old_password":"...","new_password":"..."}
-func (h *SensitiveHandler) MigrateRecords(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		OldPassword string `json:"old_password"`
-		NewPassword string `json:"new_password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if !sensitiveHasPassword(req.OldPassword) {
-		writeError(w, http.StatusForbidden, "old_password is required")
-		return
-	}
-	if !sensitiveHasPassword(req.NewPassword) {
-		writeError(w, http.StatusForbidden, "new_password is required")
-		return
-	}
-	count, err := h.svc.MigrateRecords(r.Context(), req.OldPassword, req.NewPassword)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("migration error: %s", err))
-		return
-	}
-	writeJSON(w, map[string]any{"migrated": count, "message": fmt.Sprintf("%d record(s) re-encrypted", count)})
 }
 
 // ── write endpoints ───────────────────────────────────────────────────────────

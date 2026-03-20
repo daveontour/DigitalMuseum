@@ -252,7 +252,7 @@ func dirExists(path string) bool {
 }
 
 // runThumbnailsAfterImportIfIdle starts thumbnail processing if the thumbnails job is idle.
-// Called after image-loading imports complete successfully.
+// Called after image-loading imports (filesystem, etc.) and email imports (IMAP/Gmail) complete successfully.
 func runThumbnailsAfterImportIfIdle(pool *pgxpool.Pool) {
 	if pool == nil {
 		return

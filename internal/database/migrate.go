@@ -460,31 +460,11 @@ func schemaDDL() []string {
 			updated_at        TIMESTAMP DEFAULT NOW()
 		)`,
 
-		// ── sensitive_data ──────────────────────────────────────────────────────
-		`CREATE TABLE IF NOT EXISTS sensitive_data (
-			id            SERIAL PRIMARY KEY,
-			description   VARCHAR(500) NOT NULL,
-			details       TEXT,
-			is_private    BOOLEAN NOT NULL DEFAULT FALSE,
-			is_sensitive  BOOLEAN NOT NULL DEFAULT FALSE,
-			created_at    TIMESTAMP DEFAULT NOW(),
-			updated_at    TIMESTAMP DEFAULT NOW()
-		)`,
-
 		// ── complete_profiles ───────────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS complete_profiles (
 			id          SERIAL PRIMARY KEY,
 			name        VARCHAR(500) NOT NULL,
 			profile     TEXT,
-			created_at  TIMESTAMP DEFAULT NOW(),
-			updated_at  TIMESTAMP DEFAULT NOW()
-		)`,
-
-		// ── trusted_keys ────────────────────────────────────────────────────────
-		`CREATE TABLE IF NOT EXISTS trusted_keys (
-			id          SERIAL PRIMARY KEY,
-			key         TEXT    NOT NULL,
-			is_master   BOOLEAN NOT NULL DEFAULT FALSE,
 			created_at  TIMESTAMP DEFAULT NOW(),
 			updated_at  TIMESTAMP DEFAULT NOW()
 		)`,
@@ -506,6 +486,16 @@ func schemaDDL() []string {
 			is_master            BOOLEAN NOT NULL DEFAULT FALSE,
 			created_at           TIMESTAMP DEFAULT NOW()
 		)`,
+
+		// ── visitor_key_hints (plain-text hints for non-master / visitor seats) ───
+		`CREATE TABLE IF NOT EXISTS visitor_key_hints (
+			id           SERIAL PRIMARY KEY,
+			keyring_id   INTEGER NOT NULL REFERENCES sensitive_keyring(id) ON DELETE CASCADE,
+			hint         TEXT    NOT NULL,
+			created_at   TIMESTAMP DEFAULT NOW(),
+			UNIQUE(keyring_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_visitor_key_hints_keyring_id ON visitor_key_hints (keyring_id)`,
 
 		// ── private_store ────────────────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS private_store (
@@ -586,8 +576,10 @@ func schemaDDL() []string {
 			updated_at   TIMESTAMP DEFAULT NOW()
 		)`,
 
-		// Legacy table removed — email attachments live in media_items (source='email_attachment').
+		// Legacy tables removed (replaced by reference_documents + sensitive_keyring / media_items).
 		`DROP TABLE IF EXISTS media_metadata`,
+		`DROP TABLE IF EXISTS sensitive_data`,
+		`DROP TABLE IF EXISTS trusted_keys`,
 	}
 }
 

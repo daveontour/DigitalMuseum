@@ -26,6 +26,34 @@ func NewSessionHandler(sensitiveSvc *service.SensitiveService, ram *keystore.Mem
 func (h *SessionHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/session/master-key/status", h.MasterKeyStatus)
 	r.Post("/api/session/master-key/unlock", h.MasterKeyUnlock)
+	r.Post("/api/session/master-key/unlock-visitor", h.MasterKeyUnlockVisitor)
+	r.Post("/api/session/master-key/clear", h.MasterKeyClear)
+	r.Get("/api/session/visitor-key-hints", h.VisitorKeyHintsList)
+}
+
+// VisitorKeyHintsList returns plain-text hints for visitor (non-master) keyring seats.
+func (h *SessionHandler) VisitorKeyHintsList(w http.ResponseWriter, r *http.Request) {
+	hints, err := h.sensitiveSvc.ListVisitorKeyHints(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error listing visitor key hints: %s", err))
+		return
+	}
+	// Encode with explicit timestamps for JSON
+	out := make([]map[string]any, 0, len(hints))
+	for _, x := range hints {
+		out = append(out, map[string]any{
+			"id":         x.ID,
+			"hint":       x.Hint,
+			"created_at": x.CreatedAt.Format("2006-01-02T15:04:05.999999"),
+		})
+	}
+	writeJSON(w, map[string]any{"hints": out})
+}
+
+// MasterKeyClear drops the in-process RAM master key (e.g. after a full page reload of the main app).
+func (h *SessionHandler) MasterKeyClear(w http.ResponseWriter, r *http.Request) {
+	h.ramMaster.Clear()
+	writeJSON(w, map[string]any{"cleared": true})
 }
 
 // MasterKeyStatus reports whether a keyring exists and whether this process has an unlocked master key in RAM.
@@ -70,4 +98,48 @@ func (h *SessionHandler) MasterKeyUnlock(w http.ResponseWriter, r *http.Request)
 	}
 	h.ramMaster.Set(req.Password)
 	writeJSON(w, map[string]any{"valid": true})
+}
+
+// MasterKeyUnlockVisitor validates a non-master keyring seat password, rejects the owner master key,
+// and stores the password in RAM (same slot as master unlock) for shared DEK operations.
+func (h *SessionHandler) MasterKeyUnlockVisitor(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if strings.TrimSpace(req.Password) == "" {
+		writeError(w, http.StatusBadRequest, "password is required")
+		return
+	}
+	okMaster, err := h.sensitiveSvc.VerifyMasterPassword(r.Context(), req.Password)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error validating key: %s", err))
+		return
+	}
+	if okMaster {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]any{
+			"valid":  false,
+			"detail": "Invalid visitor key, or no visitor keys are set up. Ask the owner to add a seat in Manage Keys.",
+		})
+		return
+	}
+	okVisitor, err := h.sensitiveSvc.VerifyVisitorKeyringPassword(r.Context(), req.Password)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error validating visitor key: %s", err))
+		return
+	}
+	if !okVisitor {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeJSON(w, map[string]any{
+			"valid":  false,
+			"detail": "Invalid visitor key, or no visitor keys are set up. Ask the owner to add a seat in Manage Keys.",
+		})
+		return
+	}
+	h.ramMaster.Set(req.Password)
+	writeJSON(w, map[string]any{"valid": true, "visitor": true})
 }

@@ -84,7 +84,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 	dashboardHandler.RegisterRoutes(r)
 
 	// ── Templated endpoints (GET /, suggestions, JS files) ───────────────────
-	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, cfg)
+	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, cfg, ramMasterKey)
 	templateHandler.RegisterRoutes(r)
 
 	// ── Reference documents & sensitive data (shared keyring) ────────────────

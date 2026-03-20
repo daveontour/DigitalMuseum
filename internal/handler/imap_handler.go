@@ -269,6 +269,7 @@ func (h *IMAPHandler) runIMAPImport(req imapProcessRequest, folders []string) {
 		"status":      "completed",
 		"status_line": fmt.Sprintf("Import completed. %d emails processed.", totalProcessed),
 	})
+	runThumbnailsAfterImportIfIdle(h.pool)
 	h.job.Broadcast("completed", h.job.GetState())
 }
 
@@ -393,8 +394,8 @@ func (h *IMAPHandler) storeEmail(ctx context.Context, folder string, msg *imap.M
 		    date=$8, raw_message=$9, plain_text=$10, snippet=$11, has_attachments=$12,
 		    updated_at=NOW()
 		RETURNING id`,
-		uid, folder, env.Subject, from, to, cc, bcc,
-		date, rawMsg, plainText, snippet, hasAttach,
+		uid, folder, ensureUTF8String(env.Subject), ensureUTF8String(from), ensureUTF8String(to), ensureUTF8String(cc), ensureUTF8String(bcc),
+		date, ptrEnsureUTF8(rawMsg), ptrEnsureUTF8(plainText), ptrEnsureUTF8(snippet), hasAttach,
 	).Scan(&emailID)
 	if err != nil {
 		return err
@@ -409,13 +410,11 @@ func (h *IMAPHandler) storeEmail(ctx context.Context, folder string, msg *imap.M
 		if len(att.Data) == 0 {
 			continue
 		}
-		title := att.Filename
+		title := ensureUTF8String(att.Filename)
 		if title == "" {
 			title = "attachment"
 		}
-		if len(title) > 1000 {
-			title = title[:1000]
-		}
+		title = truncateUTF8Runes(title, 1000)
 		mt := att.MediaType
 		if len(mt) > 255 {
 			mt = mt[:255]

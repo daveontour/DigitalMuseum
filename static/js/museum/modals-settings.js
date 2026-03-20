@@ -1469,9 +1469,11 @@ Modals.ManageKeys = (() => {
         if (modal) modal.style.display = 'none';
         const userPw = document.getElementById('create-trusted-key-user-password');
         const masterPw = document.getElementById('create-trusted-key-master-password');
+        const hintEl = document.getElementById('create-trusted-key-hint');
         const err = document.getElementById('create-trusted-key-error');
         if (userPw) userPw.value = '';
         if (masterPw) masterPw.value = '';
+        if (hintEl) hintEl.value = '';
         if (err) { err.textContent = ''; err.style.display = 'none'; }
     }
 
@@ -1564,9 +1566,11 @@ Modals.ManageKeys = (() => {
     async function _createTrustedKey() {
         const userPw = document.getElementById('create-trusted-key-user-password');
         const masterPw = document.getElementById('create-trusted-key-master-password');
+        const hintEl = document.getElementById('create-trusted-key-hint');
         const errEl = document.getElementById('create-trusted-key-error');
         const userPassword = userPw ? userPw.value.trim() : '';
         const masterPassword = masterPw ? masterPw.value.trim() : '';
+        const hint = hintEl ? hintEl.value.trim() : '';
         if (!userPassword) {
             if (errEl) { errEl.textContent = 'User password is required.'; errEl.style.display = 'block'; }
             return;
@@ -1575,16 +1579,20 @@ Modals.ManageKeys = (() => {
             if (errEl) { errEl.textContent = 'Master password is required.'; errEl.style.display = 'block'; }
             return;
         }
+        if (!hint) {
+            if (errEl) { errEl.textContent = 'A plain-text visitor hint is required (shown on the unlock screen).'; errEl.style.display = 'block'; }
+            return;
+        }
         if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
         try {
             const resp = await fetch('/sensitive-data/trusted-key', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_password: userPassword, master_password: masterPassword })
+                body: JSON.stringify({ user_password: userPassword, master_password: masterPassword, hint })
             });
             const data = await resp.json().catch(() => ({}));
             if (!resp.ok) {
-                throw new Error(data.detail || `HTTP ${resp.status}`);
+                throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
             }
             _closeCreateModal();
             _showStatus(data.message || 'Trusted key created successfully.');
@@ -1611,7 +1619,7 @@ Modals.ManageKeys = (() => {
     function _closeAddDocKeyModal() {
         const modal = document.getElementById('add-doc-key-modal');
         if (modal) modal.style.display = 'none';
-        ['add-doc-key-user-password', 'add-doc-key-master-password'].forEach(id => {
+        ['add-doc-key-user-password', 'add-doc-key-master-password', 'add-doc-key-hint'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
@@ -1642,9 +1650,11 @@ Modals.ManageKeys = (() => {
     async function _addDocKey() {
         const userPw = document.getElementById('add-doc-key-user-password');
         const masterPw = document.getElementById('add-doc-key-master-password');
+        const hintEl = document.getElementById('add-doc-key-hint');
         const errEl = document.getElementById('add-doc-key-error');
         const userPassword = userPw ? userPw.value.trim() : '';
         const masterPassword = masterPw ? masterPw.value.trim() : '';
+        const hint = hintEl ? hintEl.value.trim() : '';
         if (!userPassword) {
             if (errEl) { errEl.textContent = 'User password is required.'; errEl.style.display = 'block'; }
             return;
@@ -1653,16 +1663,20 @@ Modals.ManageKeys = (() => {
             if (errEl) { errEl.textContent = 'Master password is required.'; errEl.style.display = 'block'; }
             return;
         }
+        if (!hint) {
+            if (errEl) { errEl.textContent = 'A plain-text visitor hint is required.'; errEl.style.display = 'block'; }
+            return;
+        }
         if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
         try {
             const resp = await fetch('/reference-documents/add-user', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_password: userPassword, master_password: masterPassword })
+                body: JSON.stringify({ user_password: userPassword, master_password: masterPassword, hint })
             });
             const data = await resp.json().catch(() => ({}));
             if (!resp.ok) {
-                throw new Error(data.error || `HTTP ${resp.status}`);
+                throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
             }
             _closeAddDocKeyModal();
             _showStatus(data.message || 'Document key added successfully.');
@@ -3366,6 +3380,8 @@ Modals.AppConfig = (() => {
     };
 })();
 
+// Inline onclick in index.template.html uses AppConfig.* — must be on window.
+window.AppConfig = Modals.AppConfig;
 
 // --- Custom Voices (Settings Tab) ---
 Modals.CustomVoices = (() => {

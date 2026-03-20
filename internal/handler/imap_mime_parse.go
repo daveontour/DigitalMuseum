@@ -54,7 +54,7 @@ func parseIMAPMIMEBody(raw []byte) imapParsedMIME {
 			return out
 		}
 		// Last resort: single unlabeled body — store as plain only (not as raw MIME).
-		return imapParsedMIME{BodyPlain: strings.TrimSpace(string(raw))}
+		return imapParsedMIME{BodyPlain: strings.TrimSpace(decodeMIMEPartToUTF8(bytes.TrimSpace(raw), ""))}
 	}
 
 	body, err := io.ReadAll(msg.Body)
@@ -103,6 +103,7 @@ func walkMIME(h imapMIMEHeader, body []byte, st *parseState) {
 	body = decodeContentTransfer(h.Get("Content-Transfer-Encoding"), body)
 
 	ct := h.Get("Content-Type")
+	// Full header value (incl. charset) for decodeMIMEPartToUTF8; mt is media type only.
 	mt, params, err := mime.ParseMediaType(ct)
 	if err != nil {
 		mt = strings.TrimSpace(strings.Split(ct, ";")[0])
@@ -129,12 +130,12 @@ func walkMIME(h imapMIMEHeader, body []byte, st *parseState) {
 
 	case strings.HasPrefix(strings.ToLower(mt), "text/plain"):
 		if st.plain == "" {
-			st.plain = string(body)
+			st.plain = decodeMIMEPartToUTF8(body, ct)
 		}
 
 	case strings.HasPrefix(strings.ToLower(mt), "text/html"):
 		if st.html == "" {
-			st.html = string(body)
+			st.html = decodeMIMEPartToUTF8(body, ct)
 		}
 
 	case strings.EqualFold(mt, "message/rfc822"):
@@ -245,15 +246,15 @@ func decodeContentTransfer(enc string, data []byte) []byte {
 // plain_text is the first text/plain part when present (may coexist with HTML in raw_message).
 func imapEmailStoredFields(parsed imapParsedMIME) (rawMsg, plainText, snippet *string) {
 	if parsed.BodyPlain != "" {
-		p := parsed.BodyPlain
+		p := ensureUTF8String(parsed.BodyPlain)
 		plainText = &p
 	}
 	var raw string
 	switch {
 	case parsed.BodyHTML != "":
-		raw = parsed.BodyHTML
+		raw = ensureUTF8String(parsed.BodyHTML)
 	case parsed.BodyPlain != "":
-		raw = parsed.BodyPlain
+		raw = ensureUTF8String(parsed.BodyPlain)
 	}
 	if raw != "" {
 		rawMsg = &raw
@@ -261,15 +262,14 @@ func imapEmailStoredFields(parsed imapParsedMIME) (rawMsg, plainText, snippet *s
 
 	var snip string
 	if parsed.BodyPlain != "" {
-		snip = parsed.BodyPlain
+		snip = ensureUTF8String(parsed.BodyPlain)
 	} else if parsed.BodyHTML != "" {
-		snip = stripHTMLForSnippet(parsed.BodyHTML)
+		snip = stripHTMLForSnippet(ensureUTF8String(parsed.BodyHTML))
 	}
 	snip = strings.TrimSpace(snip)
 	if snip != "" {
-		if len(snip) > 200 {
-			snip = snip[:200]
-		}
+		snip = truncateUTF8Runes(snip, 200)
+		snip = ensureUTF8String(snip)
 		snippet = &snip
 	}
 	return rawMsg, plainText, snippet

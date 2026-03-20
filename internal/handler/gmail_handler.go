@@ -370,6 +370,7 @@ func (h *GmailHandler) runGmailImport(tok *oauth2.Token, labelIDs []string, labe
 		"status":      "completed",
 		"status_line": fmt.Sprintf("Import completed. %d emails processed.", totalProcessed),
 	})
+	runThumbnailsAfterImportIfIdle(h.pool)
 	h.job.Broadcast("completed", h.job.GetState())
 }
 
@@ -420,22 +421,22 @@ func (h *GmailHandler) storeGmailEmail(ctx context.Context, msg *appgmail.Messag
 
 	var plainText *string
 	if msg.BodyText != "" {
-		plainText = &msg.BodyText
+		t := ensureUTF8String(msg.BodyText)
+		plainText = &t
 	}
 
 	var rawMessage *string
 	if msg.BodyHTML != "" {
-		rawMessage = &msg.BodyHTML
+		r := ensureUTF8String(msg.BodyHTML)
+		rawMessage = &r
 	} else if msg.BodyText != "" {
-		rawMessage = &msg.BodyText
+		r := ensureUTF8String(msg.BodyText)
+		rawMessage = &r
 	}
 
 	var snippet *string
 	if msg.Snippet != "" {
-		s := msg.Snippet
-		if len(s) > 200 {
-			s = s[:200]
-		}
+		s := ensureUTF8String(truncateUTF8Runes(msg.Snippet, 200))
 		snippet = &s
 	}
 
@@ -449,7 +450,7 @@ func (h *GmailHandler) storeGmailEmail(ctx context.Context, msg *appgmail.Messag
 			subject=$3, from_address=$4, to_addresses=$5,
 			date=$6, raw_message=$7, plain_text=$8, snippet=$9,
 			updated_at=NOW()`,
-		msg.UID, msg.Folder, msg.Subject, msg.FromAddress, msg.ToAddress,
+		msg.UID, msg.Folder, ensureUTF8String(msg.Subject), ensureUTF8String(msg.FromAddress), ensureUTF8String(msg.ToAddress),
 		date, rawMessage, plainText, snippet,
 	)
 	return err

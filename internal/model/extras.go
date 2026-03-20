@@ -48,6 +48,15 @@ type Interest struct {
 	UpdatedAt time.Time
 }
 
+// ── Visitor key hints (non-master keyring seats) ─────────────────────────────
+
+// VisitorKeyHint is a row from visitor_key_hints (plain-text hint for unlock UI).
+type VisitorKeyHint struct {
+	ID        int64     `json:"id"`
+	Hint      string    `json:"hint"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ── App Configuration ──────────────────────────────────────────────────────────
 
 // AppConfiguration is a row from the app_configuration table.

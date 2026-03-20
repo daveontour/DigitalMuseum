@@ -3,10 +3,10 @@ package crypto
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,7 +20,6 @@ func DeriveUserKey(password, pepper string) string {
 // and inserts one master seat. The shared DEK (encrypted_dek) is accessible by any
 // valid seat password. The master private DEK (encrypted_master_dek) is encrypted
 // solely under masterPassword and is used for the private_store table.
-// It does NOT truncate sensitive_data — existing records must be migrated separately.
 func InitSensitiveKeyring(ctx context.Context, pool *pgxpool.Pool, masterPassword, pepper string) error {
 	if masterPassword == "" {
 		return fmt.Errorf("master password required")
@@ -169,27 +168,67 @@ func CheckSensitiveMasterPassword(ctx context.Context, pool *pgxpool.Pool, passw
 	return false, rows.Err()
 }
 
-// AddSensitiveKeyringSeat adds a new non-master keyring seat for newUserPassword.
-// Requires masterPassword to recover the existing DEK first.
-func AddSensitiveKeyringSeat(ctx context.Context, pool *pgxpool.Pool, newUserPassword, masterPassword, pepper string) error {
+// CheckSensitiveVisitorSeatPassword reports whether password unlocks a non-master keyring seat.
+// It returns false if the password is empty, if it is the owner master key (use CheckSensitiveMasterPassword),
+// or if no seat matches. Does not return true for the master row.
+func CheckSensitiveVisitorSeatPassword(ctx context.Context, pool *pgxpool.Pool, password, pepper string) (bool, error) {
+	if password == "" {
+		return false, nil
+	}
+	isMaster, err := CheckSensitiveMasterPassword(ctx, pool, password, pepper)
+	if err != nil {
+		return false, err
+	}
+	if isMaster {
+		return false, nil
+	}
+	dek, err := GetSensitiveDEK(ctx, pool, password, pepper)
+	if err != nil {
+		return false, err
+	}
+	return dek != "", nil
+}
+
+// AddSensitiveKeyringSeatTx adds a new non-master keyring seat inside an open transaction.
+// pool is used read-only for DEK recovery; writes go through tx.
+func AddSensitiveKeyringSeatTx(ctx context.Context, tx pgx.Tx, pool *pgxpool.Pool, newUserPassword, masterPassword, pepper string) (int64, error) {
 	if newUserPassword == "" {
-		return fmt.Errorf("new user password required")
+		return 0, fmt.Errorf("new user password required")
 	}
 	dek, err := GetSensitiveDEK(ctx, pool, masterPassword, pepper)
 	if err != nil {
-		return fmt.Errorf("get DEK: %w", err)
+		return 0, fmt.Errorf("get DEK: %w", err)
 	}
 	if dek == "" {
-		return fmt.Errorf("invalid master password or no keyring initialised")
+		return 0, fmt.Errorf("invalid master password or no keyring initialised")
 	}
 	newUserKey := DeriveUserKey(newUserPassword, pepper)
 	var encDek []byte
-	if err := pool.QueryRow(ctx, `SELECT pgp_sym_encrypt($1, $2)`, dek, newUserKey).Scan(&encDek); err != nil {
-		return fmt.Errorf("encrypt DEK for new user: %w", err)
+	if err := tx.QueryRow(ctx, `SELECT pgp_sym_encrypt($1, $2)`, dek, newUserKey).Scan(&encDek); err != nil {
+		return 0, fmt.Errorf("encrypt DEK for new user: %w", err)
 	}
-	_, err = pool.Exec(ctx,
-		`INSERT INTO sensitive_keyring (encrypted_dek, is_master) VALUES ($1, FALSE)`, encDek)
-	return err
+	var id int64
+	if err := tx.QueryRow(ctx,
+		`INSERT INTO sensitive_keyring (encrypted_dek, is_master) VALUES ($1, FALSE) RETURNING id`,
+		encDek).Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// AddSensitiveKeyringSeat adds a new non-master keyring seat for newUserPassword.
+// Requires masterPassword to recover the existing DEK first. Returns the new sensitive_keyring.id.
+func AddSensitiveKeyringSeat(ctx context.Context, pool *pgxpool.Pool, newUserPassword, masterPassword, pepper string) (int64, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	id, err := AddSensitiveKeyringSeatTx(ctx, tx, pool, newUserPassword, masterPassword, pepper)
+	if err != nil {
+		return 0, err
+	}
+	return id, tx.Commit(ctx)
 }
 
 // DeleteSensitiveKeyringSeat removes the keyring seat for userPassword.
@@ -244,147 +283,6 @@ func SensitiveKeyringSeatCount(ctx context.Context, pool *pgxpool.Pool) (int, er
 	return count, err
 }
 
-// EncryptSensitiveRecord encrypts details with the keyring DEK and returns a base64 string
-// suitable for storage in sensitive_data.details.
-func EncryptSensitiveRecord(ctx context.Context, pool *pgxpool.Pool, masterPassword, details, pepper string) (string, error) {
-	dek, err := GetSensitiveDEK(ctx, pool, masterPassword, pepper)
-	if err != nil {
-		return "", fmt.Errorf("get DEK: %w", err)
-	}
-	if dek == "" {
-		return "", fmt.Errorf("invalid master password or no keyring initialised")
-	}
-	var enc []byte
-	if err := pool.QueryRow(ctx, `SELECT pgp_sym_encrypt($1, $2)`, details, dek).Scan(&enc); err != nil {
-		return "", fmt.Errorf("pgp_sym_encrypt: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(enc), nil
-}
-
-// DecryptSensitiveRecord decrypts a base64-encoded sensitive_data.details field using
-// the keyring DEK. Returns "" if userPassword has no matching seat (caller handles redaction).
-func DecryptSensitiveRecord(ctx context.Context, pool *pgxpool.Pool, userPassword, encDetails, pepper string) (string, error) {
-	dek, err := GetSensitiveDEK(ctx, pool, userPassword, pepper)
-	if err != nil {
-		return "", fmt.Errorf("get DEK: %w", err)
-	}
-	if dek == "" {
-		return "", nil
-	}
-	data, err := base64.StdEncoding.DecodeString(encDetails)
-	if err != nil {
-		return "", fmt.Errorf("base64 decode: %w", err)
-	}
-	var plain string
-	if err := pool.QueryRow(ctx, `SELECT pgp_sym_decrypt($1::bytea, $2)`, data, dek).Scan(&plain); err != nil {
-		return "", fmt.Errorf("pgp_sym_decrypt: %w", err)
-	}
-	return plain, nil
-}
-
-// MigrateSensitiveRecords re-encrypts records still in the old RSA/hybrid format.
-// Requires oldMasterPassword to recover the legacy RSA private key from trusted_keys,
-// and newMasterPassword to encrypt with the new pgcrypto DEK.
-// Records that already decrypt with the new system are skipped.
-// Returns the count of records migrated.
-func MigrateSensitiveRecords(ctx context.Context, pool *pgxpool.Pool, oldMasterPassword, newMasterPassword, pepper string) (int, error) {
-	dek, err := GetSensitiveDEK(ctx, pool, newMasterPassword, pepper)
-	if err != nil {
-		return 0, fmt.Errorf("get new DEK: %w", err)
-	}
-	if dek == "" {
-		return 0, fmt.Errorf("new keyring not initialised — call init-keyring first")
-	}
-
-	privPEM, err := legacyGetPrivateKey(ctx, pool, oldMasterPassword, pepper)
-	if err != nil {
-		return 0, fmt.Errorf("recover old private key: %w", err)
-	}
-	if privPEM == "" {
-		return 0, fmt.Errorf("old master private key not found — check old password")
-	}
-
-	rows, err := pool.Query(ctx, `SELECT id, details FROM sensitive_data WHERE details IS NOT NULL AND details != ''`)
-	if err != nil {
-		return 0, fmt.Errorf("query sensitive_data: %w", err)
-	}
-	defer rows.Close()
-
-	type record struct {
-		id      int64
-		details string
-	}
-	var records []record
-	for rows.Next() {
-		var r record
-		if err := rows.Scan(&r.id, &r.details); err != nil {
-			return 0, err
-		}
-		records = append(records, r)
-	}
-	if err := rows.Err(); err != nil {
-		return 0, err
-	}
-
-	migrated := 0
-	for _, r := range records {
-		// Skip records already in new format.
-		if _, err := DecryptSensitiveRecord(ctx, pool, newMasterPassword, r.details, pepper); err == nil {
-			continue
-		}
-		plain, err := legacyDecryptRecord(privPEM, r.details)
-		if err != nil {
-			continue // skip records that cannot be decrypted
-		}
-		newEnc, err := EncryptSensitiveRecord(ctx, pool, newMasterPassword, plain, pepper)
-		if err != nil {
-			return migrated, fmt.Errorf("re-encrypt record %d: %w", r.id, err)
-		}
-		if _, err := pool.Exec(ctx,
-			`UPDATE sensitive_data SET details = $1, updated_at = NOW() WHERE id = $2`,
-			newEnc, r.id,
-		); err != nil {
-			return migrated, fmt.Errorf("update record %d: %w", r.id, err)
-		}
-		migrated++
-	}
-	return migrated, nil
-}
-
-// legacyGetPrivateKey replicates the old GetPrivateKey using EncodedPassword + Decrypt
-// against trusted_keys. Used only by MigrateSensitiveRecords.
-func legacyGetPrivateKey(ctx context.Context, pool *pgxpool.Pool, password, pepper string) (string, error) {
-	rows, err := pool.Query(ctx, `SELECT key FROM trusted_keys`)
-	if err != nil {
-		return "", fmt.Errorf("query trusted_keys: %w", err)
-	}
-	defer rows.Close()
-	encoded := EncodedPassword(password, pepper)
-	for rows.Next() {
-		var encKey string
-		if err := rows.Scan(&encKey); err != nil {
-			return "", err
-		}
-		if plain, err := Decrypt(encKey, encoded, pepper); err == nil {
-			return plain, nil
-		}
-	}
-	return "", rows.Err()
-}
-
-// legacyDecryptRecord decrypts a base64 RSA-hybrid record. Used only by MigrateSensitiveRecords.
-func legacyDecryptRecord(privateKeyPEM, encryptedB64 string) (string, error) {
-	data, err := base64.StdEncoding.DecodeString(encryptedB64)
-	if err != nil {
-		return "", fmt.Errorf("base64 decode: %w", err)
-	}
-	plain, err := DecryptWithPrivateKeyHybrid([]byte(privateKeyPEM), data)
-	if err != nil {
-		return "", err
-	}
-	return string(plain), nil
-}
-
 // EnsureKeyringSeat checks whether userPassword already has a valid keyring seat
 // and adds one if it does not. masterPassword is required to recover the existing DEK;
 // if it is empty or invalid the function returns an error.
@@ -401,8 +299,8 @@ func EnsureKeyringSeat(ctx context.Context, pool *pgxpool.Pool, userPassword, ma
 	if dek != "" {
 		return true, nil
 	}
-	// Seat missing — add it.
-	if err := AddSensitiveKeyringSeat(ctx, pool, userPassword, masterPassword, pepper); err != nil {
+	// Seat missing — add it (no visitor hint row; optional path for automation).
+	if _, err := AddSensitiveKeyringSeat(ctx, pool, userPassword, masterPassword, pepper); err != nil {
 		return false, fmt.Errorf("add keyring seat: %w", err)
 	}
 	return false, nil

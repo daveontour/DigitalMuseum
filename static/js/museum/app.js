@@ -2422,6 +2422,7 @@ const App = (() => {
         const input = document.getElementById('master-key-unlock-input');
         const errEl = document.getElementById('master-key-unlock-error');
         const submitBtn = document.getElementById('master-key-unlock-submit');
+        const visitorBtn = document.getElementById('master-key-unlock-visitor-submit');
         if (modal) modal.style.display = 'none';
         if (input) input.value = '';
         if (errEl) {
@@ -2431,6 +2432,10 @@ const App = (() => {
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Unlock';
+        }
+        if (visitorBtn) {
+            visitorBtn.disabled = false;
+            visitorBtn.textContent = 'Unlock as visitor';
         }
     }
 
@@ -2506,51 +2511,134 @@ const App = (() => {
 
         const mkSkip = document.getElementById('master-key-unlock-skip');
         const mkSubmit = document.getElementById('master-key-unlock-submit');
+        const mkVisitorSubmit = document.getElementById('master-key-unlock-visitor-submit');
         if (mkSkip) mkSkip.addEventListener('click', closeMasterKeyUnlockModal);
-        if (mkSubmit) {
-            mkSubmit.addEventListener('click', async function masterKeyUnlockSubmit() {
-                const input = document.getElementById('master-key-unlock-input');
-                const errEl = document.getElementById('master-key-unlock-error');
-                const pw = (input && input.value || '').trim();
-                if (!pw) {
+
+        async function runKeyUnlock(endpoint) {
+            const input = document.getElementById('master-key-unlock-input');
+            const errEl = document.getElementById('master-key-unlock-error');
+            const pw = (input && input.value || '').trim();
+            if (!pw) {
+                if (errEl) {
+                    errEl.textContent = 'Enter a key or choose Skip for now.';
+                    errEl.style.display = 'block';
+                }
+                return;
+            }
+            if (errEl) errEl.style.display = 'none';
+            if (mkSubmit) {
+                mkSubmit.disabled = true;
+                mkSubmit.textContent = 'Checking\u2026';
+            }
+            if (mkVisitorSubmit) {
+                mkVisitorSubmit.disabled = true;
+                mkVisitorSubmit.textContent = 'Checking\u2026';
+            }
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pw })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.valid) {
                     if (errEl) {
-                        errEl.textContent = 'Enter your master key or choose Skip for now.';
+                        errEl.textContent = data.detail || 'That key does not match. Try again or skip.';
                         errEl.style.display = 'block';
+                    }
+                    if (mkSubmit) {
+                        mkSubmit.disabled = false;
+                        mkSubmit.textContent = 'Unlock';
+                    }
+                    if (mkVisitorSubmit) {
+                        mkVisitorSubmit.disabled = false;
+                        mkVisitorSubmit.textContent = 'Unlock as visitor';
+                    }
+                    if (input) {
+                        input.value = '';
+                        input.focus();
                     }
                     return;
                 }
-                if (errEl) errEl.style.display = 'none';
-                mkSubmit.disabled = true;
-                mkSubmit.textContent = 'Checking\u2026';
-                try {
-                    const res = await fetch('/api/session/master-key/unlock', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ password: pw })
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok || !data.valid) {
-                        if (errEl) {
-                            errEl.textContent = data.detail || 'That key does not match the keyring. Try again or skip.';
-                            errEl.style.display = 'block';
-                        }
-                        mkSubmit.disabled = false;
-                        mkSubmit.textContent = 'Unlock';
-                        if (input) {
-                            input.value = '';
-                            input.focus();
-                        }
-                        return;
-                    }
-                    closeMasterKeyUnlockModal();
-                } catch (e) {
-                    if (errEl) {
-                        errEl.textContent = e.message || 'Request failed';
-                        errEl.style.display = 'block';
-                    }
+                closeMasterKeyUnlockModal();
+            } catch (e) {
+                if (errEl) {
+                    errEl.textContent = e.message || 'Request failed';
+                    errEl.style.display = 'block';
+                }
+                if (mkSubmit) {
                     mkSubmit.disabled = false;
                     mkSubmit.textContent = 'Unlock';
                 }
+                if (mkVisitorSubmit) {
+                    mkVisitorSubmit.disabled = false;
+                    mkVisitorSubmit.textContent = 'Unlock as visitor';
+                }
+            }
+        }
+
+        if (mkSubmit) {
+            mkSubmit.addEventListener('click', () => void runKeyUnlock('/api/session/master-key/unlock'));
+        }
+        if (mkVisitorSubmit) {
+            mkVisitorSubmit.addEventListener('click', () => void runKeyUnlock('/api/session/master-key/unlock-visitor'));
+        }
+
+        const visitorHintsModal = document.getElementById('visitor-key-hints-modal');
+        const visitorHintsBtn = document.getElementById('master-key-unlock-show-hints');
+        const visitorHintsClose = document.getElementById('visitor-key-hints-close');
+        const visitorHintsList = document.getElementById('visitor-key-hints-list');
+        const visitorHintsEmpty = document.getElementById('visitor-key-hints-empty');
+        const visitorHintsErr = document.getElementById('visitor-key-hints-error');
+        const visitorHintsLoading = document.getElementById('visitor-key-hints-loading');
+
+        function closeVisitorHintsModal() {
+            if (visitorHintsModal) visitorHintsModal.style.display = 'none';
+        }
+
+        async function openVisitorHintsModal() {
+            if (!visitorHintsModal || !visitorHintsList) return;
+            visitorHintsModal.style.display = 'flex';
+            if (visitorHintsErr) {
+                visitorHintsErr.style.display = 'none';
+                visitorHintsErr.textContent = '';
+            }
+            if (visitorHintsEmpty) visitorHintsEmpty.style.display = 'none';
+            visitorHintsList.innerHTML = '';
+            if (visitorHintsLoading) visitorHintsLoading.style.display = 'block';
+            try {
+                const res = await fetch('/api/session/visitor-key-hints');
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.detail || `HTTP ${res.status}`);
+                }
+                const hints = Array.isArray(data.hints) ? data.hints : [];
+                if (visitorHintsLoading) visitorHintsLoading.style.display = 'none';
+                if (hints.length === 0) {
+                    if (visitorHintsEmpty) visitorHintsEmpty.style.display = 'block';
+                    return;
+                }
+                hints.forEach((row) => {
+                    const li = document.createElement('li');
+                    li.style.marginBottom = '10px';
+                    li.style.lineHeight = '1.4';
+                    li.textContent = row.hint != null ? String(row.hint) : '';
+                    visitorHintsList.appendChild(li);
+                });
+            } catch (e) {
+                if (visitorHintsLoading) visitorHintsLoading.style.display = 'none';
+                if (visitorHintsErr) {
+                    visitorHintsErr.textContent = e.message || 'Failed to load hints';
+                    visitorHintsErr.style.display = 'block';
+                }
+            }
+        }
+
+        if (visitorHintsBtn) visitorHintsBtn.addEventListener('click', () => { void openVisitorHintsModal(); });
+        if (visitorHintsClose) visitorHintsClose.addEventListener('click', closeVisitorHintsModal);
+        if (visitorHintsModal) {
+            visitorHintsModal.addEventListener('click', (e) => {
+                if (e.target === visitorHintsModal) closeVisitorHintsModal();
             });
         }
 

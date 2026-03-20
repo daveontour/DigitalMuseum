@@ -47,6 +47,12 @@ func (s *SensitiveService) VerifyMasterPassword(ctx context.Context, masterPassw
 	return appcrypto.CheckSensitiveMasterPassword(ctx, s.pool, masterPassword, s.pepper)
 }
 
+// VerifyVisitorKeyringPassword returns true if password unlocks a non-master keyring seat only
+// (not the owner master password).
+func (s *SensitiveService) VerifyVisitorKeyringPassword(ctx context.Context, password string) (bool, error) {
+	return appcrypto.CheckSensitiveVisitorSeatPassword(ctx, s.pool, password, s.pepper)
+}
+
 // ListAll returns all sensitive records. If password is empty details are redacted.
 func (s *SensitiveService) ListAll(ctx context.Context, password string) ([]model.SensitiveDataResponse, error) {
 	docs, err := s.docRepo.ListSensitive(ctx)
@@ -116,21 +122,61 @@ func (s *SensitiveService) GenerateKeyring(ctx context.Context, masterPassword s
 	return appcrypto.InitSensitiveKeyring(ctx, s.pool, masterPassword, s.pepper)
 }
 
-// AddUser adds a new keyring seat for userPassword. Requires masterPassword.
-func (s *SensitiveService) AddUser(ctx context.Context, userPassword, masterPassword string) error {
-	return appcrypto.AddSensitiveKeyringSeat(ctx, s.pool, userPassword, masterPassword, s.pepper)
+const maxVisitorKeyHintLen = 2000
+
+// AddUser adds a new keyring seat for userPassword and stores a plain-text hint for the unlock dialog.
+// hint must be non-empty (after trim).
+func (s *SensitiveService) AddUser(ctx context.Context, userPassword, masterPassword, hint string) error {
+	hint = strings.TrimSpace(hint)
+	if hint == "" {
+		return fmt.Errorf("visitor key hint is required")
+	}
+	if len(hint) > maxVisitorKeyHintLen {
+		return fmt.Errorf("hint exceeds %d characters", maxVisitorKeyHintLen)
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	keyringID, err := appcrypto.AddSensitiveKeyringSeatTx(ctx, tx, s.pool, userPassword, masterPassword, s.pepper)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO visitor_key_hints (keyring_id, hint) VALUES ($1, $2)`,
+		keyringID, hint); err != nil {
+		return fmt.Errorf("save visitor hint: %w", err)
+	}
+	return tx.Commit(ctx)
+}
+
+// ListVisitorKeyHints returns hints for non-master keyring seats (for visitor unlock UI).
+func (s *SensitiveService) ListVisitorKeyHints(ctx context.Context) ([]model.VisitorKeyHint, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT h.id, h.hint, h.created_at
+		FROM visitor_key_hints h
+		INNER JOIN sensitive_keyring k ON k.id = h.keyring_id AND k.is_master = FALSE
+		ORDER BY h.created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.VisitorKeyHint
+	for rows.Next() {
+		var item model.VisitorKeyHint
+		if err := rows.Scan(&item.ID, &item.Hint, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }
 
 // RemoveUser removes the keyring seat for userPassword. Requires masterPassword.
 // Master seats cannot be removed.
 func (s *SensitiveService) RemoveUser(ctx context.Context, userPassword, masterPassword string) error {
 	return appcrypto.DeleteSensitiveKeyringSeat(ctx, s.pool, userPassword, masterPassword, s.pepper)
-}
-
-// MigrateRecords re-encrypts sensitive_data rows from the old RSA/hybrid format
-// to the new pgcrypto format. Returns the count of records migrated.
-func (s *SensitiveService) MigrateRecords(ctx context.Context, oldPassword, newPassword string) (int, error) {
-	return appcrypto.MigrateSensitiveRecords(ctx, s.pool, oldPassword, newPassword, s.pepper)
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
