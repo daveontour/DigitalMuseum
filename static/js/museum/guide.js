@@ -22,32 +22,143 @@ const Guide = {
                 position: 'top-center'
              },
              {
-                text: 'You can use the "Who\'s Asking?" switch in the top bar to select the person who is asking the question. If you select yourself then you can frame question from your own perspective',
+                text: 'You can use the "Who\'s Asking?" switch in the top bar to select the person who is asking the question. If you select yourself then you can frame questions from your own perspective.',
                 glow: '#its-me-visitor-switch',
                 position: 'middle-right',
                 image: '/static/images/stats.png'
-             },{
-                text:'The AI will respond based on the your question or comment, what you\'ve been discussing, and what information you have made availabler to it. Consider providing reference documents to the AI to help it answer your question.',
+             },
+             {
+                text: 'The AI responds based on your question, what you\'ve been discussing, and the information available to it. Consider providing reference documents to help it answer specific questions.',
                 position: 'middle-center'
-             }              
+             }
         ],
         'Browsing images': [
-            { text: 'Open Image Gallery or Facebook Albums from the left sidebar to browse and search your photo collection.' }
+            {
+                text: 'Open Images from the left sidebar to browse and search your personal photo collection.',
+                glow: '#new-image-gallery-sidebar-btn'
+            },
+            {
+                text: 'Open Facebook Albums to browse albums imported from your Facebook archive.',
+                glow: '#fb-albums-sidebar-btn'
+            },
+            {
+                text: 'Open Facebook Posts to browse your imported Facebook posts, which may also include photos.',
+                glow: '#fb-posts-sidebar-btn'
+            },
+            {
+                text: 'You can also ask the AI to find photos for you — try "Show me photos from last Christmas" or "Find photos with John".',
+                glow: '#user-input'
+            }
         ],
         'Managing contacts': [
-            { text: 'Use the Contacts button in the right sidebar to view and manage your contact list.' }
+            {
+                text: 'Open Contacts from the right sidebar to see everyone who appears in your emails, messages, and social data.',
+                glow: '#contacts-sidebar-btn'
+            },
+            {
+                text: 'Open Profiles to view and manage detailed profiles for your contacts, including notes and relationship context.',
+                glow: '#profiles-sidebar-btn'
+            },
+            {
+                text: 'Open Relationships to see a visual network of the people in your life and how they connect to each other.',
+                glow: '#relationships-btn'
+            },
+            {
+                text: 'In Settings you can classify contacts, exclude people from AI responses, and adjust how contacts are recognised across your data.',
+                glow: '#settings-data-import-sidebar-btn',
+                position: 'bottom-center'
+            }
         ],
         'Voice and AI settings': [
-            { text: 'Click the voice image in the top bar to change who answers (expert, friend, etc.), set creativity, or enable Companion Mode.' }
+            {
+                text: 'Click the voice image in the top bar to open the voice and AI settings.',
+                glow: '#voice-settings-trigger',
+                position: 'top-center'
+            },
+            {
+                text: 'Choose who answers your questions — a built-in voice like Expert or Friend, the subject\'s own voice, or a custom voice you have created in Settings.'
+            },
+            {
+                text: 'When the subject\'s own voice is selected, you can also set a mood to shape the tone of responses: Neutral, Reflective, Excited, Melancholic, and more.'
+            },
+            {
+                text: 'Companion Mode turns the AI into a conversational partner that responds like a friend rather than an assistant — ideal for casual, ongoing dialogue.'
+            },
+            {
+                text: 'The Creativity slider controls how imaginative the AI\'s responses are. Lower values stay closer to the facts; higher values allow more flair and interpretation.'
+            },
+            {
+                text: 'You can switch between AI providers — Gemini and Claude — to use your preferred model or compare responses.'
+            }
         ],
         "Today's Thing of Interest": [
-            { text: "Suggests something interesting for today based on your interests. Add interests in Settings if you haven't yet.", glow: '#todays-thing-sidebar-btn' }
+            {
+                text: "Today's Thing suggests something interesting to explore — a question, a memory, or a topic — based on the subject's personal interests.",
+                glow: '#todays-thing-sidebar-btn'
+            },
+            {
+                text: "Click the button to generate a suggestion. Each click produces something different drawn from the subject's interests and their data."
+            },
+            {
+                text: "To get richer suggestions, add interests in the Interests tab in Settings. The more interests you add, the more varied and personal the suggestions.",
+                glow: '#settings-data-import-sidebar-btn',
+                position: 'bottom-center'
+            }
         ],
         'Email catchup': [
-            { text: 'Get a summary of recent emails. Use this to catch up on your inbox.' }
+            {
+                text: 'Open Emails from the left sidebar to browse and search your imported email archive.',
+                glow: '#email-gallery-sidebar-btn'
+            },
+            {
+                text: 'You can ask the AI to summarise your recent emails — try "Summarise my emails from this week" or "What has John been writing to me about?"',
+                glow: '#user-input'
+            },
+            {
+                text: 'For a deeper dive, ask the AI to summarise all emails from a specific person or about a particular topic.',
+                glow: '#user-input'
+            }
         ],
-        'Settings and data import': [
-            { text: 'Configure the app, manage subject details, import messages and images, and manage your interests.' }
+        'Settings': [
+            {
+                text: 'Open Settings from the left sidebar to configure the app, manage the subject\'s data, and personalise your experience.',
+                glow: '#settings-data-import-sidebar-btn',
+                position: 'bottom-center'
+            },
+            {
+                text: 'The Chat Settings tab lets you adjust font size, control whether audio and image links are shown in responses, and enable auto-voice for short replies.'
+            },
+            {
+                text: 'Subject Configuration (requires a master key) is where you set the subject\'s name, contact details, and have the AI generate a writing style analysis or psychological profile.'
+            },
+            {
+                text: 'Custom Voices lets you create new AI personas with their own name, instructions, and creativity level — useful for tailoring how the AI presents itself.'
+            },
+            {
+                text: 'Manage Keys lets you create master keys for secure access to private settings, and configure hints shown to visitors who need to unlock the app.'
+            }
+        ],
+        'Data import': [
+            {
+                text: 'You can import data from Facebook, Instagram, WhatsApp, email, and more to build up the subject\'s digital archive.',
+                glow: '#settings-data-import-sidebar-btn',
+                position: 'bottom-center'
+            },
+            {
+                text: 'Go to Settings and open the "Manage Imported Data" tab to see all available import options.',
+                navigate() {
+                    const settingsBtn = document.getElementById('settings-data-import-sidebar-btn');
+                    if (settingsBtn) settingsBtn.click();
+                }
+            },
+            {
+                text: 'Click any import tile to run that import. Facebook and Instagram imports require you to first download your data archive from their respective settings pages.',
+                glow: '.config-tab-button[data-tab="manage-imported-data"]',
+                navigate() {
+                    const tab = document.querySelector('.config-tab-button[data-tab="manage-imported-data"]');
+                    if (tab) tab.click();
+                }
+            }
         ],
         'ImportFacebookArchive': [
             {

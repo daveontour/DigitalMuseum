@@ -98,7 +98,7 @@ func (p *ClaudeProvider) GenerateResponse(
 		})
 	}
 	if len(claudeTools) > 0 {
-		claudeTools[len(claudeTools)-1]["cache_control"] = map[string]any{"type": "ephemeral"}
+		claudeTools[len(claudeTools)-1]["cache_control"] = map[string]any{"type": "ephemeral", "ttl": "1h"}
 	}
 
 	messages := buildClaudeMessages(req, history)
@@ -116,7 +116,7 @@ func (p *ClaudeProvider) GenerateResponse(
 				{
 					"type":          "text",
 					"text":          systemPrompt,
-					"cache_control": map[string]any{"type": "ephemeral"},
+					"cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"},
 				},
 			},
 			"messages": messages,
@@ -219,7 +219,7 @@ func (p *ClaudeProvider) GenerateResponse(
 					{
 						"type":          "text",
 						"text":          string(resultJSON),
-						"cache_control": map[string]any{"type": "ephemeral", "ttl": 3600},
+						"cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"},
 					},
 				}
 			}
