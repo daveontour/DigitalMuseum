@@ -8,7 +8,10 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
+	"encoding/binary"
+	"image/png"
 	"log"
 	"net"
 	"os"
@@ -51,7 +54,9 @@ func onReady() {
 		return
 	}
 
-	systray.SetIcon(iconData)
+	if ico, err := pngToICO(iconData); err == nil {
+		systray.SetIcon(ico)
+	}
 	systray.SetTitle("DigitalMuseum")
 	systray.SetTooltip("DigitalMuseum — running")
 
@@ -168,6 +173,47 @@ func waitForServer(addr string, maxWait time.Duration) {
 		time.Sleep(500 * time.Millisecond)
 	}
 	log.Printf("server did not become ready within %s", maxWait)
+}
+
+// pngToICO wraps raw PNG bytes in a minimal ICO container so that the Windows
+// LoadImage API (used internally by getlantern/systray) can load it.
+func pngToICO(pngData []byte) ([]byte, error) {
+	img, err := png.Decode(bytes.NewReader(pngData))
+	if err != nil {
+		return nil, err
+	}
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+
+	// ICO files store width/height as 0 when the dimension is 256.
+	wb, hb := byte(w), byte(h)
+	if w >= 256 {
+		wb = 0
+	}
+	if h >= 256 {
+		hb = 0
+	}
+
+	const offset = 6 + 16 // ICONDIR (6) + one ICONDIRENTRY (16)
+	buf := new(bytes.Buffer)
+
+	// ICONDIR: reserved, type=1 (icon), count=1
+	buf.Write([]byte{0, 0, 1, 0, 1, 0})
+
+	// ICONDIRENTRY
+	entry := make([]byte, 16)
+	entry[0] = wb
+	entry[1] = hb
+	entry[2] = 0 // color count (0 = no palette)
+	entry[3] = 0 // reserved
+	binary.LittleEndian.PutUint16(entry[4:], 1)                    // planes
+	binary.LittleEndian.PutUint16(entry[6:], 32)                   // bit count
+	binary.LittleEndian.PutUint32(entry[8:], uint32(len(pngData))) // image size
+	binary.LittleEndian.PutUint32(entry[12:], offset)              // image offset
+	buf.Write(entry)
+
+	buf.Write(pngData)
+	return buf.Bytes(), nil
 }
 
 // runCmd runs an external command synchronously with no visible window.
