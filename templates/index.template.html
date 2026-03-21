@@ -983,12 +983,12 @@
                                     <div class="import-tile-title">Import Data</div>
                                     <div class="import-tile-explanation">Open the Data Import dialog to run email, message, social, and image imports.</div>
                                 </div>
+                                <div style="grid-column: 1 / -1; height: 15px;"></div>
                                 <div class="import-control-tile" data-import="contacts" title="Click to run">
                                     <div class="import-tile-title">Contacts Merge</div>
                                     <div id="import-last-run-contacts" data-import-last-run="contacts" class="import-tile-last-run"></div>
                                     <div class="import-tile-explanation">Merge and normalise contacts from the database using the import-processor.</div>
                                 </div>
-                                <div style="grid-column: 1 / -1; height: 15px;"></div>
                                 <div class="import-control-tile" data-import="reference_import" title="Click to run">
                                     <div class="import-tile-title">Import referenced images to Database</div>
                                     <div id="import-last-run-reference_import" data-import-last-run="reference_import" class="import-tile-last-run"></div>
@@ -1038,7 +1038,7 @@
                     <p style="margin: 0 0 20px 0; font-size: 0.95em; color: #64748b; line-height: 1.4;">Click a tile below to run an import. Each import may prompt for a directory path or other parameters before starting.</p>
                     <section class="config-section" style="display: flex; flex-direction: column; height: 100%; flex: 1;">
                         <div style="flex: 1; overflow: auto;">
-                            <div class="data-import-tiles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                            <div class="data-import-tiles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); row-gap: 12px; column-gap: 12px;">
                                 <div class="import-control-tile" data-import="email_processing" title="Click to run">
                                     <div class="import-tile-title"><i class="fas fa-envelope"></i> Emails from GMail</div>
                                     <div data-import-last-run="email_processing" class="import-tile-last-run"></div>
@@ -1059,12 +1059,13 @@
                                     <div data-import-last-run="whatsapp" class="import-tile-last-run"></div>
                                     <div class="import-tile-explanation">Import messages from a WhatsApp export directory (e.g. from iMazing or Android backup).</div>
                                 </div>
-                                <div style="grid-column: 1 / -1; height: 15px;"></div>
+                                
                                 <div class="import-control-tile" data-import="facebook_all" title="Click to run">
                                     <div class="import-tile-title"><i class="fab fa-facebook"></i> Facebook Archive</div>
                                     <div data-import-last-run="facebook_all" class="import-tile-last-run"></div>
                                     <div class="import-tile-explanation">Import Messenger, albums, places, and posts in parallel from a single Facebook export directory.</div>
                                 </div>
+                                <!-- <div style="grid-column: 1 / -1; height: 15px;"></div> -->
                                 <div class="import-control-tile" data-import="instagram" title="Click to run">
                                     <div class="import-tile-title"><i class="fab fa-instagram"></i> Instagram Archive</div>
                                     <div data-import-last-run="instagram" class="import-tile-last-run"></div>
@@ -1080,7 +1081,7 @@
                                     <div data-import-last-run="thumbnails" class="import-tile-last-run"></div>
                                     <div class="import-tile-explanation">Generate thumbnails and extract location metadata from images.</div>
                                 </div>
-                                <div style="grid-column: 1 / -1; height: 15px;"></div>
+                               
                                 <div class="import-control-tile data-import-dialog-tile" data-open-modal="reference-documents-manage-modal" title="Click to open">
                                     <div class="import-tile-title"><i class="fas fa-book"></i> Reference Documents</div>
                                     <div class="import-tile-explanation">Upload and manage reference documents (PDF, Word, images, text) that provide context for the AI. Upload a biography and other documents.</div>
