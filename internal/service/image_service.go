@@ -506,6 +506,7 @@ func convertHeicToJpeg(data []byte) ([]byte, error) {
 
 	// magick input.heic -quality 95 output.jpg
 	cmd := exec.Command("magick", tmpInPath, "-quality", "95", tmpOutPath)
+	hideConsole(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("imagemagick convert: %w: %s", err, string(out))
 	}

@@ -152,6 +152,7 @@ func (p *Processor) CreateThumbAndGetExif(
 		}
 
 		cmd := exec.Command(magickCmd, args...)
+		hideConsole(cmd)
 		cmd.Stdin = bytes.NewReader(imageData)
 
 		var stdout, stderr bytes.Buffer
@@ -183,6 +184,7 @@ func (p *Processor) CreateThumbAndGetExif(
 		}
 
 		cmd := exec.Command(magickCmd, args...)
+		hideConsole(cmd)
 		cmd.Stdin = bytes.NewReader(imageData)
 		output, err := cmd.Output()
 		if err != nil {
@@ -199,6 +201,7 @@ func (p *Processor) CreateThumbAndGetExif(
 		}
 
 		cmd := exec.Command(magickCmd, args...)
+		hideConsole(cmd)
 		cmd.Stdin = bytes.NewReader(imageData)
 		output, err := cmd.Output()
 		if err != nil {
