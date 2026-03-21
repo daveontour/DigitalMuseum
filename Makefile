@@ -11,7 +11,7 @@ build-exe:
 	go build -o bin/$(BINARY).exe $(CMD)
 
 build-launcher:
-	go build -ldflags="-H windowsgui" -o launcher.exe ./cmd/launcher
+	go build -buildvcs=false -ldflags="-H windowsgui" -o launcher.exe ./cmd/launcher
 
 run:
 	go run $(CMD)
