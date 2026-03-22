@@ -18,7 +18,7 @@ import (
 )
 
 const instagramService = "Instagram"
-const instagramSource = "Instagram"
+const instagramSource = "instagram"
 
 // ImportStats holds statistics about the import process
 type ImportStats struct {

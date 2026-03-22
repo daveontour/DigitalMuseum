@@ -893,7 +893,12 @@
                         <div class="container">
                             <div class="email-editor-header-row">
                                 <div class="header">
-                                    <h1>Email Editor</h1>
+                                    <div class="email-editor-title-row">
+                                        <h1>Email Editor</h1>
+                                        <button type="button" id="email-editor-open-emails-gallery-btn" class="modal-btn modal-btn-secondary">
+                                            <i class="fas fa-envelope-open"></i> Open Emails
+                                        </button>
+                                    </div>
                                     <p><h4>Search and edit email metadata (50 per page)</h4></p>
                                 
                                     <p>Use the search and filter options to find the email you want to edit.
@@ -1524,6 +1529,14 @@
                                                 <option value="oth">Other Locations</option>
                                             </select>
                                             <select id="image-gallery-source-filter" style="border-radius: 4px; border: 1px solid #bfc9da; padding: 0.3em; font-size: 0.9em;">
+                                                <option value="" selected>All sources</option>
+                                                <option value="Filesystem">Filesystem</option>
+                                                <option value="Instagram">Instagram</option>
+                                                <option value="facebook_post">facebook_post</option>
+                                                <option value="Facebook">Facebook</option>
+                                                <option value="WhatsApp">WhatsApp</option>
+                                                <option value="facebook_album">facebook_album</option>
+                                                <option value="iMessage">iMessage</option>
                                             </select>                                         
 
                                         </div>
@@ -1567,9 +1580,12 @@
         <!-- Email Gallery Modal -->
         <div id="email-gallery-modal" class="modal">
            <div class="modal-content email-gallery-modal-content">
-                <div class="modal-header">
+                <div class="modal-header email-gallery-modal-header">
                     <h2>Emails</h2>
-                    <button id="close-email-gallery-modal" class="modal-close-btn">&times;</button>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                        <button type="button" id="email-gallery-manage-emails-btn" class="modal-btn modal-btn-secondary">Manage Emails</button>
+                        <button id="close-email-gallery-modal" class="modal-close-btn">&times;</button>
+                    </div>
                 </div>
                 <div class="email-gallery-modal-body">
                     <!-- Master Pane -->
@@ -1722,7 +1738,19 @@
                                 </div>
                                 <div class="new-image-gallery-filter-row">
                                     <input type="text" id="new-image-gallery-author" placeholder="Author..." class="new-image-gallery-input">
-                                    <input type="text" id="new-image-gallery-source" placeholder="Source..." class="new-image-gallery-input">
+                                    <select id="new-image-gallery-source" class="new-image-gallery-select" aria-label="Source">
+                                        <option value="" selected>All sources</option>
+                                        <option value="filesystem">Filesystem</option>
+                                        <option value="instagram">Instagram</option>
+                                        <option value="whatsapp">WhatsApp</option>
+                                        <option value="imessage">iMessage</option>
+                                        <option value="sms">SMS</option>
+                                        <option value="email_attachment">Email Attachment</option>
+                                        <option value="gmail_attachment">Gmail Attachment</option>
+                                        <option value="facebook_messenger">Facebook Messenger</option>
+                                        <option value="facebook_post">Facebook Post</option>
+                                        <option value="facebook_album">Facebook Album</option>
+                                    </select>
                                 </div>
                                 <div class="new-image-gallery-filter-row">
                                     <select id="new-image-gallery-year-filter" class="new-image-gallery-select"></select>                                         

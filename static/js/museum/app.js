@@ -2391,6 +2391,27 @@ const App = (() => {
             });
         }
 
+        const emailGalleryManageEmailsBtn = document.getElementById('email-gallery-manage-emails-btn');
+        if (emailGalleryManageEmailsBtn) {
+            emailGalleryManageEmailsBtn.addEventListener('click', async () => {
+                if (!(await ensureMasterKeyForDataImport())) return;
+                if (Modals.EmailGallery && Modals.EmailGallery.close) Modals.EmailGallery.close();
+                if (DOM.configPage) {
+                    DOM.configPage.style.display = 'flex';
+                    void loadControlDefaults();
+                    if (Modals.AppConfig && Modals.AppConfig.load) void Modals.AppConfig.load();
+                }
+                const tabBtn = document.querySelector('.config-tab-button[data-tab="email-editor"]');
+                const tabContent = document.getElementById('email-editor-tab');
+                if (tabBtn && tabContent) {
+                    document.querySelectorAll('.config-tab-button').forEach((btn) => btn.classList.remove('active'));
+                    document.querySelectorAll('.config-tab-content').forEach((c) => c.classList.remove('active'));
+                    tabBtn.classList.add('active');
+                    tabContent.classList.add('active');
+                }
+            });
+        }
+
         const dataImportSidebarBtn = document.getElementById('data-import-sidebar-btn');
         const dataImportModal = document.getElementById('data-import-modal');
         const closeDataImportModalBtn = document.getElementById('close-data-import-modal');

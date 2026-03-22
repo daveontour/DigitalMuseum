@@ -1481,6 +1481,14 @@ Modals.EmailEditor = (() => {
             if (DOM.emailEditorSelectAllBtn) {
                 DOM.emailEditorSelectAllBtn.addEventListener('click', _handleSelectAll);
             }
+            if (DOM.emailEditorOpenEmailsGalleryBtn) {
+                DOM.emailEditorOpenEmailsGalleryBtn.addEventListener('click', () => {
+                    if (DOM.configPage) DOM.configPage.style.display = 'none';
+                    if (typeof Modals !== 'undefined' && Modals.EmailGallery && Modals.EmailGallery.open) {
+                        void Modals.EmailGallery.open();
+                    }
+                });
+            }
             _setupFilters();
         }
 

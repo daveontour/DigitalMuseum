@@ -201,10 +201,12 @@ Modals.Locations = (() => {
                         whatsappItems.push(item);
                         break;
                     case 'email_attachment':
+                    case 'gmail_attachment':
                         emailItems.push(item);
                         break;
                     case 'message':
                     case 'imessage':
+                    case 'sms':
                     case 'message_attachment':
                         messageItems.push(item);
                         break;

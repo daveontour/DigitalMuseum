@@ -578,6 +578,13 @@ Modals.NewImageGallery = (() => {
                                 _handleSearch();
                             }, 300);
                         });
+                    } else if (input.tagName === 'SELECT') {
+                        input.addEventListener('change', () => {
+                            if (searchTimeout) clearTimeout(searchTimeout);
+                            searchTimeout = setTimeout(() => {
+                                _handleSearch();
+                            }, 300);
+                        });
                     } else {
                         input.addEventListener('input', () => {
                             if (searchTimeout) clearTimeout(searchTimeout);
@@ -918,8 +925,9 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryAuthor && DOM.newImageGalleryAuthor.value.trim()) {
                 params.append('author', DOM.newImageGalleryAuthor.value.trim());
             }
-            if (DOM.newImageGallerySource && DOM.newImageGallerySource.value.trim()) {
-                params.append('source', DOM.newImageGallerySource.value.trim());
+            if (DOM.newImageGallerySource) {
+                const src = (DOM.newImageGallerySource.value || '').trim();
+                if (src) params.append('source', src);
             }
             if (DOM.newImageGalleryYearFilter && DOM.newImageGalleryYearFilter.value && DOM.newImageGalleryYearFilter.value !== '0') {
                 params.append('year', DOM.newImageGalleryYearFilter.value);
@@ -988,7 +996,7 @@ Modals.NewImageGallery = (() => {
                 (DOM.newImageGalleryDescription && DOM.newImageGalleryDescription.value.trim()) ||
                 (DOM.newImageGalleryTags && DOM.newImageGalleryTags.value.trim()) ||
                 (DOM.newImageGalleryAuthor && DOM.newImageGalleryAuthor.value.trim()) ||
-                (DOM.newImageGallerySource && DOM.newImageGallerySource.value.trim()) ||
+                (DOM.newImageGallerySource && (DOM.newImageGallerySource.value || '').trim()) ||
                 (DOM.newImageGalleryYearFilter && DOM.newImageGalleryYearFilter.value && DOM.newImageGalleryYearFilter.value !== '0') ||
                 (DOM.newImageGalleryMonthFilter && DOM.newImageGalleryMonthFilter.value && DOM.newImageGalleryMonthFilter.value !== '0') ||
                 (DOM.newImageGalleryRating && DOM.newImageGalleryRating.value) ||
@@ -1002,12 +1010,16 @@ Modals.NewImageGallery = (() => {
         function _getSourceAbbreviation(source) {
             // Return short abbreviation for source
             const abbreviations = {
-                'Email': 'E',
-                'Facebook Album': 'FB',
-                'Filesystem': 'FS',
-                'Instagram': 'IG',
-                'WhatsApp': 'WA',
-                'iMessage': 'iM'
+                'email_attachment': 'Email',
+                'gmail_attachment':"GMail",
+                'facebook_messenger': 'Facebook Messenger',
+                'filesystem': 'Imgae Import',
+                'instagram': 'Insta',
+                'whatsapp': 'WhatsApp',
+                'imessage': 'iMessage',
+                'sms': 'SMS',
+                'facebook_post': 'Facebook Post',
+                'facebook_album': 'Facebook Album'
             };
             return abbreviations[source] || source.substring(0, 2).toUpperCase();
         }
@@ -1682,13 +1694,17 @@ Modals.ImageDetailModal = (() => {
             
             // Source: Show button if not "Filesystem", otherwise show text
             const sourceValue = image.source || 'N/A';
+
+            //translate the source value to the full name
+            const sourceFullName = _getSourceFullName(sourceValue); 
+
             DOM.newImageDetailSource.innerHTML = '';
             if (sourceValue && sourceValue !== 'N/A' && sourceValue.toLowerCase() !== 'filesystem') {
                 const openSourceButton = document.createElement('button');
                 openSourceButton.type = 'button';
                 openSourceButton.className = 'modal-btn modal-btn-secondary';
                 openSourceButton.style.cssText = 'padding: 0.3em 0.8em; font-size: 0.85em;';
-                openSourceButton.textContent = 'Open Source ('+sourceValue+')';
+                openSourceButton.textContent = 'Open Source ('+sourceFullName+')';
                 openSourceButton.onclick = function(e) {
 
 
@@ -1696,7 +1712,7 @@ Modals.ImageDetailModal = (() => {
                     e.stopPropagation();
                     
                     // Handle email-attachment source
-                    if (sourceValue.toLowerCase() === 'email_attachment' || sourceValue.toLowerCase() === 'email') {
+                    if (sourceValue.toLowerCase() === 'email_attachment' || sourceValue.toLowerCase() === 'gmail_attachment' || sourceValue.toLowerCase() === 'email') {
                         if (image.source_reference) {
                             const emailId = parseInt(image.source_reference);
                             if (!isNaN(emailId)) {
@@ -1711,7 +1727,7 @@ Modals.ImageDetailModal = (() => {
                             console.error('No source_reference found for email attachment');
                             alert('Unable to open email: No email reference found');
                         }
-                    } else if (sourceValue.toLowerCase() === 'message_attachment' || sourceValue.toLowerCase() === 'whatsapp' || sourceValue.toLowerCase() === 'facebook') {
+                    } else if (sourceValue.toLowerCase() === 'message_attachment' || sourceValue.toLowerCase() === 'imessage' || sourceValue.toLowerCase() === 'sms' || sourceValue.toLowerCase() === 'whatsapp' || sourceValue.toLowerCase() === 'facebook') {
                         //Open the SMS Messages modal and select the conversation
                         Modals.NewImageGallery.close();
                         Modals.ImageDetailModal.close();
@@ -1721,6 +1737,21 @@ Modals.ImageDetailModal = (() => {
                         Modals.NewImageGallery.close();
                         Modals.ImageDetailModal.close();
                         Modals.FBAlbums.openAndSelectAlbum(image.source_reference);
+                    } else if (sourceValue.toLowerCase() === 'facebook_post') {
+                        //Open the Facebook Posts modal and select the post
+                        Modals.NewImageGallery.close();
+                        Modals.ImageDetailModal.close();
+                        Modals.FBPosts.openAndFilterOnPosts([image.source_reference]);
+                    } else if (sourceValue.toLowerCase() === 'facebook_messenger') {
+                        //Open the Facebook Messenger modal and select the conversation
+                        Modals.NewImageGallery.close();
+                        Modals.ImageDetailModal.close();
+                        Modals.SMSMessages.openAndSelectConversation(image.source_reference);
+                    } else if (sourceValue.toLowerCase() === 'instagram') {
+                        //Open the Instagram modal and select the post
+                        Modals.NewImageGallery.close();
+                        Modals.ImageDetailModal.close();
+                        Modals.SMSMessages.openAndSelectConversation(image.source_reference);
                     }
                     // Add other source types here as needed
                 };
@@ -1784,6 +1815,23 @@ Modals.ImageDetailModal = (() => {
             // Show modal
             DOM.newImageGalleryDetailModal.style.display = 'flex';
         }
+
+        function _getSourceFullName(sourceValue) {
+
+            const abbreviations = {
+                'email_attachment': 'Email',
+                'gmail_attachment':"GMail",
+                'facebook_messenger': 'Facebook Messenger',
+                'filesystem': 'Imgae Import',
+                'instagram': 'Insta',
+                'whatsapp': 'WhatsApp',
+                'imessage': 'iMessage',
+                'sms': 'SMS',
+                'facebook_post': 'Facebook Post',
+                'facebook_album': 'Facebook Album'
+            };
+            return abbreviations[sourceValue] || sourceValue.substring(0, 2).toUpperCase();
+        }   
 
         function close() {
             if (DOM.newImageGalleryDetailModal) {

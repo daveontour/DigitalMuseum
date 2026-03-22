@@ -174,7 +174,7 @@ func (r *EmailRepo) GetAttachmentIDsForEmails(ctx context.Context, emailIDs []in
 	rows, err := r.pool.Query(ctx, `
 		SELECT source_reference, id
 		FROM media_items
-		WHERE source = 'email_attachment'
+		WHERE source IN ('email_attachment', 'gmail_attachment')
 		  AND source_reference = ANY($1::text[])
 		ORDER BY id`, idStrs)
 	if err != nil {
@@ -259,12 +259,12 @@ func (r *EmailRepo) SoftDelete(ctx context.Context, id int64) (bool, error) {
 	if tag.RowsAffected() == 0 {
 		return false, nil
 	}
-	// Remove email_attachment media_items for this email; delete blobs no longer referenced.
+	// Remove IMAP/Gmail email attachment media_items for this email; delete blobs no longer referenced.
 	ref := fmt.Sprintf("%d", id)
 	_, _ = r.pool.Exec(ctx, `
 		WITH deleted AS (
 			DELETE FROM media_items
-			WHERE source = 'email_attachment' AND source_reference = $1
+			WHERE source IN ('email_attachment', 'gmail_attachment') AND source_reference = $1
 			RETURNING media_blob_id
 		)
 		DELETE FROM media_blobs b
@@ -299,7 +299,7 @@ func (r *EmailRepo) BulkSoftDelete(ctx context.Context, ids []int64) (int64, err
 	_, _ = r.pool.Exec(ctx, `
 		WITH deleted AS (
 			DELETE FROM media_items
-			WHERE source = 'email_attachment' AND source_reference = ANY($1::text[])
+			WHERE source IN ('email_attachment', 'gmail_attachment') AND source_reference = ANY($1::text[])
 			RETURNING media_blob_id
 		)
 		DELETE FROM media_blobs b

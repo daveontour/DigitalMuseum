@@ -272,7 +272,7 @@ func processMessageBatch(ctx context.Context, storage *importstorage.MessageStor
 			AttachmentData:     attachmentData,
 			AttachmentFilename: attachmentFilename,
 			AttachmentType:     attachmentType,
-			Source:             "WhatsApp",
+			Source:             "whatsapp",
 		})
 	}
 

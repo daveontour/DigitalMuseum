@@ -8,10 +8,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// AttachmentRepo accesses email_attachment rows in media_items.
+// AttachmentRepo accesses IMAP and Gmail email attachment rows in media_items.
 type AttachmentRepo struct {
 	pool *pgxpool.Pool
 }
+
+// emailAttachmentSourcesSQL matches media_items.source for stored email attachments (IMAP + Gmail).
+const emailAttachmentSourcesSQL = `mm.source IN ('email_attachment', 'gmail_attachment')`
 
 // NewAttachmentRepo creates an AttachmentRepo.
 func NewAttachmentRepo(pool *pgxpool.Pool) *AttachmentRepo {
@@ -38,13 +41,13 @@ func scanAttachmentInfo(row interface{ Scan(...any) error }) (*model.AttachmentI
 	return &a, err
 }
 
-// GetRandom returns one random email_attachment media item with email metadata.
+// GetRandom returns one random email attachment media item with email metadata.
 func (r *AttachmentRepo) GetRandom(ctx context.Context) (*model.AttachmentInfo, error) {
 	a, err := scanAttachmentInfo(r.pool.QueryRow(ctx, `
 		SELECT `+attachmentInfoCols+`
 		FROM media_items mm
 		JOIN emails e ON e.id = mm.source_reference::bigint
-		WHERE mm.source = 'email_attachment'
+		WHERE `+emailAttachmentSourcesSQL+`
 		ORDER BY RANDOM()
 		LIMIT 1`))
 	if err != nil {
@@ -62,7 +65,7 @@ func (r *AttachmentRepo) GetByIDOrder(ctx context.Context, offset int) (*model.A
 		SELECT `+attachmentInfoCols+`
 		FROM media_items mm
 		JOIN emails e ON e.id = mm.source_reference::bigint
-		WHERE mm.source = 'email_attachment'
+		WHERE `+emailAttachmentSourcesSQL+`
 		ORDER BY mm.id ASC
 		OFFSET $1
 		LIMIT 1`, offset))
@@ -86,7 +89,7 @@ func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset i
 		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		JOIN emails e ON e.id = mm.source_reference::bigint
-		WHERE mm.source = 'email_attachment'
+		WHERE `+emailAttachmentSourcesSQL+`
 		ORDER BY octet_length(mb.image_data) %s
 		OFFSET $1
 		LIMIT 1`, dir)
@@ -107,10 +110,10 @@ func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset i
 	return &a, nil
 }
 
-// Count returns the total number of email_attachment media items.
+// Count returns the total number of IMAP/Gmail email attachment media items.
 func (r *AttachmentRepo) Count(ctx context.Context) (int64, error) {
 	var n int64
-	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM media_items WHERE source='email_attachment'`).Scan(&n)
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM media_items WHERE source IN ('email_attachment', 'gmail_attachment')`).Scan(&n)
 	return n, err
 }
 
@@ -131,7 +134,7 @@ func (r *AttachmentRepo) GetInfo(ctx context.Context, id int64) (*model.Attachme
 		SELECT `+attachmentInfoColsGetInfo+`
 		FROM media_items mm
 		LEFT JOIN emails e ON e.id = mm.source_reference::bigint
-		WHERE mm.source = 'email_attachment' AND mm.id = $1`, id))
+		WHERE `+emailAttachmentSourcesSQL+` AND mm.id = $1`, id))
 	if err != nil {
 		if isNoRows(err) {
 			return nil, nil
@@ -147,7 +150,7 @@ func (r *AttachmentRepo) GetData(ctx context.Context, id int64) (data, thumbnail
 		SELECT mb.image_data, mb.thumbnail_data, COALESCE(mm.media_type,'application/octet-stream'), COALESCE(mm.title,'attachment')
 		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
-		WHERE mm.source = 'email_attachment' AND mm.id = $1`, id).
+		WHERE `+emailAttachmentSourcesSQL+` AND mm.id = $1`, id).
 		Scan(&data, &thumbnail, &mediaType, &filename)
 	if err != nil {
 		if isNoRows(err) {
@@ -163,7 +166,7 @@ func (r *AttachmentRepo) GetData(ctx context.Context, id int64) (data, thumbnail
 func (r *AttachmentRepo) Delete(ctx context.Context, id int64) (bool, error) {
 	var blobID *int64
 	err := r.pool.QueryRow(ctx,
-		`SELECT media_blob_id FROM media_items WHERE id=$1 AND source='email_attachment'`, id).
+		`SELECT media_blob_id FROM media_items WHERE id=$1 AND source IN ('email_attachment', 'gmail_attachment')`, id).
 		Scan(&blobID)
 	if err != nil {
 		if isNoRows(err) {
@@ -222,7 +225,7 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		JOIN emails e ON e.id = mm.source_reference::bigint
-		WHERE mm.source = 'email_attachment'%s`, typeFilter)).Scan(&total); err != nil {
+		WHERE `+emailAttachmentSourcesSQL+`%s`, typeFilter)).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("ListImagesCount: %w", err)
 	}
 
@@ -233,7 +236,7 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		JOIN emails e ON e.id = mm.source_reference::bigint
-		WHERE mm.source = 'email_attachment'%s
+		WHERE `+emailAttachmentSourcesSQL+`%s
 		ORDER BY %s
 		LIMIT $1 OFFSET $2`, typeFilter, orderExpr), pageSize, offset)
 	if err != nil {

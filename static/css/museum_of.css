@@ -2531,6 +2531,17 @@ body {
 .modal-header .modal-close-btn:hover {
     color: #fff !important;
 }
+
+.email-gallery-modal-header .modal-btn-secondary {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    margin-left: 0;
+}
+.email-gallery-modal-header .modal-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
 .modal-body {
     padding: 1.5rem 2rem;
     overflow-y: auto;
@@ -3991,6 +4002,21 @@ body {
     flex-shrink: 0;
 }
 
+.email-editor-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.email-editor-viewer .header .email-editor-title-row h1 {
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 0;
+}
+
 .email-editor-viewer .header h1 {
     font-size: 1.8em;
     margin-bottom: 8px;
@@ -4604,27 +4630,39 @@ body {
 }
 
 /* Different colors for different sources */
-.new-image-gallery-source-badge[data-source="Email"] {
+.new-image-gallery-source-badge[data-source="gmail_attachment"] {
+    background-color: rgba(74, 144, 226, 0.9);
+}
+.new-image-gallery-source-badge[data-source="email_attachment"] {
     background-color: rgba(74, 144, 226, 0.9);
 }
 
-.new-image-gallery-source-badge[data-source="Facebook Album"] {
+.new-image-gallery-source-badge[data-source="facebook_album"] {
+    background-color: rgba(24, 119, 242, 0.9);
+}
+.new-image-gallery-source-badge[data-source="facebook_post"] {
+    background-color: rgba(24, 119, 242, 0.9);
+}
+.new-image-gallery-source-badge[data-source="facebook_messenger"] {
     background-color: rgba(24, 119, 242, 0.9);
 }
 
-.new-image-gallery-source-badge[data-source="Filesystem"] {
+.new-image-gallery-source-badge[data-source="filesystem"] {
     background-color: rgba(108, 117, 125, 0.9);
 }
 
-.new-image-gallery-source-badge[data-source="Instagram"] {
+.new-image-gallery-source-badge[data-source="instagram"] {
     background-color: rgba(225, 48, 108, 0.9);
 }
 
-.new-image-gallery-source-badge[data-source="WhatsApp"] {
+.new-image-gallery-source-badge[data-source="whatsapp"] {
     background-color: rgba(37, 211, 102, 0.9);
 }
 
-.new-image-gallery-source-badge[data-source="iMessage"] {
+.new-image-gallery-source-badge[data-source="imessage"] {
+    background-color: rgba(0, 122, 255, 0.9);
+}
+.new-image-gallery-source-badge[data-source="sms"] {
     background-color: rgba(0, 122, 255, 0.9);
 }
 

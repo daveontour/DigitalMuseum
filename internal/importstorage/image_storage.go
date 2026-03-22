@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const filesystemSource = "Filesystem"
+const filesystemSource = "filesystem"
 
 // BatchImageItem represents a single image for batch save
 type BatchImageItem struct {

@@ -17,6 +17,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// gmailAttachmentSource is media_items.source for attachments imported via Gmail API (distinct from IMAP).
+const gmailAttachmentSource = "gmail_attachment"
+
 // GmailHandler handles all /gmail/* routes.
 type GmailHandler struct {
 	pool     *pgxpool.Pool
@@ -419,6 +422,13 @@ func (h *GmailHandler) storeGmailEmail(ctx context.Context, msg *appgmail.Messag
 		date = time.Now()
 	}
 
+	// emails.uid / folder are VARCHAR(255); Gmail folder is comma-joined label names and often exceeds 255.
+	uid := truncateUTF8Runes(ensureUTF8String(msg.UID), 255)
+	folder := truncateUTF8Runes(ensureUTF8String(msg.Folder), 255)
+	subject := truncateUTF8Runes(ensureUTF8String(msg.Subject), 1000)
+	fromAddr := truncateUTF8Runes(ensureUTF8String(msg.FromAddress), 500)
+	toAddr := ensureUTF8String(msg.ToAddress)
+
 	var plainText *string
 	if msg.BodyText != "" {
 		t := ensureUTF8String(msg.BodyText)
@@ -440,18 +450,75 @@ func (h *GmailHandler) storeGmailEmail(ctx context.Context, msg *appgmail.Messag
 		snippet = &s
 	}
 
-	_, err := h.pool.Exec(ctx, `
+	hasAttach := false
+	for _, att := range msg.Attachments {
+		if len(att.Data) > 0 {
+			hasAttach = true
+			break
+		}
+	}
+
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var emailID int64
+	err = tx.QueryRow(ctx, `
 		INSERT INTO emails (uid, folder, subject, from_address, to_addresses,
 		                    date, raw_message, plain_text, snippet, has_attachments,
 		                    user_deleted, is_personal, is_business, is_social, is_promotional,
 		                    is_spam, is_important, use_by_ai)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,TRUE)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,TRUE)
 		ON CONFLICT (uid, folder) DO UPDATE SET
 			subject=$3, from_address=$4, to_addresses=$5,
 			date=$6, raw_message=$7, plain_text=$8, snippet=$9,
-			updated_at=NOW()`,
-		msg.UID, msg.Folder, ensureUTF8String(msg.Subject), ensureUTF8String(msg.FromAddress), ensureUTF8String(msg.ToAddress),
-		date, rawMessage, plainText, snippet,
-	)
-	return err
+			has_attachments=$10,
+			updated_at=NOW()
+		RETURNING id`,
+		uid, folder, subject, fromAddr, toAddr,
+		date, rawMessage, plainText, snippet, hasAttach,
+	).Scan(&emailID)
+	if err != nil {
+		return err
+	}
+
+	ref := fmt.Sprintf("%d", emailID)
+	// Remove prior Gmail rows and any legacy rows wrongly tagged email_attachment for this email (same emails.id).
+	if _, err = tx.Exec(ctx, `DELETE FROM media_items WHERE source_reference = $1 AND source IN ($2, $3)`, ref, gmailAttachmentSource, "email_attachment"); err != nil {
+		return err
+	}
+
+	for _, att := range msg.Attachments {
+		if len(att.Data) == 0 {
+			continue
+		}
+		title := ensureUTF8String(att.Filename)
+		if title == "" {
+			title = "attachment"
+		}
+		title = truncateUTF8Runes(title, 1000)
+		mt := att.MediaType
+		if len(mt) > 255 {
+			mt = mt[:255]
+		}
+		var blobID int64
+		if err = tx.QueryRow(ctx, `INSERT INTO media_blobs (image_data, thumbnail_data) VALUES ($1, NULL) RETURNING id`, att.Data).Scan(&blobID); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `
+			INSERT INTO media_items (
+				media_blob_id, title, media_type, source, source_reference,
+				processed, available_for_task, rating, has_gps, is_referenced,
+				is_personal, is_business, is_social, is_promotional, is_spam, is_important
+			) VALUES ($1, $2, $3, $4, $5,
+				FALSE, FALSE, 5, FALSE, FALSE,
+				FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)`,
+			blobID, title, mt, gmailAttachmentSource, ref); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }

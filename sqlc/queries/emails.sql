@@ -12,11 +12,11 @@ WHERE id = $1
   AND user_deleted = FALSE;
 
 -- name: GetEmailAttachmentIDs :many
--- Returns media_item IDs where source = 'email_attachment' and source_reference matches
+-- Returns media_item IDs where source is IMAP or Gmail email attachment and source_reference matches
 -- the given set of email IDs (passed as text array for VARCHAR source_reference).
 SELECT source_reference, id AS media_item_id
 FROM media_items
-WHERE source = 'email_attachment'
+WHERE source IN ('email_attachment', 'gmail_attachment')
   AND source_reference = ANY($1::text[])
 ORDER BY id;
 

@@ -252,6 +252,15 @@ func processIMessageCSVFile(ctx context.Context, storage *importstorage.MessageS
 	return nil
 }
 
+// mediaItemSource maps the CSV Service column to media_items.source (SMS/MMS vs iMessage).
+func mediaItemSource(msg IMessageMessage) string {
+	s := strings.TrimSpace(msg.Service)
+	if strings.EqualFold(s, "SMS") || strings.EqualFold(s, "MMS") {
+		return "sms"
+	}
+	return "imessage"
+}
+
 func processIMessageBatch(ctx context.Context, storage *importstorage.MessageStorage, messages []IMessageMessage, csvDir, conversationName string, stats *ImportStats, subjectFullName *string) (*importstorage.BatchSaveResult, error) {
 	batchMessages := make([]importstorage.MessageWithAttachment, 0, len(messages))
 
@@ -263,7 +272,7 @@ func processIMessageBatch(ctx context.Context, storage *importstorage.MessageSto
 			AttachmentData:     attachmentData,
 			AttachmentFilename: attachmentFilename,
 			AttachmentType:     attachmentType,
-			Source:             "iMessage",
+			Source:             mediaItemSource(msg),
 		})
 	}
 

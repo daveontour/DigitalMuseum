@@ -17,7 +17,7 @@ import (
 )
 
 const facebookService = "Facebook Messenger"
-const facebookSource = "Facebook"
+const facebookSource = "facebook_messenger"
 
 // ImportStats holds statistics about the import process
 type ImportStats struct {
@@ -373,7 +373,7 @@ func processFacebookJSONFile(ctx context.Context, storage *importstorage.Message
 				AttachmentData:     addAtt.Data,
 				AttachmentFilename: addAtt.Filename,
 				AttachmentType:     addAtt.Type,
-				Source:             facebookSource,
+				Source:             "facebook_messenger",
 			})
 
 			if len(batch) >= batchSize {

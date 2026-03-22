@@ -347,6 +347,7 @@ const DOM = {
     emailEditorPagination: document.getElementById('email-editor-pagination'),
     emailEditorBulkDeleteBtn: document.getElementById('email-editor-bulk-delete-btn'),
     emailEditorSelectAllBtn: document.getElementById('email-editor-select-all-btn'),
+    emailEditorOpenEmailsGalleryBtn: document.getElementById('email-editor-open-emails-gallery-btn'),
     emailEditorViewer: document.getElementById('email-editor-viewer'),
     // New Image Gallery Elements
     newImageGalleryModal: document.getElementById('new-image-gallery-modal'),

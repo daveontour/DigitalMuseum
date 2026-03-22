@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -14,6 +15,13 @@ import (
 )
 
 const pageSize = 500
+
+// MailAttachment is a non-body MIME part to store as gmail_attachment (same shape as IMAP).
+type MailAttachment struct {
+	Filename  string
+	MediaType string
+	Data      []byte
+}
 
 // Message holds the parsed content of a single Gmail message.
 type Message struct {
@@ -27,6 +35,7 @@ type Message struct {
 	Date        time.Time
 	BodyText    string
 	BodyHTML    string
+	Attachments []MailAttachment
 }
 
 // Client wraps the Gmail API service.
@@ -171,6 +180,13 @@ func (c *Client) fetchOne(ctx context.Context, id string, labelNames map[string]
 			}
 		}
 		parseParts(raw.Payload, msg)
+		var attachments []MailAttachment
+		// Never fail the whole message if attachment collection errors; email body still saves.
+		if err := c.collectAttachments(ctx, id, raw.Payload, &attachments); err != nil {
+			msg.Attachments = nil
+		} else {
+			msg.Attachments = attachments
+		}
 	}
 
 	return msg, nil
@@ -203,6 +219,174 @@ func parseParts(part *gmailv1.MessagePart, msg *Message) {
 	for _, sub := range part.Parts {
 		parseParts(sub, msg)
 	}
+}
+
+func partHeader(part *gmailv1.MessagePart, name string) string {
+	if part == nil {
+		return ""
+	}
+	for _, h := range part.Headers {
+		if h == nil {
+			continue
+		}
+		if strings.EqualFold(h.Name, name) {
+			return h.Value
+		}
+	}
+	return ""
+}
+
+// gmailPartFilename returns a display filename from the part Filename field or MIME headers.
+func gmailPartFilename(part *gmailv1.MessagePart) string {
+	if part == nil {
+		return ""
+	}
+	if fn := strings.TrimSpace(part.Filename); fn != "" {
+		return mimeDecodeFilename(fn)
+	}
+	_, params, err := mime.ParseMediaType(partHeader(part, "Content-Disposition"))
+	if err == nil {
+		if fn := params["filename"]; fn != "" {
+			return mimeDecodeFilename(fn)
+		}
+	}
+	_, params, err = mime.ParseMediaType(partHeader(part, "Content-Type"))
+	if err == nil {
+		if fn := params["name"]; fn != "" {
+			return mimeDecodeFilename(fn)
+		}
+	}
+	return ""
+}
+
+func mimeDecodeFilename(s string) string {
+	dec := new(mime.WordDecoder)
+	out, err := dec.DecodeHeader(s)
+	if err != nil {
+		return strings.Trim(s, `"`)
+	}
+	return out
+}
+
+// ShouldSaveGmailPartAsAttachment mirrors IMAP shouldSaveAsAttachment for Gmail API MessageParts
+// (inline images excluded; attachment disposition and non-text parts included).
+func ShouldSaveGmailPartAsAttachment(part *gmailv1.MessagePart) bool {
+	if part == nil {
+		return false
+	}
+	mt := strings.TrimSpace(part.MimeType)
+	mtLower := strings.ToLower(mt)
+	if strings.HasPrefix(mtLower, "multipart/") {
+		return false
+	}
+	if strings.EqualFold(mt, "message/rfc822") {
+		return false
+	}
+
+	disp := partHeader(part, "Content-Disposition")
+	dispType, dispParams, _ := mime.ParseMediaType(disp)
+	dispType = strings.ToLower(dispType)
+
+	if dispType == "attachment" {
+		return true
+	}
+	if dispType == "inline" {
+		return false
+	}
+
+	fn := dispParams["filename"]
+	if fn == "" {
+		fn = gmailPartFilename(part)
+	}
+	if fn != "" && !strings.HasPrefix(mtLower, "text/plain") && !strings.HasPrefix(mtLower, "text/html") {
+		return true
+	}
+
+	if mt != "" && !strings.HasPrefix(mtLower, "text/") {
+		return true
+	}
+	return false
+}
+
+func decodeGmailBodyData(s string) ([]byte, error) {
+	if s == "" {
+		return nil, nil
+	}
+	data, err := base64.URLEncoding.DecodeString(s)
+	if err != nil {
+		data, err = base64.StdEncoding.DecodeString(s)
+	}
+	return data, err
+}
+
+func (c *Client) fetchAttachmentAPI(ctx context.Context, messageID, attachmentID string) ([]byte, error) {
+	att, err := c.svc.Users.Messages.Attachments.Get("me", messageID, attachmentID).Context(ctx).Do()
+	if err != nil {
+		return nil, err
+	}
+	return decodeGmailBodyData(att.Data)
+}
+
+func (c *Client) partAttachmentBytes(ctx context.Context, messageID string, part *gmailv1.MessagePart) ([]byte, error) {
+	if part == nil || part.Body == nil {
+		return nil, nil
+	}
+	if part.Body.AttachmentId != "" {
+		return c.fetchAttachmentAPI(ctx, messageID, part.Body.AttachmentId)
+	}
+	return decodeGmailBodyData(part.Body.Data)
+}
+
+// collectAttachments walks the payload tree and appends saved parts to *out.
+func (c *Client) collectAttachments(ctx context.Context, messageID string, part *gmailv1.MessagePart, out *[]MailAttachment) error {
+	if part == nil {
+		return nil
+	}
+	mt := strings.ToLower(strings.TrimSpace(part.MimeType))
+
+	if strings.HasPrefix(mt, "multipart/") {
+		for _, sub := range part.Parts {
+			if err := c.collectAttachments(ctx, messageID, sub, out); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	if mt == "message/rfc822" {
+		for _, sub := range part.Parts {
+			if err := c.collectAttachments(ctx, messageID, sub, out); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	if mt == "text/plain" || mt == "text/html" {
+		return nil
+	}
+
+	if !ShouldSaveGmailPartAsAttachment(part) {
+		return nil
+	}
+
+	data, err := c.partAttachmentBytes(ctx, messageID, part)
+	if err != nil || len(data) == 0 {
+		return nil
+	}
+
+	fn := gmailPartFilename(part)
+	mtClean := strings.TrimSpace(part.MimeType)
+	if mtClean == "" {
+		mtClean = "application/octet-stream"
+	}
+
+	*out = append(*out, MailAttachment{
+		Filename:  fn,
+		MediaType: mtClean,
+		Data:      data,
+	})
+	return nil
 }
 
 // parseEmailDate attempts to parse common email date formats.
