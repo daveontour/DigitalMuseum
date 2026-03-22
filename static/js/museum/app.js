@@ -2208,6 +2208,18 @@ const App = (() => {
             return null;
         }
 
+        function updateMasterImportReorderButtonStates() {
+            const root = document.getElementById('master-import-sections');
+            if (!root) return;
+            const sections = root.querySelectorAll('.master-import-section');
+            sections.forEach((sec, i) => {
+                const up = sec.querySelector('.master-import-move-up-btn');
+                const down = sec.querySelector('.master-import-move-down-btn');
+                if (up) up.disabled = i === 0;
+                if (down) down.disabled = i === sections.length - 1;
+            });
+        }
+
         async function populateMasterImportModal() {
             const root = document.getElementById('master-import-sections');
             if (!root) return;
@@ -2219,7 +2231,13 @@ const App = (() => {
                 section.dataset.masterImportType = importType;
                 section.innerHTML = `
                     <div class="master-import-section-head">
-                        <label class="master-import-run-label"><input type="checkbox" class="master-import-run-cb"> <span>Run this import</span></label>
+                        <div class="master-import-section-head-top">
+                            <label class="master-import-run-label"><input type="checkbox" class="master-import-run-cb"> <span>Run this import</span></label>
+                            <div class="master-import-reorder-buttons" role="group" aria-label="Run order for this import">
+                                <button type="button" class="master-import-move-up-btn master-import-reorder-btn modal-btn modal-btn-secondary" title="Run earlier (move up)" aria-label="Run earlier (move up)"><i class="fas fa-arrow-up" aria-hidden="true"></i></button>
+                                <button type="button" class="master-import-move-down-btn master-import-reorder-btn modal-btn modal-btn-secondary" title="Run later (move down)" aria-label="Run later (move down)"><i class="fas fa-arrow-down" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
                         <h3 class="master-import-section-title"><i class="${meta.icon}"></i> ${meta.title}</h3>
                     </div>
                     <div class="master-import-section-body"></div>
@@ -2251,6 +2269,7 @@ const App = (() => {
                     }
                 }
             }
+            updateMasterImportReorderButtonStates();
         }
 
         function gatherMasterImportJobs() {
@@ -2949,6 +2968,30 @@ const App = (() => {
         if (masterImportClearAllBtn) {
             masterImportClearAllBtn.addEventListener('click', () => {
                 document.querySelectorAll('#master-import-sections .master-import-run-cb').forEach(c => { c.checked = false; });
+            });
+        }
+
+        const masterImportSectionsRoot = document.getElementById('master-import-sections');
+        if (masterImportSectionsRoot) {
+            masterImportSectionsRoot.addEventListener('click', (e) => {
+                const upBtn = e.target.closest('.master-import-move-up-btn');
+                const downBtn = e.target.closest('.master-import-move-down-btn');
+                if (!upBtn && !downBtn) return;
+                const section = e.target.closest('.master-import-section');
+                if (!section || !masterImportSectionsRoot.contains(section)) return;
+                e.preventDefault();
+                if (upBtn && !upBtn.disabled) {
+                    const prev = section.previousElementSibling;
+                    if (prev && prev.classList.contains('master-import-section')) {
+                        masterImportSectionsRoot.insertBefore(section, prev);
+                    }
+                } else if (downBtn && !downBtn.disabled) {
+                    const next = section.nextElementSibling;
+                    if (next && next.classList.contains('master-import-section')) {
+                        masterImportSectionsRoot.insertBefore(next, section);
+                    }
+                }
+                updateMasterImportReorderButtonStates();
             });
         }
 

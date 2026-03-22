@@ -7523,6 +7523,26 @@ body {
     margin-bottom: 12px;
 }
 
+.master-import-section-head-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 12px;
+}
+
+.master-import-reorder-buttons {
+    display: inline-flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.master-import-reorder-btn {
+    padding: 4px 10px;
+    font-size: 0.85em;
+    min-width: 2.25rem;
+}
+
 .master-import-run-label {
     font-weight: 600;
     cursor: pointer;
