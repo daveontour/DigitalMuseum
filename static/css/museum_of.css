@@ -2391,6 +2391,11 @@ body {
     display: none !important;
 }
 
+/* Image gallery in artefact "Choose from Gallery" pick mode — above artefacts modals (later in DOM) */
+#new-image-gallery-modal.new-image-gallery-pick-mode {
+    z-index: 3400 !important;
+}
+
 /* Single image modal should appear above other modals */
 #single-image-modal {
     z-index: 3000 !important;
@@ -7009,6 +7014,7 @@ body {
 .artefact-detail-content {
     max-width: 90vw;
     width: 85%;
+    height: min(88vh, 820px);
     max-height: 90vh;
     display: flex;
     flex-direction: column;
@@ -7053,12 +7059,46 @@ body {
 
 .artefact-detail-body {
     padding: 16px 20px 20px;
-    overflow: hidden;
     display: flex;
-    gap: 20px;
+    flex-direction: column;
+    gap: 12px;
     flex: 1;
     min-height: 0;
     overflow: hidden;
+}
+
+.artefact-detail-main-row {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    gap: 20px;
+    overflow: hidden;
+}
+
+.artefact-save-feedback {
+    flex: 0 0 auto;
+    width: 100%;
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #14532d;
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    box-sizing: border-box;
+    animation: artefact-save-feedback-in 0.25s ease-out;
+}
+
+@keyframes artefact-save-feedback-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .artefact-photos-panel {
@@ -7068,15 +7108,25 @@ body {
     flex-direction: column;
     gap: 8px;
     flex-shrink: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.artefact-attachments-heading {
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+    flex-shrink: 0;
 }
 
 .artefact-photos-strip {
-    flex: 1;
+    flex: 1 1 auto;
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 8px;
     min-height: 0;
+    -webkit-overflow-scrolling: touch;
 }
 
 .artefact-photo-thumb-wrap {
@@ -7118,6 +7168,111 @@ body {
     flex-direction: column;
     gap: 6px;
     flex-shrink: 0;
+    margin-top: auto;
+    padding-top: 4px;
+}
+
+.artefact-doc-thumb-view {
+    width: 100%;
+    min-height: 88px;
+    border-radius: 6px;
+    border: 1px solid #cdd5e0;
+    background: linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 12px 10px;
+    box-sizing: border-box;
+}
+
+.artefact-doc-thumb-view:hover {
+    border-color: #6366f1;
+    background: linear-gradient(145deg, #eef2ff 0%, #e0e7ff 100%);
+}
+
+.artefact-doc-thumb-view i {
+    font-size: 2rem;
+    opacity: 0.9;
+}
+
+.artefact-doc-thumb-view.artefact-doc-pdf i {
+    color: #b91c1c;
+}
+
+.artefact-doc-thumb-view.artefact-doc-md i {
+    color: #6366f1;
+}
+
+.artefact-doc-thumb-view.artefact-doc-txt i {
+    color: #0d9488;
+}
+
+.artefact-doc-label {
+    font-size: 0.78rem;
+    color: #475569;
+    text-align: center;
+    line-height: 1.25;
+    max-width: 100%;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.artefact-document-view-content {
+    max-width: 92vw;
+    width: 900px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+
+.artefact-document-view-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: #f1f5f9;
+}
+
+.artefact-document-pdf-frame {
+    width: 100%;
+    flex: 1;
+    min-height: 70vh;
+    border: 0;
+    background: #525659;
+}
+
+.artefact-document-text-wrap {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    min-height: 50vh;
+    max-height: 75vh;
+    background: #fff;
+}
+
+.artefact-document-md {
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.artefact-document-plain {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: ui-monospace, monospace;
+    font-size: 0.88rem;
+}
+
+.artefact-document-loading {
+    color: #64748b;
+    margin: 0;
 }
 
 .artefact-detail-fields {
@@ -7125,8 +7280,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    overflow-x: hidden;
     overflow-y: auto;
     min-width: 0;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
 }
 
 .artefact-field-label {
@@ -7152,7 +7310,6 @@ body {
 }
 
 .artefact-story-textarea {
-    flex: 1;
     min-height: 140px;
     resize: vertical;
 }
@@ -7192,11 +7349,16 @@ body {
 }
 
 @media (max-width: 640px) {
-    .artefact-detail-body {
+    .artefact-detail-content {
+        height: min(92vh, 900px);
+    }
+    .artefact-detail-main-row {
         flex-direction: column;
     }
     .artefact-photos-panel {
         width: 100%;
+        max-height: 42vh;
+        min-height: 180px;
     }
 }
 

@@ -250,6 +250,8 @@ func (s *ImageService) GetImageContent(ctx context.Context, id int64, idType str
 		}
 		if item.SourceReference != nil && *item.SourceReference != "" {
 			filename = filepath.Base(*item.SourceReference)
+		} else if item.Title != nil && *item.Title != "" {
+			filename = *item.Title
 		}
 	}
 

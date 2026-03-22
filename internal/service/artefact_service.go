@@ -3,18 +3,24 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/jpeg"
 	_ "image/png"
+	"path/filepath"
+	"strings"
 
 	"golang.org/x/image/draw"
 
 	"github.com/daveontour/digitalmuseum/internal/model"
 	"github.com/daveontour/digitalmuseum/internal/repository"
 )
+
+// ErrArtefactUnsupportedMedia is returned when an uploaded file is not an allowed image, PDF, or text/markdown document.
+var ErrArtefactUnsupportedMedia = errors.New("unsupported artefact file type")
 
 // ArtefactService orchestrates artefact CRUD and media operations.
 type ArtefactService struct {
@@ -117,7 +123,15 @@ func (s *ArtefactService) UploadMedia(ctx context.Context, artefactID int64, ima
 		return nil, nil
 	}
 
-	thumbBytes, _ := makeThumbnail(imageBytes)
+	normType := artefactNormalizedMediaType(title, mediaType)
+	if err := validateArtefactUpload(title, mediaType); err != nil {
+		return nil, err
+	}
+
+	var thumbBytes []byte
+	if artefactMediaIsImageKind(normType) {
+		thumbBytes, _ = makeThumbnail(imageBytes)
+	}
 
 	blobID, err := s.repo.InsertMediaBlob(ctx, imageBytes, thumbBytes)
 	if err != nil {
@@ -129,7 +143,7 @@ func (s *ArtefactService) UploadMedia(ctx context.Context, artefactID int64, ima
 		return nil, err
 	}
 	srcRef := fmt.Sprintf("artefact:%d:%d", artefactID, blobID)
-	mediaItemID, err := s.repo.InsertMediaItem(ctx, blobID, title, mediaType, "artefact", srcRef)
+	mediaItemID, err := s.repo.InsertMediaItem(ctx, blobID, title, normType, "artefact", srcRef)
 	if err != nil {
 		return nil, fmt.Errorf("insert media item: %w", err)
 	}
@@ -371,4 +385,68 @@ func optStr(v any) *string {
 		return &s
 	}
 	return nil
+}
+
+func artefactNormalizedMediaType(filename, header string) string {
+	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(filename)))
+	h := strings.ToLower(strings.TrimSpace(header))
+	if semi := strings.Index(h, ";"); semi >= 0 {
+		h = strings.TrimSpace(h[:semi])
+	}
+	switch ext {
+	case ".pdf":
+		return "application/pdf"
+	case ".md", ".markdown":
+		return "text/markdown; charset=utf-8"
+	case ".txt":
+		return "text/plain; charset=utf-8"
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".heic", ".heif":
+		return "image/heic"
+	case ".bmp":
+		return "image/bmp"
+	}
+	if strings.HasPrefix(h, "image/") && h != "" {
+		return header
+	}
+	if h == "application/pdf" || h == "text/plain" || h == "text/markdown" {
+		return header
+	}
+	return header
+}
+
+func artefactMediaIsImageKind(normType string) bool {
+	base := strings.ToLower(strings.TrimSpace(normType))
+	if i := strings.Index(base, ";"); i >= 0 {
+		base = strings.TrimSpace(base[:i])
+	}
+	return strings.HasPrefix(base, "image/")
+}
+
+func validateArtefactUpload(filename, header string) error {
+	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(filename)))
+	h := strings.ToLower(strings.TrimSpace(header))
+	if semi := strings.Index(h, ";"); semi >= 0 {
+		h = strings.TrimSpace(h[:semi])
+	}
+	switch ext {
+	case ".pdf", ".md", ".markdown", ".txt":
+		return nil
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".heic", ".heif":
+		return nil
+	}
+	if strings.HasPrefix(h, "image/") {
+		return nil
+	}
+	if h == "application/pdf" || h == "text/plain" || h == "text/markdown" {
+		return nil
+	}
+	return fmt.Errorf("%w — use an image, PDF, Markdown (.md), or plain text (.txt)", ErrArtefactUnsupportedMedia)
 }

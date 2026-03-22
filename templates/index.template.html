@@ -3190,35 +3190,53 @@
                 <button class="modal-close-btn artefact-detail-close-btn" id="close-artefact-detail">&times;</button>
             </div>
             <div class="artefact-detail-body">
-                <!-- LEFT: Photos panel -->
-                <div class="artefact-photos-panel">
-                    <h3 style="margin:0 0 8px 0; font-size:1rem;">Photos</h3>
-                    <div id="artefact-photos-strip" class="artefact-photos-strip"></div>
-                    <div class="artefact-photo-actions">
-                        <button id="artefact-add-photo-file-btn" class="modal-btn modal-btn-secondary" style="width:100%;">
-                            <i class="fas fa-upload"></i> Upload Photo
-                        </button>
-                        <input id="artefact-photo-file-input" type="file" accept="image/*" style="display:none"/>
-                        <button id="artefact-add-photo-gallery-btn" class="modal-btn modal-btn-secondary" style="width:100%;">
-                            <i class="fas fa-images"></i> Choose from Gallery
-                        </button>
+                <div class="artefact-detail-main-row">
+                    <!-- LEFT: Attachments (strip scrolls; actions pinned to bottom of pane) -->
+                    <div class="artefact-photos-panel">
+                        <h3 class="artefact-attachments-heading">Attachments</h3>
+                        <div id="artefact-photos-strip" class="artefact-photos-strip"></div>
+                        <div class="artefact-photo-actions">
+                            <button id="artefact-add-photo-file-btn" class="modal-btn modal-btn-secondary" style="width:100%;">
+                                <i class="fas fa-upload"></i> Upload file
+                            </button>
+                            <input id="artefact-photo-file-input" type="file" accept="image/*,.pdf,.txt,.md,.markdown,application/pdf,text/plain,text/markdown" style="display:none"/>
+                            <button id="artefact-add-photo-gallery-btn" class="modal-btn modal-btn-secondary" style="width:100%;">
+                                <i class="fas fa-images"></i> Choose from Gallery
+                            </button>
+                        </div>
+                    </div>
+                    <!-- RIGHT: Details panel -->
+                    <div class="artefact-detail-fields">
+                        <label class="artefact-field-label">Name</label>
+                        <input id="artefact-detail-name" class="new-image-gallery-input" placeholder="Artefact name"/>
+                        <label class="artefact-field-label">Description</label>
+                        <textarea id="artefact-detail-description" class="artefact-description-textarea" placeholder="Short description"></textarea>
+                        <label class="artefact-field-label">Tags <span style="font-weight:normal; color:#888;">(comma-separated)</span></label>
+                        <input id="artefact-detail-tags" class="new-image-gallery-input" placeholder="e.g. childhood, family, 1970s" list="artefact-tags-list"/>
+                        <datalist id="artefact-tags-list"></datalist>
+                        <label class="artefact-field-label">Story</label>
+                        <textarea id="artefact-detail-story" class="artefact-story-textarea" placeholder="Tell the story behind this artefact..."></textarea>
+                        <div class="artefact-detail-actions">
+                            <button id="artefact-save-btn" class="modal-btn modal-btn-primary">Save</button>
+                            <button id="artefact-delete-btn" class="modal-btn modal-btn-danger" style="display:none;">Delete</button>
+                        </div>
                     </div>
                 </div>
-                <!-- RIGHT: Details panel -->
-                <div class="artefact-detail-fields">
-                    <label class="artefact-field-label">Name</label>
-                    <input id="artefact-detail-name" class="new-image-gallery-input" placeholder="Artefact name"/>
-                    <label class="artefact-field-label">Description</label>
-                    <textarea id="artefact-detail-description" class="artefact-description-textarea" placeholder="Short description"></textarea>
-                    <label class="artefact-field-label">Tags <span style="font-weight:normal; color:#888;">(comma-separated)</span></label>
-                    <input id="artefact-detail-tags" class="new-image-gallery-input" placeholder="e.g. childhood, family, 1970s" list="artefact-tags-list"/>
-                    <datalist id="artefact-tags-list"></datalist>
-                    <label class="artefact-field-label">Story</label>
-                    <textarea id="artefact-detail-story" class="artefact-story-textarea" placeholder="Tell the story behind this artefact..."></textarea>
-                    <div class="artefact-detail-actions">
-                        <button id="artefact-save-btn" class="modal-btn modal-btn-primary">Save</button>
-                        <button id="artefact-delete-btn" class="modal-btn modal-btn-danger" style="display:none;">Delete</button>
-                    </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Artefact PDF / text / markdown viewer (above artefact detail) -->
+    <div id="artefact-document-view-modal" class="modal artefact-document-view-modal" style="display: none; z-index: 4500;">
+        <div class="modal-content artefact-document-view-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 id="artefact-document-view-title">Document</h2>
+                <button type="button" class="modal-close-btn" id="close-artefact-document-view" aria-label="Close">&times;</button>
+            </div>
+            <div id="artefact-document-view-body" class="artefact-document-view-body">
+                <iframe id="artefact-document-pdf-frame" class="artefact-document-pdf-frame" title="PDF document" style="display:none;"></iframe>
+                <div id="artefact-document-text-wrap" class="artefact-document-text-wrap" style="display:none;">
+                    <div id="artefact-document-md" class="artefact-document-md rendered-content"></div>
                 </div>
             </div>
         </div>

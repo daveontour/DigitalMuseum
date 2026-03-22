@@ -1,12 +1,14 @@
 /**
  * Artefacts Gallery Modal
- * Allows browsing, creating, editing and deleting artefacts with associated photos.
+ * Allows browsing, creating, editing and deleting artefacts with attachments
+ * (images, PDF, Markdown, and plain text).
  */
 
 Modals.Artefacts = (() => {
     let artefacts = [];
     let currentArtefact = null;   // The artefact currently shown in the detail modal
     let isCreating = false;
+    let saveFeedbackTimer = null;
 
     // -------------------------------------------------------------------------
     // Gallery Modal
@@ -167,6 +169,89 @@ Modals.Artefacts = (() => {
         _renderPhotoStrip(artefact.media_items || []);
     }
 
+    function _artefactMediaKind(mediaType, title) {
+        const mt = (mediaType || '').toLowerCase();
+        const base = mt.split(';')[0].trim();
+        const name = (title || '').toLowerCase();
+        if (base.startsWith('image/')) return 'image';
+        if (base === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+        if (base === 'text/markdown' || name.endsWith('.md') || name.endsWith('.markdown')) return 'markdown';
+        if (base === 'text/plain' || name.endsWith('.txt')) return 'text';
+        return 'other';
+    }
+
+    function _escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function _closeArtefactDocumentView() {
+        const modal = document.getElementById('artefact-document-view-modal');
+        const iframe = document.getElementById('artefact-document-pdf-frame');
+        const md = document.getElementById('artefact-document-md');
+        const tw = document.getElementById('artefact-document-text-wrap');
+        if (iframe) {
+            iframe.src = 'about:blank';
+            iframe.style.display = 'none';
+        }
+        if (md) md.innerHTML = '';
+        if (tw) tw.style.display = 'none';
+        if (modal) modal.style.display = 'none';
+    }
+
+    function _openArtefactDocumentViewer(kind, item) {
+        const blobId = item.media_blob_id;
+        if (!blobId) return;
+        const modal = document.getElementById('artefact-document-view-modal');
+        const titleEl = document.getElementById('artefact-document-view-title');
+        const iframe = document.getElementById('artefact-document-pdf-frame');
+        const textWrap = document.getElementById('artefact-document-text-wrap');
+        const mdEl = document.getElementById('artefact-document-md');
+        if (!modal || !iframe || !textWrap || !mdEl) return;
+
+        const label = item.title || (kind === 'pdf' ? 'PDF' : kind === 'markdown' ? 'Markdown' : 'Text');
+        if (titleEl) titleEl.textContent = label;
+
+        const url = `/images/${blobId}?type=blob`;
+
+        if (kind === 'pdf') {
+            textWrap.style.display = 'none';
+            mdEl.innerHTML = '';
+            iframe.style.display = 'block';
+            iframe.src = url;
+            modal.style.display = 'flex';
+            return;
+        }
+
+        iframe.style.display = 'none';
+        iframe.src = 'about:blank';
+        textWrap.style.display = 'block';
+        mdEl.innerHTML = '<p class="artefact-document-loading">Loading…</p>';
+        modal.style.display = 'flex';
+
+        fetch(url)
+            .then(r => {
+                if (!r.ok) throw new Error(r.statusText || 'Failed to load');
+                return r.text();
+            })
+            .then(text => {
+                if (kind === 'markdown' && typeof marked !== 'undefined') {
+                    let html = marked.parse(text || '');
+                    if (typeof DOMPurify !== 'undefined') {
+                        html = DOMPurify.sanitize(html);
+                    }
+                    mdEl.innerHTML = html;
+                } else {
+                    mdEl.innerHTML = `<pre class="artefact-document-plain">${_escapeHtml(text || '')}</pre>`;
+                }
+            })
+            .catch(err => {
+                console.error('Artefact document load error:', err);
+                mdEl.innerHTML = `<p class="artefact-document-loading">Could not load this file (${_escapeHtml(err.message || 'error')}).</p>`;
+            });
+    }
+
     function _renderPhotoStrip(mediaItems) {
         const strip = document.getElementById('artefact-photos-strip');
         if (!strip) return;
@@ -175,51 +260,87 @@ Modals.Artefacts = (() => {
         if (mediaItems.length === 0) {
             const msg = document.createElement('div');
             msg.style.cssText = 'color:#aaa; font-size:0.85rem; text-align:center; padding:16px;';
-            msg.textContent = 'No photos yet. Add photos using the buttons below.';
+            msg.textContent = 'No attachments yet. Upload an image, PDF, .md, or .txt file, or choose from the gallery.';
             strip.appendChild(msg);
             return;
         }
 
         mediaItems.forEach(item => {
+            const kind = _artefactMediaKind(item.media_type, item.title);
             const wrap = document.createElement('div');
             wrap.className = 'artefact-photo-thumb-wrap';
             wrap.dataset.mediaItemId = item.media_item_id;
 
-            const img = document.createElement('img');
-            img.src = item.thumbnail_url || '';
-            img.alt = item.title || 'Photo';
-            img.loading = 'lazy';
-            img.onerror = function() {
-                this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="80"%3E%3Crect fill="%23ddd" width="100" height="80"/%3E%3C/svg%3E';
-            };
-            // Click to view full-size
-            img.addEventListener('click', () => {
-                if (Modals.SingleImageDisplay && Modals.SingleImageDisplay.showSingleImageModal) {
-                    const blobId = item.media_blob_id;
-                    if (blobId) {
-                        Modals.SingleImageDisplay.showSingleImageModal(
-                            item.title || 'Photo',
-                            `/images/${blobId}?type=blob`,
-                            null, null, null
-                        );
-                    }
-                }
-            });
-
             const removeBtn = document.createElement('button');
             removeBtn.className = 'artefact-photo-remove-btn';
-            removeBtn.title = 'Remove photo';
+            removeBtn.title = 'Remove attachment';
             removeBtn.innerHTML = '&times;';
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 Modals.ConfirmationModal.open(
-                    'Remove Photo',
-                    'Remove this photo from the artefact?',
+                    'Remove attachment',
+                    'Remove this attachment from the artefact?',
                     () => _removePhoto(item.media_item_id)
                 );
             });
 
-            wrap.appendChild(img);
+            if (kind === 'image') {
+                const img = document.createElement('img');
+                img.src = item.thumbnail_url || (item.media_blob_id ? `/images/${item.media_blob_id}?type=blob` : '');
+                img.alt = item.title || 'Image';
+                img.loading = 'lazy';
+                img.onerror = function() {
+                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="80"%3E%3Crect fill="%23ddd" width="100" height="80"/%3E%3C/svg%3E';
+                };
+                img.addEventListener('click', () => {
+                    if (Modals.SingleImageDisplay && Modals.SingleImageDisplay.showSingleImageModal) {
+                        const bid = item.media_blob_id;
+                        if (bid) {
+                            Modals.SingleImageDisplay.showSingleImageModal(
+                                item.title || 'Photo',
+                                `/images/${bid}?type=blob`,
+                                null, null, null
+                            );
+                        }
+                    }
+                });
+                wrap.appendChild(img);
+            } else if (kind === 'pdf' || kind === 'markdown' || kind === 'text') {
+                const doc = document.createElement('div');
+                doc.className = 'artefact-doc-thumb-view artefact-doc-' + (kind === 'pdf' ? 'pdf' : kind === 'markdown' ? 'md' : 'txt');
+                const icon = document.createElement('i');
+                icon.className = kind === 'pdf' ? 'fas fa-file-pdf' : kind === 'markdown' ? 'fas fa-file-lines' : 'fas fa-file-alt';
+                icon.setAttribute('aria-hidden', 'true');
+                const lab = document.createElement('div');
+                lab.className = 'artefact-doc-label';
+                lab.textContent = item.title || (kind === 'pdf' ? 'PDF document' : kind === 'markdown' ? 'Markdown' : 'Text document');
+                doc.appendChild(icon);
+                doc.appendChild(lab);
+                doc.addEventListener('click', () => _openArtefactDocumentViewer(kind, item));
+                doc.tabIndex = 0;
+                doc.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault();
+                        _openArtefactDocumentViewer(kind, item);
+                    }
+                });
+                wrap.appendChild(doc);
+            } else {
+                const doc = document.createElement('div');
+                doc.className = 'artefact-doc-thumb-view';
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-file';
+                const lab = document.createElement('div');
+                lab.className = 'artefact-doc-label';
+                lab.textContent = item.title || 'File';
+                doc.appendChild(icon);
+                doc.appendChild(lab);
+                doc.addEventListener('click', () => {
+                    window.alert('Preview is not available for this file type.');
+                });
+                wrap.appendChild(doc);
+            }
+
             wrap.appendChild(removeBtn);
             strip.appendChild(wrap);
         });
@@ -232,7 +353,15 @@ Modals.Artefacts = (() => {
 
     function _closeDetailModal() {
         const modal = document.getElementById('artefact-detail-modal');
-        if (modal) modal.style.display = 'none';
+        if (modal) {
+            const fb = modal.querySelector('.artefact-save-feedback');
+            if (fb) fb.remove();
+            modal.style.display = 'none';
+        }
+        if (saveFeedbackTimer) {
+            clearTimeout(saveFeedbackTimer);
+            saveFeedbackTimer = null;
+        }
         currentArtefact = null;
         isCreating = false;
     }
@@ -240,6 +369,29 @@ Modals.Artefacts = (() => {
     // -------------------------------------------------------------------------
     // CRUD operations
     // -------------------------------------------------------------------------
+
+    function _showArtefactSaveFeedback(message) {
+        const modal = document.getElementById('artefact-detail-modal');
+        if (!modal) return;
+        const body = modal.querySelector('.artefact-detail-body');
+        if (!body) return;
+        const prev = body.querySelector('.artefact-save-feedback');
+        if (prev) prev.remove();
+        if (saveFeedbackTimer) {
+            clearTimeout(saveFeedbackTimer);
+            saveFeedbackTimer = null;
+        }
+        const bar = document.createElement('div');
+        bar.className = 'artefact-save-feedback';
+        bar.setAttribute('role', 'status');
+        bar.setAttribute('aria-live', 'polite');
+        bar.textContent = message;
+        body.insertBefore(bar, body.firstChild);
+        saveFeedbackTimer = setTimeout(() => {
+            bar.remove();
+            saveFeedbackTimer = null;
+        }, 4000);
+    }
 
     async function _handleSave() {
         const name = _getField('artefact-detail-name').trim();
@@ -254,9 +406,11 @@ Modals.Artefacts = (() => {
             story: _getField('artefact-detail-story') || null,
         };
 
+        const wasCreating = isCreating;
+
         try {
             let resp;
-            if (isCreating) {
+            if (wasCreating) {
                 resp = await fetch('/artefacts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -280,6 +434,8 @@ Modals.Artefacts = (() => {
             // Enable photo buttons now that artefact exists
             _setPhotoButtonsEnabled(true);
             _populateDetailModal(saved);
+
+            _showArtefactSaveFeedback(wasCreating ? 'Artefact created. You can add attachments below.' : 'Artefact saved.');
 
             // Refresh gallery in background
             _loadArtefacts();
@@ -331,8 +487,8 @@ Modals.Artefacts = (() => {
             _renderPhotoStrip(updated.media_items || []);
             _loadArtefacts();
         } catch (err) {
-            console.error('Error uploading photo:', err);
-            alert(`Error uploading photo: ${err.message}`);
+            console.error('Error uploading file:', err);
+            alert(`Error uploading file: ${err.message}`);
         }
     }
 
@@ -578,6 +734,17 @@ Modals.Artefacts = (() => {
         if (detailModal) {
             detailModal.addEventListener('click', e => {
                 if (e.target === detailModal) _closeDetailModal();
+            });
+        }
+
+        const artefactDocModal = document.getElementById('artefact-document-view-modal');
+        const closeArtefactDocBtn = document.getElementById('close-artefact-document-view');
+        if (closeArtefactDocBtn) {
+            closeArtefactDocBtn.addEventListener('click', _closeArtefactDocumentView);
+        }
+        if (artefactDocModal) {
+            artefactDocModal.addEventListener('click', e => {
+                if (e.target === artefactDocModal) _closeArtefactDocumentView();
             });
         }
 

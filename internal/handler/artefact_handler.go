@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -375,6 +376,10 @@ func (h *ArtefactHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.svc.UploadMedia(r.Context(), id, imageBytes, title, mediaType)
 	if err != nil {
+		if errors.Is(err, service.ErrArtefactUnsupportedMedia) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error uploading media: %s", err))
 		return
 	}

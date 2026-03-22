@@ -711,8 +711,18 @@ Modals.NewImageGallery = (() => {
             DOM.newImageGalleryDetailPane.style.width = `${100 - masterPanePercentage}%`;
         }
 
+        function _syncGalleryPickModeZIndex() {
+            if (!DOM.newImageGalleryModal) return;
+            if (_isPickMode) {
+                DOM.newImageGalleryModal.classList.add('new-image-gallery-pick-mode');
+            } else {
+                DOM.newImageGalleryModal.classList.remove('new-image-gallery-pick-mode');
+            }
+        }
+
         async function open() {
             DOM.newImageGalleryModal.style.display = 'flex';
+            _syncGalleryPickModeZIndex();
             await _setupFilters();
             // Don't load images automatically - wait for user to enter search criteria
             imageData = [];
@@ -818,6 +828,7 @@ Modals.NewImageGallery = (() => {
             selectedImageIndex = -1;
             _isPickMode = false;
             _pickModeCallback = null;
+            _syncGalleryPickModeZIndex();
         }
 
         async function _setupFilters() {

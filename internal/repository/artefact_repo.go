@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/daveontour/digitalmuseum/internal/model"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,7 +31,12 @@ func (r *ArtefactRepo) ListSummaries(ctx context.Context, search, tags string) (
 		        JOIN media_items mi ON mi.id = am.media_item_id
 		        JOIN media_blobs mb ON mb.id = mi.media_blob_id
 		        WHERE am.artefact_id = a.id
-		        ORDER BY am.sort_order LIMIT 1) AS primary_blob_id
+		          AND (
+		            (mb.thumbnail_data IS NOT NULL AND octet_length(mb.thumbnail_data) > 0)
+		            OR (mi.media_type IS NOT NULL AND mi.media_type ILIKE 'image/%')
+		          )
+		        ORDER BY am.sort_order
+		        LIMIT 1) AS primary_blob_id
 		FROM artefacts a`
 	var args []any
 	var conds []string
@@ -94,9 +100,11 @@ func (r *ArtefactRepo) GetByID(ctx context.Context, id int64) (*model.Artefact, 
 // GetMediaItems returns all linked media items for an artefact, ordered by sort_order.
 func (r *ArtefactRepo) GetMediaItems(ctx context.Context, artefactID int64) ([]*model.ArtefactMediaItem, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT am.id, am.media_item_id, mi.media_blob_id, am.sort_order, mi.media_type, mi.title
+		`SELECT am.id, am.media_item_id, mi.media_blob_id, am.sort_order, mi.media_type, mi.title,
+		        COALESCE(octet_length(mb.thumbnail_data), 0)::bigint AS thumb_len
 		 FROM artefact_media am
 		 JOIN media_items mi ON mi.id = am.media_item_id
+		 JOIN media_blobs mb ON mb.id = mi.media_blob_id
 		 WHERE am.artefact_id = $1
 		 ORDER BY am.sort_order`, artefactID)
 	if err != nil {
@@ -107,12 +115,24 @@ func (r *ArtefactRepo) GetMediaItems(ctx context.Context, artefactID int64) ([]*
 	var out []*model.ArtefactMediaItem
 	for rows.Next() {
 		var item model.ArtefactMediaItem
+		var thumbLen int64
 		if err := rows.Scan(&item.ID, &item.MediaItemID, &item.MediaBlobID,
-			&item.SortOrder, &item.MediaType, &item.Title); err != nil {
+			&item.SortOrder, &item.MediaType, &item.Title, &thumbLen); err != nil {
 			return nil, err
 		}
 		if item.MediaBlobID != nil {
-			item.ThumbnailURL = fmt.Sprintf("/images/%d?preview=true&type=blob", *item.MediaBlobID)
+			mt := ""
+			if item.MediaType != nil {
+				mt = strings.ToLower(*item.MediaType)
+				if i := strings.Index(mt, ";"); i >= 0 {
+					mt = strings.TrimSpace(mt[:i])
+				}
+			}
+			if thumbLen > 0 {
+				item.ThumbnailURL = fmt.Sprintf("/images/%d?preview=true&type=blob", *item.MediaBlobID)
+			} else if strings.HasPrefix(mt, "image/") {
+				item.ThumbnailURL = fmt.Sprintf("/images/%d?type=blob", *item.MediaBlobID)
+			}
 		}
 		out = append(out, &item)
 	}
