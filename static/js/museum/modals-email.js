@@ -1,5 +1,29 @@
 'use strict';
 
+/** GET /emails/search returns a JSON array on success, or { detail: string } on error. */
+function coerceEmailSearchResponse(data) {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data.detail === 'string') {
+        console.warn('emails/search:', data.detail);
+        return [];
+    }
+    if (data != null && typeof data === 'object') {
+        console.warn('emails/search: expected array, got object with keys:', Object.keys(data));
+    } else {
+        console.warn('emails/search: expected array, got', typeof data);
+    }
+    return [];
+}
+
+async function parseEmailSearchFetchResponse(response) {
+    const data = await response.json();
+    if (!response.ok) {
+        const detail = data && data.detail ? data.detail : response.statusText;
+        throw new Error(detail);
+    }
+    return data;
+}
+
 // Modals.Suggestions = (() => {
 //         function executeSuggestion(sugg, cat) {
 //             Modals._closeModal(DOM.suggestionsModal);
@@ -418,19 +442,23 @@ Modals.EmailGallery = (() => {
                 // const currentMonth = new Date().getMonth() + 1;
                 // DOM.emailGalleryMonthFilter.value = currentMonth;
                 DOM.emailGalleryMonthFilter.value = 0;
+                const currentMonth = 0;
                 const currentYear = new Date().getFullYear();
                 DOM.emailGalleryYearFilter.value = currentYear;
 
                 try {
                     const params = new URLSearchParams();
                     params.append('year', currentYear);
-                    params.append('month', currentMonth);
-                    
+                    // API rejects month=0 ("All months"); omit month to search the whole year.
+                    if (currentMonth >= 1 && currentMonth <= 12) {
+                        params.append('month', String(currentMonth));
+                    }
+
                     fetch('/emails/search?' + params.toString())
-                    .then(r => r.json())
+                    .then(r => parseEmailSearchFetchResponse(r))
                     .then(data => {
-                        // Transform response to match expected format
-                        emailData = data.map(email => ({
+                        const rows = coerceEmailSearchResponse(data);
+                        emailData = rows.map(email => ({
                             id: email.id,
                             subject: email.subject || 'No Subject',
                             sender: email.from_address || 'Unknown Sender',
@@ -439,7 +467,7 @@ Modals.EmailGallery = (() => {
                             folder: email.folder || 'Unknown Folder',
                             body: email.snippet || 'No content',
                             preview: email.snippet || 'No preview',
-                            attachments: email.attachment_ids.map(id => `/attachments/${id}`),
+                            attachments: (email.attachment_ids || []).map(id => `/attachments/${id}`),
                             emailId: email.id // Store email ID for fetching full content
                         }));
                         _renderEmailList();
@@ -591,11 +619,10 @@ Modals.EmailGallery = (() => {
             hasMoreData = true;
             
             fetch('/emails/search?' + params.toString())
-            .then(r => r.json())
+            .then(r => parseEmailSearchFetchResponse(r))
             .then(data => {
-                // Transform response to match expected format
-            
-                emailData = data.map(email => ({
+                const rows = coerceEmailSearchResponse(data);
+                emailData = rows.map(email => ({
                     id: email.id,
                     subject: email.subject || 'No Subject',
                     sender: email.from_address || 'Unknown Sender',
@@ -604,7 +631,7 @@ Modals.EmailGallery = (() => {
                     folder: email.folder || 'Unknown Folder',
                     body: email.snippet || 'No content',
                     preview: email.snippet || 'No preview',
-                    attachments: email.attachment_ids.map(id => `/attachments/${id}`),
+                    attachments: (email.attachment_ids || []).map(id => `/attachments/${id}`),
                     emailId: email.id // Store email ID for fetching full content
                 }));
                 selectedEmailIndex = -1;
@@ -1305,14 +1332,9 @@ ${textContent}
                 
                 // Load emails with filters matching the email
                 const searchResponse = await fetch('/emails/search?' + params.toString());
-                if (!searchResponse.ok) {
-                    throw new Error(`Failed to search emails: ${searchResponse.status}`);
-                }
-                
-                const data = await searchResponse.json();
-                
-                // Transform response to match expected format
-                emailData = data.map(email => ({
+                const data = await parseEmailSearchFetchResponse(searchResponse);
+                const rows = coerceEmailSearchResponse(data);
+                emailData = rows.map(email => ({
                     id: email.id,
                     subject: email.subject || 'No Subject',
                     sender: email.from_address || 'Unknown Sender',
@@ -1321,7 +1343,7 @@ ${textContent}
                     folder: email.folder || 'Unknown Folder',
                     body: email.snippet || 'No content',
                     preview: email.snippet || 'No preview',
-                    attachments: email.attachment_ids.map(id => `/attachments/${id}`),
+                    attachments: (email.attachment_ids || []).map(id => `/attachments/${id}`),
                     emailId: email.id // Store email ID for fetching full content
                 }));
                 
@@ -1565,9 +1587,10 @@ Modals.EmailEditor = (() => {
 
             _setEmailEditorLoading(true);
             fetch('/emails/search?' + params.toString())
-                .then(r => r.json())
+                .then(r => parseEmailSearchFetchResponse(r))
                 .then(data => {
-                    emailData = data.map(email => ({
+                    const rows = coerceEmailSearchResponse(data);
+                    emailData = rows.map(email => ({
                         id: email.id,
                         subject: email.subject || 'No Subject',
                         sender: email.from_address || 'Unknown Sender',

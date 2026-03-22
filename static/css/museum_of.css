@@ -2130,11 +2130,103 @@ body {
     border-radius: 8px;
 }
 
-/* Data Import: remove accidental debug outlines/borders on inner panels */
+/* Data Import modal: strip borders/outlines on flex + scroll shells (avoids browser dashed focus rings on overflow:auto panes) */
+#data-import-modal .modal-content > div:not(.modal-header),
+#data-import-modal .config-section,
 #data-import-modal .config-section > div {
     border: none !important;
     outline: none !important;
 }
+#data-import-modal .modal-content > div:not(.modal-header):focus,
+#data-import-modal .modal-content > div:not(.modal-header):focus-visible,
+#data-import-modal .config-section:focus,
+#data-import-modal .config-section:focus-visible,
+#data-import-modal .config-section > div:focus,
+#data-import-modal .config-section > div:focus-visible {
+    outline: none !important;
+}
+
+/* Compact import tiles: Data Import modal + Settings → Manage Imported Data */
+.data-import-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    row-gap: 7px;
+    column-gap: 7px;
+}
+.data-import-tiles .import-control-tile {
+    padding: 11px;
+    border-left-width: 2px;
+    border-radius: 5px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.data-import-tiles .import-control-tile::after {
+    top: 10px;
+    right: 10px;
+    font-size: 0.55rem;
+}
+.data-import-tiles .import-control-tile:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
+}
+.data-import-tiles .import-tile-title {
+    font-size: 0.78rem;
+    margin-bottom: 4px;
+    padding-right: 14px;
+    gap: 0.35em;
+}
+.data-import-tiles .import-tile-title i {
+    font-size: 0.95em;
+}
+.data-import-tiles .import-tile-last-run {
+    font-size: 0.62em;
+    margin-bottom: 6px;
+}
+.data-import-tiles .import-tile-explanation {
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+/* Larger viewports: ~40% bigger tiles (both dimensions must meet threshold) */
+@media (min-width: 1400px) and (min-height: 800px) {
+    .data-import-tiles {
+        grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+        row-gap: 10px;
+        column-gap: 10px;
+    }
+    .data-import-tiles .import-control-tile {
+        padding: 15px;
+        border-left-width: 3px;
+        border-radius: 7px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+    }
+    .data-import-tiles .import-control-tile::after {
+        top: 14px;
+        right: 14px;
+        font-size: 0.77rem;
+    }
+    .data-import-tiles .import-control-tile:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 3px 11px rgba(59, 130, 246, 0.14);
+    }
+    .data-import-tiles .import-tile-title {
+        font-size: 1.09rem;
+        margin-bottom: 6px;
+        padding-right: 20px;
+        gap: 0.5em;
+    }
+    .data-import-tiles .import-tile-title i {
+        font-size: 0.95em;
+    }
+    .data-import-tiles .import-tile-last-run {
+        font-size: 0.87em;
+        margin-bottom: 8px;
+    }
+    .data-import-tiles .import-tile-explanation {
+        font-size: 1.01rem;
+        line-height: 1.4;
+    }
+}
+
 .config-section h3 {
     margin-top: 0;
     margin-bottom: 20px;
@@ -2148,7 +2240,44 @@ body {
     border-color: #4a5568 !important;
 }
 .import-controls-status-box .import-controls-status-text {
-    color: #fff !important;
+    color: #60f306 !important;
+}
+
+/* Data Import modal: status + actions as 2×2 grid; column 1 grows */
+.import-controls-footer-grid {
+    margin-top: 15px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    row-gap: 8px;
+    align-items: center;
+}
+
+.import-controls-footer-grid .import-controls-status-label {
+    font-size: 0.95em;
+    font-weight: 600;
+    color: #475569;
+}
+
+.import-controls-footer-grid .import-controls-status-box {
+    min-width: 0;
+    /* width: 100%; */
+}
+
+.import-controls-footer-grid .import-controls-footer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-self: stretch;
+    justify-self: stretch;
+    min-width: 0;
+}
+
+.import-controls-footer-grid .import-controls-footer-actions .import-controls-reset-btn,
+.import-controls-footer-grid .import-controls-footer-actions .import-controls-cancel-btn {
+    width: 100%;
+    white-space: nowrap;
 }
 
 /* Import Controls table - banded rows */
@@ -2229,9 +2358,6 @@ body {
     width: 1.1em;
     text-align: center;
     opacity: 0.85;
-}
-#data-import-modal .import-tile-title {
-    font-size: 1.05rem; /* 50% larger than 1.05rem */
 }
 .import-tile-last-run {
     font-size: 0.85em;
@@ -2569,7 +2695,7 @@ body {
 }
 .modal-btn-primary { background: #4a90e2; color: #fff; }
 .modal-btn-primary:hover { background: #233366; }
-.modal-btn-secondary { background: #eaf1fb; color: #233366; margin-left: 10px; }
+.modal-btn-secondary { background: #eaf1fb; color: #233366; margin-left: 0px; }
 .modal-btn-secondary:hover { background: #d1e2f7; }
 .modal-btn-danger { background: #dc3545; color: #fff; }
 .modal-btn-danger:hover { background: #c82333; }
@@ -3977,6 +4103,7 @@ body {
 
 .email-editor-viewer .container {
     max-width: 100%;
+    min-width: 0;
     margin: 0;
     background: white;
     border-radius: 12px;
@@ -3991,17 +4118,21 @@ body {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 20px;
     flex-shrink: 0;
     padding: 10px 20px;
     background-color: white;
     border-bottom: 1px solid #e9ecef;
+    min-width: 0;
 }
 
 .email-editor-viewer .header {
     padding: 0;
     text-align: left;
-    flex-shrink: 0;
+    flex: 1 1 220px;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .email-editor-title-row {
@@ -4043,15 +4174,78 @@ body {
     margin-bottom: 15px;
 }
 
-/* Search Criteria Pane - aligned to the right of the tab */
+/* Search Criteria Pane - aligned to the right of the tab; must shrink on narrow modals */
 .email-editor-search-pane {
-    flex-shrink: 0;
-    min-width: 655px;
-    max-width: 936px;
-    padding: 1.56em;
+    flex: 1 1 min(360px, 100%);
+    min-width: 0;
+    max-width: min(936px, 100%);
+    width: 100%;
+    box-sizing: border-box;
+    padding: 1.25em;
     background-color: aliceblue;
     border-radius: 8px;
     border: 1px solid #e9ecef;
+}
+
+/* Email Manager: filters and controls stay within the pane when the modal is narrow */
+#email-editor-modal .email-editor-search-pane .email-metadata-filters {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+}
+
+#email-editor-modal .email-editor-search-pane .email-gallery-input,
+#email-editor-modal .email-editor-search-pane .email-gallery-select {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+#email-editor-modal .email-editor-search-pane .email-gallery-filter-row,
+#email-editor-modal .email-editor-search-pane .email-gallery-filter-row-full,
+#email-editor-modal .email-editor-search-pane .email-gallery-search-row {
+    min-width: 0;
+}
+
+#email-editor-modal .email-editor-search-pane .email-gallery-button-row {
+    flex-wrap: wrap;
+    min-width: 0;
+    gap: 0.4em;
+}
+
+#email-editor-modal .email-editor-search-pane .email-gallery-button-row .modal-btn {
+    flex: 1 1 auto;
+    min-width: min(100%, 7rem);
+}
+
+#email-editor-modal #email-editor-bulk-delete-btn {
+    flex: 0 0 auto;
+    min-width: auto;
+    margin-left: auto;
+}
+
+/* Year/month + attachments: two columns then checkbox full-width (avoids 3rd grid cell overflow) */
+#email-editor-modal .email-editor-filter-year-month-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.3em;
+    align-items: center;
+}
+
+#email-editor-modal .email-editor-filter-year-month-row .email-gallery-checkbox-label {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+    .email-editor-header-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .email-editor-search-pane {
+        flex: 1 1 100%;
+        max-width: 100%;
+    }
 }
 
 /* Lower Pane: Email Table */

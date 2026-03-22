@@ -794,8 +794,8 @@
                 <div class="config-tab-content" id="manage-imported-data-tab">
                     <section class="config-section" style="display: flex; flex-direction: column; height: 100%;">
                         <div style="flex: 1; overflow: auto;">
-                            <div class="import-messages-tiles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
-                                <div class="import-control-tile import-data-dialog-tile" data-open-modal="data-import-modal" title="Click to open" style="grid-column: span 2; background-color: rgba(34, 197, 94, 0.15);">
+                            <div class="data-import-tiles">
+                                <div class="import-control-tile import-data-dialog-tile" data-open-modal="data-import-modal" title="Click to open" style="grid-column: 1 / -1; background-color: rgba(34, 197, 94, 0.15);">
                                     <div class="import-tile-title">Import Data</div>
                                     <div class="import-tile-explanation">Open the Data Import dialog to run email, message, social, and image imports.</div>
                                 </div>
@@ -826,11 +826,13 @@
                                 </div>
                             </div>
                         </div>
-                        <div style="margin-top: 15px; display: flex; align-items: stretch; gap: 10px;">
-                            <div class="import-controls-status-box" style="flex: 1; padding: 12px 15px; background-color: #2d3748; border-radius: 6px; border: 1px solid #4a5568; font-size: 0.95em; line-height: 1.5; height: 4.5em; overflow-y: auto; color: #fff;">
-                                <span class="import-controls-status-text" style="color: #fff;">Idle</span>
+                        <div class="import-controls-footer-grid">
+                            <span class="import-controls-status-label">Job Status:</span>
+                            <span></span>
+                            <div class="import-controls-status-box" style="padding: 12px 15px; background-color: #2d3748; border-radius: 6px; border: 1px solid #4a5568; font-size: 0.95em; line-height: 1.5; height: 3.5em; overflow-y: auto; color: #fff;">
+                                <span class="import-controls-status-text">Idle</span>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+                            <div class="import-controls-footer-actions">
                                 <button type="button" class="import-controls-reset-btn modal-btn modal-btn-secondary" title="Reset Import Controls to initial state"><i class="fas fa-undo"></i> Reset</button>
                                 <button type="button" class="import-controls-cancel-btn modal-btn modal-btn-secondary" disabled title="Cancel running import"><i class="fas fa-stop"></i> Cancel</button>
                             </div>
@@ -854,7 +856,7 @@
                     <p style="margin: 0 0 20px 0; font-size: 0.95em; color: #64748b; line-height: 1.4;">Click a tile below to run an import. Each import may prompt for a directory path or other parameters before starting.</p>
                     <section class="config-section" style="display: flex; flex-direction: column; height: 100%; flex: 1;">
                         <div style="flex: 1; overflow: auto;">
-                            <div class="data-import-tiles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); row-gap: 12px; column-gap: 12px;">
+                            <div class="data-import-tiles">
                                 <div class="import-control-tile import-control-tile-master" data-open-modal="master-import-modal" title="Configure and run multiple imports" style="grid-column: 1 / -1; background-color: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35);">
                                     <div class="import-tile-title"><i class="fas fa-layer-group"></i> Master Import</div>
                                     <div class="import-tile-explanation">Choose which import jobs to run, then run them <strong>one after another</strong>. Progress appears in the status area below. Failed jobs do not stop the rest of the queue.</div>
@@ -908,11 +910,13 @@
                                 </div>
                             </div>
                         </div>
-                        <div style="margin-top: 15px; display: flex; align-items: stretch; gap: 10px;">
-                            <div class="import-controls-status-box" style="flex: 1; padding: 12px 15px; background-color: #2d3748; border-radius: 6px; border: 1px solid #4a5568; font-size: 0.95em; line-height: 1.5; height: 4.5em; overflow-y: auto; color: #fff;">
-                                <span class="import-controls-status-text" style="color: #fff;">Idle</span>
+                        <div class="import-controls-footer-grid">
+                            <span class="import-controls-status-label">Job Status:</span>
+                            <span></span>
+                            <div class="import-controls-status-box" style="padding: 12px 15px; background-color: #2d3748; border-radius: 6px; border: 1px solid #4a5568; font-size: 0.95em; line-height: 1.5; height: 3.5em; overflow-y: auto; color: #fff;">
+                                <span class="import-controls-status-text">Idle</span>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+                            <div class="import-controls-footer-actions">
                                 <button type="button" class="import-controls-reset-btn modal-btn modal-btn-secondary" title="Reset Import Controls to initial state"><i class="fas fa-undo"></i> Reset</button>
                                 <button type="button" class="import-controls-cancel-btn modal-btn modal-btn-secondary" disabled title="Cancel running import"><i class="fas fa-stop"></i> Cancel</button>
                             </div>
@@ -1105,7 +1109,7 @@
                                             <div class="email-gallery-filter-row-full">
                                                 <input type="text" id="email-editor-to-from" placeholder="To or From..." class="email-gallery-input">
                                             </div>
-                                            <div class="email-gallery-filter-row">
+                                            <div class="email-gallery-filter-row email-editor-filter-year-month-row">
                                                 <select id="email-editor-year-filter" class="email-gallery-select"></select>
                                                 <select id="email-editor-month-filter" class="email-gallery-select"></select>
                                                 <label class="email-gallery-checkbox-label">
