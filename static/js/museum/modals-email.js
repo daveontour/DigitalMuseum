@@ -1483,10 +1483,20 @@ Modals.EmailEditor = (() => {
             }
             if (DOM.emailEditorOpenEmailsGalleryBtn) {
                 DOM.emailEditorOpenEmailsGalleryBtn.addEventListener('click', () => {
-                    if (DOM.configPage) DOM.configPage.style.display = 'none';
+                    if (typeof Modals !== 'undefined' && Modals.EmailEditor && Modals.EmailEditor.close) {
+                        Modals.EmailEditor.close();
+                    }
                     if (typeof Modals !== 'undefined' && Modals.EmailGallery && Modals.EmailGallery.open) {
                         void Modals.EmailGallery.open();
                     }
+                });
+            }
+            if (DOM.closeEmailEditorModalBtn) {
+                DOM.closeEmailEditorModalBtn.addEventListener('click', () => close());
+            }
+            if (DOM.emailEditorModal) {
+                DOM.emailEditorModal.addEventListener('click', (e) => {
+                    if (e.target === DOM.emailEditorModal) close();
                 });
             }
             _setupFilters();
@@ -1995,21 +2005,8 @@ Modals.EmailEditor = (() => {
         }
 
         function open() {
-            // Show config page and switch to email editor tab
-            if (DOM.configPage) {
-                DOM.configPage.style.display = 'flex';
-                if (DOM.chatMain) DOM.chatMain.style.display = 'none';
-                if (typeof Modals !== 'undefined' && Modals.AppConfig && Modals.AppConfig.load) {
-                    void Modals.AppConfig.load();
-                }
-            }
-            const tabBtn = document.querySelector('.config-tab-button[data-tab="email-editor"]');
-            const tabContent = document.getElementById('email-editor-tab');
-            if (tabBtn && tabContent) {
-                document.querySelectorAll('.config-tab-button').forEach(btn => btn.classList.remove('active'));
-                document.querySelectorAll('.config-tab-content').forEach(c => c.classList.remove('active'));
-                tabBtn.classList.add('active');
-                tabContent.classList.add('active');
+            if (DOM.emailEditorModal) {
+                DOM.emailEditorModal.style.display = 'flex';
             }
             currentPage = 1;
             selectedRowIndex = -1;
@@ -2017,7 +2014,52 @@ Modals.EmailEditor = (() => {
             _updateBulkDeleteButton();
         }
 
-        return { init, open };
+        function close() {
+            if (DOM.emailEditorModal) {
+                DOM.emailEditorModal.style.display = 'none';
+            }
+        }
+
+        return { init, open, close };
+})();
+
+
+Modals.EmailAttachments = (() => {
+        function _triggerGridLoad() {
+            if (typeof loadImages !== 'function') return;
+            setTimeout(() => {
+                const imagesGrid = document.getElementById('images-grid');
+                if (imagesGrid && (imagesGrid.innerHTML === '' || imagesGrid.style.display === 'none')) {
+                    loadImages(1);
+                }
+            }, 100);
+        }
+
+        function open() {
+            if (DOM.emailAttachmentsModal) {
+                DOM.emailAttachmentsModal.style.display = 'flex';
+            }
+            _triggerGridLoad();
+        }
+
+        function close() {
+            if (DOM.emailAttachmentsModal) {
+                DOM.emailAttachmentsModal.style.display = 'none';
+            }
+        }
+
+        function init() {
+            if (DOM.closeEmailAttachmentsModalBtn) {
+                DOM.closeEmailAttachmentsModalBtn.addEventListener('click', () => close());
+            }
+            if (DOM.emailAttachmentsModal) {
+                DOM.emailAttachmentsModal.addEventListener('click', (e) => {
+                    if (e.target === DOM.emailAttachmentsModal) close();
+                });
+            }
+        }
+
+        return { init, open, close };
 })();
 
 

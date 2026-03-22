@@ -1715,14 +1715,13 @@ body {
     display: block;
 }
 
-#images-grid-tab {
+#email-attachments-modal .email-attachments-modal-panel {
     padding: 0;
     overflow: hidden;
-}
-
-#images-grid-tab.active {
+    flex: 1;
     display: flex;
     flex-direction: column;
+    height: 100%;
     min-height: 0;
 }
 
@@ -3938,13 +3937,11 @@ body {
     background-color: #f8fbff;
 }
 
-/* Email Editor Tab Styles (matches images-grid layout) */
-#email-editor-tab {
+/* Email Editor modal panel (matches former config tab layout) */
+#email-editor-modal .email-editor-modal-panel {
     padding: 0;
     overflow: hidden;
-}
-
-#email-editor-tab.active {
+    flex: 1;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -7498,4 +7495,131 @@ body {
     background: #fafafa;
     font-size: 1.05rem;
     line-height: 1.65;
+}
+
+/* Master Import modal */
+.master-import-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.master-import-section {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    background: #f1f5f9;
+}
+
+.master-import-sections > .master-import-section:nth-child(even) {
+    background: beige;
+}
+
+.master-import-section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.master-import-run-label {
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95em;
+    color: #334155;
+}
+
+.master-import-section-title {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.master-import-section-title i {
+    margin-right: 8px;
+    color: #6366f1;
+}
+
+.master-import-section-body {
+    padding-top: 4px;
+}
+
+.master-import-confirm-subheading {
+    margin: 16px 0 8px 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.master-import-confirm-subheading:first-of-type {
+    margin-top: 0;
+}
+
+.master-import-confirm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.master-import-confirm-not-run-list .master-import-confirm-row-static {
+    opacity: 0.85;
+}
+
+.master-import-confirm-empty-note {
+    margin: 0;
+    font-size: 0.9em;
+    color: #94a3b8;
+    font-style: italic;
+    padding: 4px 2px 0 2px;
+}
+
+.master-import-confirm-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.95em;
+    color: #1e293b;
+    margin: 0;
+}
+
+.master-import-confirm-row input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.master-import-confirm-row span {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.master-import-confirm-row-static {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+    font-size: 0.95em;
+    color: #64748b;
+    margin: 0;
+}
+
+.master-import-confirm-row-static span {
+    line-height: 1.4;
 }

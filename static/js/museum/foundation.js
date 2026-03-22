@@ -349,6 +349,10 @@ const DOM = {
     emailEditorSelectAllBtn: document.getElementById('email-editor-select-all-btn'),
     emailEditorOpenEmailsGalleryBtn: document.getElementById('email-editor-open-emails-gallery-btn'),
     emailEditorViewer: document.getElementById('email-editor-viewer'),
+    emailAttachmentsModal: document.getElementById('email-attachments-modal'),
+    closeEmailAttachmentsModalBtn: document.getElementById('close-email-attachments-modal'),
+    emailEditorOpenAttachmentsBtn: document.getElementById('email-editor-open-attachments-btn'),
+    emailAttachmentsOpenEmailManagerBtn: document.getElementById('email-attachments-open-email-manager-btn'),
     // New Image Gallery Elements
     newImageGalleryModal: document.getElementById('new-image-gallery-modal'),
     closeNewImageGalleryModalBtn: document.getElementById('close-new-image-gallery-modal'),

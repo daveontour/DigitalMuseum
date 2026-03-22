@@ -276,22 +276,15 @@
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="custom-voices">
                             <i class="fas fa-microphone-alt"></i> Custom Voices
                         </button>
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-contacts">
+                            <i class="fas fa-address-book"></i> Manage Contacts
+                        </button>
                         <label class="config-tab-label config-sidebar-requires-master" style="margin-left: 10px; font-weight: bold;margin-top: 10px;color:cadetblue">Personal Data</label>
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-imported-data">
                             <i class="fas fa-database"></i> Manage Imported Data
                         </button>
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="interests">
                             <i class="fas fa-star"></i> Interests
-                        </button>
-                        <label class="config-tab-label config-sidebar-requires-master" style="margin-left: 10px; font-weight: bold;margin-top: 10px;;color:cadetblue">Manage Emails & Contacts</label>
-                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="images-grid">
-                            <i class="fas fa-images"></i> Email Attachments
-                        </button>
-                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="email-editor">
-                            <i class="fas fa-edit"></i> Email Editor
-                        </button>
-                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-contacts">
-                            <i class="fas fa-address-book"></i> Manage Contacts
                         </button>
                         <label class="config-tab-label config-sidebar-requires-master" style="margin-left: 10px; font-weight: bold;margin-top: 10px;;color:cadetblue">Manage Secure Data Access</label>
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-keys">
@@ -798,188 +791,6 @@
                         </div>
                     </section>
                 </div>
-                <div class="config-tab-content" id="images-grid-tab">
-                    <div class="images-grid-viewer">
-                        <div class="container">
-                            <div class="header">
-                                <h1>Attachments Viewer</h1>
-                                <p>View and manage attachments (50 per page)</p>
-                            </div>
-                            <div class="content">
-                                <div class="controls">
-                                    <div class="sort-controls">
-                                        <label>
-                                            <input type="checkbox" id="show-all-types-checkbox" onchange="syncTopControls(); changeSortOrder();">
-                                            <span>Show all file types</span>
-                                        </label>
-                                        <label>Sort by:</label>
-                                        <select id="sort-order-select" onchange="syncTopControls(); changeSortOrder();">
-                                            <option value="id">ID</option>
-                                            <option value="size" selected>Size</option>
-                                            <option value="date">Date</option>
-                                        </select>
-                                        <select id="sort-direction-select" onchange="syncTopControls(); changeSortOrder();">
-                                            <option value="asc" selected>Ascending</option>
-                                            <option value="desc">Descending</option>
-                                        </select>
-                                    </div>
-                                    <div class="pagination">
-                                        <button id="prev-page-btn" onclick="previousPage()">Previous</button>
-                                        <span id="page-info">Page 1 of 1</span>
-                                        <button id="next-page-btn" onclick="nextPage()">Next</button>
-                                    </div>
-                                    <button class="select-all-btn" id="select-all-btn" onclick="selectAll()">Select All</button>
-                                    <button class="delete-selected-btn" id="delete-selected-btn" onclick="deleteSelected()" disabled>Delete Selected</button>
-                                </div>
-                                
-                                <div id="images-grid" class="images-grid" style="display: none;"></div>
-                                
-                                <div class="controls" id="bottom-controls">
-                                    <div class="sort-controls">
-                                        <label>
-                                            <input type="checkbox" id="show-all-types-checkbox-bottom" onchange="syncBottomControls(); changeSortOrder();">
-                                            <span>Show all file types</span>
-                                        </label>
-                                        <label>Sort by:</label>
-                                        <select id="sort-order-select-bottom" onchange="syncBottomControls(); changeSortOrder();">
-                                            <option value="id">ID</option>
-                                            <option value="size" selected>Size</option>
-                                            <option value="date">Date</option>
-                                        </select>
-                                        <select id="sort-direction-select-bottom" onchange="syncBottomControls(); changeSortOrder();">
-                                            <option value="asc" selected>Ascending</option>
-                                            <option value="desc">Descending</option>
-                                        </select>
-                                    </div>
-                                    <div class="pagination">
-                                        <button id="prev-page-btn-bottom" onclick="previousPage()">Previous</button>
-                                        <span id="page-info-bottom">Page 1 of 1</span>
-                                        <button id="next-page-btn-bottom" onclick="nextPage()">Next</button>
-                                    </div>
-                                    <button class="select-all-btn" id="select-all-btn-bottom" onclick="selectAll()">Select All</button>
-                                    <button class="delete-selected-btn" id="delete-selected-btn-bottom" onclick="deleteSelected()" disabled>Delete Selected</button>
-                                </div>
-                                
-                                <div id="image-modal" class="image-modal" onclick="closeModal()">
-                                    <span class="close-modal">&times;</span>
-                                    <img class="image-modal-content" id="modal-image" style="display: none;">
-                                    <iframe class="pdf-modal-content" id="modal-pdf" style="display: none;"></iframe>
-                                </div>
-                                
-                                <div id="metadata-modal" class="metadata-modal" onclick="closeMetadataModal(event)">
-                                    <div class="metadata-modal-content" onclick="event.stopPropagation()">
-                                        <span class="close-metadata-modal" onclick="closeMetadataModal(event)">&times;</span>
-                                        <div id="metadata-content"></div>
-                                    </div>
-                                </div>
-                                
-                                <div id="email-modal" class="email-modal" onclick="closeEmailModal(event)">
-                                    <div class="email-modal-content" onclick="event.stopPropagation()">
-                                        <span class="close-email-modal" onclick="closeEmailModal(event)">&times;</span>
-                                        <h2 style="color: #667eea; margin-bottom: 15px;">Email Content</h2>
-                                        <div id="email-metadata-display" style="margin-bottom: 20px;"></div>
-                                        <div id="email-content" class="email-content"></div>
-                                    </div>
-                                </div>
-                                
-                                <div id="loading" class="loading">Loading images...</div>
-                                <div id="error" class="error" style="display: none;"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="config-tab-content" id="email-editor-tab">
-                    <div id="email-editor-viewer" class="email-editor-viewer">
-                        <div class="container">
-                            <div class="email-editor-header-row">
-                                <div class="header">
-                                    <div class="email-editor-title-row">
-                                        <h1>Email Editor</h1>
-                                        <button type="button" id="email-editor-open-emails-gallery-btn" class="modal-btn modal-btn-secondary">
-                                            <i class="fas fa-envelope-open"></i> Open Emails
-                                        </button>
-                                    </div>
-                                    <p><h4>Search and edit email metadata (50 per page)</h4></p>
-                                
-                                    <p>Use the search and filter options to find the email you want to edit.
-                                    <br/>
-                                    Deleting and classifying emails improves the quality of the AI's responses.
-                                    <br/>
-                                    Use the "Use by AI" column to select emails for that can be used the AI to generate responses.
-                                    <br/><br/>
-                                    Use the "Delete" column to delete emails from the database.
-                                    <br/>
-                                    Use the "Personal" and "Business" columns to classify emails as personal or business.
-                                    <br/>
-                                    Use the "Important" column to mark emails as important.</p>
-                                </div>
-                                <div class="email-editor-search-pane">
-                                        <div class="email-metadata-filters">
-                                            <div class="email-gallery-search-row">
-                                                <input type="text" id="email-editor-search" placeholder="Search emails..." class="email-gallery-input">
-                                            </div>
-                                            <div class="email-gallery-filter-row">
-                                                <input type="text" id="email-editor-sender" placeholder="From..." class="email-gallery-input">
-                                                <input type="text" id="email-editor-recipient" placeholder="To..." class="email-gallery-input">
-                                            </div>
-                                            <div class="email-gallery-filter-row-full">
-                                                <input type="text" id="email-editor-to-from" placeholder="To or From..." class="email-gallery-input">
-                                            </div>
-                                            <div class="email-gallery-filter-row">
-                                                <select id="email-editor-year-filter" class="email-gallery-select"></select>
-                                                <select id="email-editor-month-filter" class="email-gallery-select"></select>
-                                                <label class="email-gallery-checkbox-label">
-                                                    <input type="checkbox" id="email-editor-attachments-filter">
-                                                    Attachments
-                                                </label>
-                                            </div>
-                                            <div class="email-gallery-button-row">
-                                                <button id="email-editor-search-btn" class="modal-btn modal-btn-primary">
-                                                    <i class="fas fa-search"></i> Search
-                                                </button>
-                                                <button id="email-editor-clear-btn" class="modal-btn modal-btn-secondary">
-                                                    <i class="fas fa-times"></i> Clear
-                                                </button>
-                                                <button id="email-editor-select-all-btn" class="modal-btn modal-btn-secondary">
-                                                    <i class="fas fa-check-double"></i> Select All
-                                                </button>
-                                                <button id="email-editor-bulk-delete-btn" class="modal-btn modal-btn-danger" style="display: none; margin-left: auto;">
-                                                    <i class="fas fa-trash"></i> Delete Selected
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                            </div>
-                            <div class="content" style="padding-bottom: 0px;">
-                                <div class="email-editor-table-pane">
-                                    <div class="email-editor-table-container">
-                                        <table class="email-editor-table">
-                                            <thead>
-                                                <tr>
-                                                    <th class="email-editor-col-subject">Subject</th>
-                                                    <th class="email-editor-col-from">From</th>
-                                                    <th class="email-editor-col-to">To</th>
-                                                    <th class="email-editor-col-date">Date</th>
-                                                    <th class="email-editor-col-personal">Personal</th>
-                                                    <th class="email-editor-col-business">Business</th>
-                                                    <th class="email-editor-col-important">Important</th>
-                                                    <th class="email-editor-col-use-by-ai">Use by AI</th>
-                                                    <th class="email-editor-col-delete">Delete</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="email-editor-table-body">
-                                                <!-- Email rows will be inserted here -->
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="email-editor-pagination" id="email-editor-pagination">
-                                        <!-- Pagination controls will be inserted here -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <div class="config-tab-content" id="manage-imported-data-tab">
                     <section class="config-section" style="display: flex; flex-direction: column; height: 100%;">
                         <div style="flex: 1; overflow: auto;">
@@ -1044,6 +855,10 @@
                     <section class="config-section" style="display: flex; flex-direction: column; height: 100%; flex: 1;">
                         <div style="flex: 1; overflow: auto;">
                             <div class="data-import-tiles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); row-gap: 12px; column-gap: 12px;">
+                                <div class="import-control-tile import-control-tile-master" data-open-modal="master-import-modal" title="Configure and run multiple imports" style="grid-column: 1 / -1; background-color: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35);">
+                                    <div class="import-tile-title"><i class="fas fa-layer-group"></i> Master Import</div>
+                                    <div class="import-tile-explanation">Choose which import jobs to run, then run them <strong>one after another</strong>. Progress appears in the status area below. Failed jobs do not stop the rest of the queue.</div>
+                                </div>
                                 <div class="import-control-tile" data-import="email_processing" title="Click to run">
                                     <div class="import-tile-title"><i class="fas fa-envelope"></i> Emails from GMail</div>
                                     <div data-import-last-run="email_processing" class="import-tile-last-run"></div>
@@ -1103,6 +918,49 @@
                             </div>
                         </div>
                     </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- Master Import (opened from Data Import modal) -->
+        <div id="master-import-modal" class="modal" style="display: none; position: fixed; z-index: 4100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+            <div class="modal-content master-import-modal-content" style="max-width: 720px; width: 92vw; max-height: 90vh; padding: 0; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2>Master Import</h2>
+                    <button type="button" class="modal-close-btn" id="close-master-import-modal" aria-label="Close">&times;</button>
+                </div>
+                <div class="master-import-modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1; min-height: 0;">
+                    <p style="margin: 0 0 12px 0; font-size: 0.95em; color: #475569; line-height: 1.45;">Check each import you want to run. Jobs execute in <strong>top-to-bottom order</strong> among checked items only. Use the Data Import dialog’s status area and Cancel button for the job that is currently running.</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">
+                        <button type="button" id="master-import-select-all-btn" class="modal-btn modal-btn-secondary" style="font-size: 0.9em;">Select all</button>
+                        <button type="button" id="master-import-clear-all-btn" class="modal-btn modal-btn-secondary" style="font-size: 0.9em;">Clear all</button>
+                    </div>
+                    <div id="master-import-sections" class="master-import-sections"></div>
+                </div>
+                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; background: #f8fafc;">
+                    <button type="button" id="master-import-cancel-footer-btn" class="modal-btn modal-btn-secondary">Cancel</button>
+                    <button type="button" id="master-import-run-selected-btn" class="modal-btn modal-btn-primary"><i class="fas fa-play"></i> Execute selected</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Master Import: confirm which queued jobs to run (above master-import-modal, z-index 4200) -->
+        <div id="master-import-confirm-modal" class="modal" style="display: none; position: fixed; z-index: 4200; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.55); justify-content: center; align-items: center;">
+            <div class="modal-content master-import-confirm-modal-content" style="max-width: 480px; width: 92vw; max-height: 85vh; padding: 0; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2>Confirm Imports</h2>
+                    <button type="button" class="modal-close-btn" id="close-master-import-confirm-modal" aria-label="Close">&times;</button>
+                </div>
+                <div style="padding: 16px 20px; overflow-y: auto; flex: 1; min-height: 0;">
+                    <p style="margin: 0 0 14px 0; font-size: 0.95em; color: #475569; line-height: 1.45;">Imports you left unchecked in Master Import are listed below as not in this batch. For the batch, uncheck any job you do not want to run now; execution order is top to bottom.</p>
+                    <h3 class="master-import-confirm-subheading">In this batch</h3>
+                    <div id="master-import-confirm-will-run" class="master-import-confirm-list" role="list"></div>
+                    <h3 class="master-import-confirm-subheading">Not in this batch</h3>
+                    <div id="master-import-confirm-not-run" class="master-import-confirm-list master-import-confirm-not-run-list" role="list"></div>
+                </div>
+                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; background: #f8fafc;">
+                    <button type="button" id="master-import-confirm-cancel-btn" class="modal-btn modal-btn-secondary">Back</button>
+                    <button type="button" id="master-import-confirm-execute-btn" class="modal-btn modal-btn-primary"><i class="fas fa-play"></i> Execute</button>
                 </div>
             </div>
         </div>
@@ -1197,6 +1055,214 @@
                             <div id="stats-dashboard-images-by-region-chart" style="margin-top: 24px;"></div>
                         </div>
                     </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Editor (standalone; opened from Emails gallery "Manage Emails") -->
+        <div id="email-editor-modal" class="modal" style="display: none; position: fixed; z-index: 4100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+            <div class="modal-content email-gallery-modal-content" style="overflow: hidden;" onclick="event.stopPropagation()">
+                <div class="modal-header email-gallery-modal-header">
+                    <h2>Email Manager</h2>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                        <button type="button" id="email-editor-open-emails-gallery-btn" class="modal-btn modal-btn-secondary">
+                            <i class="fas fa-envelope-open"></i> View Emails
+                        </button>
+                        <button type="button" id="email-editor-open-attachments-btn" class="modal-btn modal-btn-secondary">
+                            <i class="fas fa-images"></i> Email Attachments
+                        </button>
+                        <button type="button" class="modal-close-btn" id="close-email-editor-modal" aria-label="Close">&times;</button>
+                    </div>
+                </div>
+                <div class="email-editor-modal-panel">
+                    <div id="email-editor-viewer" class="email-editor-viewer">
+                        <div class="container">
+                            <div class="email-editor-header-row">
+                                <div class="header">
+                                    <p><h4>Search and edit email metadata (50 per page)</h4></p>
+                                
+                                    <p>Use the search and filter options to find the email you want to edit.
+                                    <br/>
+                                    Deleting and classifying emails improves the quality of the AI's responses.
+                                    <br/>
+                                    Use the "Use by AI" column to select emails for that can be used the AI to generate responses.
+                                    <br/><br/>
+                                    Use the "Delete" column to delete emails from the database.
+                                    <br/>
+                                    Use the "Personal" and "Business" columns to classify emails as personal or business.
+                                    <br/>
+                                    Use the "Important" column to mark emails as important.</p>
+                                </div>
+                                <div class="email-editor-search-pane">
+                                        <div class="email-metadata-filters">
+                                            <div class="email-gallery-search-row">
+                                                <input type="text" id="email-editor-search" placeholder="Search emails..." class="email-gallery-input">
+                                            </div>
+                                            <div class="email-gallery-filter-row">
+                                                <input type="text" id="email-editor-sender" placeholder="From..." class="email-gallery-input">
+                                                <input type="text" id="email-editor-recipient" placeholder="To..." class="email-gallery-input">
+                                            </div>
+                                            <div class="email-gallery-filter-row-full">
+                                                <input type="text" id="email-editor-to-from" placeholder="To or From..." class="email-gallery-input">
+                                            </div>
+                                            <div class="email-gallery-filter-row">
+                                                <select id="email-editor-year-filter" class="email-gallery-select"></select>
+                                                <select id="email-editor-month-filter" class="email-gallery-select"></select>
+                                                <label class="email-gallery-checkbox-label">
+                                                    <input type="checkbox" id="email-editor-attachments-filter">
+                                                    Attachments
+                                                </label>
+                                            </div>
+                                            <div class="email-gallery-button-row">
+                                                <button id="email-editor-search-btn" class="modal-btn modal-btn-primary">
+                                                    <i class="fas fa-search"></i> Search
+                                                </button>
+                                                <button id="email-editor-clear-btn" class="modal-btn modal-btn-secondary">
+                                                    <i class="fas fa-times"></i> Clear
+                                                </button>
+                                                <button id="email-editor-select-all-btn" class="modal-btn modal-btn-secondary">
+                                                    <i class="fas fa-check-double"></i> Select All
+                                                </button>
+                                                <button id="email-editor-bulk-delete-btn" class="modal-btn modal-btn-danger" style="display: none; margin-left: auto;">
+                                                    <i class="fas fa-trash"></i> Delete Selected
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                            </div>
+                            <div class="content" style="padding-bottom: 0px;">
+                                <div class="email-editor-table-pane">
+                                    <div class="email-editor-table-container">
+                                        <table class="email-editor-table">
+                                            <thead>
+                                                <tr>
+                                                    <th class="email-editor-col-subject">Subject</th>
+                                                    <th class="email-editor-col-from">From</th>
+                                                    <th class="email-editor-col-to">To</th>
+                                                    <th class="email-editor-col-date">Date</th>
+                                                    <th class="email-editor-col-personal">Personal</th>
+                                                    <th class="email-editor-col-business">Business</th>
+                                                    <th class="email-editor-col-important">Important</th>
+                                                    <th class="email-editor-col-use-by-ai">Use by AI</th>
+                                                    <th class="email-editor-col-delete">Delete</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="email-editor-table-body">
+                                                <!-- Email rows will be inserted here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="email-editor-pagination" id="email-editor-pagination">
+                                        <!-- Pagination controls will be inserted here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Attachments (attachments grid; opened from Email Manager header) -->
+        <div id="email-attachments-modal" class="modal" style="display: none; position: fixed; z-index: 4100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+            <div class="modal-content email-gallery-modal-content" style="overflow: hidden;" onclick="event.stopPropagation()">
+                <div class="modal-header email-gallery-modal-header">
+                    <h2>Email Attachments</h2>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                        <button type="button" id="email-attachments-open-email-manager-btn" class="modal-btn modal-btn-secondary">
+                            <i class="fas fa-envelope"></i> Email Manager
+                        </button>
+                        <button type="button" class="modal-close-btn" id="close-email-attachments-modal" aria-label="Close">&times;</button>
+                    </div>
+                </div>
+                <div class="email-attachments-modal-panel">
+                    <div class="images-grid-viewer">
+                        <div class="container">
+                            <div class="header">
+                                <p>View and manage attachments (50 per page)</p>
+                            </div>
+                            <div class="content">
+                                <div class="controls">
+                                    <div class="sort-controls">
+                                        <label>
+                                            <input type="checkbox" id="show-all-types-checkbox" onchange="syncTopControls(); changeSortOrder();">
+                                            <span>Show all file types</span>
+                                        </label>
+                                        <label>Sort by:</label>
+                                        <select id="sort-order-select" onchange="syncTopControls(); changeSortOrder();">
+                                            <option value="id">ID</option>
+                                            <option value="size" selected>Size</option>
+                                            <option value="date">Date</option>
+                                        </select>
+                                        <select id="sort-direction-select" onchange="syncTopControls(); changeSortOrder();">
+                                            <option value="asc" selected>Ascending</option>
+                                            <option value="desc">Descending</option>
+                                        </select>
+                                    </div>
+                                    <div class="pagination">
+                                        <button id="prev-page-btn" onclick="previousPage()">Previous</button>
+                                        <span id="page-info">Page 1 of 1</span>
+                                        <button id="next-page-btn" onclick="nextPage()">Next</button>
+                                    </div>
+                                    <button class="select-all-btn" id="select-all-btn" onclick="selectAll()">Select All</button>
+                                    <button class="delete-selected-btn" id="delete-selected-btn" onclick="deleteSelected()" disabled>Delete Selected</button>
+                                </div>
+                                
+                                <div id="images-grid" class="images-grid" style="display: none;"></div>
+                                
+                                <div class="controls" id="bottom-controls">
+                                    <div class="sort-controls">
+                                        <label>
+                                            <input type="checkbox" id="show-all-types-checkbox-bottom" onchange="syncBottomControls(); changeSortOrder();">
+                                            <span>Show all file types</span>
+                                        </label>
+                                        <label>Sort by:</label>
+                                        <select id="sort-order-select-bottom" onchange="syncBottomControls(); changeSortOrder();">
+                                            <option value="id">ID</option>
+                                            <option value="size" selected>Size</option>
+                                            <option value="date">Date</option>
+                                        </select>
+                                        <select id="sort-direction-select-bottom" onchange="syncBottomControls(); changeSortOrder();">
+                                            <option value="asc" selected>Ascending</option>
+                                            <option value="desc">Descending</option>
+                                        </select>
+                                    </div>
+                                    <div class="pagination">
+                                        <button id="prev-page-btn-bottom" onclick="previousPage()">Previous</button>
+                                        <span id="page-info-bottom">Page 1 of 1</span>
+                                        <button id="next-page-btn-bottom" onclick="nextPage()">Next</button>
+                                    </div>
+                                    <button class="select-all-btn" id="select-all-btn-bottom" onclick="selectAll()">Select All</button>
+                                    <button class="delete-selected-btn" id="delete-selected-btn-bottom" onclick="deleteSelected()" disabled>Delete Selected</button>
+                                </div>
+                                
+                                <div id="image-modal" class="image-modal" onclick="closeModal()">
+                                    <span class="close-modal">&times;</span>
+                                    <img class="image-modal-content" id="modal-image" style="display: none;">
+                                    <iframe class="pdf-modal-content" id="modal-pdf" style="display: none;"></iframe>
+                                </div>
+                                
+                                <div id="metadata-modal" class="metadata-modal" onclick="closeMetadataModal(event)">
+                                    <div class="metadata-modal-content" onclick="event.stopPropagation()">
+                                        <span class="close-metadata-modal" onclick="closeMetadataModal(event)">&times;</span>
+                                        <div id="metadata-content"></div>
+                                    </div>
+                                </div>
+                                
+                                <div id="email-modal" class="email-modal" onclick="closeEmailModal(event)">
+                                    <div class="email-modal-content" onclick="event.stopPropagation()">
+                                        <span class="close-email-modal" onclick="closeEmailModal(event)">&times;</span>
+                                        <h2 style="color: #667eea; margin-bottom: 15px;">Email Content</h2>
+                                        <div id="email-metadata-display" style="margin-bottom: 20px;"></div>
+                                        <div id="email-content" class="email-content"></div>
+                                    </div>
+                                </div>
+                                
+                                <div id="loading" class="loading">Loading images...</div>
+                                <div id="error" class="error" style="display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

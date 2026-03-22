@@ -525,37 +525,3 @@ function formatBytes(bytes) {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
-// Initialize images grid when tab is opened
-function initImagesGrid() {
-    // Check if images grid elements exist
-    const imagesGrid = document.getElementById('images-grid');
-    if (imagesGrid && imagesGrid.style.display !== 'none') {
-        // Only load if not already loaded or if grid is empty
-        if (currentPage === 1 && imagesGrid.innerHTML === '') {
-            loadImages(1);
-        }
-    }
-}
-
-// Load initial page only if images-grid-tab is active
-document.addEventListener('DOMContentLoaded', function() {
-    // Check if images-grid-tab is active on page load
-    const imagesGridTab = document.getElementById('images-grid-tab');
-    if (imagesGridTab && imagesGridTab.classList.contains('active')) {
-        loadImages(1);
-    }
-    
-    // Listen for tab changes
-    const tabButtons = document.querySelectorAll('.config-tab-button');
-    tabButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const targetTab = this.getAttribute('data-tab');
-            if (targetTab === 'images-grid') {
-                // Small delay to ensure tab is visible
-                setTimeout(() => {
-                    initImagesGrid();
-                }, 100);
-            }
-        });
-    });
-});

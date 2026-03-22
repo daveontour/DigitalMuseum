@@ -2307,6 +2307,7 @@ Modals.initAll = () => {
         // Modals.ImageGallery.init();
         Modals.EmailGallery.init();
         Modals.EmailEditor.init();
+        if (Modals.EmailAttachments && Modals.EmailAttachments.init) Modals.EmailAttachments.init();
         Modals.NewImageGallery.init();
         Modals.SMSMessages.init();
         Modals.SingleImageDisplay.init();
@@ -2350,6 +2351,10 @@ Modals.closeAll = () => {
         try {
             if (Modals.EmailEditor && Modals.EmailEditor.close) Modals.EmailEditor.close();
         } catch (e) { console.debug('Error closing EmailEditor modal:', e); }
+        
+        try {
+            if (Modals.EmailAttachments && Modals.EmailAttachments.close) Modals.EmailAttachments.close();
+        } catch (e) { console.debug('Error closing EmailAttachments modal:', e); }
         
         try {
             if (Modals.NewImageGallery && Modals.NewImageGallery.close) Modals.NewImageGallery.close();

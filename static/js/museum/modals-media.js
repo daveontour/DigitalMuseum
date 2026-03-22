@@ -1714,6 +1714,7 @@ Modals.ImageDetailModal = (() => {
                     // Handle email-attachment source
                     if (sourceValue.toLowerCase() === 'email_attachment' || sourceValue.toLowerCase() === 'gmail_attachment' || sourceValue.toLowerCase() === 'email') {
                         if (image.source_reference) {
+                            Modals.NewImageGallery.close();
                             const emailId = parseInt(image.source_reference);
                             if (!isNaN(emailId)) {
                                 // Open email gallery and select the email
