@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"time"
 
@@ -192,9 +193,10 @@ func (h *GmailHandler) GetLabels(w http.ResponseWriter, r *http.Request) {
 // ── Import job ────────────────────────────────────────────────────────────────
 
 type gmailProcessRequest struct {
-	LabelIDs  []string `json:"label_ids"`
-	AllLabels bool     `json:"all_labels"`
-	NewOnly   bool     `json:"new_only"`
+	LabelIDs      []string `json:"label_ids"`
+	AllLabels     bool     `json:"all_labels"`
+	ExcludeLabels []string `json:"exclude_labels"`
+	NewOnly       bool     `json:"new_only"`
 }
 
 // StartProcess handles POST /gmail/process
@@ -248,6 +250,28 @@ func (h *GmailHandler) StartProcess(w http.ResponseWriter, r *http.Request) {
 		if len(labelIDs) == 0 {
 			labelIDs = []string{"INBOX"}
 		}
+	}
+
+	if len(req.ExcludeLabels) > 0 {
+		filtered := make([]string, 0, len(labelIDs))
+		for _, id := range labelIDs {
+			name := labelMap[id]
+			excluded := false
+			for _, pattern := range req.ExcludeLabels {
+				re, err := regexp.Compile(pattern)
+				if err != nil {
+					continue
+				}
+				if re.MatchString(name) || re.MatchString(id) {
+					excluded = true
+					break
+				}
+			}
+			if !excluded {
+				filtered = append(filtered, id)
+			}
+		}
+		labelIDs = filtered
 	}
 
 	go h.runGmailImport(tok, labelIDs, labelMap, req.NewOnly)

@@ -1,8 +1,9 @@
-.PHONY: build test generate lint run clean tidy
+.PHONY: build build-exe build-launcher build-runner test generate lint run run-runner clean tidy
 
 MODULE := github.com/daveontour/digitalmuseum
 BINARY := digitalmuseum
 CMD     := ./cmd/server
+RUNNER  := ./cmd/runner
 
 build:
 	go build -o bin/$(BINARY) $(CMD)
@@ -13,8 +14,14 @@ build-exe:
 build-launcher:
 	go build -buildvcs=false -ldflags="-H windowsgui" -o launcher.exe ./cmd/launcher
 
+build-runner:
+	go build -o runner.exe $(RUNNER)
+
 run:
 	go run $(CMD)
+
+run-runner:
+	go run $(RUNNER) -config runner.json
 
 test:
 	go test ./...

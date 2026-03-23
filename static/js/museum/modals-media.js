@@ -565,8 +565,7 @@ Modals.NewImageGallery = (() => {
                 DOM.newImageGalleryRating,
                 DOM.newImageGalleryRatingMin,
                 DOM.newImageGalleryRatingMax,
-                DOM.newImageGalleryHasGps,
-                DOM.newImageGalleryProcessed
+                DOM.newImageGalleryHasGps
             ];
 
             filterInputs.forEach(input => {
@@ -958,9 +957,6 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryHasGps && DOM.newImageGalleryHasGps.checked) {
                 params.append('has_gps', 'true');
             }
-            if (DOM.newImageGalleryProcessed && DOM.newImageGalleryProcessed.checked) {
-                params.append('processed', 'true');
-            }
 
             try {
                 const response = await fetch('/images/search?' + params.toString());
@@ -1013,8 +1009,7 @@ Modals.NewImageGallery = (() => {
                 (DOM.newImageGalleryRating && DOM.newImageGalleryRating.value) ||
                 (DOM.newImageGalleryRatingMin && DOM.newImageGalleryRatingMin.value) ||
                 (DOM.newImageGalleryRatingMax && DOM.newImageGalleryRatingMax.value) ||
-                (DOM.newImageGalleryHasGps && DOM.newImageGalleryHasGps.checked) ||
-                (DOM.newImageGalleryProcessed && DOM.newImageGalleryProcessed.checked)
+                (DOM.newImageGalleryHasGps && DOM.newImageGalleryHasGps.checked)
             );
         }
 
@@ -1376,7 +1371,6 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryRatingMin) DOM.newImageGalleryRatingMin.value = '';
             if (DOM.newImageGalleryRatingMax) DOM.newImageGalleryRatingMax.value = '';
             if (DOM.newImageGalleryHasGps) DOM.newImageGalleryHasGps.checked = false;
-            if (DOM.newImageGalleryProcessed) DOM.newImageGalleryProcessed.checked = false;
             
             selectedImageIndex = -1;
             selectedImageIds.clear();

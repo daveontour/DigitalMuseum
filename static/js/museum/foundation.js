@@ -367,7 +367,6 @@ const DOM = {
     newImageGalleryRatingMin: document.getElementById('new-image-gallery-rating-min'),
     newImageGalleryRatingMax: document.getElementById('new-image-gallery-rating-max'),
     newImageGalleryHasGps: document.getElementById('new-image-gallery-has-gps'),
-    newImageGalleryProcessed: document.getElementById('new-image-gallery-processed'),
     newImageGallerySearchBtn: document.getElementById('new-image-gallery-search-btn'),
     newImageGalleryClearBtn: document.getElementById('new-image-gallery-clear-btn'),
     newImageGalleryThumbnailGrid: document.getElementById('new-image-gallery-thumbnail-grid'),

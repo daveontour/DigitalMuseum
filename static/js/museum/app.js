@@ -1521,6 +1521,8 @@ const App = (() => {
             authLink: 'gmail-auth-link',
             importControls: 'gmail-import-controls',
             allLabels: 'import-modal-email-all-labels',
+            excludeLabelsWrap: 'import-modal-email-exclude-labels-wrap',
+            excludeLabels: 'import-modal-email-exclude-labels',
             labelsWrap: 'import-modal-email-labels-wrap',
             labelsSelect: 'import-modal-email-labels',
             newOnly: 'import-modal-email-new-only'
@@ -1532,6 +1534,8 @@ const App = (() => {
             authLink: 'mi-gmail-auth-link',
             importControls: 'mi-gmail-import-controls',
             allLabels: 'mi-gmail-all-labels',
+            excludeLabelsWrap: 'mi-gmail-exclude-labels-wrap',
+            excludeLabels: 'mi-gmail-exclude-labels',
             labelsWrap: 'mi-gmail-labels-wrap',
             labelsSelect: 'mi-gmail-labels',
             newOnly: 'mi-gmail-new-only'
@@ -1549,6 +1553,11 @@ const App = (() => {
                             <input type="checkbox" id="${ids.allLabels}" style="cursor: pointer;">
                             <span>Process All Labels</span>
                         </label>
+                    </div>
+                    <div id="${ids.excludeLabelsWrap}" class="setting-group" style="margin-bottom: 15px; display: none;">
+                        <label for="${ids.excludeLabels}" style="display: block; margin-bottom: 5px; font-weight: 500;">Exclude Labels (one regex per line)</label>
+                        <textarea id="${ids.excludeLabels}" rows="4" placeholder="e.g.&#10;^Spam$&#10;^Trash.*&#10;.*Promotions.*" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-family: monospace; font-size: 0.9em; resize: vertical; box-sizing: border-box;"></textarea>
+                        <small style="color: #666; margin-top: 4px; display: block;">Labels matching any pattern will be skipped.</small>
                     </div>
                     <div id="${ids.labelsWrap}" class="setting-group" style="margin-bottom: 15px;">
                         <label for="${ids.labelsSelect}" style="display: block; margin-bottom: 5px; font-weight: 500;">Select Labels</label>
@@ -1602,6 +1611,11 @@ const App = (() => {
                         <span>Process All Folders</span>
                     </label>
                 </div>
+                <div id="${ids.excludeFoldersWrap}" class="setting-group" style="margin-bottom: 15px; display: none;">
+                    <label for="${ids.excludeFolders}" style="display: block; margin-bottom: 5px; font-weight: 500;">Exclude Folders (one regex per line)</label>
+                    <textarea id="${ids.excludeFolders}" rows="4" placeholder="e.g.&#10;^Spam$&#10;^Trash&#10;.*Junk.*" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-family: monospace; font-size: 0.9em; resize: vertical; box-sizing: border-box;"></textarea>
+                    <small style="color: #666; margin-top: 4px; display: block;">Folders matching any pattern will be skipped.</small>
+                </div>
                 <div id="${ids.foldersWrap}" class="setting-group" style="margin-bottom: 15px; display: none;">
                     <label for="${ids.foldersSelect}" style="display: block; margin-bottom: 5px; font-weight: 500;">Select Folders</label>
                     <select id="${ids.foldersSelect}" multiple style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; min-height: 120px;"></select>
@@ -1624,6 +1638,8 @@ const App = (() => {
             fetchBtn: 'imap-modal-fetch-folders',
             fetchStatus: 'imap-modal-fetch-status',
             allFolders: 'imap-modal-all-folders',
+            excludeFoldersWrap: 'imap-modal-exclude-folders-wrap',
+            excludeFolders: 'imap-modal-exclude-folders',
             foldersWrap: 'imap-modal-folders-wrap',
             foldersSelect: 'imap-modal-folders',
             newOnly: 'imap-modal-new-only'
@@ -1638,6 +1654,8 @@ const App = (() => {
             fetchBtn: 'mi-imap-fetch-folders',
             fetchStatus: 'mi-imap-fetch-status',
             allFolders: 'mi-imap-all-folders',
+            excludeFoldersWrap: 'mi-imap-exclude-folders-wrap',
+            excludeFolders: 'mi-imap-exclude-folders',
             foldersWrap: 'mi-imap-folders-wrap',
             foldersSelect: 'mi-imap-folders',
             newOnly: 'mi-imap-new-only'
@@ -1787,7 +1805,7 @@ const App = (() => {
         }
 
         const importConfigs = {
-            email_processing: { needsInput: true, title: 'Email Processing (Gmail)', run: async (vals) => { const body = { all_labels: vals.all_folders || false, label_ids: vals.all_folders ? [] : (vals.label_ids || []), new_only: vals.new_only || false }; const r = await fetch('/gmail/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/gmail/process/stream' },
+            email_processing: { needsInput: true, title: 'Email Processing (Gmail)', run: async (vals) => { const body = { all_labels: vals.all_folders || false, label_ids: vals.all_folders ? [] : (vals.label_ids || []), new_only: vals.new_only || false, exclude_labels: vals.exclude_labels || [] }; const r = await fetch('/gmail/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/gmail/process/stream' },
             whatsapp: { needsInput: true, title: 'WhatsApp Import', fields: [{ id: 'directory_path', key: 'whatsapp_import_directory', label: 'WhatsApp Export Directory', placeholder: 'e.g., C:\\iMazingBackup\\WhatsApp', required: true }], run: async (vals) => { const r = await fetch('/whatsapp/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ directory_path: vals.directory_path }) }); return r; }, stream: '/whatsapp/import/stream' },
             facebook: { needsInput: true, title: 'Facebook Messenger Import', fields: [{ id: 'directory_path', key: 'facebook_import_directory', label: 'Export Directory', placeholder: 'e.g., G:\\My Drive\\meta-2026-Jan-11\\your_facebook_activity\\messages\\e2ee_cutover', required: true }, { id: 'user_name', key: 'facebook_user_name', label: 'Your Name (Optional)', placeholder: 'e.g., Dave Burton', required: false }], run: async (vals) => { const r = await fetch('/facebook/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ directory_path: vals.directory_path, user_name: vals.user_name || null }) }); return r; }, stream: '/facebook/import/stream' },
             instagram: { needsInput: true, title: 'Instagram Import', fields: [{ id: 'directory_path', key: 'instagram_import_directory', label: 'Export Directory', placeholder: 'e.g., G:\\My Drive\\meta-2026-Jan-11\\your_instagram_activity\\messages\\inbox', required: true }, { id: 'user_name', key: 'instagram_user_name', label: 'Your Name (Optional)', placeholder: 'e.g., Dave Burton', required: false }], run: async (vals) => { const r = await fetch('/instagram/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ directory_path: vals.directory_path, user_name: vals.user_name || null }) }); return r; }, stream: '/instagram/import/stream' },
@@ -1802,7 +1820,7 @@ const App = (() => {
             thumbnails: { needsInput: false, title: 'Image Processing', run: async () => { const r = await fetch('/images/process-thumbnails', { method: 'POST' }); return r; }, stream: '/images/process-thumbnails/stream' },
             thumbnails_async: { needsInput: false, title: 'Image Processing (Async)', run: async () => { const r = await fetch('/images/process-thumbnails/async', { method: 'POST' }); return r; }, stream: null },
             contacts: { needsInput: false, title: 'Contacts Merge', run: async () => { const r = await fetch('/contacts/extract', { method: 'POST' }); return r; }, stream: '/contacts/extract/stream' },
-            imap_processing: { needsInput: true, title: 'IMAP Import', run: async (vals) => { const body = { host: vals.host, port: vals.port, username: vals.username, password: vals.password, use_ssl: vals.use_ssl !== false, all_folders: vals.all_folders || false, folders: vals.folders && vals.folders.length ? vals.folders : (vals.all_folders ? [] : ['INBOX']), new_only: vals.new_only || false }; return await fetch('/imap/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }, stream: '/imap/process/stream' }
+            imap_processing: { needsInput: true, title: 'IMAP Import', run: async (vals) => { const body = { host: vals.host, port: vals.port, username: vals.username, password: vals.password, use_ssl: vals.use_ssl !== false, all_folders: vals.all_folders || false, folders: vals.folders && vals.folders.length ? vals.folders : (vals.all_folders ? [] : ['INBOX']), new_only: vals.new_only || false, exclude_folders: vals.exclude_folders || [] }; return await fetch('/imap/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }, stream: '/imap/process/stream' }
         };
 
         async function wireGmailImportForm(ids, submitButtonHook) {
@@ -1810,6 +1828,8 @@ const App = (() => {
             const authLink = document.getElementById(ids.authLink);
             const importControls = document.getElementById(ids.importControls);
             const allLabelsCb = document.getElementById(ids.allLabels);
+            const excludeLabelsWrap = document.getElementById(ids.excludeLabelsWrap);
+            const excludeLabelsEl = document.getElementById(ids.excludeLabels);
             const labelsWrap = document.getElementById(ids.labelsWrap);
             const labelsSelect = document.getElementById(ids.labelsSelect);
             const newOnlyCb = document.getElementById(ids.newOnly);
@@ -1818,7 +1838,8 @@ const App = (() => {
                 const all_folders = allLabelsCb ? allLabelsCb.checked : false;
                 const label_ids = all_folders ? [] : Array.from(labelsSelect.selectedOptions).map(o => o.value).filter(Boolean);
                 const new_only = newOnlyCb ? newOnlyCb.checked : true;
-                return { all_folders, label_ids, new_only };
+                const exclude_labels = (all_folders && excludeLabelsEl) ? excludeLabelsEl.value.split('\n').map(s => s.trim()).filter(Boolean) : [];
+                return { all_folders, label_ids, new_only, exclude_labels };
             }
 
             function validateGmail() {
@@ -1848,7 +1869,11 @@ const App = (() => {
                     allLabelsCb.checked = !!allLabelsVal;
                     newOnlyCb.checked = !!newOnlyVal;
                     labelsWrap.style.display = allLabelsCb.checked ? 'none' : 'block';
-                    allLabelsCb.addEventListener('change', () => { labelsWrap.style.display = allLabelsCb.checked ? 'none' : 'block'; });
+                    if (excludeLabelsWrap) excludeLabelsWrap.style.display = allLabelsCb.checked ? 'block' : 'none';
+                    allLabelsCb.addEventListener('change', () => {
+                        labelsWrap.style.display = allLabelsCb.checked ? 'none' : 'block';
+                        if (excludeLabelsWrap) excludeLabelsWrap.style.display = allLabelsCb.checked ? 'block' : 'none';
+                    });
 
                     try {
                         const labelsResp = await fetch('/gmail/labels');
@@ -1907,6 +1932,8 @@ const App = (() => {
             const fetchBtn = document.getElementById(ids.fetchBtn);
             const fetchStatus = document.getElementById(ids.fetchStatus);
             const allFoldersCb = document.getElementById(ids.allFolders);
+            const excludeFoldersWrap = document.getElementById(ids.excludeFoldersWrap);
+            const excludeFoldersEl = document.getElementById(ids.excludeFolders);
             const foldersWrap = document.getElementById(ids.foldersWrap);
             const foldersSelect = document.getElementById(ids.foldersSelect);
             const newOnlyCb = document.getElementById(ids.newOnly);
@@ -1921,7 +1948,8 @@ const App = (() => {
                 const new_only = newOnlyCb.checked;
                 const folder_options = Array.from(foldersSelect.options).map(function (o) { return o.value; });
                 const folders = all_folders ? [] : Array.from(foldersSelect.selectedOptions).map(function (o) { return o.value; }).filter(Boolean);
-                return { host: host, port: port, username: username, password: password, use_ssl: use_ssl, all_folders: all_folders, new_only: new_only, folders: folders, folder_options: folder_options };
+                const exclude_folders = excludeFoldersEl ? excludeFoldersEl.value.split('\n').map(s => s.trim()).filter(Boolean) : [];
+                return { host: host, port: port, username: username, password: password, use_ssl: use_ssl, all_folders: all_folders, new_only: new_only, folders: folders, folder_options: folder_options, exclude_folders: exclude_folders };
             }
 
             async function imapSaveToPrivateStore() {
@@ -1955,6 +1983,10 @@ const App = (() => {
                         passwordEl.value = s.password || '';
                         allFoldersCb.checked = !!s.all_folders;
                         newOnlyCb.checked = s.new_only !== false;
+                        if (excludeFoldersEl && Array.isArray(s.exclude_folders)) {
+                            excludeFoldersEl.value = s.exclude_folders.join('\n');
+                        }
+                        if (excludeFoldersWrap) excludeFoldersWrap.style.display = allFoldersCb.checked ? 'block' : 'none';
                         if (Array.isArray(s.folder_options) && s.folder_options.length) {
                             foldersSelect.innerHTML = '';
                             var selectedSet = {};
@@ -1998,6 +2030,7 @@ const App = (() => {
 
             allFoldersCb.addEventListener('change', () => {
                 foldersWrap.style.display = (!allFoldersCb.checked && foldersSelect.options.length > 0) ? 'block' : 'none';
+                if (excludeFoldersWrap) excludeFoldersWrap.style.display = allFoldersCb.checked ? 'block' : 'none';
             });
 
             fetchBtn.addEventListener('click', async () => {
@@ -2040,6 +2073,7 @@ const App = (() => {
                     fetchStatus.textContent = `${folders.length} folder(s) loaded`;
                     fetchStatus.style.color = '#27ae60';
                     if (!allFoldersCb.checked) foldersWrap.style.display = 'block';
+                    if (excludeFoldersWrap) excludeFoldersWrap.style.display = allFoldersCb.checked ? 'block' : 'none';
                     void imapSaveToPrivateStore();
                 } catch (e) {
                     fetchStatus.textContent = 'Connection error: ' + e.message;
@@ -2058,7 +2092,8 @@ const App = (() => {
                 const all_folders = allFoldersCb.checked;
                 const folders = all_folders ? [] : Array.from(foldersSelect.selectedOptions).map(o => o.value).filter(Boolean);
                 const new_only = newOnlyCb.checked;
-                return { host, port, username, password, use_ssl, all_folders, folders, new_only };
+                const exclude_folders = excludeFoldersEl ? excludeFoldersEl.value.split('\n').map(s => s.trim()).filter(Boolean) : [];
+                return { host, port, username, password, use_ssl, all_folders, folders, new_only, exclude_folders };
             }
 
             function validateImap() {

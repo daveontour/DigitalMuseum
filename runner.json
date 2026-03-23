@@ -1,0 +1,212 @@
+{
+  "_comment": "Runner config for cmd/runner. Remove or fill in each job. Jobs in the same stage array run in parallel; stages run sequentially.",
+  "master_key": "mouse11",
+  "stop_on_error": false,
+  "stages": [
+    [
+      {
+        "_comment": "Filesystem images import — scan one or more directories for images",
+        "type": "filesystem",
+        "execute": false,
+        "directories": ["C:/NonOneDrive/iCloud Sorted/"],
+        "max_images": null,
+        "reference_mode": true
+      }
+    ],
+    [
+      {
+        "_comment": "WhatsApp, iMessage, and Instagram run in parallel in this stage",
+        "type": "whatsapp",
+        "execute": true,
+        "directory": "C:/NonOneDrive/iMazingBackup/David's iPhone (4729)/WhatsApp"
+      },
+      {
+        "type": "imessage",
+        "execute": true,
+        "directory": "C:/NonOneDrive/iMazingBackup/David's iPhone (4729)/Messages"
+      },
+      {
+        "type": "instagram",
+        "execute": true,
+        "directory": "G:/My Drive/meta-2026-Jan-11-23-24-13/instagram-dave.on.tour-2026-01-11-6UHErqvT",
+        "user_name": "",
+        "export_root": ""
+      },
+      {
+        "_comment": "Facebook all-in-one: Messenger + Albums + Places + Posts",
+        "type": "facebook_all",
+        "execute": true,
+        "directory": "G:/My Drive/meta-2026-Jan-11-23-20-25/facebook-daveontour-2026-01-11-MnAtpBDv",
+        "user_name": ""
+      }
+    ],
+
+    [
+      {
+        "_comment": "IMAP email import — remove if not needed",
+        "type": "imap",
+        "execute": false,
+        "imap_host": "imap.mail.yahoo.com",
+        "imap_port": 993,
+        "imap_username": "dave_on_tour@yahoo.com",
+        "imap_password": "toxnsatpqlgeafwq",
+        "imap_use_ssl": true,
+        "imap_folders": [],
+        "imap_all_folders": true,
+        "imap_exclude_folders": ["^Spam$", "^Trash", "Junk", ".*Work.*", ".*Sent.*", ".*Draft.*", ".*SITA.*", ".*Jemena.*",".*Satyam.*"],
+        "imap_new_only": true
+      }
+    ],
+    [
+      {
+        "_comment": "Import reference documents (PDFs, Word docs, etc.) into the reference_documents table",
+        "type": "reference_files",
+        "execute": false,
+        "files": [
+          {
+            "path": "C:/path/to/document.pdf",
+            "title": "Document Title",
+            "description": "A short description of this document",
+            "author": "",
+            "tags": "",
+            "categories": ""
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "_comment": "Extract contacts from all imported messages",
+        "type": "contacts_extract",
+        "execute": false
+      }
+    ],
+    [
+      {
+        "_comment": "Import referenced images — reads files stored as path references into the database",
+        "type": "reference_import",
+        "execute": false
+      }
+    ],
+    [
+      {
+        "_comment": "Export images from the database to a directory on disk",
+        "type": "image_export",
+        "execute": false,
+        "target_directory": "C:/path/to/export"
+      }
+    ],
+    [
+      {
+        "_comment": "Generate thumbnails — always run last after image imports",
+        "type": "thumbnails",
+        "execute": true,
+        "reprocess": false
+      }
+    ],
+    [
+      {
+        "type": "reference_files",
+        "execute": false,
+        "files": [
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/01_identity_and_health.md",
+            "title": "Basic Biography of Dave Burton",
+            "description": "Basic Biography of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/02_family.md",
+            "title": "Family history of Dave Burton",
+            "description": "Family history of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/03_education_and_qualifications.md",
+            "title": "Education and Qualifactions",
+            "description": "Education and Qualifactions of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/04_career.md",
+            "title": "Career History",
+            "description": "Career history of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/05_relationships.md",
+            "title": "Friends and Romantic Relationships",
+            "description": "Friends and Romantic Relationships of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/06_interests_and_travel.md",
+            "title": "Interests and Travel",
+            "description": "Interests and Travel of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/07_communication_and_psychology.md",
+            "title": "Communication and Psychology",
+            "description": "Communication and Psychology of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/50th Birthday Speech.txt",
+            "title": "50th Birthday Speech",
+            "description": "Speech given by Dave Burton at his 50th birthday party. Reveals a lot about imeself in his own words",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/Email to Elle.txt",
+            "title": "Email to Elle O'Gorman",
+            "description": "Heartfelt email to Elle O'Gorman",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/General Intelligence Assessment.pdf",
+            "title": "General Intelligence Assessment",
+            "description": "Professional General Intelligence Assessment of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/Personal Profile Analysis.pdf",
+            "title": "Personal Profile Analysis",
+            "description": "Professional Personal Profile Analysis of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }, 
+          {
+            "path": "C:/Users/dave_/OneDrive/Desktop/Reference Documents/Trait Emotional Intelligence Questionaire.pdf",
+            "title": "Trait Emotional Intelligence Questionaire",
+            "description": "Professional Trait Emotional Intelligence Questionaire of Dave Burton",
+            "author": "Dave",
+            "tags": "biography",
+            "categories": "records"
+          }
+        ]
+      }
+    ]
+  ]
+}
