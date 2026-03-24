@@ -72,7 +72,8 @@ const CONSTANTS = {
         ALBUMS: '/getAlbums',
         EVENTS: '/events',
         HAVE_YOUR_SAY: '/HaveYourSay',
-        WHAT_ARE_PEOPLE_SAYING: '/WhatArePeopleSaying'
+        WHAT_ARE_PEOPLE_SAYING: '/WhatArePeopleSaying',
+        HAVE_A_CHAT_TURN: '/chat/have-a-chat/turn'
     },
     LOCAL_STORAGE_KEYS: {
         CHAT_SETTINGS: 'chatSettings'

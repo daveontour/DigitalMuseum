@@ -179,6 +179,9 @@ func New(pool *pgxpool.Pool, cfg *config.Config) http.Handler {
 	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo, sessionMasterStore)
 	chatHandler.RegisterRoutes(r)
 
+	haveAChatHandler := handler.NewHaveAChatHandler(chatSvc, sessionMasterStore)
+	haveAChatHandler.RegisterRoutes(r)
+
 	llmToolsAccessHandler := handler.NewLLMToolsAccessHandler(privateStoreSvc, sessionMasterStore)
 	llmToolsAccessHandler.RegisterRoutes(r)
 

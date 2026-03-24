@@ -7999,3 +7999,128 @@ body {
 .master-import-confirm-row-static span {
     line-height: 1.4;
 }
+
+
+/* ===== Have A Chat Feature ===== */
+
+.have-a-chat-message {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    margin: 8px 0;
+    border-radius: 8px;
+    max-width: 88%;
+    position: relative;
+    align-self: flex-start;
+}
+
+.have-a-chat-claude {
+    background-color: #e8f0fe;
+    border-left: 4px solid #1a73e8;
+}
+
+.have-a-chat-gemini {
+    background-color: #f3e8ff;
+    border-left: 4px solid #7c3aed;
+}
+
+.have-a-chat-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.have-a-chat-voice-image {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.have-a-chat-label {
+    font-size: 0.75em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: #fff;
+}
+
+.have-a-chat-claude .have-a-chat-label {
+    background: #1a73e8;
+}
+
+.have-a-chat-gemini .have-a-chat-label {
+    background: #7c3aed;
+}
+
+.have-a-chat-content {
+    font-size: var(--message-font-size, 16px);
+    line-height: 1.6;
+    color: #222;
+}
+
+.have-a-chat-content p:first-child { margin-top: 0; }
+.have-a-chat-content p:last-child  { margin-bottom: 0; }
+
+/* Control bar — sits below the chat form when a conversation is active */
+.have-a-chat-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: #19264d;
+    color: #fff;
+    font-size: 0.875em;
+    border-top: 2px solid #2e4080;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.have-a-chat-controls-status {
+    flex: 1;
+    font-style: italic;
+    color: #b8d4f7;
+    min-width: 120px;
+}
+
+.have-a-chat-controls button {
+    padding: 5px 13px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.have-a-chat-controls button:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.have-a-chat-controls button.stop-btn {
+    border-color: #f44336;
+    color: #f44336;
+}
+
+.have-a-chat-controls button.stop-btn:hover {
+    background: rgba(244, 67, 54, 0.15);
+}
+
+/* User-injected comment during have-a-chat */
+.have-a-chat-user-comment {
+    background: #fff9c4;
+    border-left: 4px solid #f9a825;
+    padding: 8px 14px;
+    border-radius: 6px;
+    margin: 6px auto;
+    font-size: 0.9em;
+    font-style: italic;
+    color: #555;
+    max-width: 70%;
+    align-self: center;
+}

@@ -208,6 +208,14 @@
                 <div id="chat-dictation-status" style="color: #b8e0f7; font-size: 12px; margin-top: 5px; min-height: 15px; margin-left: 10px;"></div>
                 <button type="submit" id="send-button" >Send</button>
             </form>
+
+            <!-- Have A Chat Control Bar (hidden when inactive) -->
+            <div id="have-a-chat-control-bar" class="have-a-chat-controls" style="display:none;">
+                <span class="have-a-chat-controls-status" id="have-a-chat-status-text">Initialising...</span>
+                <button id="have-a-chat-pause-btn"><i class="fas fa-pause"></i> Pause</button>
+                <button id="have-a-chat-inject-btn"><i class="fas fa-comment-medical"></i> Inject Comment</button>
+                <button id="have-a-chat-stop-btn" class="stop-btn"><i class="fas fa-stop"></i> Stop</button>
+            </div>
         </div>
 
         <!-- Right Sidebar -->
@@ -239,6 +247,9 @@
                 </div>
                 <div class="sidebar-spacer" aria-hidden="true"></div>
                 <div class="sidebar-bottom-tile">
+                    <button type="button" class="more-options-btn sidebar-settings-btn" id="have-a-chat-sidebar-btn">
+                        <i class="fas fa-comments"></i> Have a Chat
+                    </button>
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="random-question-sidebar-btn">
                         <i class="fas fa-question-circle"></i> Random Question
                     </button>
@@ -252,8 +263,64 @@
             </div>
         </div>
         </div><!-- end main-content -->
-        
-        
+
+        <!-- Have A Chat Setup Modal -->
+        <div id="have-a-chat-setup-modal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:540px; width:92vw;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-comments"></i> Have a Chat</h2>
+                    <button class="modal-close-btn" id="close-have-a-chat-setup-modal">&times;</button>
+                </div>
+                <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:16px;">
+                    <div>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px;">Topic / Starter Prompt <span style="font-weight:normal;color:#777;">(optional)</span></label>
+                        <textarea id="have-a-chat-topic" rows="3" style="width:100%; box-sizing:border-box; border-radius:6px; border:1px solid #bfc9da; padding:8px; font-size:1em;" placeholder="e.g. 'What do the messages reveal about relationships?' — or leave blank to let the AIs explore freely."></textarea>
+                    </div>
+                    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:180px;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; color:#1a73e8;"><i class="fas fa-robot"></i> Claude Voice</label>
+                            <select id="have-a-chat-claude-voice" style="width:100%; padding:6px; border-radius:4px; border:1px solid #bfc9da;">
+                                <option value="expert">Expert</option>
+                            </select>
+                        </div>
+                        <div style="flex:1; min-width:180px;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; color:#7c3aed;"><i class="fas fa-robot"></i> Gemini Voice</label>
+                            <select id="have-a-chat-gemini-voice" style="width:100%; padding:6px; border-radius:4px; border:1px solid #bfc9da;">
+                                <option value="expert">Expert</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px;">Temperature: <span id="have-a-chat-temperature-display">0.7</span></label>
+                        <input type="range" id="have-a-chat-temperature" min="0" max="2" step="0.1" value="0.7" style="width:100%;">
+                    </div>
+                    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:4px;">
+                        <button class="modal-btn modal-btn-secondary" id="have-a-chat-cancel-btn">Cancel</button>
+                        <button class="modal-btn modal-btn-primary" id="have-a-chat-start-btn"><i class="fas fa-play"></i> Start Chat</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Have A Chat Inject Comment Modal -->
+        <div id="have-a-chat-inject-modal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:440px; width:92vw;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-comment-medical"></i> Inject a Comment</h2>
+                    <button class="modal-close-btn" id="close-have-a-chat-inject-modal">&times;</button>
+                </div>
+                <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:12px;">
+                    <p style="margin:0; color:#555; font-size:0.95em;">Your comment will be added to the conversation and both AIs will take it into account.</p>
+                    <textarea id="have-a-chat-inject-text" rows="4" style="width:100%; box-sizing:border-box; border-radius:6px; border:1px solid #bfc9da; padding:8px; font-size:1em;" placeholder="Your comment or question to inject into the conversation..."></textarea>
+                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                        <button class="modal-btn modal-btn-secondary" id="have-a-chat-inject-cancel-btn">Cancel</button>
+                        <button class="modal-btn modal-btn-primary" id="have-a-chat-inject-submit-btn"><i class="fas fa-paper-plane"></i> Inject</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
         <!-- Configuration Modal -->
         <div class="config-modal-overlay" id="config-modal-overlay" style="display: none;">
             <div class="config-modal-content">
@@ -2801,6 +2868,7 @@
     <script src="/static/js/museum/modals-settings.js" defer></script>
     <script src="/static/js/museum/guide.js" defer></script>
     <script src="/static/js/museum/app.js" defer></script>
+    <script src="/static/js/museum/have-a-chat.js" defer></script>
     <script src="/static/js/leaflet.js"></script>
     <script src="/static/js/images_grid.js"></script>
     <script>

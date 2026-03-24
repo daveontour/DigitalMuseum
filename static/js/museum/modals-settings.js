@@ -2332,6 +2332,7 @@ Modals.initAll = () => {
         if (Modals.EmailExclusions && Modals.EmailExclusions.init) Modals.EmailExclusions.init();
         if (Modals.PreviousResponses && Modals.PreviousResponses.init) Modals.PreviousResponses.init();
         if (Modals.SaveResponseTitle && Modals.SaveResponseTitle.init) Modals.SaveResponseTitle.init();
+        if (typeof HaveAChat !== 'undefined' && HaveAChat.init) HaveAChat.init();
 };
 
 Modals.closeAll = () => {
