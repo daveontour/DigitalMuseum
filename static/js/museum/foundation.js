@@ -373,7 +373,6 @@ const DOM = {
     newImageGalleryThumbnailGrid: document.getElementById('new-image-gallery-thumbnail-grid'),
     newImageGalleryMasterPane: document.querySelector('.new-image-gallery-master-pane'),
     newImageGallerySelectMode: document.getElementById('new-image-gallery-select-mode'),
-    newImageGalleryBulkEditSection: document.getElementById('new-image-gallery-bulk-edit-section'),
     newImageGallerySelectedCount: document.getElementById('new-image-gallery-selected-count'),
     newImageGalleryBulkTags: document.getElementById('new-image-gallery-bulk-tags'),
     newImageGalleryApplyTagsBtn: document.getElementById('new-image-gallery-apply-tags-btn'),

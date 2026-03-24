@@ -1843,12 +1843,6 @@
                     <div class="new-image-gallery-master-pane">
                         <div class="new-image-gallery-search-section">
                             <div class="new-image-metadata-filters">
-                                <div class="new-image-gallery-title" style="display: flex; justify-content: flex-end; align-items: center;">
-                                    <label class="new-image-gallery-select-mode-toggle" style="display: flex; align-items: center; gap: 0.5em; cursor: pointer;">
-                                        <input type="checkbox" id="new-image-gallery-select-mode" style="cursor: pointer;">
-                                        <span>Select Mode</span>
-                                    </label>
-                                </div>
                                 <!-- <div id="new-image-gallery-bulk-edit-section" style="display: none; padding: 1em; background-color: #e8f4f8; border-radius: 4px; margin-top: 1em;">
                                     <div style="margin-bottom: 0.5em; font-weight: 600; color: #233366;">
                                         <span id="new-image-gallery-selected-count">0</span> image(s) selected
@@ -1897,13 +1891,17 @@
                                     <input type="number" id="new-image-gallery-rating" placeholder="Rating (1-5)" min="1" max="5" class="new-image-gallery-input">
                                     <input type="number" id="new-image-gallery-rating-min" placeholder="Min Rating" min="1" max="5" class="new-image-gallery-input">
                                     <input type="number" id="new-image-gallery-rating-max" placeholder="Max Rating" min="1" max="5" class="new-image-gallery-input">
-                                </div>
-                                <div class="new-image-gallery-filter-row">
                                     <label class="new-image-gallery-checkbox-label">
                                         <input type="checkbox" id="new-image-gallery-has-gps">
                                         Has GPS
                                     </label>
                                 </div>
+                                <!-- <div class="new-image-gallery-filter-row">
+                                    <label class="new-image-gallery-checkbox-label">
+                                        <input type="checkbox" id="new-image-gallery-has-gps">
+                                        Has GPS
+                                    </label>
+                                </div> -->
                                 <div class="new-image-gallery-button-row">
                                     <button id="new-image-gallery-search-btn" class="modal-btn modal-btn-primary">
                                         <i class="fas fa-search"></i>Search
@@ -1914,23 +1912,23 @@
                                 </div>
                             </div>
                             <div class="new-image-gallery-right-hand-box">
-                                <div id="new-image-gallery-bulk-edit-section" style="display: none; padding: 1em; background-color: #e8f4f8; border-radius: 4px; margin-top: 2em;">
+                                <div id="new-image-gallery-bulk-edit-section" style="padding: 1em; background-color: #e8f4f8; border-radius: 4px;">
+                                    <div style="margin-bottom: 1em;">
+                                        <label class="new-image-gallery-select-mode-toggle" style="display: flex; align-items: center; gap: 0.5em; cursor: pointer;">
+                                            <input type="checkbox" id="new-image-gallery-select-mode" style="cursor: pointer;">
+                                            <span>Select Mode</span>
+                                        </label>
+                                    </div>
                                     <div style="margin-bottom: 0.5em; font-weight: 600; color: #233366;">
                                         <span id="new-image-gallery-selected-count">0</span> image(s) selected
                                     </div>
                                     <div style="display: flex; gap: 0.5em; align-items: center;">
                                         <input type="text" id="new-image-gallery-bulk-tags" placeholder="Enter tags to apply..." class="new-image-gallery-input" style="flex: 1;">
+                                    </div>
+                                    <div style="display: flex; gap: 0.5em; align-items: end;flex-direction: row; margin-top: 1em;">
                                         <button id="new-image-gallery-apply-tags-btn" class="modal-btn modal-btn-primary" disabled style="width: 200px;">
                                             <i class="fas fa-tags"></i> Apply Tags
                                         </button>
-                                        <!-- <button id="new-image-gallery-delete-selected-btn" class="modal-btn modal-btn-danger" disabled>
-                                            <i class="fas fa-trash-alt"></i> Delete Selected
-                                        </button>
-                                        <button id="new-image-gallery-clear-selection-btn" class="modal-btn modal-btn-secondary">
-                                            <i class="fas fa-times"></i> Clear Selection
-                                        </button> -->
-                                    </div>
-                                    <div style="display: flex; gap: 0.5em; align-items: end;flex-direction: column; margin-top: 1em;">
                                         <button id="new-image-gallery-delete-selected-btn" class="modal-btn modal-btn-danger" disabled style="width: 200px;">
                                             <i class="fas fa-trash-alt"></i> Delete Selected
                                         </button>

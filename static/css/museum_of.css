@@ -2700,6 +2700,43 @@ body {
 .modal-btn-danger { background: #dc3545; color: #fff; }
 .modal-btn-danger:hover { background: #c82333; }
 
+/* Modal buttons — disabled (distinct from enabled; hover must not “wake” them) */
+.modal-btn:disabled,
+.modal-btn[disabled] {
+    cursor: not-allowed;
+    opacity: 0.58;
+    filter: grayscale(0.82);
+    box-shadow: none;
+}
+.modal-btn-primary:disabled,
+.modal-btn-primary:disabled:hover,
+.modal-btn-primary[disabled],
+.modal-btn-primary[disabled]:hover {
+    background: #9aa6ba;
+    color: rgba(255, 255, 255, 0.88);
+    filter: grayscale(0.55);
+    opacity: 0.72;
+}
+.modal-btn-secondary:disabled,
+.modal-btn-secondary:disabled:hover,
+.modal-btn-secondary[disabled],
+.modal-btn-secondary[disabled]:hover {
+    background: #e8edf4;
+    color: #8b98ad;
+    border: 1px solid #cfd8e6;
+    filter: grayscale(0.65);
+    opacity: 0.85;
+}
+.modal-btn-danger:disabled,
+.modal-btn-danger:disabled:hover,
+.modal-btn-danger[disabled],
+.modal-btn-danger[disabled]:hover {
+    background: #c4a8ac;
+    color: rgba(255, 255, 255, 0.85);
+    filter: grayscale(0.7);
+    opacity: 0.72;
+}
+
 /* Import Execute buttons - disabled state (exclude Executing button) */
 .import-execute-btn:disabled {
     opacity: 0.5;
@@ -4715,7 +4752,7 @@ body {
 }
 
 .new-image-gallery-filter-row:has(input[type="number"]) {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
 }
 
 .new-image-gallery-input,
@@ -4726,6 +4763,15 @@ body {
     font-size: 0.9em;
     width: 100%;
     box-sizing: border-box;
+}
+
+.new-image-gallery-input:disabled,
+.new-image-gallery-select:disabled {
+    cursor: not-allowed;
+    background-color: #eef1f6;
+    color: #8b96a8;
+    border-color: #d5dde8;
+    opacity: 0.92;
 }
 
 .new-image-gallery-checkbox-label {

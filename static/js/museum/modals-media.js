@@ -602,12 +602,10 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGallerySelectMode) {
                 DOM.newImageGallerySelectMode.addEventListener('change', (e) => {
                     selectMode = e.target.checked;
-                    _updateSelectModeUI();
                     if (!selectMode) {
-                        // Clear selection when exiting select mode
                         selectedImageIds.clear();
-                        _updateSelectionUI();
                     }
+                    _updateSelectionUI();
                 });
             }
             
@@ -734,7 +732,7 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryBulkTags) {
                 DOM.newImageGalleryBulkTags.value = '';
             }
-            _updateSelectModeUI();
+            _updateSelectionUI();
             _updatePickModeBanner();
             await _updateThumbnailProcessingBanner();
             _renderThumbnailGrid();
@@ -1207,28 +1205,29 @@ Modals.NewImageGallery = (() => {
             }
         }
         
-        function _updateSelectModeUI() {
-            if (DOM.newImageGalleryBulkEditSection) {
-                DOM.newImageGalleryBulkEditSection.style.display = selectMode ? 'block' : 'none';
-            }
-            _updateSelectionUI();
-        }
-        
         function _updateSelectionUI() {
             // Update selected count
             if (DOM.newImageGallerySelectedCount) {
                 DOM.newImageGallerySelectedCount.textContent = selectedImageIds.size;
             }
+
+            if (DOM.newImageGalleryBulkTags) {
+                DOM.newImageGalleryBulkTags.disabled = !selectMode;
+            }
+            if (DOM.newImageGalleryClearSelectionBtn) {
+                DOM.newImageGalleryClearSelectionBtn.disabled = !selectMode;
+            }
             
             // Enable/disable apply button
             if (DOM.newImageGalleryApplyTagsBtn) {
-                DOM.newImageGalleryApplyTagsBtn.disabled = selectedImageIds.size === 0 || 
+                DOM.newImageGalleryApplyTagsBtn.disabled = !selectMode ||
+                    selectedImageIds.size === 0 ||
                     !DOM.newImageGalleryBulkTags || !DOM.newImageGalleryBulkTags.value.trim();
             }
             
             // Enable/disable delete button
             if (DOM.newImageGalleryDeleteSelectedBtn) {
-                DOM.newImageGalleryDeleteSelectedBtn.disabled = selectedImageIds.size === 0;
+                DOM.newImageGalleryDeleteSelectedBtn.disabled = !selectMode || selectedImageIds.size === 0;
             }
             
             // Update thumbnail visual selection state
