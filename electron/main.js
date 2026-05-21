@@ -34,25 +34,46 @@ function getPaths() {
   const userData = app.getPath('userData');
 
   //userData = "C:/Users/dave_/OneDrive/Desktop/digitalmuseum"
-  const dataDir = path.join(userData, 'data');
+  const goExe = path.join(res, 'bin', 'digitalmuseum.exe');
   return {
     // Install / project root (contains bin/, static/, templates/). The Go server
     // must run with this as cwd so relative paths like static/data/*.json in
     // cmd/server/main.go resolve correctly — same as cmd/launcher (cmd.Dir = root).
     appRoot:     res,
-    goExe:       path.join(res, 'bin', 'digitalmuseum.exe'),
+    goExe,
     templatesDir: path.join(res, 'templates'),
     staticDir:   path.join(res, 'static'),
     userData,
-    dataDir,
-    sqliteMainPath: path.join(dataDir, 'main.sqlite'),
-    sqliteBillingPath: path.join(dataDir, 'billing.sqlite'),
+    defaultAdminSqlitePath: path.join(path.dirname(goExe), 'data', 'admin.sqlite'),
     dotEnvPath:  path.join(userData, '.env'),
     dotEnvDefaults: app.isPackaged
       ? path.join(process.resourcesPath, '.env.defaults')
       : path.join(__dirname, '.env.defaults'),
-    appLogFile:  path.join(userData, 'logs', 'app.log'),
   };
+}
+
+/** Resolve ADMIN_SQLITE_PATH the same way as Go (relative paths vs goExe dir). */
+function resolveAdminSqlitePath(paths, dotenv) {
+  const raw = (dotenv && dotenv.ADMIN_SQLITE_PATH) ? String(dotenv.ADMIN_SQLITE_PATH).trim() : '';
+  if (!raw) return paths.defaultAdminSqlitePath;
+  if (path.isAbsolute(raw)) return path.normalize(raw);
+  return path.normalize(path.join(path.dirname(paths.goExe), raw));
+}
+
+function getAdminDataDir(paths, dotenv) {
+  return path.dirname(resolveAdminSqlitePath(paths, dotenv || {}));
+}
+
+function getAppLogFile(paths, dotenv) {
+  return path.join(getAdminDataDir(paths, dotenv || {}), 'app.log');
+}
+
+/** Attach adminDataDir and appLogFile derived from resolved ADMIN_SQLITE_PATH. */
+function applyResolvedDataPaths(paths, dotenv) {
+  const adminDataDir = getAdminDataDir(paths, dotenv);
+  paths.adminDataDir = adminDataDir;
+  paths.appLogFile = path.join(adminDataDir, 'app.log');
+  return paths;
 }
 
 /** Logs SQLite paths as configured, absolute, relative to userData/appRoot/cwd, and file presence. */
@@ -92,9 +113,54 @@ function logSqliteDatabasePaths(paths, mainPath, billingPath, ctxLabel) {
 // Logging
 // ---------------------------------------------------------------------------
 
+const APP_LOG_MAX_BYTES = 10 * 1024 * 1024;
+
 let logStream = null;
 
+/** If logFile exceeds maxBytes, drop oldest lines from the top and keep the tail. */
+function trimLogFileToMaxSize(logFile, maxBytes = APP_LOG_MAX_BYTES) {
+  try {
+    if (!fs.existsSync(logFile)) return;
+    const { size } = fs.statSync(logFile);
+    if (size <= maxBytes) return;
+
+    const fd = fs.openSync(logFile, 'r+');
+    try {
+      let dropThrough = size - maxBytes;
+      const scan = Buffer.alloc(4096);
+      let pos = dropThrough;
+      while (pos < size) {
+        const n = fs.readSync(fd, scan, 0, Math.min(scan.length, size - pos), pos);
+        if (n <= 0) break;
+        const idx = scan.subarray(0, n).indexOf('\n');
+        if (idx >= 0) {
+          dropThrough = pos + idx + 1;
+          break;
+        }
+        pos += n;
+      }
+
+      const keepLen = size - dropThrough;
+      const tail = Buffer.alloc(keepLen);
+      fs.readSync(fd, tail, 0, keepLen, dropThrough);
+      const marker = Buffer.from(
+        `[${new Date().toISOString()}] --- log trimmed (${size} bytes -> ${keepLen} bytes retained) ---\n`,
+        'utf8',
+      );
+      fs.ftruncateSync(fd, 0);
+      fs.writeSync(fd, marker, 0, marker.length, 0);
+      fs.writeSync(fd, tail, 0, keepLen, marker.length);
+      fs.ftruncateSync(fd, marker.length + keepLen);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (e) {
+    console.error(`Failed to trim log file ${logFile}: ${e.message}`);
+  }
+}
+
 function setupLogging(logFile) {
+  trimLogFileToMaxSize(logFile);
   try {
     logStream = fs.createWriteStream(logFile, { flags: 'a' });
   } catch (e) {
@@ -215,7 +281,8 @@ async function ensureOllamaRunning() {
   } catch (_) { /* not running yet */ }
   const paths = getPaths();
   let logFd;
-  try { logFd = fs.openSync(paths.appLogFile, 'a'); } catch (_) { /* ignore */ }
+  const logFile = getAppLogFile(paths, activeDotenv || {});
+  try { logFd = fs.openSync(logFile, 'a'); } catch (_) { /* ignore */ }
   ollamaProcess = spawn(ollamaExe, ['serve'], {
     windowsHide: true,
     stdio: ['ignore', logFd ?? 'ignore', logFd ?? 'ignore'],
@@ -326,7 +393,7 @@ function startGoServer(port, paths, dotenv) {
     ...dotenv,
     HOST_PORT:             String(port),
     SQLITE_PATH:           '',
-    ADMIN_SQLITE_PATH:   dotenv.ADMIN_SQLITE_PATH || paths.sqliteBillingPath,
+    ADMIN_SQLITE_PATH:   dotenv.ADMIN_SQLITE_PATH || paths.defaultAdminSqlitePath,
     TEMPLATES_DIR:         paths.templatesDir,
     ASSET_STATIC_DIR:      paths.staticDir,
     DEPLOYMENT_NATURE:     dotenv.DEPLOYMENT_NATURE  || 'local',
@@ -435,7 +502,7 @@ async function restartGoServer(logLevel) {
     });
   }
   await forceKillDigitalMuseumWindows();
-  const paths = getPaths();
+  const paths = applyResolvedDataPaths(getPaths(), activeDotenv || {});
   let envContent = fs.existsSync(paths.dotEnvPath)
     ? fs.readFileSync(paths.dotEnvPath, 'utf8') : '';
 
@@ -629,38 +696,38 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
 
   const paths = getPaths();
-  // Writable dirs before any log or pg_ctl (packaged app resources/ may be read-only).
+
+  const createdUserDotEnv = !fs.existsSync(paths.dotEnvPath) && fs.existsSync(paths.dotEnvDefaults);
+  if (createdUserDotEnv) {
+    fs.copyFileSync(paths.dotEnvDefaults, paths.dotEnvPath);
+  }
+
+  let dotenv = {
+    ...loadDotEnv(paths.dotEnvDefaults),
+    ...loadDotEnv(paths.dotEnvPath),
+    ...(app.isPackaged ? {} : loadDotEnv(path.join(__dirname, '..', '.env'))),
+  };
+  dotenv = {
+    ...dotenv,
+    ADMIN_SQLITE_PATH: dotenv.ADMIN_SQLITE_PATH || paths.defaultAdminSqlitePath,
+  };
+  applyResolvedDataPaths(paths, dotenv);
+
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
-  fs.mkdirSync(path.dirname(paths.appLogFile), { recursive: true });
-  fs.mkdirSync(paths.dataDir, { recursive: true });
+  fs.mkdirSync(paths.adminDataDir, { recursive: true });
 
   setupLogging(paths.appLogFile);
   log('Digital Museum starting...');
-
-  // Copy .env.defaults to userData on first run
-  if (!fs.existsSync(paths.dotEnvPath) && fs.existsSync(paths.dotEnvDefaults)) {
-    fs.copyFileSync(paths.dotEnvDefaults, paths.dotEnvPath);
+  if (createdUserDotEnv) {
     log(`Created ${paths.dotEnvPath} from defaults`);
   }
 
   createLoadingWindow();
 
   try {
-    // Load config: defaults as base, user's AppData .env on top.
-    // In dev mode, also layer in the project root .env last so local DB
-    // credentials (which aren't committed) stay in sync automatically.
-    let dotenv = {
-      ...loadDotEnv(paths.dotEnvDefaults),
-      ...loadDotEnv(paths.dotEnvPath),
-      ...(app.isPackaged ? {} : loadDotEnv(path.join(__dirname, '..', '.env'))),
-    };
-    // ADMIN_SQLITE_PATH always has a default so billing tracking works from day one.
+    // ADMIN_SQLITE_PATH: honor .env when set; else <goExeDir>/data/admin.sqlite (Go resolves relative paths vs exe dir).
     // SQLITE_PATH is left empty when absent — Go handles nil pool on first run
     // and the user creates their first archive through the login page.
-    dotenv = {
-      ...dotenv,
-      ADMIN_SQLITE_PATH: dotenv.ADMIN_SQLITE_PATH || paths.sqliteBillingPath,
-    };
     logSqliteDatabasePaths(paths, dotenv.SQLITE_PATH, dotenv.ADMIN_SQLITE_PATH, 'electron-resolved');
 
     sendStatus('Cleaning up previous processes...');
@@ -785,8 +852,8 @@ ipcMain.handle('create-profile', async (_event, opts) => {
   const { name, dbPath: customPath } = opts || {};
   if (!name || !name.trim()) return { ok: false, error: 'Name is required' };
 
-  const paths = getPaths();
-  const archivesDir = path.join(paths.userData, 'archives');
+  const paths = applyResolvedDataPaths(getPaths(), activeDotenv || {});
+  const archivesDir = paths.adminDataDir;
   if (!fs.existsSync(archivesDir)) fs.mkdirSync(archivesDir, { recursive: true });
   const dbPath = customPath || path.join(archivesDir, slugify(name.trim()) + '.sqlite');
 
@@ -846,6 +913,17 @@ ipcMain.handle('get-profile-db-path', async (_event, id) => {
     const d = await res.json();
     return { ok: true, dbPath: d.db_path };
   } catch (_) { return { ok: false, error: 'Network error' }; }
+});
+
+ipcMain.handle('get-admin-data-dir', () => {
+  const paths = applyResolvedDataPaths(getPaths(), activeDotenv || {});
+  return { ok: true, dir: paths.adminDataDir };
+});
+
+ipcMain.handle('suggest-archive-db-path', (_event, name) => {
+  const paths = applyResolvedDataPaths(getPaths(), activeDotenv || {});
+  const base = String(name || 'archive').trim() || 'archive';
+  return { ok: true, dbPath: path.join(paths.adminDataDir, slugify(base) + '.sqlite') };
 });
 
 // ── Ollama local AI ───────────────────────────────────────────────────────────

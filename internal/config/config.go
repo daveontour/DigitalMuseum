@@ -248,13 +248,13 @@ func loadCryptoConfig() (CryptoConfig, error) {
 }
 
 func loadDatabaseConfig() (DatabaseConfig, error) {
-	billing := strings.TrimSpace(os.Getenv("ADMIN_SQLITE_PATH"))
-	if billing == "" {
-		return DatabaseConfig{}, fmt.Errorf("ADMIN_SQLITE_PATH is required (main archives are opened from billing archive_profiles only; SQLITE_PATH is not used)")
+	billing, err := ResolveAdminSQLitePath()
+	if err != nil {
+		return DatabaseConfig{}, fmt.Errorf("resolve admin sqlite path: %w", err)
 	}
 	return DatabaseConfig{
 		SQLitePath:        "",
-		BillingSQLitePath: filepath.Clean(billing),
+		BillingSQLitePath: billing,
 	}, nil
 }
 

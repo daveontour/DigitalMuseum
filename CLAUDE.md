@@ -85,7 +85,7 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `SQLITE_PATH` | Yes | Absolute path to the main SQLite database file |
-| `ADMIN_SQLITE_PATH` | Yes | Absolute path to the billing SQLite database file |
+| `ADMIN_SQLITE_PATH` | No | Billing/admin SQLite file; default `<exeDir>/data/admin.sqlite`. Optional override: absolute as-is, relative resolved against exe dir |
 | `HOST_PORT` | No | HTTP listen port (default: 8000; Electron overrides to 8081) |
 | `ANTHROPIC_API_KEY` | At least one AI key | Claude API |
 | `CLAUDE_MODEL_NAME` | No | Default: `claude-sonnet-4-6` |
@@ -304,7 +304,7 @@ The codebase targets SQLite exclusively (via `github.com/mattn/go-sqlite3`). Key
 
 ### Billing Database (LLM Usage)
 
-A **second SQLite file** (`ADMIN_SQLITE_PATH`) holds `llm_usage_events` — one row per
+A **second SQLite file** (billing/admin DB: default `<exeDir>/data/admin.sqlite`, overridable via `ADMIN_SQLITE_PATH`) holds `llm_usage_events` — one row per
 completed LLM interaction with provider, model, token counts, user snapshot fields, and
 whether the server API key was used. Billing inserts are best-effort. Admin JSON/UI
 lives under `/admin/llm-usage/…`. Users can download their own PDF bill via

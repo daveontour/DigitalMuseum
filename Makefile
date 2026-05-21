@@ -61,8 +61,8 @@ build-linux: check-go
 build-launcher: check-go
 	go build -buildvcs=false -ldflags="$(strip $(WINDOWS_STRIP_LDF) -H windowsgui)" -o launcher.exe ./cmd/launcher
 
-run: check-go
-	go run $(CMD)
+run: build-exe
+	./bin/$(BINARY).exe
 
 test: check-go
 	go test ./...

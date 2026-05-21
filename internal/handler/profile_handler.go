@@ -203,9 +203,21 @@ func (h *ProfileHandler) AdminCreate(w http.ResponseWriter, r *http.Request) {
 	familyName := strings.TrimSpace(body.FamilyName)
 	username := strings.TrimSpace(body.Username)
 	dbPath := strings.TrimSpace(body.DBPath)
-	if displayName == "" || familyName == "" || username == "" || body.Password == "" || dbPath == "" {
-		writeError(w, http.StatusBadRequest, "display_name, family_name, username, password, and db_path are required")
+	if displayName == "" || familyName == "" || username == "" || body.Password == "" {
+		writeError(w, http.StatusBadRequest, "display_name, family_name, username, and password are required")
 		return
+	}
+	archiveName := strings.TrimSpace(displayName + " " + familyName)
+	if archiveName == "" {
+		archiveName = displayName
+	}
+	if dbPath == "" {
+		defaultPath, err := config.DefaultNewArchiveSQLitePath(archiveName)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to resolve default archive path")
+			return
+		}
+		dbPath = defaultPath
 	}
 	if body.Password != body.PasswordConfirm {
 		writeError(w, http.StatusBadRequest, "passwords do not match")
@@ -214,10 +226,6 @@ func (h *ProfileHandler) AdminCreate(w http.ResponseWriter, r *http.Request) {
 	abs := filepath.Clean(dbPath)
 	if a, err := filepath.Abs(abs); err == nil {
 		abs = a
-	}
-	archiveName := strings.TrimSpace(displayName + " " + familyName)
-	if archiveName == "" {
-		archiveName = displayName
 	}
 
 	if err := h.provision.CreateArchiveWithFirstUser(r.Context(), abs, displayName, familyName, username, body.Password); err != nil {

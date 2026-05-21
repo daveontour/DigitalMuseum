@@ -66,7 +66,7 @@ func NewBilling(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	cfg = cfg.BillingConfig()
 	path := cfg.BillingSQLitePath
 	if path == "" {
-		return nil, fmt.Errorf("billing sqlite path is empty (set ADMIN_SQLITE_PATH)")
+		return nil, fmt.Errorf("billing sqlite path is empty")
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("create billing sqlite directory: %w", err)

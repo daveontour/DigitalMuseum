@@ -981,7 +981,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="form-group">
           <label for="archive-add-db-path">DB Path *</label>
           <div style="display:flex;gap:8px;align-items:center">
-            <input id="archive-add-db-path" type="text" placeholder="C:\path\to\new-archive.sqlite" style="font-family:monospace;font-size:.88rem;flex:1">
+            <input id="archive-add-db-path" type="text" placeholder="Leave blank for default next to admin database" style="font-family:monospace;font-size:.88rem;flex:1">
             <button class="btn btn-secondary" id="archive-add-browse-btn" type="button"><i class="fas fa-folder-open" style="margin-right:6px"></i>Browse…</button>
           </div>
         </div>
@@ -1851,9 +1851,16 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         return;
       }
       try {
+        var defaultPath = 'archive.sqlite';
+        if (window.electronAPI && window.electronAPI.getAdminDataDir) {
+          var dirRes = await window.electronAPI.getAdminDataDir();
+          if (dirRes && dirRes.ok && dirRes.dir) {
+            defaultPath = dirRes.dir.replace(/[\\/]+$/, '') + '/archive.sqlite';
+          }
+        }
         var res = await window.electronAPI.showSaveDialog({
           title: 'Save new archive database as',
-          defaultPath: 'archive.sqlite',
+          defaultPath: defaultPath,
           filters: [
             { name: 'SQLite Databases', extensions: ['sqlite', 'db'] },
             { name: 'All Files', extensions: ['*'] }
@@ -1884,8 +1891,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       var password = passwordEl.value;
       var confirm = confirmEl.value;
       var dbPath = (dbPathEl.value || '').trim();
-      if (!displayName || !familyName || !username || !password || !dbPath) {
-        errEl.textContent = 'First name, family name, username, password, and DB path are required.';
+      if (!displayName || !familyName || !username || !password) {
+        errEl.textContent = 'First name, family name, username, and password are required.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (!dbPath && window.electronAPI && window.electronAPI.suggestArchiveDbPath) {
+        var sug = await window.electronAPI.suggestArchiveDbPath(displayName + ' ' + familyName);
+        if (sug && sug.ok && sug.dbPath) dbPath = sug.dbPath;
+      }
+      if (!dbPath) {
+        errEl.textContent = 'DB path is required (leave blank in the desktop app to use the default next to the admin database).';
         errEl.style.display = 'block';
         return;
       }
