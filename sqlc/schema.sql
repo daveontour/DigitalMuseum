@@ -171,6 +171,7 @@ CREATE TABLE IF NOT EXISTS media_items (
 
 CREATE INDEX IF NOT EXISTS idx_media_items_processed   ON media_items (processed);
 CREATE INDEX IF NOT EXISTS idx_media_items_source      ON media_items (source);
+CREATE INDEX IF NOT EXISTS idx_media_items_source_reference ON media_items (source, source_reference);
 CREATE INDEX IF NOT EXISTS idx_media_items_media_type  ON media_items (media_type);
 CREATE INDEX IF NOT EXISTS idx_media_items_year_month  ON media_items (year, month);
 CREATE INDEX IF NOT EXISTS idx_media_items_use_by_ai   ON media_items (use_by_ai);

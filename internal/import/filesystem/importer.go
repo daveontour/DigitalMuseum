@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -179,18 +178,19 @@ func ImportImagesFromDirectories(
 		return stats, nil
 	}
 
-	numWorkers := runtime.NumCPU()
-	if numWorkers < 1 {
-		numWorkers = 1
-	}
-	if numWorkers > len(workItems) {
-		numWorkers = len(workItems)
+	var existingRefs map[string]struct{}
+	if !overwriteExisting {
+		var err error
+		existingRefs, err = storage.LoadFilesystemSourceRefSet(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	// Single writer: SQLite uses one connection; parallel batch commits contend on the DB lock.
+	numWorkers := 1
 	workChan := make(chan imageWork, len(workItems))
 	var wg sync.WaitGroup
-
-	numWorkers = 4
 
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
@@ -201,7 +201,7 @@ func ImportImagesFromDirectories(
 				if len(batch) == 0 {
 					return
 				}
-				imp, upd, err := storage.SaveImagesBatch(ctx, batch)
+				imp, upd, err := storage.SaveImagesBatch(ctx, batch, !overwriteExisting)
 				if err != nil {
 					for _, item := range batch {
 						_, isUpdate, saveErr := storage.SaveImage(ctx, item.SourceRef, item.ImageData, item.MediaType, item.Title, item.Tags, item.IsReferenced)
@@ -227,6 +227,11 @@ func ImportImagesFromDirectories(
 					stats.ImagesImported += imp
 					stats.ImagesUpdated += upd
 					stats.mu.Unlock()
+					if existingRefs != nil {
+						for _, item := range batch {
+							existingRefs[item.SourceRef] = struct{}{}
+						}
+					}
 				}
 				batch = batch[:0]
 			}
@@ -252,9 +257,8 @@ func ImportImagesFromDirectories(
 
 				absPath, _ := filepath.Abs(work.Path)
 
-				if !overwriteExisting {
-					exists, _ := storage.FilesystemMediaItemExists(ctx, absPath)
-					if exists {
+				if existingRefs != nil {
+					if _, ok := existingRefs[absPath]; ok {
 						continue
 					}
 				}

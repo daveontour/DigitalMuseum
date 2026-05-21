@@ -4653,8 +4653,8 @@
         <div class="wizard-fields wizard-fields--identity">
           <!-- Left column: all single-line inputs -->
           <div class="wizard-identity-inputs">
-            <label>Full Name <input type="text" id="wf-full-name" class="form-control" placeholder="e.g. David John Burton"></label>
-            <label>Preferred Name <input type="text" id="wf-preferred-name" class="form-control" placeholder="e.g. Dave"></label>
+            <label>Full Name <input type="text" id="wf-full-name" class="form-control" placeholder="e.g. Jane Smith"></label>
+            <label>Preferred Name <input type="text" id="wf-preferred-name" class="form-control" placeholder="e.g. Jane"></label>
             <label>Date of Birth <input type="date" id="wf-dob" class="form-control"></label>
             <label>Gender
               <select id="wf-gender" class="form-control">
@@ -4666,7 +4666,7 @@
               </select>
             </label>
             <label>Nationality <input type="text" id="wf-nationality" class="form-control" placeholder="e.g. Australian"></label>
-            <label>Current Residence <input type="text" id="wf-residence" class="form-control" placeholder="e.g. Brisbane, Australia"></label>
+            <label>Current Residence <input type="text" id="wf-residence" class="form-control" placeholder="e.g. Melbourne, Australia"></label>
             <label>Email Addresses <input type="text" id="wf-emails" class="form-control" placeholder="comma-separated"></label>
             <label>Phone Numbers <input type="text" id="wf-phones" class="form-control" placeholder="comma-separated"></label>
             <label>LinkedIn URL <input type="url" id="wf-linkedin" class="form-control" placeholder="https://linkedin.com/in/…"></label>
@@ -4715,7 +4715,6 @@
               <button type="button" class="wizard-chip" data-value="Arthritis">Arthritis</button>
               <button type="button" class="wizard-chip" data-value="Depression">Depression</button>
               <button type="button" class="wizard-chip" data-value="Anxiety">Anxiety</button>
-              <button type="button" class="wizard-chip" data-value="Low heart rate">Low heart rate</button>
             </div>
             <label style="font-size:var(--text-sm);color:var(--color-text-muted);">Other conditions (comma-separated)
               <input type="text" id="wf-conditions-custom" class="form-control" placeholder="Any other conditions…">
@@ -4779,7 +4778,7 @@
             <textarea id="wf-career-summary" rows="4" placeholder="A paragraph describing your overall career profile, expertise and approach…"></textarea>
           </label>
           <label>Career Timeline (one role per line: Years | Role | Organisation)
-            <textarea id="wf-career-timeline" rows="6" placeholder="e.g.&#10;1987–1996 | Engineer/Consultant | Hewlett-Packard&#10;2016–2023 | Head Integration Services | SITA, Dubai"></textarea>
+            <textarea id="wf-career-timeline" rows="6" placeholder="e.g.&#10;1987–1996 | Engineer/Consultant | Telco &#10;2016–2023 | Head Integration Services | Aviaton Sector"></textarea>
           </label>
           <label>Key Skills
             <textarea id="wf-career-skills" rows="3" placeholder="e.g. Enterprise Architecture · Aviation IT · Program Management · Cloud…"></textarea>
@@ -4829,13 +4828,14 @@
             <span class="wizard-chip-group-label">Arts &amp; Culture</span>
             <div class="wizard-chip-container" id="wf-arts-chips">
               <button type="button" class="wizard-chip" data-value="Theatre">Theatre</button>
-              <button type="button" class="wizard-chip" data-value="Improv">Improv</button>
               <button type="button" class="wizard-chip" data-value="Music">Music</button>
               <button type="button" class="wizard-chip" data-value="Film">Film</button>
               <button type="button" class="wizard-chip" data-value="Dance">Dance</button>
               <button type="button" class="wizard-chip" data-value="Writing">Writing</button>
               <button type="button" class="wizard-chip" data-value="Photography">Photography</button>
               <button type="button" class="wizard-chip" data-value="Reading">Reading</button>
+              <button type="button" class="wizard-chip" data-value="Social Causes">Social Causes</button>
+              <button type="button" class="wizard-chip" data-value="Community Volunteering">Community Volunteering</button>
             </div>
           </div>
           <div class="wizard-chip-group">
@@ -4845,6 +4845,7 @@
               <button type="button" class="wizard-chip" data-value="Philosophy">Philosophy</button>
               <button type="button" class="wizard-chip" data-value="Technology">Technology</button>
               <button type="button" class="wizard-chip" data-value="Politics">Politics</button>
+              <button type="button" class="wizard-chip" data-value="Psychology">Psychology</button>
               <button type="button" class="wizard-chip" data-value="History">History</button>
               <button type="button" class="wizard-chip" data-value="Economics">Economics</button>
               <button type="button" class="wizard-chip" data-value="Atheism / Secularism">Atheism / Secularism</button>

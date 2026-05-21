@@ -161,6 +161,7 @@ func schemaDDL() []string {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_items_processed   ON media_items (processed)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_items_source      ON media_items (source)`,
+		`CREATE INDEX IF NOT EXISTS idx_media_items_source_reference ON media_items (source, source_reference)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_items_media_type  ON media_items (media_type)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_items_year_month  ON media_items (year, month)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_items_use_by_ai   ON media_items (use_by_ai)`,
@@ -1140,8 +1141,30 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 	if err := addUserRunpodEndpointColumns(ctx, db); err != nil {
 		return err
 	}
+	if err := ensureMediaItemsSourceReferenceIndex(ctx, db); err != nil {
+		return err
+	}
 
 	slog.Info("sqlite database migration complete")
+	return nil
+}
+
+func ensureMediaItemsSourceReferenceIndex(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_items'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master media_items: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx,
+		`CREATE INDEX IF NOT EXISTS idx_media_items_source_reference ON media_items (source, source_reference)`,
+	); err != nil {
+		return fmt.Errorf("create idx_media_items_source_reference: %w", err)
+	}
+	slog.Info("sqlite migration: ensured idx_media_items_source_reference")
 	return nil
 }
 

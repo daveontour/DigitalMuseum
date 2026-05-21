@@ -31,7 +31,7 @@ func NewImageStorage(pool *sql.DB) *ImageStorage {
 }
 
 // FilesystemMediaItemExists reports whether a media_items row exists for source=filesystem
-// and the given source_reference. Matches the lookup used by SaveImage before insert/update.
+// and the given source_reference.
 func (s *ImageStorage) FilesystemMediaItemExists(ctx context.Context, sourceRef string) (bool, error) {
 	const q = `SELECT 1 FROM media_items WHERE source = ?1 AND source_reference = ?2 LIMIT 1`
 	var one int
@@ -43,6 +43,30 @@ func (s *ImageStorage) FilesystemMediaItemExists(ctx context.Context, sourceRef 
 		return false, nil
 	}
 	return false, err
+}
+
+// LoadFilesystemSourceRefSet returns all filesystem source_reference paths already in the DB.
+// Used once per import to skip existing files without a query per file.
+func (s *ImageStorage) LoadFilesystemSourceRefSet(ctx context.Context) (map[string]struct{}, error) {
+	rows, err := s.pool.QueryContext(ctx,
+		`SELECT source_reference FROM media_items WHERE source = ?1 AND source_reference IS NOT NULL`,
+		filesystemSource)
+	if err != nil {
+		return nil, fmt.Errorf("load filesystem source refs: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string]struct{})
+	for rows.Next() {
+		var ref string
+		if err := rows.Scan(&ref); err != nil {
+			return nil, fmt.Errorf("scan filesystem source ref: %w", err)
+		}
+		if ref != "" {
+			out[ref] = struct{}{}
+		}
+	}
+	return out, rows.Err()
 }
 
 // SaveImage saves or updates an image in the database.
@@ -134,8 +158,9 @@ func (s *ImageStorage) SaveImage(ctx context.Context, sourceRef string, imageDat
 }
 
 // SaveImagesBatch saves or updates multiple images in a single transaction.
+// When skipExisting is true, rows already present are left unchanged (no update).
 // Returns (importedCount, updatedCount, error). On error, the entire batch is rolled back.
-func (s *ImageStorage) SaveImagesBatch(ctx context.Context, items []BatchImageItem) (imported, updated int, err error) {
+func (s *ImageStorage) SaveImagesBatch(ctx context.Context, items []BatchImageItem, skipExisting bool) (imported, updated int, err error) {
 	if len(items) == 0 {
 		return 0, 0, nil
 	}
@@ -185,6 +210,9 @@ func (s *ImageStorage) SaveImagesBatch(ctx context.Context, items []BatchImageIt
 
 	for _, item := range items {
 		if ex, ok := existing[item.SourceRef]; ok {
+			if skipExisting {
+				continue
+			}
 			if !item.IsReferenced {
 				_, err = tx.ExecContext(ctx, `UPDATE media_blobs SET image_data = ?1, thumbnail_data = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?2`,
 					item.ImageData, ex.blobID)
