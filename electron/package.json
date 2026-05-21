@@ -1,0 +1,14 @@
+{
+  "name": "digital-museum",
+  "version": "1.0.0",
+  "description": "Digital Museum Desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

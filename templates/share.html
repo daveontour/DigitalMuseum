@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Museum — Shared Archive</title>
+    <link rel="stylesheet" href="/static/css/museum_of.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #0f1922;
+            font-family: var(--font-sans-ui);
+        }
+        .share-card {
+            background: #19264d;
+            border-radius: 12px;
+            padding: 48px;
+            max-width: 440px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            text-align: center;
+        }
+        .share-icon {
+            font-size: var(--text-icon-2xl);
+            color: #3b82f6;
+            margin-bottom: 16px;
+        }
+        .share-title {
+            color: #fff;
+            margin: 0 0 8px;
+            font-size: var(--text-screen-title);
+        }
+        .share-subtitle {
+            color: #8fa4c8;
+            margin: 0 0 8px;
+            font-size: var(--text-lead);
+        }
+        .share-expiry {
+            color: #8fa4c8;
+            font-size: var(--text-caption);
+            margin-bottom: 28px;
+        }
+        .share-expiry .expiry-warn {
+            color: #fbbf24;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            color: #cdd6e8;
+            margin-bottom: 6px;
+            font-size: var(--text-md);
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px solid #2e4068;
+            background: #0f1922;
+            color: #fff;
+            font-size: var(--text-base);
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .form-group input:focus {
+            border-color: #3b82f6;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            border: none;
+            background: #3b82f6;
+            color: #fff;
+            font-size: var(--text-base);
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 4px;
+            transition: background 0.15s;
+        }
+        .submit-btn:hover {
+            background: #2563eb;
+        }
+        .submit-btn:disabled {
+            background: #1e3a6b;
+            cursor: not-allowed;
+        }
+        .error-msg {
+            display: none;
+            color: #f87171;
+            margin-bottom: 16px;
+            font-size: var(--text-md);
+            padding: 10px 14px;
+            background: rgba(248,113,113,0.1);
+            border-radius: 6px;
+            border: 1px solid rgba(248,113,113,0.25);
+            text-align: left;
+        }
+        .loading-state {
+            color: #8fa4c8;
+            font-size: var(--text-base);
+        }
+        #main-content { display: none; }
+        #error-state { display: none; }
+        #loading-state { display: block; }
+    </style>
+</head>
+<body>
+    <div class="share-card">
+        <!-- Loading state -->
+        <div id="loading-state">
+            <div class="share-icon"><i class="fas fa-spinner fa-spin"></i></div>
+            <p class="loading-state">Loading share link&hellip;</p>
+        </div>
+
+        <!-- Error state (invalid/expired link) -->
+        <div id="error-state">
+            <div class="share-icon" style="color:#f87171;"><i class="fas fa-exclamation-circle"></i></div>
+            <h1 class="share-title" id="error-title">Link Unavailable</h1>
+            <p class="share-subtitle" id="error-detail">This share link is not valid.</p>
+        </div>
+
+        <!-- Main content (valid link) -->
+        <div id="main-content">
+            <div class="share-icon"><i class="fas fa-landmark"></i></div>
+            <h1 class="share-title" id="share-archive-name">Digital Museum</h1>
+            <p class="share-subtitle" id="share-label"></p>
+            <p class="share-expiry" id="share-expiry"></p>
+
+            <div id="error-msg" class="error-msg"></div>
+
+            <!-- Password form (shown if has_password: true) -->
+            <form id="share-form">
+                <div class="form-group" id="password-group" style="display:none;">
+                    <label for="share-password"><i class="fas fa-lock" style="margin-right:6px;"></i>This link is password protected</label>
+                    <input id="share-password" type="password" placeholder="Enter password" autocomplete="current-password">
+                </div>
+                <button type="submit" class="submit-btn" id="enter-btn">
+                    <i class="fas fa-door-open" style="margin-right:6px;"></i>Enter Archive
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            // Extract token from path: /s/{token}
+            var pathParts = window.location.pathname.split('/');
+            var token = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
+
+            var loadingEl = document.getElementById('loading-state');
+            var errorStateEl = document.getElementById('error-state');
+            var mainContentEl = document.getElementById('main-content');
+            var errorMsgEl = document.getElementById('error-msg');
+
+            function showError(title, detail) {
+                loadingEl.style.display = 'none';
+                mainContentEl.style.display = 'none';
+                errorStateEl.style.display = 'block';
+                document.getElementById('error-title').textContent = title;
+                document.getElementById('error-detail').textContent = detail;
+            }
+
+            function showInlineError(msg) {
+                errorMsgEl.textContent = msg;
+                errorMsgEl.style.display = 'block';
+            }
+
+            // Fetch share metadata
+            fetch('/share/' + token)
+                .then(function (res) {
+                    if (res.status === 404) {
+                        showError('Link Not Found', 'This share link is invalid or has been removed.');
+                        return null;
+                    }
+                    if (res.status === 410) {
+                        showError('Link Expired', 'This share link has expired.');
+                        return null;
+                    }
+                    if (!res.ok) {
+                        showError('Unavailable', 'This share link is not available right now.');
+                        return null;
+                    }
+                    return res.json();
+                })
+                .then(function (data) {
+                    if (!data) return;
+
+                    loadingEl.style.display = 'none';
+                    mainContentEl.style.display = 'block';
+
+                    // Archive name
+                    var archiveName = '';
+                    if (data.owner_display_name) {
+                        archiveName = data.owner_display_name + "'s Archive";
+                    } else {
+                        archiveName = 'Digital Museum Archive';
+                    }
+                    document.getElementById('share-archive-name').textContent = archiveName;
+
+                    // Label
+                    if (data.label) {
+                        document.getElementById('share-label').textContent = data.label;
+                    }
+
+                    // Expiry
+                    var expiryEl = document.getElementById('share-expiry');
+                    if (data.expires_at) {
+                        var exp = new Date(data.expires_at);
+                        var now = new Date();
+                        var diffMs = exp - now;
+                        var diffH = Math.floor(diffMs / 3600000);
+                        var diffD = Math.floor(diffMs / 86400000);
+                        var expiryStr = '';
+                        if (diffD >= 2) {
+                            expiryStr = 'Expires in ' + diffD + ' days (' + exp.toLocaleDateString() + ')';
+                        } else if (diffH >= 1) {
+                            expiryStr = '<span class="expiry-warn">Expires in about ' + diffH + ' hour' + (diffH !== 1 ? 's' : '') + '</span>';
+                        } else {
+                            expiryStr = '<span class="expiry-warn">Expires very soon</span>';
+                        }
+                        expiryEl.innerHTML = '<i class="fas fa-clock" style="margin-right:4px;"></i>' + expiryStr;
+                    } else {
+                        expiryEl.textContent = 'No expiry set';
+                    }
+
+                    // Password protection
+                    if (data.has_password) {
+                        document.getElementById('password-group').style.display = 'block';
+                        document.getElementById('share-password').setAttribute('required', 'required');
+                    }
+                })
+                .catch(function () {
+                    showError('Error', 'Could not load share link information.');
+                });
+
+            // Submit handler
+            document.getElementById('share-form').addEventListener('submit', function (e) {
+                e.preventDefault();
+                var btn = document.getElementById('enter-btn');
+                errorMsgEl.style.display = 'none';
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Loading\u2026';
+
+                var body = {};
+                var pwInput = document.getElementById('share-password');
+                if (pwInput && pwInput.value) {
+                    body.password = pwInput.value;
+                }
+
+                fetch('/share/' + token, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(body)
+                })
+                    .then(function (res) {
+                        if (res.status === 401) {
+                            showInlineError('Incorrect password. Please try again.');
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-door-open" style="margin-right:6px;"></i>Enter Archive';
+                            return null;
+                        }
+                        if (res.status === 404) {
+                            showError('Link Not Found', 'This share link is invalid or has been removed.');
+                            return null;
+                        }
+                        if (res.status === 410) {
+                            showError('Link Expired', 'This share link has expired.');
+                            return null;
+                        }
+                        if (!res.ok) {
+                            return res.json().catch(function () { return {}; }).then(function (data) {
+                                showInlineError(data.error || data.detail || 'Something went wrong. Please try again.');
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fas fa-door-open" style="margin-right:6px;"></i>Enter Archive';
+                                return null;
+                            });
+                        }
+                        return res.json().catch(function () { return {}; });
+                    })
+                    .then(function (data) {
+                        if (!data) return;
+                        if (data.session_created) {
+                            window.location.href = '/';
+                        } else {
+                            showInlineError('Access could not be granted. Please try again.');
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-door-open" style="margin-right:6px;"></i>Enter Archive';
+                        }
+                    })
+                    .catch(function () {
+                        showInlineError('Network error. Please try again.');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-door-open" style="margin-right:6px;"></i>Enter Archive';
+                    });
+            });
+        })();
+    </script>
+</body>
+</html>

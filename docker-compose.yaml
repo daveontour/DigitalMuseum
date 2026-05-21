@@ -1,0 +1,40 @@
+services:
+  # The Database Service
+  db:
+    image: postgres:16-alpine
+    container_name: museum_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: musegomulti
+    ports:
+      - "5435:5432" # Allows DBeaver/pgAdmin access via localhost:5432
+    volumes:
+      # PERSISTENCE: Maps internal DB data to a local folder named 'pgdata'
+      - ./pgdata2:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_admin -d musegomulti"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Your Go App Service
+  app:
+    build: .
+    container_name: digitalmuseum
+    depends_on:
+      db:
+        condition: service_healthy # Only starts when DB is truly "Ready"
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    # Override in .env for Docker: DB_HOST=db, DB_PORT=5432 (service name `db`, not localhost).
+    # Optional explicit overrides:
+    environment:
+     DB_HOST: db
+
+    # No need to persist the imports folder, it is only used temporarily
+    # volumes:
+    #   - ./imports:/app/tmp/imports

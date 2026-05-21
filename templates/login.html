@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Museum — Sign In</title>
+    <link rel="stylesheet" href="/static/css/museum_of.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        html { font-family: var(--font-sans-ui); }
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #0f1922;
+            font-family: inherit;
+        }
+
+        /* ── Step indicator ── */
+        #step-indicator {
+            display: none;
+            gap: 0;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .step-chip {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: #19264d;
+            color: #4a5a80;
+            border: 1px solid #2e4068;
+            transition: all 0.2s;
+        }
+        .step-chip.active { background: #1e3a6b; color: #fff; border-color: #3b82f6; }
+        .step-chip.done   { background: #0d2a1a; color: #4ade80; border-color: #166534; }
+        .step-chip .step-num {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem;
+            background: #2e4068; color: #8fa4c8;
+        }
+        .step-chip.active .step-num { background: #3b82f6; color: #fff; }
+        .step-chip.done   .step-num { background: #166534; color: #4ade80; }
+        .step-arrow { color: #2e4068; font-size: 0.9rem; margin: 0 6px; }
+
+        /* ── Login card ── */
+        .login-card input, .login-card button, .login-card textarea,
+        .login-card select, .login-card label { font-family: inherit; }
+        .login-card {
+            background: #19264d;
+            border-radius: 12px;
+            padding: 48px;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            transition: max-width 0.2s;
+        }
+        .login-title  { color: #fff; margin: 0 0 8px; font-size: 1.8rem; }
+        .login-subtitle { color: #8fa4c8; margin: 0 0 28px; font-size: 0.95rem; }
+        .tab-row { display: flex; margin-bottom: 28px; border-bottom: 1px solid #2a3a6b; }
+        .tab-btn {
+            background: none; border: none; color: #8fa4c8;
+            font-size: 1rem; padding: 8px 20px 10px; cursor: pointer;
+            border-bottom: 2px solid transparent; margin-bottom: -1px;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .tab-btn.active { color: #fff; border-bottom-color: #3b82f6; }
+        .tab-row .advanced-btn { margin-left: auto; }
+        .form-group { margin-bottom: 20px; }
+        .form-row { display: flex; gap: 12px; }
+        .form-row .form-group { flex: 1; }
+        .form-group label { display: block; color: #cdd6e8; margin-bottom: 6px; font-size: 0.9rem; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 10px 14px; border-radius: 6px;
+            border: 1px solid #2e4068; background: #0f1922; color: #fff;
+            font-size: 1rem; box-sizing: border-box; outline: none;
+            transition: border-color 0.15s;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: #3b82f6; }
+        .form-group select { cursor: pointer; }
+        .login-pw-wrap {
+            display: flex; align-items: stretch; width: 100%;
+            border-radius: 6px; border: 1px solid #2e4068; background: #0f1922;
+            box-sizing: border-box; overflow: hidden;
+        }
+        .login-pw-wrap:focus-within { border-color: #3b82f6; }
+        .login-pw-wrap input {
+            flex: 1; min-width: 0; border: none !important; border-radius: 0 !important;
+            background: transparent !important; box-sizing: border-box;
+        }
+        .login-pw-toggle {
+            flex: 0 0 44px; border: none; background: #162536; color: #8fa4c8;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; transition: background .15s, color .15s;
+        }
+        .login-pw-toggle:hover { background: #243368; color: #e2e8f0; }
+        /* style the dropdown arrow */
+        .form-group select option { background: #19264d; }
+        .submit-btn {
+            width: 100%; padding: 12px; border-radius: 6px; border: none;
+            background: #3b82f6; color: #fff; font-size: 1rem; font-weight: 600;
+            cursor: pointer; margin-top: 8px; transition: background 0.15s;
+        }
+        .submit-btn:hover { background: #2563eb; }
+        .submit-btn:disabled { background: #1e3a6b; cursor: not-allowed; }
+        .error-msg {
+            display: none; color: #f87171; margin-bottom: 16px; font-size: 0.9rem;
+            padding: 10px 14px; background: rgba(248,113,113,0.1);
+            border-radius: 6px; border: 1px solid rgba(248,113,113,0.25);
+        }
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* ── New user inline form (inside sign-in panel) ── */
+        #new-user-form {
+            display: none;
+            margin-top: 4px;
+            padding-top: 16px;
+            border-top: 1px solid #2e4068;
+        }
+        #new-user-form h3 {
+            color: #cdd6e8; font-size: 0.95rem; font-weight: 600;
+            margin: 0 0 14px;
+        }
+        .adv-btn {
+            padding: 8px 14px; border-radius: 6px; font-size: 0.85rem;
+            font-family: inherit; cursor: pointer;
+        }
+        .adv-btn-outline {
+            border: 1px solid #2e4068; background: #0f1922; color: #8fa4c8;
+        }
+        .adv-btn-outline:hover { border-color: #3b82f6; color: #fff; }
+        .adv-btn-primary { border: none; background: #3b82f6; color: #fff; }
+        .adv-btn-primary:hover { background: #2563eb; }
+        .adv-btn-primary:disabled { background: #1e3a6b; cursor: not-allowed; opacity: 0.55; }
+
+        /* ── AI & Setup (advanced) panel ── */
+        #adv-ollama-progress-bar-wrap { display: none; margin-top: 10px; }
+        #adv-ollama-progress-bar-wrap progress {
+            width: 100%; height: 10px; border-radius: 5px; accent-color: #3b82f6;
+        }
+        #adv-ollama-progress-label {
+            display: flex; justify-content: space-between;
+            color: #8fa4c8; font-size: 0.78rem; margin-top: 4px;
+        }
+        .adv-status-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            font-size: 0.82rem; margin-top: 8px; padding: 8px 10px; border-radius: 6px;
+            background: #0c1419; border: 1px solid #1e3050;
+        }
+        .adv-status-row:first-of-type { margin-top: 0; }
+        .adv-status-label { color: #8fa4c8; flex-shrink: 0; }
+        .adv-status-value { font-weight: 600; text-align: right; }
+        .adv-input {
+            padding: 6px 10px; border-radius: 6px; border: 1px solid #2e4068;
+            background: #0f1922; color: #cdd6e8; font-size: 0.85rem;
+            font-family: inherit; box-sizing: border-box;
+        }
+        .adv-btn-sm { padding: 6px 12px; font-size: 0.82rem; }
+
+        #advanced-btn.advanced-btn {
+            color: #fbbf24;
+            transition: color 0.15s ease;
+        }
+        #advanced-btn.advanced-btn:hover {
+            color: #fcd34d;
+        }
+        #advanced-btn.advanced-btn.advanced-btn-needs-attention {
+            color: #ef4444 !important;
+        }
+        #advanced-btn.advanced-btn.advanced-btn-needs-attention:hover {
+            color: #f87171 !important;
+        }
+        #advanced-btn.advanced-btn.advanced-btn-ready {
+            color: #4ade80 !important;
+        }
+        #advanced-btn.advanced-btn.advanced-btn-ready:hover {
+            color: #86efac !important;
+        }
+
+        #login-admin-login-btn {
+            position: fixed; top: 14px; right: 14px; z-index: 100;
+            padding: 8px 14px; border-radius: 6px; border: 1px solid #2e4068;
+            background: #19264d; color: #cdd6e8; font-size: 0.88rem; font-weight: 600;
+            cursor: pointer; font-family: inherit;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        #login-admin-login-btn:hover { background: #243368; border-color: #3b82f6; color: #fff; }
+
+        @media (max-width: 640px) {
+            .form-row { flex-direction: column; gap: 0; }
+            .login-card { padding: 28px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <button type="button" id="login-admin-login-btn" style="display:none;">Admin Login</button>
+
+    <!-- First-run step indicator (shown by JS when HAS_REGISTERED_USER=false) -->
+    <div id="step-indicator">
+        <div class="step-chip active" id="step-1"><span class="step-num">1</span>Create Account</div>
+        <span class="step-arrow">›</span>
+        <div class="step-chip" id="step-2"><span class="step-num">2</span>Set Up AI</div>
+        <span class="step-arrow">›</span>
+        <div class="step-chip" id="step-3"><span class="step-num">3</span>Sign In</div>
+    </div>
+
+    <div class="login-card">
+        <h1 class="login-title"><i class="fas fa-landmark" style="margin-right:10px; color:#3b82f6;"></i>Digital Museum</h1>
+        <p class="login-subtitle">Sign in to access the archive.</p>
+
+        <div class="tab-row">
+            <button class="tab-btn active" id="tab-login"    type="button">Sign In</button>
+            <button class="tab-btn"        id="tab-register" type="button">Register</button>
+            <button class="tab-btn"        id="tab-visitor"  type="button">Visitor</button>
+            <button type="button" id="advanced-btn" class="tab-btn advanced-btn" aria-expanded="false"
+                title="AI configuration and advanced options">Local AI Setup</button>
+        </div>
+
+        <div id="error-msg" class="error-msg"></div>
+        <div id="success-msg" style="display:none; color:#4ade80; background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.25); padding:10px 14px; border-radius:6px; margin-bottom:16px; font-size:0.9rem;"></div>
+
+        <!-- AI & Setup panel -->
+        <div id="panel-advanced" style="display:none; margin-bottom:16px; padding:14px; background:#0f1922; border:1px solid #2e4068; border-radius:8px;">
+            <div id="adv-no-electron-msg" style="display:none; color:#8fa4c8; font-size:0.82rem;">
+                Advanced setup is only available in the Digital Museum desktop app.
+            </div>
+            <!-- Local AI -->
+            <div id="adv-ollama-block">
+                <div style="color:#cdd6e8; font-size:0.88rem; font-weight:600; margin-bottom:4px;">Local AI</div>
+                <div style="color:#8fa4c8; font-size:0.82rem; margin-bottom:10px;">
+                    Runs privately on your computer. The app starts the Ollama server when you open Digital Museum. The Ollama server makes the Local AI available to the app.
+                    Downloads of the required models may take several minutes.
+                </div>
+                <div id="adv-local-ai-rows" style="margin-top:4px;">
+                    <div class="adv-status-row">
+                        <span class="adv-status-label">Ollama server</span>
+                        <span id="adv-ollama-server-value" class="adv-status-value" style="color:#6b7c99;">…</span>
+                    </div>
+                    <div class="adv-status-row">
+                        <span class="adv-status-label">Chat and Image Classification (gemma4)</span>
+                        <span id="adv-model-gemma-value" class="adv-status-value" style="color:#6b7c99;">—</span>
+                    </div>
+                    <div class="adv-status-row">
+                        <span class="adv-status-label">Vectorisation for Similarity Searches (embeddingemma)</span>
+                        <span id="adv-model-embed-value" class="adv-status-value" style="color:#6b7c99;">—</span>
+                    </div>
+                </div>
+                <button type="button" id="adv-download-models-btn" class="adv-btn adv-btn-primary adv-btn-sm" style="margin-top:12px;display:none;white-space:nowrap;">
+                    <i class="fas fa-download" style="margin-right:5px;"></i>Download required models
+                </button>
+                <div id="adv-ollama-msg" style="display:none; font-size:0.82rem; margin-top:8px; padding:6px 8px; border-radius:4px; color:#8fa4c8;"></div>
+                <div id="adv-ollama-progress-bar-wrap">
+                    <progress id="adv-ollama-progress-bar" value="0" max="100"></progress>
+                    <div id="adv-ollama-progress-label">
+                        <span id="adv-ollama-progress-status">Preparing…</span>
+                        <span id="adv-ollama-progress-size"></span>
+                    </div>
+                </div>
+                <div style="margin-top:12px; padding-top:10px; border-top:1px solid #1e3050; color:#4a5a80; font-size:0.8rem;">
+                    Prefer more capable cloud AI? Add a Claude, Gemini, or DeepSeek API key in <strong style="color:#6b80a8;">Configuration</strong> after signing in.
+                </div>
+            </div>
+            <div id="adv-status" style="color:#f87171; font-size:0.82rem; margin-top:12px; display:none;"></div>
+        </div>
+
+        <!-- ── Sign In panel ── -->
+        <div class="panel active" id="panel-login">
+            <form id="login-form" autocomplete="on">
+                <!-- Profile select (Electron only — hidden in browser mode) -->
+                <div class="form-group" id="login-profile-group" style="display:none;">
+                    <label for="login-profile-select">User</label>
+                    <select id="login-profile-select"></select>
+                </div>
+                <!-- Username input (browser mode, or fallback) -->
+                <div class="form-group" id="login-username-group">
+                    <label for="login-username">Username</label>
+                    <input id="login-username" type="text" name="username"
+                        placeholder="Enter your username" autocomplete="username">
+                </div>
+                <div class="form-group" id="login-password-group">
+                    <label for="login-password">Password</label>
+                    <div class="login-pw-wrap">
+                        <input id="login-password" type="password" name="password" required
+                            placeholder="Your password" autocomplete="current-password">
+                        <button type="button" class="login-pw-toggle" id="login-password-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn" id="login-btn">
+                    <i class="fas fa-sign-in-alt" style="margin-right:6px;"></i>Sign In
+                </button>
+            </form>
+
+            <!-- New user: combined archive creation + registration -->
+            <div id="new-user-form">
+                <h3 style="color:#fff; font-size:1rem; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-plus-circle" style="color:#3b82f6;"></i>Create Your Archive
+                </h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="new-display-name">First Name</label>
+                        <input type="text" id="new-display-name" placeholder="e.g. Jane" autocomplete="given-name">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-family-name">Family Name</label>
+                        <input type="text" id="new-family-name" placeholder="e.g. Smith" autocomplete="family-name">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="new-username">Username</label>
+                    <input type="text" id="new-username" placeholder="Choose a username" autocomplete="username">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="new-password">Password</label>
+                        <div class="login-pw-wrap">
+                            <input type="password" id="new-password" placeholder="At least 12 characters" autocomplete="new-password">
+                            <button type="button" class="login-pw-toggle" id="new-password-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-password-confirm">Confirm</label>
+                        <div class="login-pw-wrap">
+                            <input type="password" id="new-password-confirm" placeholder="Re-enter" autocomplete="new-password">
+                            <button type="button" class="login-pw-toggle" id="new-password-confirm-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label style="display:flex; align-items:center; gap:6px; color:#8fa4c8; font-size:0.82rem; cursor:pointer;">
+                        <input type="checkbox" id="new-profile-custom-loc" style="accent-color:#3b82f6;">
+                        Custom archive storage location
+                        <button type="button" id="new-profile-browse" class="adv-btn adv-btn-outline" style="padding:3px 10px; font-size:0.78rem; margin-left:4px; display:none;">Browse…</button>
+                    </label>
+                    <div id="new-profile-custom-path" style="display:none; margin-top:5px; color:#8fa4c8; font-size:0.78rem; word-break:break-all;"></div>
+                </div>
+                <div id="new-profile-error" style="display:none; color:#f87171; font-size:0.82rem; margin-bottom:10px;"></div>
+                <div style="display:flex; gap:10px;">
+                    <button type="button" id="new-profile-create" class="adv-btn adv-btn-primary" style="flex:1; padding:10px;">
+                        <i class="fas fa-user-plus" style="margin-right:5px;"></i>Create &amp; Register
+                    </button>
+                    <button type="button" id="new-profile-cancel" class="adv-btn adv-btn-outline" style="padding:10px 16px; display:none;">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Register panel ── -->
+        <div class="panel" id="panel-register">
+            <form id="register-form" autocomplete="on">
+                <div class="form-group">
+                    <label for="reg-username">Username</label>
+                    <input id="reg-username" type="text" name="username" required
+                        placeholder="Choose any username" autocomplete="username">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-display-name">First Name</label>
+                        <input id="reg-display-name" type="text" name="display_name" required placeholder="e.g. Jane">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-family-name">Family Name</label>
+                        <input id="reg-family-name" type="text" name="family_name" placeholder="e.g. Smith">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-password">Password</label>
+                        <div class="login-pw-wrap">
+                            <input id="reg-password" type="password" name="password" required
+                                placeholder="Choose a password" autocomplete="new-password">
+                            <button type="button" class="login-pw-toggle" id="reg-password-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-password-confirm">Confirm Password</label>
+                        <div class="login-pw-wrap">
+                            <input id="reg-password-confirm" type="password" required
+                                placeholder="Re-enter" autocomplete="new-password">
+                            <button type="button" class="login-pw-toggle" id="reg-password-confirm-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn" id="register-btn">
+                    <i class="fas fa-user-plus" style="margin-right:6px;"></i>Register
+                </button>
+            </form>
+        </div>
+
+        <!-- ── Visitor panel ── -->
+        <div class="panel" id="panel-visitor">
+            <div class="form-group">
+                <label>Access the archive with the visitor key provided by the archive owner.</label>
+                <br/>
+                <button type="button" id="visitor-hints-btn"
+                    style="padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#8fa4c8; cursor:pointer;">
+                    Get Hints
+                </button>
+                <div id="visitor-hints-list" style="display:none; margin-top:10px; padding:10px 14px; background:#0f1922; border:1px solid #2e4068; border-radius:6px; color:#8fa4c8; font-size:0.88rem;"></div>
+            </div>
+            <div class="form-group">
+                <label for="visitor-key">Visitor Key</label>
+                <input id="visitor-key" type="password" placeholder="Enter your visitor key" autocomplete="current-password">
+            </div>
+            <button type="button" class="submit-btn" id="visitor-login-btn">
+                <i class="fas fa-door-open" style="margin-right:6px;"></i>Access Archive
+            </button>
+        </div>
+    </div><!-- .login-card -->
+
+    <script>
+        const HAS_REGISTERED_USER = {{ has_registered_user }};
+        const HAS_VISITOR_KEYS    = {{ has_visitor_keys }};
+        const SHOW_LOGIN_ADVANCED = {{ show_login_advanced }};
+        const hasElectron = typeof window.electronAPI !== 'undefined' && window.electronAPI !== null;
+
+        // ── Tab switching ─────────────────────────────────────────────────────
+        const tabLogin    = document.getElementById('tab-login');
+        const tabRegister = document.getElementById('tab-register');
+        const tabVisitor  = document.getElementById('tab-visitor');
+        const errorMsg    = document.getElementById('error-msg');
+
+        function showTab(tab) {
+            if (window.closeSetupPanel) window.closeSetupPanel(false);
+            ['login','register','visitor'].forEach(t => {
+                document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+                document.getElementById('panel-' + t).classList.toggle('active', t === tab);
+            });
+            errorMsg.style.display = 'none';
+            document.getElementById('success-msg').style.display = 'none';
+            const adminBtn = document.getElementById('login-admin-login-btn');
+            if (adminBtn) adminBtn.style.display = (tab === 'login' && tabLogin.style.display !== 'none') ? 'block' : 'none';
+        }
+        function showSuccess(msg) {
+            const el = document.getElementById('success-msg');
+            el.textContent = msg; el.style.display = 'block';
+        }
+        function showError(msg) { errorMsg.textContent = msg; errorMsg.style.display = 'block'; }
+        function wireLoginPwToggle(toggleId, inputId) {
+            const btn = document.getElementById(toggleId);
+            const inp = document.getElementById(inputId);
+            if (!btn || !inp) return;
+            btn.addEventListener('click', function() {
+                const show = inp.type === 'password';
+                inp.type = show ? 'text' : 'password';
+                btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+                btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+                btn.title = show ? 'Hide password' : 'Show password';
+                const i = btn.querySelector('i');
+                if (i) i.className = show ? 'far fa-eye-slash' : 'far fa-eye';
+            });
+        }
+        function resetLoginPwFieldMask(inputId, toggleId) {
+            const inp = document.getElementById(inputId);
+            const btn = document.getElementById(toggleId);
+            if (inp) inp.type = 'password';
+            if (btn) {
+                btn.setAttribute('aria-pressed', 'false');
+                btn.setAttribute('aria-label', 'Show password');
+                btn.title = 'Show password';
+                const i = btn.querySelector('i');
+                if (i) i.className = 'far fa-eye';
+            }
+        }
+        async function shouldProceedWithSignInWhenAIIncomplete() {
+            if (!hasElectron || !window.electronAPI) return true;
+            try {
+                const aiSetupBtn = document.getElementById('advanced-btn');
+                if (aiSetupBtn && aiSetupBtn.classList.contains('advanced-btn-ready')) {
+                    return true;
+                }
+                if (aiSetupBtn && aiSetupBtn.classList.contains('advanced-btn-needs-attention')) {
+                    if (window.electronAPI.confirmContinueWithoutAI) {
+                        const result = await window.electronAPI.confirmContinueWithoutAI();
+                        return !!(result && result.ok && result.proceed);
+                    }
+                    return window.confirm('Local AI setup is incomplete. Some functions may not be available. Continue signing in?');
+                }
+
+                const startRes = await window.electronAPI.startOllama();
+                const check = await window.electronAPI.checkOllamaModel();
+                const hasIssue = !startRes?.ok || !check?.ok || !check?.hasGemma4 || !check?.hasEmbeddingModel;
+                if (!hasIssue) return true;
+
+                if (window.electronAPI.confirmContinueWithoutAI) {
+                    const result = await window.electronAPI.confirmContinueWithoutAI();
+                    return !!(result && result.ok && result.proceed);
+                }
+                return window.confirm('Local AI setup is incomplete. Some functions may not be available. Continue signing in?');
+            } catch (_) {
+                return true;
+            }
+        }
+
+        tabLogin.addEventListener('click',    () => showTab('login'));
+        tabRegister.addEventListener('click', () => showTab('register'));
+        tabVisitor.addEventListener('click',  () => showTab('visitor'));
+        document.getElementById('login-admin-login-btn').addEventListener('click', () => { window.location.href = '/admin'; });
+
+        wireLoginPwToggle('login-password-toggle', 'login-password');
+        wireLoginPwToggle('new-password-toggle', 'new-password');
+        wireLoginPwToggle('new-password-confirm-toggle', 'new-password-confirm');
+        wireLoginPwToggle('reg-password-toggle', 'reg-password');
+        wireLoginPwToggle('reg-password-confirm-toggle', 'reg-password-confirm');
+
+        if (HAS_REGISTERED_USER) {
+            tabRegister.style.display = 'none';
+            document.getElementById('panel-register').classList.remove('active');
+            showTab('login');
+        } else {
+            tabLogin.style.display = 'none';
+            document.getElementById('panel-login').classList.remove('active');
+            showTab('register');
+            // const si = document.getElementById('step-indicator');
+            // if (si) si.style.display = 'flex';
+        }
+        if (!HAS_VISITOR_KEYS) {
+            tabVisitor.style.display = 'none';
+            document.getElementById('panel-visitor').classList.remove('active');
+        }
+
+        // ── Step indicator ────────────────────────────────────────────────────
+        function setStep(n) {
+            [1,2,3].forEach(i => {
+                const el = document.getElementById('step-' + i);
+                if (!el) return;
+                el.classList.remove('active','done');
+                if (i < n) el.classList.add('done');
+                else if (i === n) el.classList.add('active');
+            });
+        }
+
+        // ── Login form ────────────────────────────────────────────────────────
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            if (btn.disabled) return;
+            errorMsg.style.display = 'none';
+            // Resolve username: prefer the visible input; fall back to the selected
+            // profile option's dataset.username (Electron mode hides the input).
+            let username = document.getElementById('login-username').value.trim();
+            if (!username) {
+                const sel = document.getElementById('login-profile-select');
+                if (sel && sel.selectedIndex >= 0) {
+                    const opt = sel.options[sel.selectedIndex];
+                    if (opt && opt.dataset && opt.dataset.username) {
+                        username = opt.dataset.username.trim();
+                    }
+                }
+            }
+            const password = document.getElementById('login-password').value;
+            if (!username) { showError('Please enter your username.'); return; }
+            if (!password) { showError('Please enter your password.'); return; }
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Signing in…';
+            try {
+                const proceed = await shouldProceedWithSignInWhenAIIncomplete();
+                if (!proceed) return;
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ username, password })
+                });
+                if (res.ok) { window.location.href = '/'; }
+                else {
+                    const d = await res.json().catch(() => ({}));
+                    showError(d.error || d.detail || 'Invalid username or password.');
+                }
+            } catch(_) { showError('Network error. Please try again.'); }
+            finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sign-in-alt" style="margin-right:6px;"></i>Sign In';
+            }
+        });
+
+        // ── Register form ─────────────────────────────────────────────────────
+        document.getElementById('register-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('register-btn');
+            errorMsg.style.display = 'none';
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Registering…';
+            try {
+                const password = document.getElementById('reg-password').value;
+                if (password !== document.getElementById('reg-password-confirm').value) {
+                    showError('Passwords do not match.'); return;
+                }
+                const username    = document.getElementById('reg-username').value.trim();
+                const displayName = document.getElementById('reg-display-name').value.trim();
+                const familyName  = document.getElementById('reg-family-name').value.trim();
+                const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ username, display_name: displayName, family_name: familyName, password })
+                });
+                if (res.ok) {
+                    // Store username in the billing DB profile record, then reload.
+                    if (hasElectron && window.electronAPI.updateProfile) {
+                        try {
+                            const { activeId } = await window.electronAPI.getProfiles();
+                            if (activeId) {
+                                const fullName = [displayName, familyName].filter(Boolean).join(' ');
+                                await window.electronAPI.updateProfile({ id: activeId, username, name: fullName || username });
+                            }
+                        } catch(_) {}
+                    }
+                    setStep(2);
+                    showSuccess('Account created! Set up your AI model, then sign in.');
+                    // Brief pause so the user sees the success, then reload into Sign In
+                    setTimeout(() => window.location.reload(), 1200);
+                } else {
+                    const d = await res.json().catch(() => ({}));
+                    showError(d.error || d.detail || 'Registration failed. Please try again.');
+                }
+            } catch(_) { showError('Network error. Please try again.'); }
+            finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-user-plus" style="margin-right:6px;"></i>Register';
+            }
+        });
+
+        // ── Visitor ───────────────────────────────────────────────────────────
+        document.getElementById('visitor-hints-btn').addEventListener('click', async function() {
+            const list = document.getElementById('visitor-hints-list');
+            try {
+                const res = await fetch('/visitor/hints', { credentials: 'same-origin' });
+                const d = await res.json().catch(() => ({}));
+                const hints = d.hints || [];
+                list.innerHTML = hints.length === 0
+                    ? 'No hints available for this archive.'
+                    : '<strong style="color:#cdd6e8;">Key hints:</strong><ul style="margin:6px 0 0; padding-left:18px;">'
+                      + hints.map(h => '<li>' + h.replace(/</g,'&lt;') + '</li>').join('') + '</ul>';
+                list.style.display = 'block';
+            } catch(_) { list.innerHTML = 'Could not retrieve hints.'; list.style.display = 'block'; }
+        });
+
+        document.getElementById('visitor-login-btn').addEventListener('click', async function() {
+            const btn = this;
+            const key = document.getElementById('visitor-key').value;
+            errorMsg.style.display = 'none';
+            if (!key) { showError('Please enter your visitor key.'); return; }
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Checking…';
+            try {
+                const res = await fetch('/visitor/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin', body: JSON.stringify({ key })
+                });
+                if (res.ok) { window.location.href = '/'; }
+                else {
+                    const d = await res.json().catch(() => ({}));
+                    showError(res.status === 401 ? 'Invalid visitor key. Please try again.'
+                        : (d.error || d.detail || 'Access failed. Please try again.'));
+                }
+            } catch(_) { showError('Network error. Please try again.'); }
+            finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-door-open" style="margin-right:6px;"></i>Access Archive'; }
+        });
+
+        // ── Profile select (Electron only) ────────────────────────────────────
+        (async function() {
+            if (!hasElectron) return;
+
+            // In Electron the combined create+register form lives inside the Sign In
+            // panel, so the separate Register tab is not needed.
+            tabRegister.style.display = 'none';
+            tabLogin.style.display = '';
+            showTab('login');
+
+            // Fetch profile list from Go HTTP (works whether or not a main DB is loaded).
+            let profiles = [], activeId = null;
+            try {
+                const res = await fetch('/profiles', { credentials: 'same-origin' });
+                if (res.ok) {
+                    const d = await res.json();
+                    profiles = Array.isArray(d) ? d : (d.profiles || []);
+                }
+            } catch(_) {}
+
+            // activeId still comes from Electron IPC (only it knows which DB is active).
+            if (window.electronAPI && window.electronAPI.getProfiles) {
+                try {
+                    const r = await window.electronAPI.getProfiles();
+                    activeId = r.activeId;
+                } catch(_) {}
+            }
+
+            const profileGroup   = document.getElementById('login-profile-group');
+            const usernameGroup  = document.getElementById('login-username-group');
+            const profileSelect  = document.getElementById('login-profile-select');
+            const usernameInput  = document.getElementById('login-username');
+            const passwordGroup  = document.getElementById('login-password-group');
+            const loginBtn       = document.getElementById('login-btn');
+            const newUserForm    = document.getElementById('new-user-form');
+
+            // Show select, hide plain text input
+            profileGroup.style.display = 'block';
+            usernameGroup.style.display = 'none';
+
+            function buildSelect() {
+                profileSelect.innerHTML = '';
+                const hasActive = profiles.some(p => p.id === activeId);
+                const defaultProfile = profiles.find(p => p.is_default);
+                profiles.forEach((p, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value            = p.id;
+                    opt.textContent      = (p.is_default ? '\u2605 ' : '') + (p.username ? p.name + ' (' + p.username + ')' : p.name);
+                    opt.dataset.username = p.username || '';
+                    const isActiveProfile = p.id === activeId
+                        || (!hasActive && defaultProfile && p.id === defaultProfile.id)
+                        || (!hasActive && !defaultProfile && idx === 0);
+                    opt.dataset.active   = isActiveProfile ? '1' : '0';
+                    if (isActiveProfile) opt.selected = true;
+                    profileSelect.appendChild(opt);
+                });
+                const newOpt = document.createElement('option');
+                newOpt.value = '__new__';
+                newOpt.textContent = '+ New User...';
+                profileSelect.appendChild(newOpt);
+            }
+
+            function showSignInFields() {
+                passwordGroup.style.display = '';
+                loginBtn.style.display = '';
+                newUserForm.style.display = 'none';
+            }
+
+            function showNewUserSection() {
+                passwordGroup.style.display = 'none';
+                loginBtn.style.display = 'none';
+                newUserForm.style.display = 'block';
+                document.getElementById('new-display-name').focus();
+            }
+
+            buildSelect();
+
+            async function ensureInitialActiveProfile() {
+                if (!profiles.length) return;
+                const hasActive = profiles.some(p => p.id === activeId);
+                if (hasActive) return;
+                const defaultProfile = profiles.find(p => p.is_default);
+                const first = defaultProfile || profiles[0];
+                if (!first || !window.electronAPI || !window.electronAPI.getProfileDbPath || !window.electronAPI.selectDatabase) {
+                    return;
+                }
+                try {
+                    profileSelect.disabled = true;
+                    const dbRes = await window.electronAPI.getProfileDbPath(first.id);
+                    if (!dbRes || !dbRes.ok || !dbRes.dbPath) {
+                        showError('Could not resolve archive path for selected user.');
+                        profileSelect.disabled = false;
+                        return;
+                    }
+                    const result = await window.electronAPI.selectDatabase({
+                        path: dbRes.dbPath,
+                        profileId: first.id,
+                    });
+                    if (result && result.ok) {
+                        window.location.reload();
+                        return;
+                    }
+                    showError('Failed to switch archive: ' + ((result && result.error) || 'unknown'));
+                } catch (_) {
+                    showError('Failed to initialize selected archive.');
+                } finally {
+                    profileSelect.disabled = false;
+                }
+            }
+
+            // Cancel button only makes sense when there is an existing archive to revert to.
+            document.getElementById('new-profile-cancel').style.display =
+                profiles.length > 0 ? '' : 'none';
+
+            if (profiles.length === 0) {
+                // First run — hide the profile select (only "+ New User..." in it),
+                // show the step indicator, and go straight to archive creation.
+                profileGroup.style.display = 'none';
+                // const si = document.getElementById('step-indicator');
+                // if (si) { si.style.display = 'flex'; setStep(1); }
+                showNewUserSection();
+            } else {
+                // Pre-fill username from active profile, else billing startup default, else first row
+                const defaultProfile = profiles.find(p => p.is_default);
+                const active = profiles.find(p => p.id === activeId);
+                if (active && active.username) {
+                    usernameInput.value = active.username;
+                } else if (defaultProfile && defaultProfile.username) {
+                    usernameInput.value = defaultProfile.username;
+                } else if (profiles[0] && profiles[0].username) {
+                    usernameInput.value = profiles[0].username;
+                }
+                await ensureInitialActiveProfile();
+            }
+
+            profileSelect.addEventListener('change', async function() {
+                const val = this.value;
+                showSignInFields(); // reset first
+                errorMsg.style.display = 'none';
+
+                if (val === '__new__') {
+                    showNewUserSection();
+                    return;
+                }
+
+                const opt = this.options[this.selectedIndex];
+                const isActive = opt.dataset.active === '1';
+
+                if (isActive) {
+                    usernameInput.value = opt.dataset.username || '';
+                } else {
+                    // Resolve the db path via localhost-only IPC, then switch.
+                    this.disabled = true;
+                    const dbRes = window.electronAPI.getProfileDbPath
+                        ? await window.electronAPI.getProfileDbPath(val)
+                        : { ok: false };
+                    if (!dbRes.ok) {
+                        this.disabled = false;
+                        showError('Could not resolve archive path.');
+                        this.value = activeId || '';
+                        return;
+                    }
+                    const result = await window.electronAPI.selectDatabase({
+                        path: dbRes.dbPath,
+                        profileId: val,
+                    });
+                    if (result.ok) { window.location.reload(); }
+                    else {
+                        this.disabled = false;
+                        showError('Failed to switch archive: ' + (result.error || 'unknown'));
+                    }
+                }
+            });
+
+            // ── New user form (combined archive creation + registration) ──────
+            let customDbPath = null;
+
+            document.getElementById('new-profile-custom-loc').addEventListener('change', function() {
+                const browseBtn = document.getElementById('new-profile-browse');
+                browseBtn.style.display = this.checked ? '' : 'none';
+                if (!this.checked) {
+                    customDbPath = null;
+                    document.getElementById('new-profile-custom-path').style.display = 'none';
+                }
+            });
+
+            document.getElementById('new-profile-browse').addEventListener('click', async () => {
+                const result = await window.electronAPI.showSaveDialog({
+                    title: 'Choose location for new archive',
+                    defaultPath: 'archive.sqlite',
+                    filters: [{ name: 'SQLite Database', extensions: ['sqlite', 'db'] }],
+                });
+                if (!result.canceled && result.filePath) {
+                    customDbPath = result.filePath;
+                    const el = document.getElementById('new-profile-custom-path');
+                    el.textContent = customDbPath;
+                    el.style.display = 'block';
+                }
+            });
+
+            document.getElementById('new-profile-cancel').addEventListener('click', () => {
+                const activeOpt = [...profileSelect.options].find(o => o.dataset.active === '1');
+                if (activeOpt) profileSelect.value = activeOpt.value;
+                ['new-display-name','new-family-name','new-username','new-password','new-password-confirm']
+                    .forEach(id => { document.getElementById(id).value = ''; });
+                resetLoginPwFieldMask('new-password', 'new-password-toggle');
+                resetLoginPwFieldMask('new-password-confirm', 'new-password-confirm-toggle');
+                document.getElementById('new-profile-custom-loc').checked = false;
+                document.getElementById('new-profile-browse').style.display = 'none';
+                document.getElementById('new-profile-custom-path').style.display = 'none';
+                document.getElementById('new-profile-error').style.display = 'none';
+                customDbPath = null;
+                showSignInFields();
+            });
+
+            document.getElementById('new-profile-create').addEventListener('click', async () => {
+                const errEl     = document.getElementById('new-profile-error');
+                const createBtn = document.getElementById('new-profile-create');
+                errEl.style.display = 'none';
+
+                const firstName = document.getElementById('new-display-name').value.trim();
+                const lastName  = document.getElementById('new-family-name').value.trim();
+                const username  = document.getElementById('new-username').value.trim();
+                const password  = document.getElementById('new-password').value;
+                const confirm   = document.getElementById('new-password-confirm').value;
+
+                if (!firstName) { errEl.textContent = 'First name is required.';           errEl.style.display = 'block'; return; }
+                if (!username)  { errEl.textContent = 'Username is required.';              errEl.style.display = 'block'; return; }
+                if (password.length < 12) { errEl.textContent = 'Password must be at least 12 characters.'; errEl.style.display = 'block'; return; }
+                if (password !== confirm)  { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
+
+                const baseName = [firstName, lastName].filter(Boolean).join(' ');
+
+                // Reject if the entered first+last (case-insensitive) collides with an
+                // existing archive's base name. We strip any "(created …)" suffix that
+                // earlier creations may have appended, so old plain names also match.
+                const baseLower = baseName.toLowerCase();
+                const stripCreatedSuffix = (s) => (s || '').replace(/\s*\(created\s+[^)]*\)\s*$/i, '').trim();
+                const collision = (profiles || []).find(p => stripCreatedSuffix(p.name).toLowerCase() === baseLower);
+                if (collision) {
+                    errEl.textContent = 'An archive named "' + baseName + '" already exists. Please use a different first or family name.';
+                    errEl.style.display = 'block';
+                    document.getElementById('new-display-name').focus();
+                    return;
+                }
+
+                // Append a creation timestamp so the stored archive name (and the
+                // derived db file slug) is always unique.
+                const now = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                const ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate())
+                    + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+                const archiveName = baseName + ' (created ' + ts + ')';
+
+                createBtn.disabled = true;
+                createBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:5px;"></i>Creating archive…';
+
+                // Step 1: create the archive (Electron restarts Go with the new DB).
+                const archiveResult = await window.electronAPI.createProfile({
+                    name: archiveName,
+                    dbPath: customDbPath || undefined,
+                });
+                if (!archiveResult.ok) {
+                    const rawErr = (archiveResult.error || '').toString();
+                    const isDuplicate = /unique/i.test(rawErr) || /already exists/i.test(rawErr);
+                    errEl.textContent = isDuplicate
+                        ? 'An archive with this name already exists. Please use a different first or family name.'
+                        : 'Failed to create archive: ' + (rawErr || 'unknown');
+                    errEl.style.display = 'block';
+                    if (isDuplicate) document.getElementById('new-display-name').focus();
+                    createBtn.disabled = false;
+                    createBtn.innerHTML = '<i class="fas fa-user-plus" style="margin-right:5px;"></i>Create &amp; Register';
+                    return;
+                }
+
+                // Step 2: register the user in the freshly started archive DB.
+                createBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:5px;"></i>Registering…';
+                try {
+                    const regRes = await fetch('/auth/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ username, display_name: firstName, family_name: lastName, password }),
+                    });
+                    if (!regRes.ok) {
+                        const d = await regRes.json().catch(() => ({}));
+                        errEl.textContent = 'Registration failed: ' + (d.error || d.detail || 'unknown');
+                        errEl.style.display = 'block';
+                        createBtn.disabled = false;
+                        createBtn.innerHTML = '<i class="fas fa-user-plus" style="margin-right:5px;"></i>Create &amp; Register';
+                        return;
+                    }
+                } catch(_) {
+                    errEl.textContent = 'Network error during registration. Please try again.';
+                    errEl.style.display = 'block';
+                    createBtn.disabled = false;
+                    createBtn.innerHTML = '<i class="fas fa-user-plus" style="margin-right:5px;"></i>Create &amp; Register';
+                    return;
+                }
+
+                // Step 3: store the username back in the billing DB profile record.
+                try {
+                    const { activeId: newActiveId } = await window.electronAPI.getProfiles();
+                    if (newActiveId) {
+                        await window.electronAPI.updateProfile({ id: newActiveId, username, name: archiveName });
+                    }
+                } catch(_) {}
+
+                setStep(2);
+                showSuccess('Archive created and account registered! Set up AI, then sign in.');
+                setTimeout(() => window.location.reload(), 1500);
+            });
+        }());
+
+        // ── AI & Setup panel ──────────────────────────────────────────────────
+        (function() {
+            const statusEl    = document.getElementById('adv-status');
+            const panelAdv    = document.getElementById('panel-advanced');
+            const advBtn      = document.getElementById('advanced-btn');
+            const loginCard   = document.querySelector('.login-card');
+            const noElectronMsg = document.getElementById('adv-no-electron-msg');
+            const ollamaBlock = document.getElementById('adv-ollama-block');
+            let refreshLocalAiStatus;
+            let lastPrimaryTab = 'login';
+            if (!hasElectron && !SHOW_LOGIN_ADVANCED) { advBtn.style.display = 'none'; return; }
+
+            function syncAiSetupTriggerAlert(startRes, check) {
+                const serverBad = !startRes || !startRes.ok;
+                const modelsBad = !check || !check.ok || !check.hasGemma4 || !check.hasEmbeddingModel;
+                const bad = serverBad || modelsBad;
+                advBtn.classList.toggle('advanced-btn-needs-attention', bad);
+                advBtn.classList.toggle('advanced-btn-ready', !bad);
+                advBtn.title = bad
+                    ? 'Local AI needs attention — open for server status and model downloads'
+                    : 'AI configuration and advanced options';
+            }
+
+            function hideLoginFields(hidden) {
+                // When advanced is open, collapse all tab panels
+                ['panel-login','panel-register','panel-visitor'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = hidden ? 'none' : '';
+                });
+            }
+
+            async function openSetupPanel() {
+                const activeTab = ['login','register','visitor'].find((t) =>
+                    document.getElementById('tab-' + t).classList.contains('active')
+                );
+                if (activeTab) lastPrimaryTab = activeTab;
+                panelAdv.style.display = 'block';
+                advBtn.setAttribute('aria-expanded', 'true');
+                advBtn.classList.add('active');
+                ['login','register','visitor'].forEach((t) => {
+                    document.getElementById('tab-' + t).classList.remove('active');
+                });
+                hideLoginFields(true);
+                loginCard.style.maxWidth = '840px';
+                statusEl.style.display = 'none';
+
+                if (!hasElectron) {
+                    if (ollamaBlock) ollamaBlock.style.display = 'none';
+                    if (noElectronMsg) noElectronMsg.style.display = 'block';
+                    return;
+                }
+                if (noElectronMsg) noElectronMsg.style.display = 'none';
+                if (ollamaBlock) ollamaBlock.style.display = '';
+                if (typeof refreshLocalAiStatus === 'function') await refreshLocalAiStatus();
+            }
+
+            window.openSetupPanel = openSetupPanel;
+            window.closeSetupPanel = function closeSetupPanel(restorePrimaryTab) {
+                if (panelAdv.style.display !== 'block') return;
+                panelAdv.style.display = 'none';
+                advBtn.setAttribute('aria-expanded', 'false');
+                advBtn.classList.remove('active');
+                hideLoginFields(false);
+                loginCard.style.maxWidth = '';
+                if (restorePrimaryTab) showTab(lastPrimaryTab);
+            };
+
+            advBtn.addEventListener('click', async function() {
+                if (panelAdv.style.display === 'block') {
+                    window.closeSetupPanel(true);
+                    return;
+                }
+                await openSetupPanel();
+            });
+
+            // ── Local AI ──────────────────────────────────────────────────────
+            const ollamaMsg       = document.getElementById('adv-ollama-msg');
+            const progressWrap    = document.getElementById('adv-ollama-progress-bar-wrap');
+            const progressBar     = document.getElementById('adv-ollama-progress-bar');
+            const progressStatus  = document.getElementById('adv-ollama-progress-status');
+            const progressSize    = document.getElementById('adv-ollama-progress-size');
+            const downloadModelsBtn = document.getElementById('adv-download-models-btn');
+            const serverValueEl = document.getElementById('adv-ollama-server-value');
+            const gemmaValueEl  = document.getElementById('adv-model-gemma-value');
+            const embedValueEl  = document.getElementById('adv-model-embed-value');
+
+            function ollamaSetMsg(text, color) {
+                ollamaMsg.textContent = text;
+                ollamaMsg.style.color = color || '#8fa4c8';
+                ollamaMsg.style.display = text ? 'block' : 'none';
+            }
+
+            if (hasElectron) {
+                window.electronAPI.onOllamaPullProgress((evt) => {
+                    const label = evt.model ? evt.model + ': ' : '';
+                    if (evt.type === 'progress') {
+                        progressWrap.style.display = 'block';
+                        progressBar.value = evt.percent;
+                        progressStatus.textContent = label + (evt.status || 'Downloading…');
+                        progressSize.textContent   = evt.downloaded + ' / ' + evt.total;
+                    } else if (evt.type === 'status') {
+                        progressWrap.style.display = 'block';
+                        progressBar.value = 0;
+                        progressStatus.textContent = evt.status;
+                        progressSize.textContent   = '';
+                    } else if (evt.type === 'done') {
+                        progressBar.value = 100;
+                        progressStatus.textContent = 'All models downloaded';
+                        progressSize.textContent   = '';
+                    }
+                });
+
+                refreshLocalAiStatus = async function refreshLocalAiStatus() {
+                    ollamaMsg.style.display = 'none';
+                    serverValueEl.textContent = 'Checking…';
+                    serverValueEl.style.color = '#8fa4c8';
+                    gemmaValueEl.textContent = '…';
+                    gemmaValueEl.style.color = '#8fa4c8';
+                    embedValueEl.textContent = '…';
+                    embedValueEl.style.color = '#8fa4c8';
+                    downloadModelsBtn.style.display = 'none';
+
+                    const startRes = await window.electronAPI.startOllama();
+                    if (startRes.ok) {
+                        serverValueEl.textContent = 'Running';
+                        serverValueEl.style.color = '#4ade80';
+                    } else {
+                        serverValueEl.textContent = 'Not running';
+                        serverValueEl.style.color = '#f87171';
+                        ollamaSetMsg('Ollama: ' + (startRes.error || 'failed to start'), '#f87171');
+                    }
+
+                    const check = await window.electronAPI.checkOllamaModel();
+                    if (!check.ok) {
+                        gemmaValueEl.textContent = '—';
+                        embedValueEl.textContent = '—';
+                        ollamaSetMsg(check.error, '#f87171');
+                        syncAiSetupTriggerAlert(startRes, check);
+                        return;
+                    }
+
+                    gemmaValueEl.textContent = check.hasGemma4 ? 'Available' : 'Not installed';
+                    gemmaValueEl.style.color = check.hasGemma4 ? '#4ade80' : '#fbbf24';
+                    embedValueEl.textContent = check.hasEmbeddingModel ? 'Available' : 'Not installed';
+                    embedValueEl.style.color = check.hasEmbeddingModel ? '#4ade80' : '#fbbf24';
+
+                    const needDownload = !check.hasGemma4 || !check.hasEmbeddingModel;
+                    downloadModelsBtn.style.display = needDownload ? 'inline-flex' : 'none';
+
+                    syncAiSetupTriggerAlert(startRes, check);
+                    if (check.hasModel && startRes.ok) setStep(3);
+                };
+
+                downloadModelsBtn.addEventListener('click', async () => {
+                    downloadModelsBtn.disabled = true;
+                    progressWrap.style.display = 'block';
+                    progressBar.value = 0;
+                    progressStatus.textContent = 'Preparing…';
+                    progressSize.textContent = '';
+                    ollamaSetMsg('Downloading AI models — this may take several minutes…', '#8fa4c8');
+                    const res = await window.electronAPI.pullOllamaModel();
+                    progressWrap.style.display = 'none';
+                    downloadModelsBtn.disabled = false;
+                    if (!res.ok) {
+                        ollamaSetMsg('Download failed: ' + (res.error || 'unknown'), '#f87171');
+                        await refreshLocalAiStatus();
+                        return;
+                    }
+                    ollamaSetMsg('Models installed.', '#4ade80');
+                    await refreshLocalAiStatus();
+                });
+            }
+
+            // First-run: open Local AI Setup only if something needs attention. If Local AI is all OK, stay on Sign In.
+            (async function() {
+                if (!hasElectron) return;
+                await refreshLocalAiStatus();
+                if (!HAS_REGISTERED_USER && !advBtn.classList.contains('advanced-btn-ready')) {
+                    await openSetupPanel();
+                }
+            })();
+        }());
+    </script>
+</body>
+</html>

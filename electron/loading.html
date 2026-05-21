@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Museum</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #c9a96e;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 40px;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 2px solid #333;
+      border-top-color: #c9a96e;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 24px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .status {
+      font-size: 12px;
+      color: #888;
+      letter-spacing: 1px;
+      min-height: 18px;
+      text-align: center;
+      transition: color 0.3s;
+    }
+
+    .status.ready {
+      color: #c9a96e;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">Digital Museum</div>
+  <div class="subtitle">Loading your archive</div>
+  <div class="spinner" id="spinner"></div>
+  <div class="status" id="status">Starting...</div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const spinnerEl = document.getElementById('spinner');
+
+    if (window.electronAPI) {
+      window.electronAPI.onStatusUpdate((msg) => {
+        statusEl.textContent = msg;
+        if (msg === 'Ready!') {
+          statusEl.classList.add('ready');
+          spinnerEl.style.borderTopColor = '#c9a96e';
+        }
+        if (msg.startsWith('Error:')) {
+          statusEl.style.color = '#e05555';
+          spinnerEl.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

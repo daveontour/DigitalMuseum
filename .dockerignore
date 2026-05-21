@@ -1,0 +1,7 @@
+.env
+bin/
+tmp/
+*.exe
+*.log
+launcher.exe
+launch.bat

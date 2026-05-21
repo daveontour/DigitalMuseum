@@ -1,0 +1,40 @@
+{
+  "env": {
+    "CGO_CFLAGS": "-IC:/NonOneDrive/ElectronMuseum/cgo-compat"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(go version *)",
+      "Bash(dlv version *)",
+      "Bash(export PATH=\"/c/TDM-GCC-64/bin:$PATH\")",
+      "Bash(gcc --version)",
+      "Bash(go build *)",
+      "Bash(CGO_ENABLED=1 CGO_CFLAGS=\"-IC:/NonOneDrive/ElectronMuseum/cgo-compat -O0 -g\" CGO_CPPFLAGS=\"-IC:/NonOneDrive/ElectronMuseum/cgo-compat -O0 -g\" go build -o /tmp/test_build.exe ./cmd/server)",
+      "Bash(export CGO_ENABLED=1)",
+      "Bash(export CGO_CFLAGS=\"-IC:/NonOneDrive/ElectronMuseum/cgo-compat -O0 -g\")",
+      "Bash(export CGO_CPPFLAGS=\"-IC:/NonOneDrive/ElectronMuseum/cgo-compat -O0 -g\")",
+      "Bash(dlv debug *)",
+      "Bash(kill %1)",
+      "Read(//c/Users/dave_/AppData/Local/Temp/**)",
+      "Bash(xxd \"C:/Users/dave_/AppData/Local/Temp/__debug_test.exe\")",
+      "Bash(CGO_ENABLED=1 CGO_CFLAGS='-IC:/NonOneDrive/ElectronMuseum/cgo-compat -O0 -g' go build '-gcflags=all=-N -l' -o /c/Users/dave_/AppData/Local/Temp/dm_debug_test.exe ./cmd/server)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(cmd.exe /c \"C:\\\\Users\\\\dave_\\\\AppData\\\\Local\\\\Temp\\\\dm_captured.exe\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(CGO_ENABLED=1 CGO_CFLAGS='-IC:/NonOneDrive/ElectronMuseum/cgo-compat -O0 -g' go build '-gcflags=all=-N -l' -o /c/NonOneDrive/ElectronMuseum/bin/dm_debug_test.exe ./cmd/server)",
+      "Bash(echo \"Build exit: $?\")",
+      "Bash(objdump -p /c/NonOneDrive/ElectronMuseum/bin/dm_debug_test.exe)",
+      "Bash(go env *)",
+      "Read(//c/Users/dave_/cgotest2/**)",
+      "Read(//c/Users/dave_/gotest/**)",
+      "Bash(mkdir -p /c/Users/dave_/bigtest)",
+      "Bash(cat)",
+      "Read(//c/Users/dave_/**)",
+      "Bash(go vet *)",
+      "Bash(make build-exe *)",
+      "Bash(git checkout *)",
+      "Bash(go list *)",
+      "Bash(powershell -Command \"Get-ChildItem -Recurse -Path 'c:\\\\NonOneDrive\\\\ElectronMuseum' -Filter '*identity*' | Select-Object FullName\")"
+    ]
+  }
+}

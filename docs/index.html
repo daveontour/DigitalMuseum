@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Digital Museum — a personal digital archive and AI-powered memory explorer.">
+    <title>Digital Museum</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <style>
+        /* Mirrors app tokens from museum_of.css */
+        :root {
+            --color-navy: #233366;
+            --color-navy-dark: #19264d;
+            --color-blue: #4a90e2;
+            --color-blue-dark: #2d6bc4;
+            --color-blue-light: #e8f0fe;
+            --color-text: #333;
+            --color-text-muted: #666;
+            --color-bg: #fff;
+            --color-bg-alt: #f8f9fa;
+            --color-border: #dee2e6;
+            --radius-md: 6px;
+            --radius-lg: 8px;
+            --shadow-md: 0 2px 8px rgba(0,0,0,0.10);
+            --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+            --focus-ring: 0 0 0 3px rgba(74,144,226,0.25);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--color-text);
+            background: #f0f2f5;
+            line-height: 1.5;
+        }
+
+        a {
+            color: var(--color-blue);
+            text-decoration: none;
+        }
+        a:hover { text-decoration: underline; color: var(--color-blue-dark); }
+
+        .wrap {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 0 1.25rem;
+        }
+
+        /* —— Top bar (app-like) —— */
+        .site-header {
+            background: var(--color-navy-dark);
+            color: #fff;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .site-header .inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 52px;
+            gap: 1rem;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+        .brand i { color: var(--color-blue); }
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1.25rem;
+            font-size: 0.9rem;
+        }
+        .nav-links a {
+            color: rgba(255,255,255,0.88);
+            text-decoration: none;
+        }
+        .nav-links a:hover { color: #fff; text-decoration: underline; }
+
+        /* —— Hero —— */
+        .hero {
+            background: linear-gradient(155deg, var(--color-navy-dark) 0%, #1a3050 45%, var(--color-navy) 100%);
+            color: #fff;
+            padding: clamp(3rem, 8vw, 5rem) 0;
+            border-bottom: 1px solid rgba(0,0,0,0.15);
+        }
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            align-items: center;
+        }
+        @media (min-width: 900px) {
+            .hero-grid { grid-template-columns: 1.1fr 1fr; }
+        }
+        .hero h1 {
+            margin: 0 0 0.75rem;
+            font-size: clamp(1.85rem, 4vw, 2.5rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+        }
+        .hero-lead {
+            margin: 0 0 1.5rem;
+            font-size: 1.05rem;
+            color: rgba(255,255,255,0.88);
+            max-width: 38ch;
+        }
+        .hero-cta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.65rem 1.15rem;
+            border-radius: var(--radius-md);
+            font-size: 0.95rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+        }
+        .btn-primary {
+            background: var(--color-blue);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: var(--color-blue-dark);
+            box-shadow: var(--shadow-md);
+        }
+        .btn-ghost {
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.25);
+        }
+        .btn-ghost:hover { background: rgba(255,255,255,0.2); }
+
+        /* Screenshot frame */
+        .screenshot-frame {
+            background: var(--color-bg-alt);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+        .screenshot-frame img {
+            display: block;
+            width: 100%;
+            height: auto;
+            vertical-align: middle;
+        }
+        .screenshot-caption {
+            margin: 0.5rem 0 0;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.65);
+        }
+
+        /* Hero image carousel */
+        .hero-carousel {
+            background: var(--color-bg-alt);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+        .hero-carousel:focus { outline: none; }
+        .hero-carousel:focus-visible {
+            box-shadow: var(--shadow-lg), var(--focus-ring);
+        }
+        .hero-carousel__viewport {
+            position: relative;
+            aspect-ratio: 16 / 9;
+            background: #e8ecf2;
+        }
+        .hero-carousel__slide {
+            position: absolute;
+            inset: 0;
+            margin: 0;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.35s ease, visibility 0.35s ease;
+        }
+        .hero-carousel__slide.is-active {
+            opacity: 1;
+            visibility: visible;
+            z-index: 1;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .hero-carousel__slide {
+                transition: none;
+            }
+        }
+        .hero-carousel__slide img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: top center;
+        }
+        .hero-carousel__caption {
+            position: absolute;
+            bottom: 0.75rem;
+            right: 0.75rem;
+            left: auto;
+            max-width: min(88%, 20rem);
+            margin: 0;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.82rem;
+            line-height: 1.35;
+            font-weight: 500;
+            color: #fff;
+            text-align: left;
+            background: rgba(25, 38, 77, 0.88);
+            border-radius: var(--radius-md);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        }
+        .hero-carousel__toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.5rem 0.65rem;
+            background: var(--color-bg);
+            border-top: 1px solid var(--color-border);
+        }
+        .hero-carousel__dots {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.35rem;
+            max-width: min(100%, 22rem);
+        }
+        .hero-carousel__dot {
+            width: 8px;
+            height: 8px;
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            background: var(--color-border);
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+        .hero-carousel__dot:hover {
+            background: #b8c0cc;
+        }
+        .hero-carousel__dot.is-active {
+            background: var(--color-blue);
+            transform: scale(1.15);
+        }
+        .hero-carousel__dot:focus-visible {
+            outline: none;
+            box-shadow: var(--focus-ring);
+        }
+        .hero-carousel__nav {
+            display: flex;
+            gap: 0.35rem;
+        }
+        .hero-carousel__nav .btn {
+            padding: 0.45rem 0.75rem;
+            min-width: 2.5rem;
+            justify-content: center;
+            font-size: 0.9rem;
+            color: var(--color-navy);
+            background: var(--color-bg-alt);
+            border: 1px solid var(--color-border);
+        }
+        .hero-carousel__nav .btn:hover {
+            background: var(--color-blue-light);
+            border-color: rgba(74,144,226,0.45);
+        }
+        .hero-carousel__nav .btn:focus-visible {
+            outline: none;
+            box-shadow: var(--focus-ring);
+        }
+        .hero-carousel__live {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* —— Sections —— */
+        section {
+            padding: clamp(2.5rem, 5vw, 3.5rem) 0;
+        }
+        section.alt { background: var(--color-bg); }
+        .section-title {
+            margin: 0 0 0.35rem;
+            font-size: 1.5rem;
+            color: var(--color-navy);
+        }
+        .section-intro {
+            margin: 0 0 1.75rem;
+            color: var(--color-text-muted);
+            max-width: 60ch;
+        }
+
+        /* —— Feature grid —— */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
+        }
+        @media (min-width: 600px) {
+            .feature-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (min-width: 900px) {
+            .feature-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        .feature-card {
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem 1.35rem;
+            box-shadow: var(--shadow-md);
+        }
+        .feature-card .icon {
+            width: 42px;
+            height: 42px;
+            border-radius: var(--radius-md);
+            background: var(--color-blue-light);
+            color: var(--color-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            margin-bottom: 0.85rem;
+        }
+        .feature-card h3 {
+            margin: 0 0 0.4rem;
+            font-size: 1.05rem;
+            color: var(--color-navy);
+        }
+        .feature-card p {
+            margin: 0;
+            font-size: 0.92rem;
+            color: var(--color-text-muted);
+        }
+
+        /* —— Technical —— */
+        .tech-layout {
+            display: grid;
+            gap: 1.5rem;
+        }
+        @media (min-width: 800px) {
+            .tech-layout { grid-template-columns: 1fr 1fr; align-items: start; }
+        }
+        .tech-panel {
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: 1.35rem;
+            box-shadow: var(--shadow-md);
+        }
+        .tech-panel h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1.05rem;
+            color: var(--color-navy);
+        }
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            background: var(--color-blue-light);
+            color: var(--color-navy);
+            border: 1px solid rgba(74,144,226,0.35);
+        }
+        .tech-list {
+            margin: 0;
+            padding-left: 1.2rem;
+            color: var(--color-text-muted);
+            font-size: 0.92rem;
+        }
+        .tech-list li { margin-bottom: 0.4rem; }
+
+        /* —— Dev journal —— */
+        .journal {
+            border-top: 1px solid var(--color-border);
+        }
+        .journal-entry {
+            display: grid;
+            gap: 1rem;
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--color-border);
+        }
+        @media (min-width: 700px) {
+            .journal-entry {
+                grid-template-columns: 140px 1fr;
+                gap: 1.5rem;
+            }
+        }
+        .journal-meta {
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+        }
+        .journal-meta time {
+            display: block;
+            font-weight: 600;
+            color: var(--color-navy);
+            margin-bottom: 0.25rem;
+        }
+        .journal-body h3 {
+            margin: 0 0 0.35rem;
+            font-size: 1.1rem;
+            color: var(--color-navy);
+        }
+        .journal-body p {
+            margin: 0;
+            font-size: 0.95rem;
+            color: var(--color-text-muted);
+        }
+
+        .site-footer {
+            background: var(--color-navy-dark);
+            color: rgba(255,255,255,0.75);
+            padding: 1.5rem 0;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        .site-footer a { color: var(--color-blue-light); }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="wrap inner">
+            <a href="#" class="brand" style="text-decoration:none;">
+                <i class="fas fa-landmark" aria-hidden="true"></i>
+                <span>Digital Museum</span>
+            </a>
+            <nav class="nav-links" aria-label="Page">
+                <a href="#features">Features</a>
+                <a href="#technical">Technical</a>
+                <a href="#journal">Dev journal</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero" id="top">
+            <div class="wrap hero-grid">
+                <div>
+                    <h1>Your life archive, explored with AI</h1>
+                    <p class="hero-lead">
+                        Aggregate emails, messages, photos, and social history into one searchable museum—then chat with an assistant that can use tools to search and reason over your data.
+                    </p>
+                    <div class="hero-cta">
+                        <a class="btn btn-primary" href="#features"><i class="fas fa-compass" aria-hidden="true"></i> Explore features</a>
+                        <a class="btn btn-ghost" href="#technical"><i class="fas fa-code" aria-hidden="true"></i> Under the hood</a>
+                    </div>
+                </div>
+                <div>
+                    <div
+                        class="hero-carousel"
+                        data-hero-carousel
+                        role="region"
+                        aria-roledescription="carousel"
+                        aria-label="Product screenshots"
+                        tabindex="0">
+                        <div class="hero-carousel__viewport" id="hero-carousel-slides">
+                            <figure class="hero-carousel__slide is-active" role="group" aria-roledescription="slide" aria-label="Slide 1 of 23">
+                                <img src="./images/0100_Welcome.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Welcome screen with the gallery of available personalities and data statistics</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 2 of 23" aria-hidden="true">
+                                <img src="./images/0200_AIConversation.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Have a conversation with the AI about your archive or topics in general</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 3 of 23" aria-hidden="true">
+                                <img src="./images/0400_ChatConfig.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Set up a conversation between AIs about the data in the archive</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 4 of 23" aria-hidden="true">
+                                <img src="./images/0500_Chat.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Watch how the AI conversation evolves and inject where needed</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 5 of 23" aria-hidden="true">
+                                <img src="./images/0600_Question.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Get the AI to generate a probing question about the data in the archive - and then answer it</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 6 of 23" aria-hidden="true">
+                                <img src="./images/0700_InterviewConfig.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Set up an interview with the AI about the data in the archive</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 7 of 23" aria-hidden="true">
+                                <img src="./images/0800_Interview.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Have an interactive interview with the AI about the data in the archive</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 8 of 23" aria-hidden="true">
+                                <img src="./images/0900_Emails.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Email archive browser</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 9 of 23" aria-hidden="true">
+                                <img src="./images/1000_Messages.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Messages browser across channels</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 10 of 23" aria-hidden="true">
+                                <img src="./images/1050_Images.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Image gallery from all your sources</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 11 of 23" aria-hidden="true">
+                                <img src="./images/1100_FBAlbums.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Facebook Albums</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 12 of 23" aria-hidden="true">
+                                <img src="./images/1200_FBPosts.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Facebook Posts</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 13 of 23" aria-hidden="true">
+                                <img src="./images/1300_Locations.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Locations and Places</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 14 of 23" aria-hidden="true">
+                                <img src="./images/1400_Contacts.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Contacts Browser</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 15 of 23" aria-hidden="true">
+                                <img src="./images/1450_MemoryCompanion.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Memory Companion</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 16 of 23" aria-hidden="true">
+                                <img src="./images/1500_Statistics.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Archive statistics</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 17 of 23" aria-hidden="true">
+                                <img src="./images/1600_DataImport.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Import and manage data sources</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 18 of 23" aria-hidden="true">
+                                <img src="./images/1700_PrivateData.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Confidently store and access private and sensitive data</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 19 of 23" aria-hidden="true">
+                                <img src="./images/1800_ReferenceDocuments.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Import and manage reference documents for the AI</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 20 of 23" aria-hidden="true">
+                                <img src="./images/1900_SystemConfig.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">System and account configuration</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 21 of 23" aria-hidden="true">
+                                <img src="./images/2000_VisitorRights.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Allow Visitor access with fine-grained and controlled access rights</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 22 of 23" aria-hidden="true">
+                                <img src="./images/features.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Features overview composite</figcaption>
+                            </figure>
+                            <figure class="hero-carousel__slide" role="group" aria-roledescription="slide" aria-label="Slide 23 of 23" aria-hidden="true">
+                                <img src="./images/info-graphic.png" width="800" height="450" alt="" />
+                                <figcaption class="hero-carousel__caption">Architecture and flow overview</figcaption>
+                            </figure>
+                        </div>
+                        <p id="hero-carousel-live" class="hero-carousel__live" aria-live="polite"></p>
+                        <div class="hero-carousel__toolbar">
+                            <div class="hero-carousel__dots" role="group" aria-label="Choose slide">
+                                <button type="button" class="hero-carousel__dot is-active" data-carousel-dot="0" aria-current="true" aria-label="Slide 1 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="1" aria-label="Slide 2 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="2" aria-label="Slide 3 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="3" aria-label="Slide 4 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="4" aria-label="Slide 5 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="5" aria-label="Slide 6 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="6" aria-label="Slide 7 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="7" aria-label="Slide 8 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="8" aria-label="Slide 9 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="9" aria-label="Slide 10 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="10" aria-label="Slide 11 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="11" aria-label="Slide 12 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="12" aria-label="Slide 13 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="13" aria-label="Slide 14 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="14" aria-label="Slide 15 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="15" aria-label="Slide 16 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="16" aria-label="Slide 17 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="17" aria-label="Slide 18 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="18" aria-label="Slide 19 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="19" aria-label="Slide 20 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="20" aria-label="Slide 21 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="21" aria-label="Slide 22 of 23"></button>
+                                <button type="button" class="hero-carousel__dot" data-carousel-dot="22" aria-label="Slide 23 of 23"></button>
+                            </div>
+                            <div class="hero-carousel__nav">
+                                <button type="button" class="btn" data-carousel-prev aria-label="Previous slide">
+                                    <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="btn" data-carousel-next aria-label="Next slide">
+                                    <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- <p class="screenshot-caption">Add or replace assets under <code style="background:rgba(0,0,0,0.2);padding:0.1em 0.35em;border-radius:4px;">docs/images/</code> (e.g. <code style="background:rgba(0,0,0,0.2);padding:0.1em 0.35em;border-radius:4px;">features.png</code>, <code style="background:rgba(0,0,0,0.2);padding:0.1em 0.35em;border-radius:4px;">architecture.png</code>, <code style="background:rgba(0,0,0,0.2);padding:0.1em 0.35em;border-radius:4px;">info-graphic.png</code>). Use arrow keys when the carousel is focused.</p> -->
+                </div>
+            </div>
+        </section>
+
+        <section class="alt" id="features">
+            <div class="wrap">
+                <h2 class="section-title">Features</h2>
+                <p class="section-intro">Capabilities that mirror the product—tool-assisted chat, multi-source imports, and a vault for sensitive material.</p>
+
+                <div class="feature-grid">
+                    <article class="feature-card">
+                        <div class="icon" aria-hidden="true"><i class="fas fa-comments"></i></div>
+                        <h3>AI chat with tools</h3>
+                        <p>Ask questions in natural language; the model can call tools to search emails, messages, albums, and more.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon" aria-hidden="true"><i class="fas fa-database"></i></div>
+                        <h3>Unified archive</h3>
+                        <p>Bring IMAP/Gmail, messaging exports, Facebook, and media into one PostgreSQL-backed collection.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon" aria-hidden="true"><i class="fas fa-shield-halved"></i></div>
+                        <h3>Sensitive data vault</h3>
+                        <p>Encrypt sensitive entries with your master key; separate visitor keys for controlled sharing.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon" aria-hidden="true"><i class="fas fa-file-lines"></i></div>
+                        <h3>Reference documents</h3>
+                        <p>Attach documents the AI can retrieve when answering—scoped by your policies and visitor permissions.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon" aria-hidden="true"><i class="fas fa-microphone-lines"></i></div>
+                        <h3>Voice &amp; mood</h3>
+                        <p>Shape tone and persona—companion mode, custom voices, and subject-aware instructions.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon" aria-hidden="true"><i class="fas fa-map-location-dot"></i></div>
+                        <h3>Maps &amp; relationships</h3>
+                        <p>Visualise contacts, places, and links between people alongside classic search and chat.</p>
+                    </article>
+                </div>
+
+                <figure class="screenshot-frame" style="margin-top:2rem; max-width: 720px;">
+                    <img
+                        src="./images/features.png"
+                        width="720"
+                        height="400"
+                       />
+                    <figcaption style="padding:0.6rem 1rem; font-size:0.85rem; color:var(--color-text-muted); border-top:1px solid var(--color-border);">
+                        Placeholder: swap for a real screenshot of the AI Tool Access or Personal Data / keys UI.
+                    </figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <section id="technical">
+            <div class="wrap">
+                <h2 class="section-title">Technical</h2>
+                <p class="section-intro">Go services, PostgreSQL, and a vanilla JS front end—aligned with how the app is actually built.</p>
+
+                <div class="tech-layout">
+                    <div class="tech-panel">
+                        <h3><i class="fas fa-layer-group" style="color:var(--color-blue);margin-right:0.35rem;"></i> Stack</h3>
+                        <div class="badge-row">
+                            <span class="badge">Go 1.25</span>
+                            <span class="badge">Chi</span>
+                            <span class="badge">pgx v5</span>
+                            <span class="badge">PostgreSQL</span>
+                            <span class="badge">Gemini / Claude</span>
+                        </div>
+                        <ul class="tech-list">
+                            <li>HTTP API with middleware-based auth and request-scoped user context.</li>
+                            <li>Repositories add <code>user_id</code> predicates; optional row-level security in the database.</li>
+                            <li>AI tool executor maps model tool calls to SQL-backed operations with strict scoping.</li>
+                        </ul>
+                    </div>
+                    <div class="tech-panel">
+                        <h3><i class="fas fa-lock" style="color:var(--color-blue);margin-right:0.35rem;"></i> Security model</h3>
+                        <ul class="tech-list">
+                            <li>Session cookies, Argon2id passwords, encrypted sensitive blobs with keyring-derived keys.</li>
+                            <li>Visitor keys and share links with granular feature flags.</li>
+                            <li>Separate admin and launcher entry points where applicable.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <figure class="screenshot-frame" style="margin-top:1.75rem;">
+                    <img src="images/architecture.png" alt="Architecture diagram">
+                    <img
+                        src="./images/info-graphic.png"
+                        width="800"
+                        height="380"
+                        alt="Diagram or screenshot: high-level flow from browser to Chi router, Auth middleware injecting user id into context, service and repository layers, and PostgreSQL with optional RLS." />
+                    <figcaption style="padding:0.6rem 1rem; font-size:0.85rem; color:var(--color-text-muted); border-top:1px solid var(--color-border);">
+                        Placeholder: use an architecture diagram export or a terminal screenshot of <code>make test</code> / project tree.
+                    </figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <section class="alt journal" id="journal">
+            <div class="wrap">
+                <h2 class="section-title">Dev journal</h2>
+                <p class="section-intro">Short notes from building Digital Museum—replace with real posts or link to your blog.</p>
+
+                <article class="journal-entry">
+                    <div class="journal-meta">
+                        <time datetime="2026-03-01">March 2026</time>
+                        <span>Multi-tenant &amp; auth</span>
+                    </div>
+                    <div class="journal-body">
+                        <h3>Layering user scope without breaking single-user deploys</h3>
+                        <p>We introduced <code>user_id</code> across archive tables and kept optional strict auth so existing installs could migrate gradually. Middleware + context keys made the Go handlers stay readable.</p>
+                    </div>
+                </article>
+
+                <article class="journal-entry">
+                    <div class="journal-meta">
+                        <time datetime="2026-02-15">February 2026</time>
+                        <span>AI &amp; tools</span>
+                    </div>
+                    <div class="journal-body">
+                        <h3>One executor, multiple providers</h3>
+                        <p>Claude and Gemini share tool definitions and a single execution path; the tricky part is consistent JSON shapes and error surfaces when tools hit the database under the caller’s user id.</p>
+                    </div>
+                </article>
+
+                <article class="journal-entry">
+                    <div class="journal-meta">
+                        <time datetime="2026-01-20">January 2026</time>
+                        <span>Product</span>
+                    </div>
+                    <div class="journal-body">
+                        <h3>Interviewer mode and vertical slices</h3>
+                        <p>New features ship as routes + migrations + UI modules instead of one growing handler file—easier to review and to retire.</p>
+                    </div>
+                </article>
+                <article class="journal-entry">
+                    <div class="journal-meta">
+                        <time datetime="2026-02-01">March 2026</time>
+                        <span>Multi-Tenant Architecture</span>
+                    </div>
+                    <div class="journal-body">
+                        <h3>Migration to a secure multi-tenant architecture</h3>
+                        <p></p>
+                    </div>
+                </article>
+                <article class="journal-entry">
+                    <div class="journal-meta">
+                        <time datetime="2026-02-01">February 2026</time>
+                        <span>Making Performance Better</span>
+                    </div>
+                    <div class="journal-body">
+                        <h3>Port the Python code to Go</h3>
+                        <p></p>
+                    </div>
+                </article>
+                <article class="journal-entry">
+                    <div class="journal-meta">
+                        <time datetime="2025-012-01">December 2025</time>
+                        <span>Python Vibe Coding</span>
+                    </div>
+                    <div class="journal-body">
+                        <h3>Handing over the grunt work</h3>
+                        <p></p>
+                    </div>
+                </article>
+                <article class="journal-entry">
+                    <div class="journal-meta">
+                        <time datetime="2025-05-01">May 2025</time>
+                        <span>Project Origins</span>
+                    </div>
+                    <div class="journal-body">
+                        <h3>A learning activity that got out of control</h3>
+                        <p>I had been using AI tools, but just the normal chat bot type websites. Professionally, AI was coming up a lot more and I needed to know more of the tech in details, so since I learn best by doing, I started some of my own coding exercises to learn more about the tech.</p>
+                        <p>One of the places I started was RAG (Retrieval-Augmented Generation) and I started to build my own RAG system. I started with archived WhatsApp conversations and Facebook messages and found the AI tools were able to answer questions about the conversations and provide insights into the conversations.</p>
+                        <p>When I was coding up the system instructions, I playfully decided to give it a persoanlity and was amused and impressed by the results.</p>
+                    </div>
+                </article>
+
+                <figure class="screenshot-frame" style="margin-top:1rem; max-width: 640px;">
+                    <img
+                        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='360'%3E%3Crect fill='%23e8f0fe' width='640' height='360'/%3E%3Ctext x='320' y='185' text-anchor='middle' fill='%23233366' font-size='14'%3E Dev journal image %3C/text%3E%3C/svg%3E"
+                        width="640"
+                        height="360"
+                        alt="Optional screenshot: GitHub commit history or pull request list showing Digital Museum repository activity over a release cycle." />
+                    <figcaption style="padding:0.6rem 1rem; font-size:0.85rem; color:var(--color-text-muted); border-top:1px solid var(--color-border);">
+                        Placeholder: e.g. GitHub Insights or a milestone board screenshot.
+                    </figcaption>
+                </figure>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="wrap">
+            <p style="margin:0;">Digital Museum — public site template for GitHub Pages. App styling aligned with in-product CSS tokens (navy / blue / light gray).</p>
+        </div>
+    </footer>
+    <script>
+        (function () {
+            var root = document.querySelector('[data-hero-carousel]');
+            if (!root) return;
+            var slides = root.querySelectorAll('.hero-carousel__slide');
+            var prev = root.querySelector('[data-carousel-prev]');
+            var next = root.querySelector('[data-carousel-next]');
+            var dots = root.querySelectorAll('[data-carousel-dot]');
+            var live = document.getElementById('hero-carousel-live');
+            var n = slides.length;
+            var i = 0;
+
+            function show(j) {
+                i = ((j % n) + n) % n;
+                slides.forEach(function (s, k) {
+                    var active = k === i;
+                    s.classList.toggle('is-active', active);
+                    s.setAttribute('aria-hidden', active ? 'false' : 'true');
+                });
+                dots.forEach(function (d, k) {
+                    var active = k === i;
+                    d.classList.toggle('is-active', active);
+                    if (active) d.setAttribute('aria-current', 'true');
+                    else d.removeAttribute('aria-current');
+                });
+                if (live) {
+                    var cap = slides[i].querySelector('.hero-carousel__caption');
+                    live.textContent = cap ? cap.textContent.trim() : '';
+                }
+            }
+
+            if (prev) prev.addEventListener('click', function () { show(i - 1); });
+            if (next) next.addEventListener('click', function () { show(i + 1); });
+            dots.forEach(function (d, k) {
+                d.addEventListener('click', function () { show(k); });
+            });
+            root.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    show(i - 1);
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    show(i + 1);
+                }
+            });
+            show(0);
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+# Loaded when `npx electron-builder` runs from `electron/` (see Makefile `electron-dist`).
+# Paths in `extraResources.from` are relative to this folder (the app project dir).
+appId: com.digitalmuseum.app
+productName: Digital Museum
+
+directories:
+  output: ../dist/electron
+
+# Custom icons: add electron/build/icon.ico (multi-size .ico), then set win.icon + nsis installer/uninstaller icons.
+win:
+  target: nsis
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+files:
+  - main.js
+  - preload.js
+  - loading.html
+  - package.json
+  - tray-icon.png
+
+extraResources:
+  - from: ../bin/digitalmuseum.exe
+    to: bin/digitalmuseum.exe
+  - from: ../bin/ImageMagick
+    to: bin/ImageMagick
+    filter:
+      - "**/*"
+  - from: ../bin/Ollama
+    to: bin/Ollama
+    filter:
+      - "**/*"
+  - from: ../templates
+    to: templates
+    filter:
+      - "**/*"
+  - from: ../static
+    to: static
+    filter:
+      - "**/*"
+      - "!**/data/email_classifications.json"
+      - "!**/data/email_matches.json"
+      - "!**/data/exclusions.json"
+      - "!**/data/identity_and_health.txt"
+
+  # Packaged app loads defaults from process.resourcesPath (see main.js dotEnvDefaults).
+  # Do not reference a secret .env here — that file is not in the repo.
+  - from: .env.defaults
+    to: .env
+
+asar: true
