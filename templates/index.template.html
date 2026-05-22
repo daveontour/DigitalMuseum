@@ -7,12 +7,14 @@
     <title>{{ page_title }}</title>
     <link rel="stylesheet" href="/static/css/museum_of.css?v=20260509a">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="/static/css/leaflet.css">
     <link rel="stylesheet" href="/static/css/images_grid.css">
     <!-- Include marked.js -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Optional: highlight.js -->
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <!-- Font Awesome for icons (optional, but nice for buttons) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -23,7 +25,7 @@
 <body class="{{ deployment_nature_body_class }}">
     <div class="app-container">
         <!-- Top Bar -->
-        <div class="top-bar" style="background-color: #19264d;">
+        <div class="top-bar">
             <div class="top-bar-title">
                 <h2 id="top-bar-page-title">{{ page_title }}</h2>
             </div>
@@ -126,8 +128,8 @@
                         <i class="fas fa-user-circle"></i>
                         <span id="account-display-name" style="margin-left:4px; font-size:var(--text-sm);"></span>
                     </button>
-                    <div id="account-dropdown-menu" class="account-dropdown-menu" style="display:none; position:absolute; right:0; top:100%; background:#19264d; border:1px solid #2a3a6b; border-radius:6px; min-width:220px; z-index:1000; padding:4px 0;">
-                        <div id="account-billing-section" style="display:none; border-bottom:1px solid #2a3a6b; padding-bottom:4px; margin-bottom:4px;">
+                    <div id="account-dropdown-menu" class="account-dropdown-menu" style="display:none; position:absolute; right:0; top:100%; background:var(--color-bg-elevated); border:1px solid var(--color-border); border-radius:6px; min-width:220px; z-index:1000; padding:4px 0;">
+                        <div id="account-billing-section" style="display:none; border-bottom:1px solid var(--color-border); padding-bottom:4px; margin-bottom:4px;">
                             <button type="button" id="account-billing-current-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
                                 <i class="fas fa-file-pdf" style="margin-right:6px;"></i>Current Month Usage
                             </button>
@@ -135,7 +137,7 @@
                                 <i class="fas fa-file-pdf" style="margin-right:6px;"></i>Previous Month Usage
                             </button>
                         </div>
-                        <div id="account-admin-section" style="display:none; border-bottom:1px solid #2a3a6b; padding-bottom:4px; margin-bottom:4px;">
+                        <div id="account-admin-section" style="display:none; border-bottom:1px solid var(--color-border); padding-bottom:4px; margin-bottom:4px;">
                             <button type="button" id="account-admin-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
                                 <i class="fas fa-user-shield" style="margin-right:6px;"></i>Admin
                             </button>
@@ -149,7 +151,7 @@
         </div>
 
         <div class="main-content">
-        <div class="sidebar sidebar-left" style="background-color: #19264d;">
+        <div class="sidebar sidebar-left">
             <!-- More Options Section (Left - Media & Communication) -->
             <div class="more-options-section sidebar-left-main">
                 <!-- <h3>Explore {{owner}}'s World</h3> -->
@@ -193,7 +195,7 @@
                         <i class="fas fa-id-card"></i> Profile
                     </button>
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="data-import-sidebar-btn">
-                        <i class="fas fa-database"></i> Import &amp; Manage Data
+                        <i class="fas fa-database sidebar-data-import-btn-icon" aria-hidden="true"></i> Import &amp; Manage Data
                     </button>
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="settings-data-import-sidebar-btn">
                         <i class="fas fa-cog"></i> Configuration
@@ -266,7 +268,7 @@
 
             <!-- Input + mode control bars: pinned to bottom of .chat-main when bars are hidden -->
             <div class="chat-main-bottom-stack">
-            <form id="chat-form" style="background-color: #19264d;padding-left: 0px;">
+            <form id="chat-form" style="padding-left: 0px;">
                 <div class="chat-form-main-row" style="margin-bottom: 8px;">
                     <div class="chat-input-wrap">
                         <textarea id="user-input" placeholder="Enter your question or comment..." rows="2"></textarea>
@@ -333,7 +335,7 @@
         </div>
 
         <!-- Right Sidebar -->
-        <div class="sidebar sidebar-right" style="background-color: #19264d;">
+        <div class="sidebar sidebar-right">
             <div class="more-options-section sidebar-right-main">
                 <!-- <h3>Tools &amp; Data</h3> -->
                 <div class="more-options-buttons">
@@ -412,12 +414,12 @@
                 <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:16px;">
                     <p class="have-a-chat-setup-intro">Two archive <strong>voices</strong> reply in turn, each backed by <strong>Gemini</strong>, <strong>Claude</strong>, <strong>DeepSeek</strong>, or <strong>Local AI</strong> (you pick below). Add an optional topic to steer the thread, or leave it open so they explore freely. After you start, use the bar above the chat to <strong>pause</strong>, <strong>inject</strong> your own comment or question, or <strong>stop</strong> the run.</p>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:4px;">Topic / Starter Prompt <span style="font-weight:normal;color:#777;">(optional)</span></label>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px;">Topic / Starter Prompt <span style="font-weight:normal;color:var(--color-text-muted);">(optional)</span></label>
                         <textarea id="have-a-chat-topic" rows="3" style="width:100%; box-sizing:border-box; border-radius:6px; border:1px solid #bfc9da; padding:8px; font-size:var(--text-base);" placeholder="e.g. 'What do the messages reveal about relationships?' — or leave blank to let the AIs explore freely."></textarea>
                     </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                         <div>
-                            <label style="display:block; font-weight:bold; margin-bottom:4px; color:#2d6bc4;"><i class="fas fa-comment-dots"></i> Voice A</label>
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; color:var(--color-blue);"><i class="fas fa-comment-dots"></i> Voice A</label>
                             <select id="have-a-chat-voice-a" class="form-control" style="margin-bottom:8px;">
                                 <option value="expert">Expert</option>
                             </select>
@@ -430,7 +432,7 @@
                             </select>
                         </div>
                         <div>
-                            <label style="display:block; font-weight:bold; margin-bottom:4px; color:#7c3aed;"><i class="fas fa-comment-dots"></i> Voice B</label>
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; color:#a78bfa;"><i class="fas fa-comment-dots"></i> Voice B</label>
                             <select id="have-a-chat-voice-b" class="form-control" style="margin-bottom:8px;">
                                 <option value="expert">Expert</option>
                             </select>
@@ -482,7 +484,7 @@
                 </div>
                 <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:14px;">
                     <p style="margin:0; color:var(--color-text-muted); font-size:var(--text-sm); line-height:1.45;">Conversations you chose to save when stopping a run appear here. Select one to read the transcript or download it as Markdown.</p>
-                    <p id="have-a-chat-sessions-error" style="display:none; margin:0; color:#b91c1c; font-size:var(--text-sm);"></p>
+                    <p id="have-a-chat-sessions-error" style="display:none; margin:0; color:var(--color-danger); font-size:var(--text-sm);"></p>
                     <div id="have-a-chat-sessions-list"></div>
                     <div id="have-a-chat-sessions-detail" style="min-height:4rem;"></div>
                     <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end;">
@@ -503,7 +505,7 @@
                 <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:12px;">
                     <p style="margin:0; color:var(--color-text-muted); font-size:var(--text-lead); line-height:1.45;">Save this Have a Chat transcript to your archive? You can reopen it later from <strong>Previous conversations</strong> or download it as Markdown.</p>
                     <p style="margin:0; font-size:var(--text-sm); color:var(--color-text-muted);"><span id="have-a-chat-save-prompt-turn-count">0</span> turns will be stored.</p>
-                    <p id="have-a-chat-save-prompt-error" style="display:none; margin:0; color:#b91c1c; font-size:var(--text-sm);"></p>
+                    <p id="have-a-chat-save-prompt-error" style="display:none; margin:0; color:var(--color-danger); font-size:var(--text-sm);"></p>
                     <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
                         <button type="button" class="modal-btn modal-btn-secondary" id="have-a-chat-save-prompt-discard-btn">Don't save</button>
                         <button type="button" class="modal-btn modal-btn-primary" id="have-a-chat-save-prompt-save-btn"><i class="fas fa-check"></i> Save to archive</button>
@@ -520,7 +522,7 @@
                     <button class="modal-close-btn" id="close-have-a-chat-inject-modal">&times;</button>
                 </div>
                 <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:12px;">
-                    <p style="margin:0; color:#555; font-size:var(--text-lead);">Your comment will be added to the conversation and both AIs will take it into account.</p>
+                    <p style="margin:0; color:var(--color-text-muted); font-size:var(--text-lead);">Your comment will be added to the conversation and both AIs will take it into account.</p>
                     <textarea id="have-a-chat-inject-text" rows="4" style="width:100%; box-sizing:border-box; border-radius:6px; border:1px solid #bfc9da; padding:8px; font-size:var(--text-base);" placeholder="Your comment or question to inject into the conversation..."></textarea>
                     <div style="display:flex; gap:10px; justify-content:flex-end;">
                         <button class="modal-btn modal-btn-secondary" id="have-a-chat-inject-cancel-btn">Cancel</button>
@@ -635,7 +637,7 @@
 
                     <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
                         <div style="flex:1 1 520px;">
-                            <label class="interview-section-label">Focus / Topic <span style="font-weight:normal;color:#777;">(optional)</span></label>
+                            <label class="interview-section-label">Focus / Topic <span style="font-weight:normal;color:var(--color-text-muted);">(optional)</span></label>
                             <textarea id="interview-purpose-detail" rows="2" class="interview-detail-input" placeholder="e.g. 'Career in aviation' or 'Childhood memories in Brisbane' — leave blank for a general interview"></textarea>
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px; min-width:180px; flex:0 0 auto;">
@@ -659,7 +661,7 @@
 
                     <div id="interview-finished-section" style="display:none;">
                         <label class="interview-section-label"><i class="fas fa-file-alt"></i> Saved interviews</label>
-                        <p class="interview-finished-hint" style="margin:0 0 8px; font-size:var(--text-md); color:#555;">Finished sessions and writeups stored in your archive. Select one to load the Q&amp;A and writeup into the chat.</p>
+                        <p class="interview-finished-hint" style="margin:0 0 8px; font-size:var(--text-md); color:var(--color-text-muted);">Finished sessions and writeups stored in your archive. Select one to load the Q&amp;A and writeup into the chat.</p>
                         <select id="interview-finished-select" class="form-control">
                             <option value="">— select —</option>
                         </select>
@@ -701,16 +703,13 @@
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tools-access">
                             <i class="fas fa-wrench"></i> Tools Access
                         </button>
-                        <button type="button" class="config-tab-button" data-tab="background-jobs">
-                            <i class="fas fa-tasks"></i> Background Jobs
-                        </button>
                     </div>
                     <div class="config-content">
                 <div class="config-tab-content active" id="settings-tab">
                     <section class="section-config">
                         <h1>Appearance</h1>
                     </section>
-                    <div style="display: flex; gap: 2em; flex-wrap: wrap; background-color: #f8f9fa;">
+                    <div style="display: flex; gap: 2em; flex-wrap: wrap; background-color: var(--color-bg-base);">
                    <section class="config-section"> 
                         <h3>Chat Settings</h3>
                         <div class="setting-group">
@@ -759,11 +758,11 @@
                         <h1>AI API Keys & Models</h1>
                     </section>
                     <section class="config-section" id="user-llm-settings-section" style="display:none;">
-                        <p id="user-llm-intro" style="color:#666; font-size:var(--text-md); margin-bottom:8px; max-width:52rem;"></p>
-                        <p id="user-llm-subject-hints" style="color:#555; font-size:var(--text-caption); margin-bottom:12px; max-width:52rem;"></p>
+                        <p id="user-llm-intro" style="color:var(--color-text-muted); font-size:var(--text-md); margin-bottom:8px; max-width:52rem;"></p>
+                        <p id="user-llm-subject-hints" style="color:var(--color-text-muted); font-size:var(--text-caption); margin-bottom:12px; max-width:52rem;"></p>
                         <div class="setting-group user-llm-provider-row">
                             <div class="user-llm-field-col">
-                                <label for="user-llm-gemini-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Google Gemini API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-gemini-key" aria-label="Information about Gemini API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-gemini-key-hint" class="user-llm-field-hint-after-info" style="color:#888;font-weight:normal;"></span></label>
+                                <label for="user-llm-gemini-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Google Gemini API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-gemini-key" aria-label="Information about Gemini API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-gemini-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
                                 <div class="user-llm-field-controls">
                                     <input type="password" id="user-llm-gemini-key" class="modal-input user-llm-field-input" autocomplete="off">
                                 </div>
@@ -782,7 +781,7 @@
                         </div>
                         <div class="setting-group user-llm-provider-row">
                             <div class="user-llm-field-col">
-                                <label for="user-llm-anthropic-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Anthropic Claude API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-anthropic-key" aria-label="Information about Anthropic API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-anthropic-key-hint" class="user-llm-field-hint-after-info" style="color:#888;font-weight:normal;"></span></label>
+                                <label for="user-llm-anthropic-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Anthropic Claude API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-anthropic-key" aria-label="Information about Anthropic API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-anthropic-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
                                 <div class="user-llm-field-controls">
                                     <input type="password" id="user-llm-anthropic-key" class="modal-input user-llm-field-input" autocomplete="off">
                                 </div>
@@ -801,7 +800,7 @@
                         </div>
                         <div class="setting-group user-llm-provider-row">
                             <div class="user-llm-field-col">
-                                <label for="user-llm-deepseek-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">DeepSeek API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-deepseek-key" aria-label="Information about DeepSeek API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-deepseek-key-hint" class="user-llm-field-hint-after-info" style="color:#888;font-weight:normal;"></span></label>
+                                <label for="user-llm-deepseek-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">DeepSeek API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-deepseek-key" aria-label="Information about DeepSeek API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-deepseek-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
                                 <div class="user-llm-field-controls">
                                     <input type="password" id="user-llm-deepseek-key" class="modal-input user-llm-field-input" autocomplete="off">
                                 </div>
@@ -820,7 +819,7 @@
                         </div>
                         <div class="setting-group user-llm-provider-row user-llm-provider-row--tavily">
                             <div class="user-llm-field-col user-llm-field-col--span-2">
-                                <label for="user-llm-tavily-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Tavily API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-tavily-key" aria-label="Information about Tavily API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(web search)</span><span id="user-llm-tavily-key-hint" class="user-llm-field-hint-after-info" style="color:#888;font-weight:normal;"></span></label>
+                                <label for="user-llm-tavily-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Tavily API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-tavily-key" aria-label="Information about Tavily API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(web search)</span><span id="user-llm-tavily-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
                                 <div class="user-llm-field-controls">
                                     <input type="password" id="user-llm-tavily-key" class="modal-input user-llm-field-input" autocomplete="off">
                                 </div>
@@ -833,7 +832,7 @@
                         </div>
                         <div class="setting-group user-llm-provider-row user-llm-provider-row--runpod">
                             <div class="user-llm-field-col">
-                                <label for="user-llm-runpod-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">RunPod API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-runpod-key" aria-label="Information about RunPod API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(image AI classification)</span><span id="user-llm-runpod-key-hint" class="user-llm-field-hint-after-info" style="color:#888;font-weight:normal;"></span></label>
+                                <label for="user-llm-runpod-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">RunPod API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-runpod-key" aria-label="Information about RunPod API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(image AI classification)</span><span id="user-llm-runpod-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
                                 <div class="user-llm-field-controls">
                                     <input type="password" id="user-llm-runpod-key" class="modal-input user-llm-field-input" autocomplete="off">
                                 </div>
@@ -866,7 +865,7 @@
                         </div>
                         <div class="setting-group user-llm-provider-row user-llm-provider-row--elevenlabs">
                             <div class="user-llm-field-col user-llm-field-col--span-2">
-                                <label for="user-llm-elevenlabs-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">ElevenLabs API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-elevenlabs-key" aria-label="Information about ElevenLabs API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(speech / voice)</span><span id="user-llm-elevenlabs-key-hint" class="user-llm-field-hint-after-info" style="color:#888;font-weight:normal;"></span></label>
+                                <label for="user-llm-elevenlabs-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">ElevenLabs API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-elevenlabs-key" aria-label="Information about ElevenLabs API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(speech / voice)</span><span id="user-llm-elevenlabs-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
                                 <div class="user-llm-field-controls">
                                     <input type="password" id="user-llm-elevenlabs-key" class="modal-input user-llm-field-input" autocomplete="off">
                                 </div>
@@ -879,7 +878,7 @@
                         </div>
                         <div class="setting-group" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                             <button type="button" class="modal-btn modal-btn-primary" id="user-llm-save-btn">Save AI API Settings</button>
-                            <span id="user-llm-status" role="status" aria-live="polite" style="font-size:var(--text-md);color:#666;min-height:1.35em;display:inline-block;"></span>
+                            <span id="user-llm-status" role="status" aria-live="polite" style="font-size:var(--text-md);color:var(--color-text-muted);min-height:1.35em;display:inline-block;"></span>
                         </div>
                     </section>
                 </div>
@@ -901,16 +900,16 @@
                         <div class="subject-config-details-grid">
                         <div class="subject-config-details-col subject-config-details-col--left">
                         <section class="config-section">
-                        <p id="subject-archive-owner-line" style="margin: 0 0 1.25em 0; color: #333; font-size: var(--text-base); line-height: var(--line-height-body, 1.5);">
+                        <p id="subject-archive-owner-line" style="margin: 0 0 1.25em 0; color: var(--color-text); font-size: var(--text-base); line-height: var(--line-height-body, 1.5);">
                             <span style="font-weight: bold;">Archive Owner/Subject:</span> <span id="subject-archive-owner-name">{{full_name}}</span>
                         </p>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; row-gap: 1.5em; column-gap: 5px; margin-bottom: 1.5em;">
                             <div style="min-width: 0;">
-                                <label for="other-names-input" style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5em;">Other Names (comma-separated):</label>
+                                <label for="other-names-input" style="display: block; color: var(--color-text); font-weight: bold; margin-bottom: 0.5em;">Other Names (comma-separated):</label>
                                 <input id="other-names-input" type="text" placeholder="Enter other names, separated by commas..." class="form-control" />
                             </div>
                             <div style="min-width: 0;">
-                                <label for="subject-gender-select" style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5em;">Gender:</label>
+                                <label for="subject-gender-select" style="display: block; color: var(--color-text); font-weight: bold; margin-bottom: 0.5em;">Gender:</label>
                                 <select id="subject-gender-select" class="form-control">
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
@@ -918,17 +917,17 @@
                             </div>
                         </div>
                         <div style="margin-bottom: 1.5em;">
-                            <label for="email-addresses-input" style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5em;">Email Addresses (comma-separated):</label>
+                            <label for="email-addresses-input" style="display: block; color: var(--color-text); font-weight: bold; margin-bottom: 0.5em;">Email Addresses (comma-separated):</label>
                             <input id="email-addresses-input" type="text" placeholder="Enter email addresses, separated by commas..." class="form-control" />
                         </div>
                         <div style="margin-bottom: 0;">
-                            <label for="subject-owner-contact-select" style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5em;">Archive owner contact:</label>
-                            <p style="color: #666; font-size: var(--text-md); margin: 0 0 0.5em 0; max-width: none;">Choose the contact record that represents {{owner}} in your contacts list. The list below is guessed from the subject name, family name, other names, and email fields (saved values). You can widen the list to every contact if needed.</p>
+                            <label for="subject-owner-contact-select" style="display: block; color: var(--color-text); font-weight: bold; margin-bottom: 0.5em;">Archive owner contact:</label>
+                            <p style="color: var(--color-text-muted); font-size: var(--text-md); margin: 0 0 0.5em 0; max-width: none;">Choose the contact record that represents {{owner}} in your contacts list. The list below is guessed from the subject name, family name, other names, and email fields (saved values). You can widen the list to every contact if needed.</p>
                             <select id="subject-owner-contact-select" class="form-control" aria-describedby="subject-owner-contact-hint">
                                 <option value="">None (not linked)</option>
                             </select>
                             <p id="subject-owner-contact-hint" class="config-tab-lead" style="margin: 0.5em 0 0 0; max-width: none;">Tip: save name and email details first, then reopen this tab for better guesses.</p>
-                            <label style="display: flex; align-items: flex-start; gap: 8px; margin-top: 0.75em; cursor: pointer; font-size: var(--text-md); color: #444;">
+                            <label style="display: flex; align-items: flex-start; gap: 8px; margin-top: 0.75em; cursor: pointer; font-size: var(--text-md); color: var(--color-text);">
                                 <input type="checkbox" id="subject-owner-contact-show-all" style="margin-top: 0.2em;" />
                                 <span>Show all contacts in this list (can be slow for very large archives)</span>
                             </label>
@@ -938,8 +937,8 @@
                         <div class="subject-config-details-col subject-config-details-col--interests">
                         <section class="config-section">
                             <div class="subject-config-subtab-heading-row">
-                            <span style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5em;">Interests</span>
-                            <p style="color: #666; font-size: var(--text-md); margin: 0 0 0.5em 0; max-width: none;">Topics used for suggestions for Today&rsquo;s Thing of Interest and other AI-generated content.</p>
+                            <span style="display: block; color: var(--color-text); font-weight: bold; margin-bottom: 0.5em;">Interests</span>
+                            <p style="color: var(--color-text-muted); font-size: var(--text-md); margin: 0 0 0.5em 0; max-width: none;">Topics used for suggestions for Today&rsquo;s Thing of Interest and other AI-generated content.</p>
                             </div>  
                             <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
                                 <button type="button" id="interests-create-btn-sc" class="modal-btn modal-btn-primary">
@@ -956,7 +955,7 @@
                             <div id="interests-table-container-sc" style="overflow-x: auto; max-height: 55vh; overflow-y: auto;">
                                 <table class="contacts-table manage-contacts-data-table" id="interests-table-sc" style="width: 100%; margin-top: 0;">
                                     <thead>
-                                        <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                        <tr style="background: var(--color-bg-base); border-bottom: 2px solid var(--color-border);">
                                             <th class="manage-contacts-th">Name</th>
                                             <th class="manage-contacts-th manage-contacts-th-actions">Actions</th>
                                         </tr>
@@ -965,7 +964,7 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <p id="interests-empty-msg-sc" style="display: none; padding: 1em; color: #666; text-align: center;">No interests. Add one to get started.</p>
+                            <p id="interests-empty-msg-sc" style="display: none; padding: 1em; color: var(--color-text-muted); text-align: center;">No interests. Add one to get started.</p>
                         </section>
                         </div>
                         <div class="subject-config-details-actions">
@@ -984,7 +983,7 @@
                                 <i class="fas fa-magic"></i> Generate Writing Style
                             </button>
                             <p id="writing-style-require-contact-hint" class="config-tab-lead" style="display: none; margin: 0 0 0.75em 0;  color: #555;font-size: var(--text-md);">On <strong>Subject Details and Interests</strong>, link the archive owner to a contact, then click <strong>Save</strong>, before generating a writing style summary.</p>
-                            <div id="writing-style-loading" style="display: none; color: #666; margin-bottom: 0.5em;">
+                            <div id="writing-style-loading" style="display: none; color: var(--color-text-muted); margin-bottom: 0.5em;">
                                 <i class="fas fa-spinner fa-spin"></i> Analyzing messages...
                             </div>
                             <div id="writing-style-ai-inner-wrap" class="subject-config-ai-inner-wrap">
@@ -996,12 +995,12 @@
                                     <div id="writing-style-display" class="writing-style-markdown"></div>
                                 </div>
                                 <div id="writing-style-inner-panel-edit" class="subject-config-ai-inner-panel" role="tabpanel" aria-labelledby="writing-style-inner-tab-edit" data-inner-subtab="edit">
-                                    <label for="writing-style-edit-textarea" style="display: block; color: #333; font-weight: bold; margin: 0 0 0.5em 0;">Edit summary (Markdown)</label>
+                                    <label for="writing-style-edit-textarea" style="display: block; color: var(--color-text); font-weight: bold; margin: 0 0 0.5em 0;">Edit summary (Markdown)</label>
                                     <textarea id="writing-style-edit-textarea" class="form-control subject-config-ai-textarea" rows="14" spellcheck="true" placeholder="Generate a summary above, or type or paste Markdown here."></textarea>
-                                    <!-- <p class="config-tab-lead" style="margin: 0.5em 0 0.75em 0; color: #666; max-width: none;">Saving updates the stored summary only (master key required). Open the Preview tab to see rendered Markdown; it updates as you type here.</p> -->
+                                    <!-- <p class="config-tab-lead" style="margin: 0.5em 0 0.75em 0; color: var(--color-text-muted); max-width: none;">Saving updates the stored summary only (master key required). Open the Preview tab to see rendered Markdown; it updates as you type here.</p> -->
                                     <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 0;">
                                         <button type="button" id="save-writing-style-ai-btn" class="modal-btn modal-btn-primary">Save summary</button>
-                                        <span id="writing-style-save-status" role="status" aria-live="polite" style="font-size: var(--text-md); color: #666; min-height: 1.35em;"></span>
+                                        <span id="writing-style-save-status" role="status" aria-live="polite" style="font-size: var(--text-md); color: var(--color-text-muted); min-height: 1.35em;"></span>
                                     </div>
                                 </div>
                             </div>
@@ -1017,7 +1016,7 @@
                                 <i class="fas fa-brain"></i> Generate Psychological Profile
                             </button>
                             <p id="psychological-profile-require-contact-hint" class="config-tab-lead" style="display: none; margin: 0 0 0.75em 0;  color: #555;font-size: var(--text-md);">On <strong>Subject Details and Interests</strong>, link the archive owner to a contact, then click <strong>Save</strong>, before generating a psychological profile.</p>
-                            <div id="psychological-profile-loading" style="display: none; color: #666; margin-bottom: 0.5em;">
+                            <div id="psychological-profile-loading" style="display: none; color: var(--color-text-muted); margin-bottom: 0.5em;">
                                 <i class="fas fa-spinner fa-spin"></i> Analyzing messages...
                             </div>
                             <div id="psychological-profile-ai-inner-wrap" class="subject-config-ai-inner-wrap">
@@ -1029,12 +1028,12 @@
                                     <div id="psychological-profile-display" class="writing-style-markdown"></div>
                                 </div>
                                 <div id="psychological-profile-inner-panel-edit" class="subject-config-ai-inner-panel" role="tabpanel" aria-labelledby="psychological-profile-inner-tab-edit" data-inner-subtab="edit">
-                                    <label for="psychological-profile-edit-textarea" style="display: block; color: #333; font-weight: bold; margin: 0 0 0.5em 0;">Edit profile (Markdown)</label>
+                                    <label for="psychological-profile-edit-textarea" style="display: block; color: var(--color-text); font-weight: bold; margin: 0 0 0.5em 0;">Edit profile (Markdown)</label>
                                     <textarea id="psychological-profile-edit-textarea" class="form-control subject-config-ai-textarea" rows="14" spellcheck="true" placeholder="Generate a profile above, or type or paste Markdown here."></textarea>
-                                    <!-- <p class="config-tab-lead" style="margin: 0.5em 0 0.75em 0; color: #666; max-width: none;">Saving updates the stored profile only (master key required). Open the Preview tab to see rendered Markdown; it updates as you type here.</p> -->
+                                    <!-- <p class="config-tab-lead" style="margin: 0.5em 0 0.75em 0; color: var(--color-text-muted); max-width: none;">Saving updates the stored profile only (master key required). Open the Preview tab to see rendered Markdown; it updates as you type here.</p> -->
                                     <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 0;">
                                         <button type="button" id="save-psychological-profile-ai-btn" class="modal-btn modal-btn-primary">Save profile</button>
-                                        <span id="psychological-profile-save-status" role="status" aria-live="polite" style="font-size: var(--text-md); color: #666; min-height: 1.35em;"></span>
+                                        <span id="psychological-profile-save-status" role="status" aria-live="polite" style="font-size: var(--text-md); color: var(--color-text-muted); min-height: 1.35em;"></span>
                                     </div>
                                 </div>
                             </div>
@@ -1048,13 +1047,13 @@
                 <div class="config-tab-content" id="custom-voices-tab">
                     <section class="section-config">
                         <h1>Custom Voices</h1>
-                        <p style="color: #666; margin-bottom: 10px;">
+                        <p style="color: var(--color-text-muted); margin-bottom: 10px;">
                             Define additional LLM personas in addition to the built-in voices. Custom voices appear in the voice selector marked with *.
                         </p>
                     </section>
                     <section class="config-section">
                         <div class="setting-group">
-                            <!-- <p style="color: #666; margin-bottom: 10px;">
+                            <!-- <p style="color: var(--color-text-muted); margin-bottom: 10px;">
                                 Define additional LLM personas in addition to the built-in voices. Custom voices appear in the voice selector marked with *.
                             </p> -->
                             <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
@@ -1071,7 +1070,7 @@
                             <div id="custom-voices-table-container" style="overflow-x: auto; max-height: 45vh; overflow-y: auto;">
                                 <table class="contacts-table" id="custom-voices-table" style="width: 100%; margin-top: 0;">
                                     <thead>
-                                        <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                        <tr style="background: var(--color-bg-base); border-bottom: 2px solid var(--color-border);">
                                             <th style="padding: 8px; text-align: left;">Name</th>
                                             <th style="padding: 8px; text-align: left;">Description</th>
                                             <th style="padding: 8px; text-align: center; width: 60px;">Creativity</th>
@@ -1081,7 +1080,7 @@
                                     <tbody id="custom-voices-tbody"></tbody>
                                 </table>
                             </div>
-                            <p id="custom-voices-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center;">No custom voices. Click "New Voice" to create one.</p>
+                            <p id="custom-voices-empty-msg" style="display: none; padding: 1em; color: var(--color-text-muted); text-align: center;">No custom voices. Click "New Voice" to create one.</p>
                         </div>
                     </section>
                 </div>
@@ -1106,7 +1105,7 @@
                             <div style="margin-bottom: 1em;">
                                 <label style="display: block; font-weight: bold; margin-bottom: 0.3em;">Instructions</label>
                                 <textarea id="custom-voice-edit-instructions" rows="6" placeholder="Describe the persona in detail. e.g. Your name is Professor X and you are a grumpy academic who speaks in Latin phrases." class="form-control" style="font-family: monospace; resize: vertical;"></textarea>
-                                <small style="color: #666;">You can use {SUBJECT_NAME} as a placeholder for the subject name.</small>
+                                <small style="color: var(--color-text-muted);">You can use {SUBJECT_NAME} as a placeholder for the subject name.</small>
                             </div>
                             <div style="margin-bottom: 0;">
                                 <label style="display: block; font-weight: bold; margin-bottom: 0.3em;">Creativity: <span id="custom-voice-edit-creativity-display">0.5</span></label>
@@ -1115,7 +1114,7 @@
                                     <span>0 (factual)</span><span>1</span><span>2 (creative)</span>
                                 </div>
                             </div>
-                            <div id="custom-voice-edit-error" style="display: none; padding: 0.6em; background: #fdecea; border-radius: 6px; color: #c0392b; margin-top: 1em;"></div>
+                            <div id="custom-voice-edit-error" style="display: none; padding: 0.6em; background: rgba(248,113,113,0.12); border-radius: 6px; color: var(--color-danger); margin-top: 1em;"></div>
                         </div>
                         <div class="confirmation-modal-buttons">
                             <button type="button" id="custom-voice-edit-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
@@ -1134,7 +1133,7 @@
                     </section>
                     <section class="config-section">
                         <div class="setting-group">
-                            <!-- <p style="color: #666; margin-bottom: 10px;">
+                            <!-- <p style="color: var(--color-text-muted); margin-bottom: 10px;">
                                 Manage access to encrypted information and access to tools.<br/>
                                 Add a visitor key to allow a person (or the AI) to decrypt data and access tools. Remove a key to revoke access.<br/>
                                 <strong>Delete All</strong> removes every visitor key at once.
@@ -1151,11 +1150,11 @@
                                 </button>
                             </div>
                             <!-- <div id="manage-keys-status" style="margin-top: 10px; padding: 10px; border-radius: 4px; display: none;"></div>
-                            <div id="doc-keyring-count-display" style="color: #666; font-size: var(--text-md); display: none;">
+                            <div id="doc-keyring-count-display" style="color: var(--color-text-muted); font-size: var(--text-md); display: none;">
                                 Document keyring seats: <strong id="doc-keyring-count-value">—</strong>
                             </div> -->
                             <h2 style="font-size: var(--text-heading); margin: 1.25rem 0 0.5rem 0;">Visitor key hints</h2>
-                            <p style="color: #666; font-size: var(--text-md); margin-bottom: 8px;">
+                            <p style="color: var(--color-text-muted); font-size: var(--text-md); margin-bottom: 8px;">
                                 Hints are shown on the unlock screen. They are not the keys themselves.<em>They should allow a someone close to you to recognise the hint and unlock the system</em>
                                 <br/><br/><strong>Edit</strong> updates the hint, access permissions, and which reference / sensitive documents the AI may use.
                                 <br/><strong>Delete</strong> removes the whole visitor key.
@@ -1169,7 +1168,7 @@
                                     <i class="fas fa-plus"></i> Add hint (orphan seat)
                                 </button>
                             </div> -->
-                            <!-- <div id="visitor-key-hints-loading" style="display: none; color: #666; margin-bottom: 8px;"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+                            <!-- <div id="visitor-key-hints-loading" style="display: none; color: var(--color-text-muted); margin-bottom: 8px;"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
                             <div id="visitor-key-hints-error" style="display: none; color: #dc3545; margin-bottom: 8px;"></div> -->
                             <div style="overflow-x: auto;">
                                 <table class="sensitive-data-table" id="visitor-key-hints-table" style="width: 100%;">
@@ -1190,21 +1189,21 @@
                                     <tbody id="visitor-key-hints-tbody"></tbody>
                                 </table>
                             </div>
-                            <p id="visitor-key-hints-empty" style="display: none; color: #666; font-size: var(--text-md);">No visitor hints yet.</p>
+                            <p id="visitor-key-hints-empty" style="display: none; color: var(--color-text-muted); font-size: var(--text-md);">No visitor hints yet.</p>
                         </div>
                     </section>
                 </div>
                 <div class="config-tab-content" id="tools-access-tab">
                     <section class="section-config">
                         <h1>AI Tool Access</h1>
-                        <p style="color:#666; margin-bottom:12px; line-height:1.45;">
+                        <p style="color:var(--color-text-muted); margin-bottom:12px; line-height:1.45;">
                             The AI can use tools defined within the system to get additional information of perform actions.
                             <br/>
                             Choose which kinds of browser session may use each tool type the during chat. If no box is ticked for a tool, it is not available to anyone until you enable it.
                         </p>
                         </section>
                         <section class="config-section">
-                        <!-- <p style="color:#666; margin-bottom:12px; line-height:1.45;">
+                        <!-- <p style="color:var(--color-text-muted); margin-bottom:12px; line-height:1.45;">
                             The AI can use tools defined within the system to get additional information of perform actions.
                             <br/>
                             Choose which kinds of browser session may use each tool type the during chat. If no box is ticked for a tool, it is not available to anyone until you enable it.
@@ -1225,39 +1224,6 @@
                         <div style="margin-top:16px;">
                             <button type="button" id="llm-tools-access-save" class="modal-btn modal-btn-primary">Save</button>
                         </div>
-                    </section>
-                </div>
-                <div class="config-tab-content" id="background-jobs-tab">
-                    <section class="section-config">
-                        <h1>Background Jobs</h1>
-                        <p style="color:#666; margin-bottom:12px; line-height:1.45;">
-                            Schedule maintenance jobs that keep your archive's thumbnails, embeddings, and AI tags up to date.
-                            <br/>
-                            <strong>Auto-start at boot</strong> runs the job once when the server starts.
-                            <strong>Restart on complete</strong> re-runs it after each completion.
-                            <strong>Interval</strong> is the wait between completion and next run.
-                        </p>
-                    </section>
-                    <section class="config-section">
-                        
-                        <div style="overflow-x:auto;">
-                            <table class="sensitive-data-table" id="background-jobs-table" style="width:100%;">
-                                <thead>
-                                    <tr>
-                                        <th style="text-align:left;">Job</th>
-                                        <th style="text-align:center;" title="Run automatically when the server starts">Auto-start at boot</th>
-                                        <th style="text-align:center;" title="Re-run after each completion">Restart on complete</th>
-                                        <th style="text-align:center;" title="Wait between completion and next run">Interval (s)</th>
-                                        <th style="text-align:left;">Last run</th>
-                                        <th style="text-align:left;">Status</th>
-                                        <th style="text-align:center; width:140px;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="background-jobs-tbody"></tbody>
-                            </table>
-                        </div>
-                        <div id="background-jobs-status" style="display:none; margin-bottom:10px; padding:8px 12px; border-radius:4px;"></div>
-                        <p id="background-jobs-empty" style="display:none; color:#666; font-size:var(--text-md);">No background jobs registered.</p>
                     </section>
                 </div>
                     </div>
@@ -1282,6 +1248,7 @@
                             <div class="data-import-category-tabstrip" role="tablist" aria-label="Import and maintenance">
                                 <button type="button" role="tab" class="data-import-category-tab data-import-category-tab--active" id="data-import-tab-import" data-import-category-tab="import" aria-selected="true" aria-controls="data-import-panel-import">Data Import</button>
                                 <button type="button" role="tab" class="data-import-category-tab" id="data-import-tab-maintenance" data-import-category-tab="maintenance" aria-selected="false" aria-controls="data-import-panel-maintenance">Data Maintenance</button>
+                                <button type="button" role="tab" class="data-import-category-tab" id="data-import-tab-background-jobs" data-import-category-tab="background-jobs" aria-selected="false" aria-controls="data-import-panel-background-jobs"><i class="fas fa-tasks" aria-hidden="true"></i> Scheduled  Data Maintenance Jobs</button>
                             </div>
                             <div class="data-import-panels-scroll">
                             <div id="data-import-panel-import" role="tabpanel" class="data-import-category-panel data-import-category-panel--active" data-import-category-panel="import" aria-labelledby="data-import-tab-import">
@@ -1608,6 +1575,37 @@
                                 </article>
                                 </div>
                             </div>
+                            <div id="data-import-panel-background-jobs" role="tabpanel" class="data-import-category-panel" data-import-category-panel="background-jobs" aria-labelledby="data-import-tab-background-jobs">
+                                <div class="data-import-background-jobs-panel">
+                                    <p class="data-import-background-jobs-intro">
+                                        Schedule maintenance jobs that keep your archive's thumbnails, embeddings, and AI tags up to date.
+                                        <strong>Auto-start at boot</strong> runs the job once when the server starts.
+                                        <strong>Restart on complete</strong> re-runs it after each completion.
+                                        <strong>Interval</strong> is the wait between completion and next run.
+                                    </p>
+                                    <div id="background-jobs-status" style="display:none; margin-bottom:10px; padding:8px 12px; border-radius:4px;"></div>
+                                    <div id="background-jobs-loading" class="loading-state background-jobs-loading" aria-live="polite">
+                                        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading scheduled jobs&hellip;
+                                    </div>
+                                    <div id="background-jobs-table-wrap" style="overflow-x:auto;">
+                                        <table class="sensitive-data-table" id="background-jobs-table" style="width:100%;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="text-align:left;">Job</th>
+                                                    <th style="text-align:center;" title="Run automatically when the server starts">Auto-start at boot</th>
+                                                    <th style="text-align:center;" title="Re-run after each completion">Restart on complete</th>
+                                                    <th style="text-align:center;" title="Wait between completion and next run">Interval (s)</th>
+                                                    <th style="text-align:left;">Last run</th>
+                                                    <th style="text-align:left;">Status</th>
+                                                    <th style="text-align:center; width:140px;">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="background-jobs-tbody"></tbody>
+                                        </table>
+                                    </div>
+                                    <p id="background-jobs-empty" style="display:none; color:var(--color-text-muted); font-size:var(--text-md);">No background jobs registered.</p>
+                                </div>
+                            </div>
                             </div>
                             </div>
                             <aside class="data-import-detail-sidebar" aria-label="Import option details">
@@ -1716,11 +1714,11 @@
                     <section class="config-section">
                         <div class="setting-group">
                             <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px; min-height: 2rem;">
-                                <span id="stats-dashboard-loading" style="color: #666; display: none;">
+                                <span id="stats-dashboard-loading" style="color: var(--color-text-muted); display: none;">
                                     <i class="fas fa-spinner fa-spin"></i> Loading...
                                 </span>
                             </div>
-                            <div id="stats-dashboard-load-error" style="display: none; padding: 10px; background: #fee; color: #c00; border-radius: 4px; margin-bottom: 12px;"></div>
+                            <div id="stats-dashboard-load-error" style="display: none; padding: 10px; background: rgba(248,113,113,0.12); color: var(--color-danger); border-radius: 4px; margin-bottom: 12px;"></div>
                             <div id="stats-dashboard-stats" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;"></div>
                             <div id="stats-dashboard-messages-by-year-chart" style="margin-top: 24px;"></div>
                             <div id="stats-dashboard-emails-by-year-chart" style="margin-top: 24px;"></div>
@@ -1958,26 +1956,26 @@
                 </div>
                 <div style="display: flex; flex: 1; overflow: hidden;">
                     <!-- Master Pane (Left) - Resizable -->
-                    <div id="fb-albums-master-pane" style="width: 350px; min-width: 200px; max-width: 600px; border-right: 1px solid #dee2e6; display: flex; flex-direction: column; background-color: #f8f9fa; position: relative;">
-                        <div style="padding: 1rem; border-bottom: 1px solid #dee2e6; box-sizing: border-box;">
+                    <div id="fb-albums-master-pane" style="width: 350px; min-width: 200px; max-width: 600px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background-color: var(--color-bg-base); position: relative;">
+                        <div style="padding: 1rem; border-bottom: 1px solid var(--color-border); box-sizing: border-box;">
                             <input type="text" id="fb-albums-search" placeholder="Search albums..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-size: var(--text-md); box-sizing: border-box;">
                         </div>
                         <div id="fb-albums-list" style="flex: 1; overflow-y: auto; padding: 0.5rem;">
                             <!-- Albums will be loaded here -->
-                            <div style="text-align: center; padding: 2rem; color: #666;">Loading albums...</div>
+                            <div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">Loading albums...</div>
                         </div>
                         <!-- Resize handle -->
                         <div id="fb-albums-resize-handle" style="position: absolute; right: 0; top: 0; bottom: 0; width: 4px; cursor: col-resize; background-color: transparent; z-index: 5;"></div>
                     </div>
                     <!-- Slave Pane (Right) -->
                     <div id="fb-albums-slave-pane" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                        <div id="fb-albums-album-header" style="padding: 1rem; border-bottom: 1px solid #dee2e6; background-color: #f8f9fa;">
-                            <h3 id="fb-albums-album-title" style="margin: 0; color: #233366; font-size: var(--text-heading);">Select an album</h3>
-                            <p id="fb-albums-album-description" style="margin: 0.5rem 0 0 0; color: #666; font-size: var(--text-md);"></p>
+                        <div id="fb-albums-album-header" style="padding: 1rem; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base);">
+                            <h3 id="fb-albums-album-title" style="margin: 0; color: var(--color-text); font-size: var(--text-heading);">Select an album</h3>
+                            <p id="fb-albums-album-description" style="margin: 0.5rem 0 0 0; color: var(--color-text-muted); font-size: var(--text-md);"></p>
                         </div>
                         <div id="fb-albums-images-container" style="flex: 1; overflow-y: auto; padding: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; align-content: start; min-height: 0;">
                             <!-- Images will be displayed here -->
-                            <div style="text-align: center; padding: 2rem; color: #666; grid-column: 1 / -1;">Select an album to view images</div>
+                            <div style="text-align: center; padding: 2rem; color: var(--color-text-muted); grid-column: 1 / -1;">Select an album to view images</div>
                         </div>
                     </div>
                 </div>
@@ -1993,27 +1991,27 @@
                 </div>
                 <div style="display: flex; flex: 1; overflow: hidden;">
                     <!-- Master Pane (Left) - Resizable -->
-                    <div id="fb-posts-master-pane" style="width: 350px; min-width: 200px; max-width: 600px; border-right: 1px solid #dee2e6; display: flex; flex-direction: column; background-color: #f8f9fa; position: relative;">
-                        <div style="padding: 1rem; border-bottom: 1px solid #dee2e6; box-sizing: border-box; display: flex; gap: 8px; align-items: center;">
+                    <div id="fb-posts-master-pane" style="width: 350px; min-width: 200px; max-width: 600px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background-color: var(--color-bg-base); position: relative;">
+                        <div style="padding: 1rem; border-bottom: 1px solid var(--color-border); box-sizing: border-box; display: flex; gap: 8px; align-items: center;">
                             <input type="text" id="fb-posts-search" placeholder="Search posts..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-size: var(--text-md); box-sizing: border-box;">
                             <button type="button" id="fb-posts-clear-btn" class="modal-btn modal-btn-secondary" style="flex-shrink: 0;">Clear</button>
                         </div>
                         <div id="fb-posts-list" style="flex: 1; overflow-y: auto; padding: 0.5rem;">
-                            <div style="text-align: center; padding: 2rem; color: #666;">Loading posts...</div>
+                            <div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">Loading posts...</div>
                         </div>
                         <!-- Resize handle -->
                         <div id="fb-posts-resize-handle" style="position: absolute; right: 0; top: 0; bottom: 0; width: 4px; cursor: col-resize; background-color: transparent; z-index: 5;"></div>
                     </div>
                     <!-- Slave Pane (Right) -->
                     <div id="fb-posts-slave-pane" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                        <div id="fb-posts-post-header" style="padding: 1rem; border-bottom: 1px solid #dee2e6; background-color: #f8f9fa;">
-                            <h3 id="fb-posts-post-date" style="margin: 0; color: #233366; font-size: var(--text-heading);">Select a post</h3>
-                            <p id="fb-posts-post-text" style="margin: 0.5rem 0 0 0; color: #333; font-size: var(--text-lead); white-space: pre-wrap;"></p>
-                            <a id="fb-posts-post-link" href="#" target="_blank" rel="noopener noreferrer" style="display: none; margin-top: 0.5rem; font-size: var(--text-sm); color: #0066cc; word-break: break-all;"></a>
+                        <div id="fb-posts-post-header" style="padding: 1rem; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base);">
+                            <h3 id="fb-posts-post-date" style="margin: 0; color: var(--color-text); font-size: var(--text-heading);">Select a post</h3>
+                            <p id="fb-posts-post-text" style="margin: 0.5rem 0 0 0; color: var(--color-text); font-size: var(--text-lead); white-space: pre-wrap;"></p>
+                            <a id="fb-posts-post-link" href="#" target="_blank" rel="noopener noreferrer" style="display: none; margin-top: 0.5rem; font-size: var(--text-sm); color: var(--color-blue); word-break: break-all;"></a>
                         </div>
                         <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 1rem;">
                             <div id="fb-posts-images-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; align-content: start;">
-                                <div style="text-align: center; padding: 2rem; color: #666; grid-column: 1 / -1;">Select a post to view details</div>
+                                <div style="text-align: center; padding: 2rem; color: var(--color-text-muted); grid-column: 1 / -1;">Select a post to view details</div>
                             </div>
                         </div>
                     </div>
@@ -2056,11 +2054,11 @@
                     <div style="margin-bottom: 0.75rem;">
                         <label style="display: flex; align-items: center; padding: 4px 6px; margin-bottom: 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'">
                             <input type="radio" name="sms-ask-ai-option" value="summarise" checked style="margin-right: 10px; cursor: pointer;">
-                            <span style="color: #333; font-size: var(--text-base);">Summarise the Conversation</span>
+                            <span style="color: var(--color-text); font-size: var(--text-base);">Summarise the Conversation</span>
                         </label>
                         <label style="display: flex; align-items: center; padding: 4px 6px; margin-bottom: 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'">
                             <input type="radio" name="sms-ask-ai-option" value="other" style="margin-right: 10px; cursor: pointer;">
-                            <span style="color: #333; font-size: var(--text-base);">Other</span>
+                            <span style="color: var(--color-text); font-size: var(--text-base);">Other</span>
                         </label>
                     </div>
                     <div id="sms-ask-ai-other-text" style="margin-bottom: 1rem;">
@@ -2083,7 +2081,7 @@
                 </div>
                 <div class="modal-body" style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
                     <div id="previous-responses-list-view" style="overflow-y: auto; flex: 1;">
-                        <p id="previous-responses-empty" style="color: #666; padding: 1rem; display: none;">No saved responses yet.</p>
+                        <p id="previous-responses-empty" style="color: var(--color-text-muted); padding: 1rem; display: none;">No saved responses yet.</p>
                         <ul id="previous-responses-list" style="list-style: none; margin: 0; padding: 0;"></ul>
                     </div>
                     <div id="previous-responses-detail-view" style="display: none; flex: 1; flex-direction: column; overflow: hidden;">
@@ -2091,8 +2089,8 @@
                             <h3 id="previous-responses-detail-title" style="margin: 0; font-size: var(--text-heading);"></h3>
                             <button class="modal-close-btn" id="previous-responses-back-btn" style="font-size: var(--text-2xl);">&larr;</button>
                         </div>
-                        <div id="previous-responses-detail-meta" style="padding: 8px 1rem; font-size: var(--text-sm); color: #666; border-bottom: 1px solid #dee2e6; margin: 0 1rem;"></div>
-                        <div id="previous-responses-detail-content" style="flex: 1; overflow-y: auto; padding: 1rem; background: #f8f9fa; border-radius: 4px; margin: 0 1rem 1rem; line-height: 1.6;"></div>
+                        <div id="previous-responses-detail-meta" style="padding: 8px 1rem; font-size: var(--text-sm); color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); margin: 0 1rem;"></div>
+                        <div id="previous-responses-detail-content" style="flex: 1; overflow-y: auto; padding: 1rem; background: var(--color-bg-base); border-radius: 4px; margin: 0 1rem 1rem; line-height: 1.6;"></div>
                         <div style="padding: 0 1rem 1rem;">
                             <button id="previous-responses-delete-btn" class="modal-btn modal-btn-danger">Delete</button>
                         </div>
@@ -2109,16 +2107,16 @@
                     <button class="modal-close-btn" id="close-conversation-summary-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div id="conversation-summary-progress" style="display: none; margin-bottom: 1rem; padding: 1rem; background-color: #f8f9fa; border-radius: 4px;">
+                    <div id="conversation-summary-progress" style="display: none; margin-bottom: 1rem; padding: 1rem; background-color: var(--color-bg-base); border-radius: 4px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <i class="fas fa-spinner fa-spin"></i>
                             <span id="conversation-summary-progress-text">Generating summary...</span>
                         </div>
                     </div>
-                    <div id="conversation-summary-content" style="max-height: 60vh; overflow-y: auto; padding: 1rem; background-color: #f8f9fa; border-radius: 4px; line-height: 1.6; color: #333;">
+                    <div id="conversation-summary-content" style="max-height: 60vh; overflow-y: auto; padding: 1rem; background-color: var(--color-bg-base); border-radius: 4px; line-height: 1.6; color: var(--color-text);">
                         <!-- Summary content will be displayed here -->
                     </div>
-                    <div id="conversation-summary-error" style="display: none; margin-top: 1rem; padding: 1rem; background-color: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;">
+                    <div id="conversation-summary-error" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);">
                         <!-- Error messages will be displayed here -->
                     </div>
                 </div>
@@ -2139,11 +2137,11 @@
                     <div style="margin-bottom: 0.75rem;">
                         <label style="display: flex; align-items: center; padding: 4px 6px; margin-bottom: 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'">
                             <input type="radio" name="email-ask-ai-option" value="summarise" checked style="margin-right: 10px; cursor: pointer;">
-                            <span style="color: #333; font-size: var(--text-base);">Summarise Emails with the same sender</span>
+                            <span style="color: var(--color-text); font-size: var(--text-base);">Summarise Emails with the same sender</span>
                         </label>
                         <label style="display: flex; align-items: center; padding: 4px 6px; margin-bottom: 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'">
                             <input type="radio" name="email-ask-ai-option" value="other" style="margin-right: 10px; cursor: pointer;">
-                            <span style="color: #333; font-size: var(--text-base);">Other</span>
+                            <span style="color: var(--color-text); font-size: var(--text-base);">Other</span>
                         </label>
                     </div>
                     <div id="email-ask-ai-other-text" style="margin-bottom: 1rem;">
@@ -2284,10 +2282,10 @@
 
                                         </div>
                                         <div style="display: flex; align-items: center; gap: 0.3em;">
-                                            <button id="image-gallery-search-btn" class="modal-btn modal-btn-primary" style="background: #233366; color: white; border: none; padding: 0.3em 0.8em; border-radius: 4px; cursor: pointer; font-size: var(--text-md);">
+                                            <button id="image-gallery-search-btn" class="modal-btn modal-btn-primary" style="border: none; padding: 0.3em 0.8em; border-radius: 4px; cursor: pointer; font-size: var(--text-md);">
                                                 <i class="fas fa-search" style="margin-right: 0.3em;"></i>Search
                                             </button>
-                                            <button id="image-gallery-clear-btn" class="modal-btn modal-btn-secondary" style="background: #6c757d; color: white; border: none; padding: 0.3em 0.8em; border-radius: 4px; cursor: pointer; font-size: var(--text-md);">
+                                            <button id="image-gallery-clear-btn" class="modal-btn modal-btn-secondary" style="border: none; padding: 0.3em 0.8em; border-radius: 4px; cursor: pointer; font-size: var(--text-md);">
                                                 <i class="fas fa-times" style="margin-right: 0.3em;"></i>Clear
                                             </button>
                                         </div>
@@ -2572,18 +2570,16 @@
                     </div>
                     <!-- Metadata Section -->
                     <div class="new-image-gallery-detail-metadata-section">
-                        <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1em; gap: 0.5em;">
-                            <div style="display: flex; gap: 0.5em; flex-wrap: wrap;">
-                                <button type="button" id="new-image-detail-find-similar-btn" class="modal-btn modal-btn-secondary" title="Search the gallery for images with similar tags (local AI)">
+                        <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1em; gap: 0.4em; flex-wrap: nowrap;">
+                                <button type="button" id="new-image-detail-find-similar-btn" class="modal-btn modal-btn-secondary" style="padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" title="Search the gallery for images with similar tags (local AI)">
                                     <i class="fas fa-search"></i> Find Similar
                                 </button>
-                                <button id="new-image-gallery-save-btn" class="modal-btn" style="display: none;" disabled>
+                                <button id="new-image-gallery-save-btn" class="modal-btn modal-btn-primary" style="display:none; padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" disabled>
                                     <i class="fas fa-save"></i> Save Changes
                                 </button>
-                                <button id="new-image-gallery-delete-btn" class="modal-btn modal-btn-danger" style="display: none;">
+                                <button id="new-image-gallery-delete-btn" class="modal-btn modal-btn-danger" style="display:none; padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;">
                                     <i class="fas fa-trash-alt"></i> Delete Image
                                 </button>
-                            </div>
                         </div>
                         <div class="new-image-gallery-detail-metadata-content">
                             <div class="new-image-gallery-detail-metadata-row">
@@ -2679,7 +2675,7 @@
                     <button class="modal-close-btn" id="close-reference-documents-notification-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p style="margin: 0 0 1rem 0; color: #666; font-size: var(--text-lead);">Reference documents that will be included in your chat are shown below. Documents not selected for chat are also listed.</p>
+                    <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-lead);">Reference documents that will be included in your chat are shown below. Documents not selected for chat are also listed.</p>
                     <div id="reference-documents-notification-list" style="max-height: 400px; overflow-y: auto; margin-bottom: 1.5rem; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem;">
                         <!-- Documents will be listed here -->
                     </div>
@@ -2716,11 +2712,11 @@
                 </div>
                 <div class="modal-body">
                 <div style="margin-bottom: 1.5rem;">
-                    <label for="new-conversation-title-input" style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5em;">Conversation Title:</label>
+                    <label for="new-conversation-title-input" style="display: block; color: var(--color-text); font-weight: bold; margin-bottom: 0.5em;">Conversation Title:</label>
                     <input type="text" id="new-conversation-title-input" placeholder="Enter conversation title..." class="form-control" />
                 </div>
                 <div style="margin-bottom: 1.5rem;">
-                    <label for="new-conversation-voice-select" style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5em;">Voice:</label>
+                    <label for="new-conversation-voice-select" style="display: block; color: var(--color-text); font-weight: bold; margin-bottom: 0.5em;">Voice:</label>
                     <!-- Options populated dynamically from /api/voices by VoiceSelector.loadVoices() -->
                     <select id="new-conversation-voice-select" class="form-control">
                         <option value="expert" selected>Expert</option>
@@ -2757,24 +2753,24 @@
 
                     </div>
                     <div id="contacts-directory-tab-content" class="manage-contacts-tab-content active" style="flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
-                    <div id="contacts-loading" style="padding: 2em; text-align: center; color: #666;">
+                    <div id="contacts-loading" style="padding: 2em; text-align: center; color: var(--color-text-muted);">
                         <i class="fas fa-spinner fa-spin"></i> Loading contacts...
                     </div>
                     <div id="contacts-table-container" class="contacts-table-container" style="display: none;">
                         <div id="contacts-pagination-top" class="contacts-pagination-row contacts-controls-top">
                             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;margin-top:16px">
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: var(--text-md); color: #666;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: var(--text-md); color: var(--color-text-muted);">
                                     Search: <input type="text" id="contacts-search" placeholder="Name or email (Enter to search)" style="width: 200px; padding: 4px 8px;">
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: var(--text-md); color: #666; cursor: pointer;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: var(--text-md); color: var(--color-text-muted); cursor: pointer;">
                                     <input type="checkbox" id="contacts-has-messages-only" title="Show only contacts with at least 1 message">
                                     At Least 1 Message Only
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: var(--text-md); color: #666; cursor: pointer;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: var(--text-md); color: var(--color-text-muted); cursor: pointer;">
                                     <input type="checkbox" id="contacts-email-contains-at" title="Show only contacts with at least 1 '@' in the email field">
                                     Valid Email Adrresses Only
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: var(--text-md); color: #666; cursor: pointer;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: var(--text-md); color: var(--color-text-muted); cursor: pointer;">
                                     <input type="checkbox" checked id="contacts-exclude-phone-numbers" title="Exclude contacts whose name contains only digits, whitespace and '+'">
                                     Exclude Phone Numbers
                                 </label>
@@ -2784,7 +2780,7 @@
                         <div class="contacts-table-scroll-wrapper">
                         <table class="contacts-table" style="width: 100%; border-collapse: collapse;">
                             <thead>
-                                <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                <tr style="background: var(--color-bg-base); border-bottom: 2px solid var(--color-border);">
                                     <th style="padding: 10px; text-align: center; width: 40px;"><input type="checkbox" id="contacts-select-all" title="Select all on page"></th>
                                     <th class="contacts-sortable-header" data-sort="name" style="padding: 10px; text-align: left; width: 120px; cursor: pointer;">Name</th>
                                     <th class="contacts-sortable-header" data-sort="email" style="padding: 10px; text-align: left; width: 450px; cursor: pointer;">Email</th>
@@ -2862,8 +2858,8 @@
                             <div class="rel-legend-item"><div class="rel-line rel-strong"></div> Strong (8-10)</div>
                             <div class="rel-legend-item"><div class="rel-line rel-weak"></div> Weak (1-3)</div> -->
 
-                            <div id="rel-node-details" class="rel-node-details" style="margin-bottom: 1em; padding: 0.75em; background: #f8f9fa; border-radius: 6px; min-height: 3em;">
-                                <em style="color: #666;">Click a person to view details</em>
+                            <div id="rel-node-details" class="rel-node-details" style="margin-bottom: 1em; padding: 0.75em; background: var(--color-bg-surface); border-radius: 6px; min-height: 3em;">
+                                <em style="color: var(--color-text-muted);">Click a person to view details</em>
                             </div>
                         </div>
                     </div>
@@ -2871,7 +2867,7 @@
                     </div>
                         <div id="email-matches-tab-content" class="manage-contacts-tab-content" style="flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
                             <div class="setting-group" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                                <p style="color: #666; margin-bottom: 10px; flex-shrink: 0;">
+                                <p style="color: var(--color-text-muted); margin-bottom: 10px; flex-shrink: 0;">
                                     Manage email matches used to merge duplicate contacts. Each row maps an email address to a primary contact name.
                                 </p>
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
@@ -2896,7 +2892,7 @@
                                 <div id="email-matches-table-container" style="overflow: auto; flex: 1; min-height: 0;">
                                     <table class="contacts-table manage-contacts-data-table" id="email-matches-table" style="width: 100%; margin-top: 0;">
                                         <thead>
-                                            <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                            <tr style="background: var(--color-bg-base); border-bottom: 2px solid var(--color-border);">
                                                 <th class="manage-contacts-th">Primary Name</th>
                                                 <th class="manage-contacts-th">Email</th>
                                                 <th class="manage-contacts-th manage-contacts-th-actions">Actions</th>
@@ -2906,12 +2902,12 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <p id="email-matches-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center; flex-shrink: 0;">No email matches. Add one to map emails to a primary contact name.</p>
+                                <p id="email-matches-empty-msg" style="display: none; padding: 1em; color: var(--color-text-muted); text-align: center; flex-shrink: 0;">No email matches. Add one to map emails to a primary contact name.</p>
                             </div>
                         </div>
                         <div id="email-exclusions-tab-content" class="manage-contacts-tab-content" style="flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
                             <div class="setting-group" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                                <p style="color: #666; margin-bottom: 10px; flex-shrink: 0;">
+                                <p style="color: var(--color-text-muted); margin-bottom: 10px; flex-shrink: 0;">
                                     Manage email and name exclusions used to filter out contacts during import. Email patterns exclude by email substring; name patterns by name; name+email pairs exclude a specific name when paired with a specific email.
                                 </p>
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
@@ -2942,7 +2938,7 @@
                                 <div id="email-exclusions-table-container" style="overflow: auto; flex: 1; min-height: 0;">
                                     <table class="contacts-table manage-contacts-data-table" id="email-exclusions-table" style="width: 100%; margin-top: 0;">
                                         <thead>
-                                            <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                            <tr style="background: var(--color-bg-base); border-bottom: 2px solid var(--color-border);">
                                                 <th class="manage-contacts-th">Email</th>
                                                 <th class="manage-contacts-th">Name</th>
                                                 <th class="manage-contacts-th">Type</th>
@@ -2953,12 +2949,12 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <p id="email-exclusions-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center; flex-shrink: 0;">No email exclusions. Add one to exclude emails or names during contact import.</p>
+                                <p id="email-exclusions-empty-msg" style="display: none; padding: 1em; color: var(--color-text-muted); text-align: center; flex-shrink: 0;">No email exclusions. Add one to exclude emails or names during contact import.</p>
                             </div>
                         </div>
                         <div id="email-classifications-tab-content" class="manage-contacts-tab-content" style="flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
                             <div class="setting-group" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                                <p style="color: #666; margin-bottom: 10px; flex-shrink: 0;">
+                                <p style="color: var(--color-text-muted); margin-bottom: 10px; flex-shrink: 0;">
                                     Manage contact classifications (friend, family, colleague, etc.) used to categorise contacts.
                                 </p>
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
@@ -2986,7 +2982,7 @@
                                 <div id="email-classifications-table-container" style="overflow: auto; flex: 1; min-height: 0;">
                                     <table class="contacts-table manage-contacts-data-table" id="email-classifications-table" style="width: 100%; margin-top: 0;">
                                         <thead>
-                                            <tr style="background: #f0f4f8; border-bottom: 2px solid #bfc9da;">
+                                            <tr style="background: var(--color-bg-base); border-bottom: 2px solid var(--color-border);">
                                                 <th class="manage-contacts-th">Name</th>
                                                 <th class="manage-contacts-th">Classification</th>
                                                 <th class="manage-contacts-th manage-contacts-th-actions">Actions</th>
@@ -2996,7 +2992,7 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <p id="email-classifications-empty-msg" style="display: none; padding: 1em; color: #666; text-align: center; flex-shrink: 0;">No email classifications. Add one to assign a contact to a classification.</p>
+                                <p id="email-classifications-empty-msg" style="display: none; padding: 1em; color: var(--color-text-muted); text-align: center; flex-shrink: 0;">No email classifications. Add one to assign a contact to a classification.</p>
                             </div>
                         </div>
                 </div>
@@ -3115,7 +3111,7 @@
                             </button>
                         </div>
                         <input type="hidden" id="upload-zip-selected-path" value="">
-                        <div id="upload-zip-filename" style="display: none; margin-top: 8px; font-weight: 600; color: #1e293b; word-break: break-all;"></div>
+                        <div id="upload-zip-filename" style="display: none; margin-top: 8px; font-weight: 600; color: var(--color-text); word-break: break-all;"></div>
                     </div>
                     <div id="upload-zip-progress-wrap" style="display: none;">
                         <div class="upload-import-label" style="margin-bottom: 6px;" id="upload-zip-progress-label">Uploading…</div>
@@ -3126,7 +3122,7 @@
                     </div>
                     <div id="upload-zip-result" style="display: none; margin-top: 12px; font-size: var(--text-md); border-radius: 6px; padding: 10px 14px;"></div>
                 </div>
-                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; background: #f8fafc;">
+                <div style="padding: 12px 20px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; background: var(--color-bg-base);">
                     <button type="button" class="modal-btn modal-btn-secondary" id="upload-zip-cancel-btn">Cancel</button>
                     <button type="button" class="modal-btn modal-btn-primary" id="upload-zip-start-btn" disabled onclick="return window.startUploadImportFromSelected && window.startUploadImportFromSelected(event)"><i class="fas fa-upload"></i> Upload &amp; Import</button>
                 </div>
@@ -3166,7 +3162,7 @@
                         </div>
                     </fieldset>
                 </div>
-                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; background: #f8fafc;">
+                <div style="padding: 12px 20px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; background: var(--color-bg-base);">
                     <button type="button" class="modal-btn modal-btn-secondary" id="upload-zip-confirm-back-btn">Back</button>
                     <button type="button" class="modal-btn modal-btn-primary" id="upload-zip-confirm-start-btn" onclick="return window.confirmUploadImportFromSelected && window.confirmUploadImportFromSelected(event)"><i class="fas fa-file-import"></i> Confirm &amp; Import</button>
                 </div>
@@ -3190,7 +3186,7 @@
                         <div class="upload-import-dropzone" id="upload-photos-dropzone" style="cursor: pointer;">
                             <i class="fas fa-folder-open" style="font-size: var(--text-icon-xl); color: #10b981; margin-bottom: 8px;"></i>
                             <div id="upload-photos-drop-text">Click to select a folder, or drag files here</div>
-                            <div id="upload-photos-count" style="display: none; margin-top: 8px; font-weight: 600; color: #1e293b;"></div>
+                            <div id="upload-photos-count" style="display: none; margin-top: 8px; font-weight: 600; color: var(--color-text);"></div>
                             <input type="file" id="upload-photos-file" webkitdirectory multiple accept="image/*" style="display: none;">
                         </div>
                     </div>
@@ -3217,7 +3213,7 @@
                     </div>
                     <div id="upload-photos-result" style="display: none; margin-top: 12px; font-size: var(--text-md); border-radius: 6px; padding: 10px 14px;"></div>
                 </div>
-                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; flex-shrink: 0; background: #f8fafc;">
+                <div style="padding: 12px 20px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; flex-shrink: 0; background: var(--color-bg-base);">
                     <button type="button" class="modal-btn modal-btn-secondary" id="upload-photos-cancel-btn">Cancel</button>
                     <button type="button" class="modal-btn modal-btn-secondary" id="upload-photos-background-btn" style="display: none;"><i class="fas fa-window-minimize" style="margin-right: 6px;"></i>Run in Background</button>
                     <button type="button" class="modal-btn modal-btn-primary" id="upload-photos-start-btn"><i class="fas fa-upload"></i> Upload Photos</button>
@@ -3257,7 +3253,7 @@
                     <div class="reference-documents-form-group">
                         <label class="reference-documents-checkbox-label">
                             <input type="checkbox" id="reference-documents-upload-task" name="available_for_task">
-                            Make availaable to the AI
+                            Make available to the AI
                         </label>
                     </div>
                     <div class="reference-documents-form-group">
@@ -3265,7 +3261,7 @@
                             <input type="checkbox" id="reference-documents-upload-system-prompt" name="include_in_system_prompt">
                             Include in system prompt
                         </label>
-                        <div class="reference-documents-field-hint" style="margin-top:0.35rem;font-size:var(--text-md);color:#64748b;">When enabled, the document text is sent with every chat-style request and is hidden from the “list available reference documents” tools.</div>
+                        <div class="reference-documents-field-hint" style="margin-top:0.35rem;font-size:var(--text-md);color:var(--color-text-muted);">When enabled, the document text is sent with every chat-style request and is hidden from the “list available reference documents” tools.</div>
                     </div>
                     <div class="reference-documents-form-actions">
                         <button type="submit" id="reference-documents-upload-submit" class="modal-btn modal-btn-primary">Import</button>
@@ -3303,7 +3299,7 @@
                     <div class="reference-documents-form-group">
                         <label class="reference-documents-checkbox-label">
                             <input type="checkbox" id="reference-documents-edit-task" name="available_for_task">
-                            Make availaable to the AI
+                            Make available to the AI
                         </label>
                     </div>
                     <div class="reference-documents-form-group">
@@ -3311,7 +3307,7 @@
                             <input type="checkbox" id="reference-documents-edit-system-prompt" name="include_in_system_prompt">
                             Include in system prompt
                         </label>
-                        <div class="reference-documents-field-hint" style="margin-top:0.35rem;font-size:var(--text-md);color:#64748b;">When enabled, the document text is sent with every chat-style request and is hidden from the “list available reference documents” tools.</div>
+                        <div class="reference-documents-field-hint" style="margin-top:0.35rem;font-size:var(--text-md);color:var(--color-text-muted);">When enabled, the document text is sent with every chat-style request and is hidden from the “list available reference documents” tools.</div>
                     </div>
                     <div class="reference-documents-form-actions">
                         <button type="submit" class="modal-btn modal-btn-primary">Save Changes</button>
@@ -3331,7 +3327,7 @@
                     <button class="modal-close-btn" id="close-email-match-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div id="email-match-modal-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;"></div>
+                    <div id="email-match-modal-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
                     <div class="setting-group">
                         <label for="email-match-primary-name" class="artefact-field-label">Primary Name</label>
                         <input type="text" id="email-match-primary-name" class="new-image-gallery-input" placeholder="e.g. Dave Burton" style="width: 100%;">
@@ -3356,7 +3352,7 @@
                     <button class="modal-close-btn" id="close-interest-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div id="interest-modal-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;"></div>
+                    <div id="interest-modal-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
                     <div class="setting-group">
                         <label for="interest-name" class="artefact-field-label">Name</label>
                         <input type="text" id="interest-name" class="new-image-gallery-input" placeholder="e.g. Photography" style="width: 100%;">
@@ -3377,7 +3373,7 @@
                     <button class="modal-close-btn" id="close-email-classification-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div id="email-classification-modal-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;"></div>
+                    <div id="email-classification-modal-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
                     <div class="setting-group">
                         <label for="email-classification-name" class="artefact-field-label">Name</label>
                         <input type="text" id="email-classification-name" class="new-image-gallery-input" placeholder="e.g. John Smith" style="width: 100%;">
@@ -3404,7 +3400,7 @@
                     <button class="modal-close-btn" id="close-email-exclusion-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div id="email-exclusion-modal-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;"></div>
+                    <div id="email-exclusion-modal-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
                     <div class="setting-group">
                         <label for="email-exclusion-type" class="artefact-field-label">Type</label>
                         <select id="email-exclusion-type" class="new-image-gallery-input" style="width: 100%; padding: 8px 12px;">
@@ -3532,14 +3528,14 @@
                     <h2><i class="fas fa-lock"></i> Unlock Encryption</h2>
                 </div>
                 <div class="confirmation-modal-body">
-                    <p style="color:#555; margin-bottom:12px; font-size:var(--text-lead); line-height:1.45;">
+                    <p style="color:var(--color-text-muted); margin-bottom:12px; font-size:var(--text-lead); line-height:1.45;">
                         Enter the <strong>owner's master key</strong> and choose <strong>Unlock with Master Key</strong> for full access (including the private store).
                         <br/><br/>If the owner gave you a <strong>visitor key</strong> then enter it and choose <strong>Unlock as visitor</strong>
                         Visitor access can decrypt shared sensitive data and reference documents, but not the owner-only private store.
                         <br/>The owner may have left a <strong>visitor key hint</strong> to help you remember or guess the key.
                         <br/><br/>You can <strong>Skip for now</strong> but some features stay unavailable until you unlock.
                     </p>
-                    <div id="master-key-unlock-error" style="display:none; color:#b91c1c; margin-bottom:10px; font-size:var(--text-md);"></div>
+                    <div id="master-key-unlock-error" style="display:none; color:var(--color-danger); margin-bottom:10px; font-size:var(--text-md);"></div>
                     <label for="master-key-unlock-input" style="display:block; margin-bottom:6px; font-weight:500;">Master or Visitor key</label>
                     <input type="password" id="master-key-unlock-input" class="modal-input" autocomplete="off"
                         style="width:100%; padding:10px 12px; border-radius:6px; border:1px solid #bfc9da; box-sizing:border-box;" />
@@ -3564,11 +3560,11 @@
                     <h2><i class="fas fa-key"></i> Visitor key hints</h2>
                 </div>
                 <div class="confirmation-modal-body">
-                    <p style="color:#555; margin-bottom:12px; font-size:var(--text-md);">These are reminders the owner entered when creating visitor keys. They are not the keys themselves.</p>
-                    <div id="visitor-key-hints-error" style="display:none; color:#b91c1c; margin-bottom:10px; font-size:var(--text-md);"></div>
-                    <div id="visitor-key-hints-loading" style="display:none; color:#666; margin-bottom:8px;">Loading…</div>
+                    <p style="color:var(--color-text-muted); margin-bottom:12px; font-size:var(--text-md);">These are reminders the owner entered when creating visitor keys. They are not the keys themselves.</p>
+                    <div id="visitor-key-hints-error" style="display:none; color:var(--color-danger); margin-bottom:10px; font-size:var(--text-md);"></div>
+                    <div id="visitor-key-hints-loading" style="display:none; color:var(--color-text-muted); margin-bottom:8px;">Loading…</div>
                     <ul id="visitor-key-hints-list" style="margin:0; padding-left:1.25rem; max-height:280px; overflow-y:auto;"></ul>
-                    <p id="visitor-key-hints-empty" style="display:none; color:#666; font-size:var(--text-md);">No visitor hints are saved yet.</p>
+                    <p id="visitor-key-hints-empty" style="display:none; color:var(--color-text-muted); font-size:var(--text-md);">No visitor hints are saved yet.</p>
                 </div>
                 <div class="confirmation-modal-buttons" style="display:flex; justify-content:flex-end;">
                     <button type="button" id="visitor-key-hints-close" class="modal-btn modal-btn-primary">Close</button>
@@ -3584,8 +3580,8 @@
                     <button class="modal-close-btn" id="close-todays-thing-add-interest-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p style="color: #666; margin-bottom: 12px;">You don't have any interests yet. Add at least one topic here, or use <strong>Subject Configuration</strong> in the Configuration dialog.</p>
-                    <div id="todays-thing-add-interest-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;"></div>
+                    <p style="color: var(--color-text-muted); margin-bottom: 12px;">You don't have any interests yet. Add at least one topic here, or use <strong>Subject Configuration</strong> in the Configuration dialog.</p>
+                    <div id="todays-thing-add-interest-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
                     <div class="setting-group">
                         <label for="todays-thing-add-interest-input" class="artefact-field-label">Topic or interest</label>
                         <input type="text" id="todays-thing-add-interest-input" class="new-image-gallery-input" placeholder="e.g. Astronomy, Photography" style="width: 100%;">
@@ -3656,57 +3652,57 @@
 
         <!-- SMS Messages Modal -->
         <div id="sms-messages-modal" class="modal">
-            <div class="modal-content" style="max-width: 1400px; width: 95vw; background: #fff; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); padding: 0; position: relative; display: flex; flex-direction: column; height: 90vh;">
+            <div class="modal-content" style="max-width: 1400px; width: 95vw; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); padding: 0; position: relative; display: flex; flex-direction: column; height: 90vh;">
                 <div class="modal-header">
                     <h2><i class="fas fa-comment-dots"></i> Messages &amp; Chats</h2>
                     <button class="modal-close-btn" id="close-sms-messages-modal" title="Close">&times;</button>
                 </div>
                 <div style="display: flex; flex: 1; min-height: 0; overflow: hidden;">
                     <!-- Master Pane (Left) - WhatsApp Style -->
-                    <div id="sms-chat-list-pane" style="width: 400px; min-width: 300px; max-width: 500px; border-right: 1px solid #e9edef; display: flex; flex-direction: column; background-color: #f0f2f5;">
+                    <div id="sms-chat-list-pane" style="width: 400px; min-width: 300px; max-width: 500px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background-color: var(--color-bg-base);">
                         <!-- Chat List Header -->
-                        <div style="padding: 10px 16px; background-color: #f0f2f5;">
-                            <input type="text" id="sms-chat-search" placeholder="Search By Contact Name..." style="width: 100%; padding: 8px 12px; border-radius: 8px; border: none; background-color: #fff; font-size: var(--text-md); box-sizing: border-box; color: #667781;">
+                        <div style="padding: 10px 16px; background-color: var(--color-bg-base);">
+                            <input type="text" id="sms-chat-search" placeholder="Search By Contact Name..." style="width: 100%; padding: 8px 12px; border-radius: 8px; border: none; background-color: var(--color-bg-surface); font-size: var(--text-md); box-sizing: border-box; color: var(--color-text);">
                         </div>
                         <!-- Filter Buttons -->
-                        <div id="sms-chat-filters" style="padding: 8px 16px; background-color: #fff; border-bottom: 1px solid #e9edef; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
-                            <label id="filter-imessage-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #d1e7dd; border: 2px solid #0f3251; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#e4e6eb'; this.style.borderColor='#e4e6eb';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#f0f2f5'; this.style.borderColor='#f0f2f5';">
+                        <div id="sms-chat-filters" style="padding: 8px 16px; background-color: var(--color-bg-elevated); border-bottom: 1px solid var(--color-border); display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                            <label id="filter-imessage-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #1e2d4f; border: 2px solid #3d5278; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#243358'; this.style.borderColor='#4f9cf9';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#1e2d4f'; this.style.borderColor='#3d5278';">
                                 <input type="checkbox" id="filter-imessage" class="sms-filter-checkbox" checked style="margin-right: 6px; cursor: pointer; display: none;">
-                                <i class="fab fa-apple" style="color: #0f3251; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #0f3251; font-weight: 600;">iMessage</span>
+                                <i class="fab fa-apple" style="color: #8fa4c8; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #8fa4c8; font-weight: 600;">iMessage</span>
                             </label>
-                            <label id="filter-sms-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #d1e7dd; border: 2px solid #0f3251; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#e4e6eb'; this.style.borderColor='#e4e6eb';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#f0f2f5'; this.style.borderColor='#f0f2f5';">
+                            <label id="filter-sms-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #1e2d4f; border: 2px solid #3d5278; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#243358'; this.style.borderColor='#4f9cf9';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#1e2d4f'; this.style.borderColor='#3d5278';">
                                 <input type="checkbox" id="filter-sms" class="sms-filter-checkbox" checked style="margin-right: 6px; cursor: pointer; display: none;">
-                                <i class="fas fa-comment" style="color: #0f3251; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #0f3251; font-weight: 600;">SMS</span>
+                                <i class="fas fa-comment" style="color: #8fa4c8; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #8fa4c8; font-weight: 600;">SMS</span>
                             </label>
-                            <label id="filter-whatsapp-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #d1e7dd; border: 2px solid #0f3251; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#e4e6eb'; this.style.borderColor='#e4e6eb';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#f0f2f5'; this.style.borderColor='#f0f2f5';">
+                            <label id="filter-whatsapp-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #1e2d4f; border: 2px solid #3d5278; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#243358'; this.style.borderColor='#4f9cf9';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#1e2d4f'; this.style.borderColor='#3d5278';">
                                 <input type="checkbox" id="filter-whatsapp" class="sms-filter-checkbox" checked style="margin-right: 6px; cursor: pointer; display: none;">
-                                <i class="fab fa-whatsapp" style="color: #0f3251; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #0f3251; font-weight: 600;">WhatsApp</span>
+                                <i class="fab fa-whatsapp" style="color: #8fa4c8; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #8fa4c8; font-weight: 600;">WhatsApp</span>
                             </label>
-                            <label id="filter-facebook-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #d1e7dd; border: 2px solid #0f3251; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#e4e6eb'; this.style.borderColor='#e4e6eb';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#f0f2f5'; this.style.borderColor='#f0f2f5';">
+                            <label id="filter-facebook-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #1e2d4f; border: 2px solid #3d5278; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#243358'; this.style.borderColor='#4f9cf9';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#1e2d4f'; this.style.borderColor='#3d5278';">
                                 <input type="checkbox" id="filter-facebook" class="sms-filter-checkbox" checked style="margin-right: 6px; cursor: pointer; display: none;">
-                                <i class="fab fa-facebook-messenger" style="color: #0f3251; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #0f3251; font-weight: 600;">Facebook</span>
+                                <i class="fab fa-facebook-messenger" style="color: #8fa4c8; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #8fa4c8; font-weight: 600;">Facebook</span>
                             </label>
-                            <label id="filter-instagram-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #d1e7dd; border: 2px solid #0f3251; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#e4e6eb'; this.style.borderColor='#e4e6eb';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#f0f2f5'; this.style.borderColor='#f0f2f5';">
+                            <label id="filter-instagram-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #1e2d4f; border: 2px solid #3d5278; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#243358'; this.style.borderColor='#4f9cf9';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#1e2d4f'; this.style.borderColor='#3d5278';">
                                 <input type="checkbox" id="filter-instagram" class="sms-filter-checkbox" checked style="margin-right: 6px; cursor: pointer; display: none;">
-                                <i class="fab fa-instagram" style="color: #0f3251; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #0f3251; font-weight: 600;">Instagram</span>
+                                <i class="fab fa-instagram" style="color: #8fa4c8; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #8fa4c8; font-weight: 600;">Instagram</span>
                             </label>
-                            <label id="filter-mixed-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #d1e7dd; border: 2px solid #0f3251; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#e4e6eb'; this.style.borderColor='#e4e6eb';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#f0f2f5'; this.style.borderColor='#f0f2f5';">
+                            <label id="filter-mixed-label" style="display: flex; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 20px; background-color: #1e2d4f; border: 2px solid #3d5278; white-space: nowrap; transition: all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.backgroundColor='#243358'; this.style.borderColor='#4f9cf9';" onmouseout="if(!this.querySelector('input').checked) this.style.backgroundColor='#1e2d4f'; this.style.borderColor='#3d5278';">
                                 <input type="checkbox" id="filter-mixed" class="sms-filter-checkbox" checked style="margin-right: 6px; cursor: pointer; display: none;">
-                                <i class="fas fa-comments" style="color: #0f3251; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #0f3251; font-weight: 600;">Mixed</span>
+                                <i class="fas fa-comments" style="color: #8fa4c8; margin-right: 4px; font-size: var(--text-xs);"></i><span style="font-size: var(--text-xs); color: #8fa4c8; font-weight: 600;">Mixed</span>
                             </label>
                         </div>
-                        <div id="sms-chat-sessions-list" style="flex: 1; overflow-y: auto; background-color: #fff;">
+                        <div id="sms-chat-sessions-list" style="flex: 1; overflow-y: auto; background-color: var(--color-bg-base);">
                             <!-- Chat sessions will be loaded here -->
-                            <div style="text-align: center; padding: 2rem; color: #667781;">Loading conversations...</div>
+                            <div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">Loading conversations...</div>
                         </div>
                     </div>
                     <!-- Slave Pane (Right) - Chat View -->
-                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; background-color: #efeae2; background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiPjxwYXRoIGQ9Ik0wIDBoMTAwdjEwMEgweiIgZmlsbD0iI2VmZWFlMiIvPjxwYXRoIGQ9Ik0yMCAyMGgxMHYxMEgyMHoiIGZpbGw9IiNkNWQ1ZDUiIG9wYWNpdHk9IjAuMDMiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2EpIi8+PC9zdmc+'); position: relative;">
-                        <div id="sms-conversation-header" style="padding: 10px 16px; border-bottom: 1px solid #e9edef; background-color: #f0f2f5; display: flex; justify-content: space-between; align-items: center; min-height: 60px;">
+                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; background-color: var(--color-bg-deep); position: relative;">
+                        <div id="sms-conversation-header" style="padding: 10px 16px; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base); display: flex; justify-content: space-between; align-items: center; min-height: 60px;">
                             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                                 <div id="sms-conversation-type-icon" style="display: none; font-size: var(--text-xl);"></div>
                                 <div style="flex: 1;">
-                                    <h3 id="sms-conversation-title" style="margin: 0; color: #111b21; font-size: var(--text-base); font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                                    <h3 id="sms-conversation-title" style="margin: 0; color: var(--color-text); font-size: var(--text-base); font-weight: 500; display: flex; align-items: center; gap: 8px;">
                                         <span id="sms-conversation-title-text">Select a conversation</span>
                                     </h3>
                                     <div id="sms-conversation-subtitle" style="font-size: var(--text-sm); color: #667781; margin-top: 2px;"></div>
@@ -3966,7 +3962,7 @@
                         </tr>
                     </thead>
                     <tbody id="sensitive-data-table-body">
-                        <tr><td colspan="5" style="text-align:center;padding:2rem;color:#666;">Loading...</td></tr>
+                        <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--color-text-muted);">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -4001,7 +3997,7 @@
                            placeholder="Enter a password for the master key"
                            style="width:100%; padding-right: 2.5rem;"/>
                     <button type="button" id="sensitive-data-master-key-password-toggle" class="modal-btn"
-                            style="position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:0.25em 0.5em; background:transparent; border:none; cursor:pointer; color:#666;"
+                            style="position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:0.25em 0.5em; background:transparent; border:none; cursor:pointer; color:var(--color-text-muted);"
                             title="Show password"><i class="fas fa-eye"></i></button>
                 </div>
                 <label class="artefact-field-label">Confirm Password</label>
@@ -4010,7 +4006,7 @@
                            placeholder="Enter the password again"
                            style="width:100%; padding-right: 2.5rem;"/>
                     <button type="button" id="sensitive-data-master-key-confirm-toggle" class="modal-btn"
-                            style="position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:0.25em 0.5em; background:transparent; border:none; cursor:pointer; color:#666;"
+                            style="position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:0.25em 0.5em; background:transparent; border:none; cursor:pointer; color:var(--color-text-muted);"
                             title="Show password"><i class="fas fa-eye"></i></button>
                 </div>
                 <div id="sensitive-data-no-master-key-error" style="color: #dc3545; margin-bottom: 0.5rem; display: none;"></div>
@@ -4060,7 +4056,7 @@
                                placeholder="Enter new master password"
                                style="width:100%; padding-right: 2.5rem;"/>
                         <button type="button" id="create-new-master-key-password-toggle" class="modal-btn"
-                                style="position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:0.25em 0.5em; background:transparent; border:none; cursor:pointer; color:#666;"
+                                style="position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:0.25em 0.5em; background:transparent; border:none; cursor:pointer; color:var(--color-text-muted);"
                                 title="Show password"><i class="fas fa-eye"></i></button>
                     </div>
                     <label class="artefact-field-label">Confirm Password</label>
@@ -4069,7 +4065,7 @@
                                placeholder="Enter the password again"
                                style="width:100%; padding-right: 2.5rem;"/>
                         <button type="button" id="create-new-master-key-confirm-toggle" class="modal-btn"
-                                style="position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:0.25em 0.5em; background:transparent; border:none; cursor:pointer; color:#666;"
+                                style="position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:0.25em 0.5em; background:transparent; border:none; cursor:pointer; color:var(--color-text-muted);"
                                 title="Show password"><i class="fas fa-eye"></i></button>
                     </div>
                     <div id="create-new-master-key-error" style="color: #dc3545; margin-bottom: 0.5rem; display: none;"></div>
@@ -4284,7 +4280,7 @@
                 <button type="button" class="modal-close-btn" id="close-create-visitor-key-hint-modal">&times;</button>
             </div>
             <div class="sensitive-data-hints-body">
-                <p style="margin-bottom: 1rem; color: #666;">Choose a visitor keyring seat that has no hint row yet, then enter the text visitors will see on the unlock screen.</p>
+                <p style="margin-bottom: 1rem; color: var(--color-text-muted);">Choose a visitor keyring seat that has no hint row yet, then enter the text visitors will see on the unlock screen.</p>
                 <label class="artefact-field-label">Keyring seat ID</label>
                 <select id="create-visitor-key-hint-keyring-select" class="new-image-gallery-input" style="width:100%; margin-bottom: 1rem;"></select>
                 <label class="artefact-field-label">Hint (plain text)</label>
@@ -4409,7 +4405,7 @@
                         <input id="artefact-detail-name" class="new-image-gallery-input" placeholder="Artefact name"/>
                         <label class="artefact-field-label">Description</label>
                         <textarea id="artefact-detail-description" class="artefact-description-textarea" placeholder="Short description"></textarea>
-                        <label class="artefact-field-label">Tags <span style="font-weight:normal; color:#888;">(comma-separated)</span></label>
+                        <label class="artefact-field-label">Tags <span style="font-weight:normal; color:var(--color-text-muted);">(comma-separated)</span></label>
                         <input id="artefact-detail-tags" class="new-image-gallery-input" placeholder="e.g. childhood, family, 1970s" list="artefact-tags-list"/>
                         <datalist id="artefact-tags-list"></datalist>
                         <label class="artefact-field-label">Story</label>
@@ -4447,7 +4443,7 @@
             <div class="info-box-welcome-top">
             <div class="info-box-content-wrapper" style="display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start; gap: 2rem;">
                 <div class="info-content" style="width: 45%;">
-                    <h2 class="info-box-welcome-main-heading"><i class="fas fa-landmark info-box-welcome-museum-icon" aria-hidden="true" style="color: black;"></i><span class="info-box-welcome-title-text">{{ page_title }}</span></h2>
+                    <h2 class="info-box-welcome-main-heading"><i class="fas fa-landmark info-box-welcome-museum-icon" aria-hidden="true" style="color: var(--color-navy);"></i><span class="info-box-welcome-title-text">{{ page_title }}</span></h2>
                     <ul>
                         <li>Select a voice from the top toolbar to get responses from different perspectives</li>
                         <li>If you choose "{{owner}}'s own voice", you can also select his current mood</li>
@@ -4457,7 +4453,7 @@
                     </ul>
                 </div>
                 <div id="voice-preview" class="voice-preview" style="width: 20%;display: inline;">
-                    <p style="font-weight: bold; color: #2c3e50; margin-bottom: 0.5rem; font-size: var(--text-heading);">Current Voice</p>
+                    <p style="font-weight: bold; color: var(--color-text-muted); margin-bottom: 0.5rem; font-size: var(--text-heading);">Current Voice</p>
                     <img src="/static/images/expert.png" alt="expert character" class="preview-image">
                     <p class="preview-description">A knowledgeable expert who provides accurate, factual information</p>
                 </div>
@@ -4539,9 +4535,9 @@
 
 <!-- Quick-add LLM keys (when no provider is available); owners save to account, visitors to session -->
 <div id="archive-overview-llm-modal" class="modal archive-overview-llm-modal" style="display:none;position:fixed;inset:0;z-index:4200;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
-    <div class="modal-content archive-overview-llm-modal-content" style="max-width:520px;width:100%;max-height:90vh;overflow-y:auto;background:#fff;border-radius:10px;padding:22px 24px;box-shadow:0 12px 40px rgba(0,0,0,0.25);border:1px solid #e2e8f0;">
-        <h3 id="archive-overview-llm-modal-title" style="margin:0 0 10px 0;font-size:var(--text-heading-lg);color:#0f172a;">Add API keys</h3>
-        <p id="archive-overview-llm-modal-intro" style="margin:0 0 16px 0;font-size:var(--text-md);color:#64748b;line-height:1.45;"></p>
+    <div class="modal-content archive-overview-llm-modal-content" style="max-width:520px;width:100%;max-height:90vh;overflow-y:auto;border-radius:10px;padding:22px 24px;box-shadow:0 12px 40px rgba(0,0,0,0.25);">
+        <h3 id="archive-overview-llm-modal-title" style="margin:0 0 10px 0;font-size:var(--text-heading-lg);color:var(--color-text);">Add API keys</h3>
+        <p id="archive-overview-llm-modal-intro" style="margin:0 0 16px 0;font-size:var(--text-md);color:var(--color-text-muted);line-height:1.45;"></p>
         <div class="setting-group" style="margin-bottom:12px;">
             <label for="overview-llm-gemini-key">Gemini API key</label>
             <input type="password" id="overview-llm-gemini-key" class="modal-input" style="width:100%;box-sizing:border-box;" autocomplete="off">
@@ -4581,7 +4577,7 @@
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;">
             <button type="button" id="archive-overview-llm-save-btn" class="modal-btn modal-btn-primary">Save</button>
             <button type="button" id="archive-overview-llm-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
-            <span id="archive-overview-llm-save-status" style="font-size:var(--text-md);color:#64748b;"></span>
+            <span id="archive-overview-llm-save-status" style="font-size:var(--text-md);color:var(--color-text-muted);"></span>
         </div>
     </div>
 </div>

@@ -6,12 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Digital Museum Setup</title>
     <link rel="stylesheet" href="/static/css/museum_of.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="/static/css/leaflet.css">
     <link rel="stylesheet" href="/static/css/images_grid.css">
     <!-- Include marked.js -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Optional: highlight.js -->
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <!-- Font Awesome for icons (optional, but nice for buttons) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -20,8 +22,8 @@
 </head>
 
 <body>
-    <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0f1922;">
-        <div style="background:#19264d; border-radius:12px; padding:48px; max-width:480px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0d1117;">
+        <div style="background:#1a2540; border-radius:12px; padding:48px; max-width:480px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
             <h1 style="color:#fff; margin:0 0 8px; font-size:var(--text-3xl);">Welcome to the Digital Museum</h1>
             <p style="color:#8fa4c8; margin:0 0 20px; font-size:var(--text-lead);">
                 Let's set up your Digital Museum. Enter your details to get started.
@@ -38,17 +40,17 @@
                 <div style="margin-bottom:20px;">
                     <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:var(--text-md);">First Name *</label>
                     <input id="subject-name" type="text" required placeholder="e.g. Dave"
-                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #3d5278; background:#1e2d4f; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
                 </div>
                 <div style="margin-bottom:20px;">
                     <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:var(--text-md);">Family Name *</label>
                     <input id="family-name" type="text" required placeholder="e.g. Burton"
-                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #3d5278; background:#1e2d4f; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
                 </div>
                 <div style="margin-bottom:20px;">
                     <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:var(--text-md);">Gender <span style="color:#8fa4c8;">(optional)</span></label>
                     <select id="gender"
-                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #3d5278; background:#1e2d4f; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                     </select>
@@ -60,7 +62,7 @@
                     <input id="master-key" type="password" required
                         autocomplete="new-password"
                         placeholder="Choose a strong passphrase"
-                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #3d5278; background:#1e2d4f; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
                 </div>
                 <div style="margin-bottom:28px;">
                     <label style="display:block; color:#cdd6e8; margin-bottom:6px; font-size:var(--text-md);">
@@ -69,7 +71,7 @@
                     <input id="master-key-confirm" type="password" required
                         autocomplete="new-password"
                         placeholder="Re-enter the master key"
-                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
+                        style="width:100%; padding:10px 14px; border-radius:6px; border:1px solid #3d5278; background:#1e2d4f; color:#fff; font-size:var(--text-base); box-sizing:border-box;">
                 </div>
                 <button type="submit" id="submit-btn"
                     style="width:100%; padding:12px; border-radius:6px; border:none; background:#3b82f6; color:#fff; font-size:var(--text-base); font-weight:600; cursor:pointer;">

@@ -981,9 +981,6 @@ const App = (() => {
                 if (targetTab === 'tools-access') {
                     if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.load) void Modals.LLMToolsAccess.load();
                 }
-                if (targetTab === 'background-jobs') {
-                    if (Modals.BackgroundJobs && Modals.BackgroundJobs.load) void Modals.BackgroundJobs.load();
-                }
                 if (targetTab === 'settings' || targetTab === 'api-keys') {
                     if (Modals.UserLLMSettings && Modals.UserLLMSettings.load) void Modals.UserLLMSettings.load();
                     if (targetTab === 'settings') void loadLLMProviderAvailability();
@@ -2143,6 +2140,41 @@ const App = (() => {
         /** @type {Map<string, { importType: string, zipArchiveType: string|null, label: string, lines: string[], eventSource: EventSource|null, cancelPending?: boolean }>} */
         const runningJobs = new Map();
         let selectedJobKey = null;
+        let sidebarBackgroundJobsRunning = false;
+        let sidebarBackgroundJobsPollTimer = null;
+
+        function syncDataImportSidebarJobIndicator() {
+            const btn = document.getElementById('data-import-sidebar-btn');
+            if (!btn) return;
+            const icon = btn.querySelector('.sidebar-data-import-btn-icon');
+            const active = runningJobs.size > 0 || sidebarBackgroundJobsRunning;
+            btn.classList.toggle('sidebar-jobs-running', active);
+            btn.title = active ? 'Import or maintenance jobs running' : '';
+            if (!icon) return;
+            icon.classList.toggle('fa-database', !active);
+            icon.classList.toggle('fa-cog', active);
+            icon.classList.toggle('fa-spin', active);
+        }
+
+        async function refreshSidebarBackgroundJobsState() {
+            try {
+                const res = await fetch('/api/background-jobs', { credentials: 'same-origin' });
+                if (!res.ok) return;
+                const data = await res.json();
+                const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+                sidebarBackgroundJobsRunning = jobs.some((j) => j && j.in_progress);
+            } catch (_) {
+                /* ignore polling errors */
+            }
+            syncDataImportSidebarJobIndicator();
+        }
+
+        function ensureSidebarBackgroundJobsPoll() {
+            if (sidebarBackgroundJobsPollTimer) return;
+            sidebarBackgroundJobsPollTimer = setInterval(() => {
+                void refreshSidebarBackgroundJobsState();
+            }, 8000);
+        }
 
         function makeJobKey(importType, extra = {}) {
             if (importType === 'upload_zip' && extra.zipArchiveType) {
@@ -2311,6 +2343,7 @@ const App = (() => {
             }
             selectJobTab(selectedJobKey);
             syncLegacyConfigStatusLine();
+            syncDataImportSidebarJobIndicator();
         }
 
         function closeEventSourceForJob(jobKey) {
@@ -2817,6 +2850,8 @@ const App = (() => {
                     console.warn('Import Linked Images to Database after filesystem import failed:', e);
                 });
             }
+            syncDataImportSidebarJobIndicator();
+            void refreshSidebarBackgroundJobsState();
         }
 
         const importConfigs = {
@@ -3648,6 +3683,13 @@ const App = (() => {
                     const on = p.getAttribute('data-import-category-panel') === tab;
                     p.classList.toggle('data-import-category-panel--active', on);
                 });
+                const scrollRegion = modal.querySelector('.data-import-table-scroll-region');
+                if (scrollRegion) {
+                    scrollRegion.classList.toggle('data-import-table-scroll-region--background-jobs', tab === 'background-jobs');
+                }
+                if (tab === 'background-jobs') {
+                    if (Modals.BackgroundJobs && Modals.BackgroundJobs.load) void Modals.BackgroundJobs.load();
+                }
                 resetDataImportDetailSidebar();
             });
         })();
@@ -3881,8 +3923,11 @@ const App = (() => {
                     }
                 } catch (_) {}
             }
+            syncDataImportSidebarJobIndicator();
         }
-        checkInitialImportStatus();
+        void checkInitialImportStatus();
+        void refreshSidebarBackgroundJobsState();
+        ensureSidebarBackgroundJobsPoll();
 
         // ── Public hook for upload-import.js ────────────────────────────────
         // Called after the upload ZIP modal closes to wire the background import

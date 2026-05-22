@@ -6,6 +6,8 @@
     <title>Digital Museum — Sign In</title>
     <link rel="stylesheet" href="/static/css/museum_of.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <style>
         html { font-family: var(--font-sans-ui); }
         body {
@@ -15,7 +17,7 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: #0f1922;
+            background: #0d1117;
             font-family: inherit;
         }
 
@@ -35,9 +37,9 @@
             border-radius: 20px;
             font-size: 0.85rem;
             font-weight: 600;
-            background: #19264d;
+            background: #1a2540;
             color: #4a5a80;
-            border: 1px solid #2e4068;
+            border: 1px solid #3d5278;
             transition: all 0.2s;
         }
         .step-chip.active { background: #1e3a6b; color: #fff; border-color: #3b82f6; }
@@ -47,17 +49,17 @@
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 0.75rem;
-            background: #2e4068; color: #8fa4c8;
+            background: #3d5278; color: #8fa4c8;
         }
         .step-chip.active .step-num { background: #3b82f6; color: #fff; }
         .step-chip.done   .step-num { background: #166534; color: #4ade80; }
-        .step-arrow { color: #2e4068; font-size: 0.9rem; margin: 0 6px; }
+        .step-arrow { color: #3d5278; font-size: 0.9rem; margin: 0 6px; }
 
         /* ── Login card ── */
         .login-card input, .login-card button, .login-card textarea,
         .login-card select, .login-card label { font-family: inherit; }
         .login-card {
-            background: #19264d;
+            background: #1a2540;
             border-radius: 12px;
             padding: 48px;
             max-width: 520px;
@@ -82,7 +84,7 @@
         .form-group label { display: block; color: #cdd6e8; margin-bottom: 6px; font-size: 0.9rem; }
         .form-group input, .form-group select {
             width: 100%; padding: 10px 14px; border-radius: 6px;
-            border: 1px solid #2e4068; background: #0f1922; color: #fff;
+            border: 1px solid #3d5278; background: #1e2d4f; color: #fff;
             font-size: 1rem; box-sizing: border-box; outline: none;
             transition: border-color 0.15s;
         }
@@ -90,7 +92,7 @@
         .form-group select { cursor: pointer; }
         .login-pw-wrap {
             display: flex; align-items: stretch; width: 100%;
-            border-radius: 6px; border: 1px solid #2e4068; background: #0f1922;
+            border-radius: 6px; border: 1px solid #3d5278; background: #1e2d4f;
             box-sizing: border-box; overflow: hidden;
         }
         .login-pw-wrap:focus-within { border-color: #3b82f6; }
@@ -99,13 +101,13 @@
             background: transparent !important; box-sizing: border-box;
         }
         .login-pw-toggle {
-            flex: 0 0 44px; border: none; background: #162536; color: #8fa4c8;
+            flex: 0 0 44px; border: none; background: #131b2e; color: #8fa4c8;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
             font-size: 1rem; transition: background .15s, color .15s;
         }
         .login-pw-toggle:hover { background: #243368; color: #e2e8f0; }
         /* style the dropdown arrow */
-        .form-group select option { background: #19264d; }
+        .form-group select option { background: #1a2540; }
         .submit-btn {
             width: 100%; padding: 12px; border-radius: 6px; border: none;
             background: #3b82f6; color: #fff; font-size: 1rem; font-weight: 600;
@@ -126,7 +128,7 @@
             display: none;
             margin-top: 4px;
             padding-top: 16px;
-            border-top: 1px solid #2e4068;
+            border-top: 1px solid #3d5278;
         }
         #new-user-form h3 {
             color: #cdd6e8; font-size: 0.95rem; font-weight: 600;
@@ -137,7 +139,7 @@
             font-family: inherit; cursor: pointer;
         }
         .adv-btn-outline {
-            border: 1px solid #2e4068; background: #0f1922; color: #8fa4c8;
+            border: 1px solid #3d5278; background: #1e2d4f; color: #8fa4c8;
         }
         .adv-btn-outline:hover { border-color: #3b82f6; color: #fff; }
         .adv-btn-primary { border: none; background: #3b82f6; color: #fff; }
@@ -156,14 +158,14 @@
         .adv-status-row {
             display: flex; align-items: center; justify-content: space-between; gap: 12px;
             font-size: 0.82rem; margin-top: 8px; padding: 8px 10px; border-radius: 6px;
-            background: #0c1419; border: 1px solid #1e3050;
+            background: #0d1117; border: 1px solid #253355;
         }
         .adv-status-row:first-of-type { margin-top: 0; }
         .adv-status-label { color: #8fa4c8; flex-shrink: 0; }
         .adv-status-value { font-weight: 600; text-align: right; }
         .adv-input {
-            padding: 6px 10px; border-radius: 6px; border: 1px solid #2e4068;
-            background: #0f1922; color: #cdd6e8; font-size: 0.85rem;
+            padding: 6px 10px; border-radius: 6px; border: 1px solid #3d5278;
+            background: #1e2d4f; color: #cdd6e8; font-size: 0.85rem;
             font-family: inherit; box-sizing: border-box;
         }
         .adv-btn-sm { padding: 6px 12px; font-size: 0.82rem; }
@@ -190,12 +192,12 @@
 
         #login-admin-login-btn {
             position: fixed; top: 14px; right: 14px; z-index: 100;
-            padding: 8px 14px; border-radius: 6px; border: 1px solid #2e4068;
-            background: #19264d; color: #cdd6e8; font-size: 0.88rem; font-weight: 600;
+            padding: 8px 14px; border-radius: 6px; border: 1px solid #3d5278;
+            background: #1a2540; color: #cdd6e8; font-size: 0.88rem; font-weight: 600;
             cursor: pointer; font-family: inherit;
             transition: background 0.15s, border-color 0.15s, color 0.15s;
         }
-        #login-admin-login-btn:hover { background: #243368; border-color: #3b82f6; color: #fff; }
+        #login-admin-login-btn:hover { background: #243358; border-color: #3b82f6; color: #fff; }
 
         @media (max-width: 640px) {
             .form-row { flex-direction: column; gap: 0; }
@@ -231,7 +233,7 @@
         <div id="success-msg" style="display:none; color:#4ade80; background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.25); padding:10px 14px; border-radius:6px; margin-bottom:16px; font-size:0.9rem;"></div>
 
         <!-- AI & Setup panel -->
-        <div id="panel-advanced" style="display:none; margin-bottom:16px; padding:14px; background:#0f1922; border:1px solid #2e4068; border-radius:8px;">
+        <div id="panel-advanced" style="display:none; margin-bottom:16px; padding:14px; background:#0d1117; border:1px solid #3d5278; border-radius:8px;">
             <div id="adv-no-electron-msg" style="display:none; color:#8fa4c8; font-size:0.82rem;">
                 Advanced setup is only available in the Digital Museum desktop app.
             </div>
@@ -402,10 +404,10 @@
                 <label>Access the archive with the visitor key provided by the archive owner.</label>
                 <br/>
                 <button type="button" id="visitor-hints-btn"
-                    style="padding:10px 14px; border-radius:6px; border:1px solid #2e4068; background:#0f1922; color:#8fa4c8; cursor:pointer;">
+                    style="padding:10px 14px; border-radius:6px; border:1px solid #3d5278; background:#1e2d4f; color:#8fa4c8; cursor:pointer;">
                     Get Hints
                 </button>
-                <div id="visitor-hints-list" style="display:none; margin-top:10px; padding:10px 14px; background:#0f1922; border:1px solid #2e4068; border-radius:6px; color:#8fa4c8; font-size:0.88rem;"></div>
+                <div id="visitor-hints-list" style="display:none; margin-top:10px; padding:10px 14px; background:#0d1117; border:1px solid #3d5278; border-radius:6px; color:#8fa4c8; font-size:0.88rem;"></div>
             </div>
             <div class="form-group">
                 <label for="visitor-key">Visitor Key</label>

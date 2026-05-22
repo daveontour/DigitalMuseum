@@ -3311,6 +3311,17 @@ Modals.BackgroundJobs = (() => {
         el.style.backgroundColor = isErr ? 'rgba(220,53,69,0.1)' : 'rgba(26,127,55,0.1)';
     }
 
+    function _setLoading(loading) {
+        const loadingEl = document.getElementById('background-jobs-loading');
+        const tableWrap = document.getElementById('background-jobs-table-wrap');
+        const empty = document.getElementById('background-jobs-empty');
+        const panel = document.getElementById('data-import-panel-background-jobs');
+        if (loadingEl) loadingEl.style.display = loading ? 'flex' : 'none';
+        if (tableWrap) tableWrap.style.display = loading ? 'none' : '';
+        if (loading && empty) empty.style.display = 'none';
+        if (panel) panel.setAttribute('aria-busy', loading ? 'true' : 'false');
+    }
+
     function _formatLocal(ts) {
         if (!ts) return '—';
         try {
@@ -3449,6 +3460,7 @@ Modals.BackgroundJobs = (() => {
 
     async function load() {
         _status('', false);
+        _setLoading(true);
         try {
             const res = await fetch('/api/background-jobs', { credentials: 'same-origin' });
             const data = await res.json().catch(() => ({}));
@@ -3460,16 +3472,18 @@ Modals.BackgroundJobs = (() => {
             _ensurePolling();
         } catch (e) {
             _status(e.message || 'Load failed', true);
+        } finally {
+            _setLoading(false);
         }
     }
 
     function _ensurePolling() {
-        const modal = document.getElementById('config-modal-overlay');
-        const tab = document.getElementById('background-jobs-tab');
+        const modal = document.getElementById('data-import-modal');
+        const tab = document.getElementById('data-import-panel-background-jobs');
         if (!modal || !tab) return;
         if (pollTimer) return;
         pollTimer = setInterval(() => {
-            const visible = modal.style.display !== 'none' && tab.classList.contains('active');
+            const visible = modal.style.display !== 'none' && tab.classList.contains('data-import-category-panel--active');
             if (!visible) {
                 clearInterval(pollTimer);
                 pollTimer = null;
