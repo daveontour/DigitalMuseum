@@ -505,6 +505,82 @@ function appendSouthernCrossToChatStarfield(host) {
     host.appendChild(wrap);
 }
 
+function appendSunTattooToChatStarfield(host) {
+    const container = document.createElement('div');
+   container.className = 'chat-starfield-sun-tattoo';
+    container.setAttribute('aria-hidden', 'true');
+    
+        // 1. Setup the Canvas and Context
+       // const container = document.getElementById('sun-container');
+        const canvas = document.createElement('canvas');
+        
+        canvas.width = 300;
+        canvas.height = 300;
+        // Ensure the canvas itself remains completely transparent
+        canvas.style.backgroundColor = 'transparent';
+        container.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+
+        // 2. Configure the "Marker" Style
+        // Using a dark charcoal color, rounded caps, and thick lines to mimic the drawing
+        ctx.strokeStyle = 'rgba(255, 220, 100, 0.80)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        const centerX = 150;
+        const centerY = 150;
+        const radius = 15;
+
+        // 3. Draw the Central Circle
+        // Slight organic variation can be added by making it slightly elliptical, 
+        // but a standard arc matches the mathematical layout best for now
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 4. Map Out the Rays
+        // The distance between the circle and where the line starts
+        const gap = 5; 
+        
+        // Custom array defining the specific lengths based on the reference image,
+        // but now with perfectly equal angular spacing (0.2 * Math.PI increments)
+        const rays = [
+            { angle: Math.PI, length: 10 },       // Left horizontal (Short)
+            { angle: Math.PI * 1.2, length: 20 }, // Up-left (Long)
+            { angle: Math.PI * 1.4, length: 10 }, // Top-left (Short)
+            { angle: Math.PI * 1.6, length: 20 }, // Top-right (Long)
+            { angle: Math.PI * 1.8, length: 10 }, // Up-right (Short)
+            { angle: 0, length: 20 },             // Right horizontal (Long)
+            { angle: Math.PI * 0.2, length: 10 }, // Down-right (Short)
+            { angle: Math.PI * 0.4, length: 20 }, // Bottom-right (Long)
+            { angle: Math.PI * 0.6, length: 10 }, // Bottom-left (Short)
+            { angle: Math.PI * 0.8, length: 20 }  // Down-left (Long)
+        ];
+
+        // 5. Draw the Rays
+        rays.forEach(ray => {
+            // Calculate starting coordinates (circle edge + gap)
+            const startX = centerX + Math.cos(ray.angle) * (radius + gap);
+            const startY = centerY + Math.sin(ray.angle) * (radius + gap);
+            
+            // Calculate ending coordinates (starting point + length)
+            const endX = centerX + Math.cos(ray.angle) * (radius + gap + ray.length);
+            const endY = centerY + Math.sin(ray.angle) * (radius + gap + ray.length);
+
+            // Draw the line
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+        });
+
+
+        host.appendChild(container);
+}
+
+
 /** Random static star positions (four size classes); call once after DOM is ready. */
 function initChatStarfield() {
     const host = document.getElementById('chat-starfield');
@@ -523,6 +599,7 @@ function initChatStarfield() {
     }
     host.appendChild(frag);
     appendSouthernCrossToChatStarfield(host);
+    appendSunTattooToChatStarfield(host);
 }
 
 // Debug DOM elements
