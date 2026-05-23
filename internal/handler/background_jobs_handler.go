@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -91,6 +92,25 @@ func (h *BackgroundJobsHandler) jobView(def backgroundjobs.JobDef, row *model.Ba
 	return out
 }
 
+func (h *BackgroundJobsHandler) reconcileStaleRunningRow(ctx context.Context, uid int64, jobName string, row *model.BackgroundJob) *model.BackgroundJob {
+	if row == nil || row.LastRunResult == nil || *row.LastRunResult != "running" {
+		return row
+	}
+	inProgress, _ := h.runner.Status(jobName)
+	if inProgress {
+		return row
+	}
+	result, msg := h.runner.IdleOutcome(jobName)
+	if err := h.repo.MarkCompleted(ctx, uid, jobName, result, msg, nil); err != nil {
+		return row
+	}
+	updated, err := h.repo.GetByName(ctx, jobName)
+	if err != nil || updated == nil {
+		return row
+	}
+	return updated
+}
+
 // List returns the per-user state of every registered background job. Rows are
 // auto-seeded the first time the panel is opened.
 func (h *BackgroundJobsHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +137,9 @@ func (h *BackgroundJobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(defs))
 	for _, d := range defs {
-		out = append(out, h.jobView(d, byName[d.Name]))
+		row := byName[d.Name]
+		row = h.reconcileStaleRunningRow(r.Context(), uid, d.Name, row)
+		out = append(out, h.jobView(d, row))
 	}
 	writeJSON(w, map[string]any{"jobs": out})
 }

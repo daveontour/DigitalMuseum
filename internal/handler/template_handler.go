@@ -440,9 +440,8 @@ const indexFilesystemImportTileHTML = `
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="filesystem">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="filesystem"></span>
                                     </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Scan folders on this machine and register image paths as referenced media (local Electron deployments only). Entries counts referenced-path images. <strong>Clear Data</strong> removes filesystem-linked rows.</p></div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Scan folders on this machine and register image paths as referenced media (local Electron deployments only).<br/><br/>Thumbnails are generated and stored in the database for quick access.  <br/><br/> Optonally, you can select to import the images into the database as part of the process or run the import process at a later stage. <br/><br/> <strong>Clear Data</strong> removes filesystem-linked rows.</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
@@ -458,7 +457,6 @@ const indexFilesystemImportTileHTML = `
 // const indexFilesystemReferenceImportTileHTML = `                                <tr class="data-import-row data-import-path-row" data-import="filesystem_reference">
 //                                     <td><i class="fas fa-link"></i> Picture and Images (reference paths on disk)</td>
 //                                     <td class="data-import-count" data-import-count-key="filesystem_reference">—</td>
-//                                     <td class="data-import-last-run" data-import-last-run="filesystem_reference"></td>
 //                                     <td class="data-import-actions-td">
 //                                         <div class="data-import-action-group">
 //                                             <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="filesystem_reference"><i class="fas fa-play"></i> Start</button>

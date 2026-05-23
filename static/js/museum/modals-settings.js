@@ -3394,12 +3394,15 @@ Modals.BackgroundJobs = (() => {
         lastLine.textContent = _formatLocal(job.last_run_at);
         tdLast.appendChild(lastLine);
         if (job.last_run_result) {
+            const showResult = job.in_progress || job.last_run_result !== 'running';
+            if (showResult) {
             const resLine = document.createElement('div');
             resLine.style.color = job.last_run_result === 'error' ? '#dc3545' :
                                   job.last_run_result === 'cancelled' ? '#856404' :
                                   job.last_run_result === 'running' ? '#0c63e4' : '#1a7f37';
             resLine.textContent = job.last_run_result;
             tdLast.appendChild(resLine);
+            }
         }
         tr.appendChild(tdLast);
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/daveontour/aimuseum/internal/appctx"
 	"github.com/daveontour/aimuseum/internal/importer"
@@ -64,6 +65,30 @@ func (r *backgroundJobsRunner) Status(jobName string) (bool, string) {
 	inProgress, _ := state["in_progress"].(bool)
 	line, _ := state["status_line"].(string)
 	return inProgress, line
+}
+
+// IdleOutcome maps the in-memory job status to a persisted last_run_result.
+func (r *backgroundJobsRunner) IdleOutcome(jobName string) (string, string) {
+	job, ok := r.jobByName(jobName)
+	if !ok || job == nil {
+		return "interrupted", "Job was marked running but is no longer in progress"
+	}
+	state := job.Status()
+	line, _ := state["status_line"].(string)
+	if strings.TrimSpace(line) == "" {
+		line = "Job was marked running but is no longer in progress"
+	}
+	st, _ := state["status"].(string)
+	switch st {
+	case "completed":
+		return "completed", line
+	case "cancelled":
+		return "cancelled", line
+	case "error":
+		return "error", line
+	default:
+		return "interrupted", line
+	}
 }
 
 // Cancel signals cancellation of the named job (no-op if idle).

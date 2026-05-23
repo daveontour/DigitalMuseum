@@ -171,3 +171,18 @@ func (s *DashboardService) GetDashboard(ctx context.Context) (*model.DashboardRe
 		SubjectHasCompleteProfile:       subjectHasCompleteProfile,
 	}, nil
 }
+
+// GetImportModalStats returns aggregate counts for the Import & Manage Data modal only.
+func (s *DashboardService) GetImportModalStats(ctx context.Context) (*model.ImportModalStatsResponse, error) {
+	raw, err := s.repo.GetImportModalStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if raw.EmailsBySource == nil {
+		raw.EmailsBySource = map[string]int64{}
+	}
+	if raw.MessageCounts == nil {
+		raw.MessageCounts = map[string]int64{}
+	}
+	return raw, nil
+}

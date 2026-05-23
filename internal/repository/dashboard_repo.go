@@ -342,6 +342,163 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 	return out, nil
 }
 
+// GetImportModalStats collects only the aggregate counts needed by the Import & Manage Data modal.
+func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportModalStatsResponse, error) {
+	uid := uidFromCtx(ctx)
+
+	makeUIDCond := func(baseArgs []any) (string, []any) {
+		if uid == 0 {
+			return "", baseArgs
+		}
+		baseArgs = append(baseArgs, uid)
+		return fmt.Sprintf(" AND user_id = ?%d", len(baseArgs)), baseArgs
+	}
+
+	out := &model.ImportModalStatsResponse{
+		MessageCounts:  make(map[string]int64),
+		EmailsBySource: make(map[string]int64),
+	}
+
+	// Messages by service (WhatsApp, Instagram, iMessage, …)
+	{
+		uidCond, args := makeUIDCond(nil)
+		rows, err := r.pool.QueryContext(ctx,
+			`SELECT COALESCE(service, 'unknown'), COUNT(id) FROM messages WHERE TRUE`+uidCond+` GROUP BY service`,
+			args...)
+		if err != nil {
+			return nil, fmt.Errorf("messages by service: %w", err)
+		}
+		for rows.Next() {
+			var svc string
+			var cnt int64
+			if err := rows.Scan(&svc, &cnt); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out.MessageCounts[svc] = cnt
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("messages by service scan: %w", err)
+		}
+	}
+
+	// Contacts count
+	{
+		uidCond, args := makeUIDCond(nil)
+		if err := r.pool.QueryRowContext(ctx,
+			`SELECT COUNT(id) FROM contacts WHERE TRUE`+uidCond, args...,
+		).Scan(&out.ContactsCount); err != nil {
+			return nil, fmt.Errorf("contacts count: %w", err)
+		}
+	}
+
+	// Image counts
+	{
+		uidCond, args := makeUIDCond(nil)
+		if err := r.pool.QueryRowContext(ctx,
+			`SELECT COUNT(id) FROM media_items WHERE media_type LIKE 'image/%'`+uidCond, args...,
+		).Scan(&out.TotalImages); err != nil {
+			return nil, fmt.Errorf("total images: %w", err)
+		}
+	}
+	{
+		uidCond, args := makeUIDCond(nil)
+		if err := r.pool.QueryRowContext(ctx,
+			`SELECT COUNT(id) FROM media_items WHERE source = 'filesystem' AND is_referenced = FALSE`+uidCond, args...,
+		).Scan(&out.FilesystemImagesEmbeddedCount); err != nil {
+			return nil, fmt.Errorf("filesystem embedded images: %w", err)
+		}
+	}
+	{
+		uidCond, args := makeUIDCond(nil)
+		if err := r.pool.QueryRowContext(ctx,
+			`SELECT COUNT(id) FROM media_items WHERE source = 'filesystem' AND is_referenced = TRUE`+uidCond, args...,
+		).Scan(&out.FilesystemImagesReferencedCount); err != nil {
+			return nil, fmt.Errorf("filesystem referenced images: %w", err)
+		}
+	}
+	{
+		uidCond, args := makeUIDCond(nil)
+		if err := r.pool.QueryRowContext(ctx,
+			`SELECT COUNT(id) FROM media_items WHERE media_type LIKE 'image/%' AND is_referenced = FALSE`+uidCond, args...,
+		).Scan(&out.ImportedImages); err != nil {
+			return nil, fmt.Errorf("imported images: %w", err)
+		}
+	}
+	{
+		uidCond, args := makeUIDCond(nil)
+		if err := r.pool.QueryRowContext(ctx,
+			`SELECT COUNT(id) FROM media_items WHERE media_type LIKE 'image/%' AND is_referenced = TRUE`+uidCond, args...,
+		).Scan(&out.ReferenceImages); err != nil {
+			return nil, fmt.Errorf("reference images: %w", err)
+		}
+	}
+	{
+		var uidCond string
+		var args []any
+		if uid > 0 {
+			args = append(args, uid)
+			uidCond = fmt.Sprintf(" AND mi.user_id = ?%d", len(args))
+		}
+		if err := r.pool.QueryRowContext(ctx,
+			`SELECT COUNT(mi.id)
+			 FROM media_items mi
+			 JOIN media_blobs mb ON mb.id = mi.media_blob_id
+			 WHERE mi.media_type LIKE 'image/%'
+			   AND mb.thumbnail_data IS NOT NULL`+uidCond, args...,
+		).Scan(&out.ThumbnailCount); err != nil {
+			return nil, fmt.Errorf("thumbnail count: %w", err)
+		}
+	}
+
+	// Facebook / locations / reference docs
+	{
+		uidCond, args := makeUIDCond(nil)
+		scalars := []struct {
+			dest  *int64
+			query string
+			label string
+		}{
+			{&out.FacebookAlbumsCount, `SELECT COUNT(id) FROM facebook_albums WHERE TRUE` + uidCond, "facebook_albums"},
+			{&out.FacebookPostsCount, `SELECT COUNT(id) FROM facebook_posts WHERE TRUE` + uidCond, "facebook_posts"},
+			{&out.LocationsCount, `SELECT COUNT(id) FROM locations WHERE TRUE` + uidCond, "locations"},
+			{&out.ReferenceDocsCount, `SELECT COUNT(id) FROM reference_documents WHERE TRUE` + uidCond, "reference_docs"},
+		}
+		for _, s := range scalars {
+			if err := r.pool.QueryRowContext(ctx, s.query, args...).Scan(s.dest); err != nil {
+				return nil, fmt.Errorf("%s count: %w", s.label, err)
+			}
+		}
+	}
+
+	// Emails by import source (gmail, IMAP hostname, legacy, …)
+	{
+		uidCond, args := makeUIDCond(nil)
+		rows, err := r.pool.QueryContext(ctx,
+			`SELECT COALESCE(NULLIF(TRIM(source), ''), 'legacy'), COUNT(id) FROM emails WHERE TRUE`+uidCond+` GROUP BY 1`,
+			args...)
+		if err != nil {
+			return nil, fmt.Errorf("emails by source: %w", err)
+		}
+		for rows.Next() {
+			var src string
+			var cnt int64
+			if err := rows.Scan(&src, &cnt); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out.EmailsBySource[src] = cnt
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("emails by source scan: %w", err)
+		}
+	}
+
+	return out, nil
+}
+
 // GetSubjectContactNames returns the names of contacts that should be treated as
 // the subject person (contacts WHERE is_subject=TRUE plus the contact with id=0).
 // Names are returned as-is (lowercasing is done in the service layer).

@@ -439,14 +439,29 @@ const App = (() => {
         });
     }
 
+    /** Cached owner master unlock; updated by refreshDataImportMasterKeyAccessUI. */
+    let dataImportMasterUnlockedCached = null;
+
+    /** Sidebar Import button is only shown after refreshDataImportMasterKeyAccessUI confirms owner master unlock. */
+    function isDataImportSidebarMasterUnlockVisible() {
+        const btn = document.getElementById('data-import-sidebar-btn');
+        if (!btn) return false;
+        return window.getComputedStyle(btn).display !== 'none';
+    }
+
     /** True only when the owner master key was used for this session (visitor unlock does not count). */
     async function fetchMasterUnlockedForDataImport() {
         try {
             const st = await fetch('/api/session/master-key/status', { credentials: 'same-origin' });
-            if (!st.ok) return false;
+            if (!st.ok) {
+                dataImportMasterUnlockedCached = false;
+                return false;
+            }
             const sj = await st.json();
-            return !!sj.master_unlocked;
+            dataImportMasterUnlockedCached = !!sj.master_unlocked;
+            return dataImportMasterUnlockedCached;
         } catch (e) {
+            dataImportMasterUnlockedCached = false;
             return false;
         }
     }
@@ -464,6 +479,11 @@ const App = (() => {
     }
 
     async function ensureMasterKeyForDataImport() {
+        if (dataImportMasterUnlockedCached === true) return true;
+        if (isDataImportSidebarMasterUnlockVisible()) {
+            dataImportMasterUnlockedCached = true;
+            return true;
+        }
         if (await fetchMasterUnlockedForDataImport()) return true;
         if (typeof Modals !== 'undefined' && Modals.ConfirmationModal && Modals.ConfirmationModal.open) {
             Modals.ConfirmationModal.open(
@@ -490,6 +510,7 @@ const App = (() => {
                 fetchMasterUnlockedForDataImport(),
                 fetchSessionKeyringUnlocked(),
             ]);
+            dataImportMasterUnlockedCached = masterOk;
             const sidebarBtn = document.getElementById('data-import-sidebar-btn');
             const sensitiveSidebarBtn = document.getElementById('sensitive-data-sidebar-btn');
             const tiles = document.querySelectorAll('.import-data-dialog-tile[data-open-modal="data-import-modal"]');
@@ -1563,135 +1584,108 @@ const App = (() => {
         }
         setupArchiveOverviewLLMKeysModal();
 
-        // Format date/time in local timezone, 24-hour format (dd/mm/yyyy HH:mm)
-        function formatImportLastRunLocal(isoString) {
-            if (!isoString) return '';
-            try {
-                const date = new Date(isoString);
-                if (isNaN(date.getTime())) return '';
-                return new Intl.DateTimeFormat('en-AU', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                }).format(date);
-            } catch (e) {
-                return '';
+        let importModalContentLoadGen = 0;
+
+        function showDataImportModalLoading(show) {
+            const loadingEl = document.getElementById('data-import-modal-loading');
+            const modal = document.getElementById('data-import-modal');
+            if (loadingEl) {
+                loadingEl.hidden = !show;
+                loadingEl.style.display = show ? 'flex' : 'none';
             }
+            if (modal) modal.setAttribute('aria-busy', show ? 'true' : 'false');
+        }
+
+        function applyImportModalStats(d) {
+            const modalRoot = document.getElementById('data-import-modal');
+            if (!modalRoot || !d) return;
+            const mc = d.message_counts || {};
+            const n = (k) => {
+                const v = mc[k];
+                return v != null ? Number(v) : 0;
+            };
+            const imessageMsg = n('iMessage') + n('SMS') + n('MMS');
+            const fbZipTotal = n('Facebook Messenger') + (d.facebook_albums_count || 0) + (d.facebook_posts_count || 0) + (d.locations_count || 0);
+            const setCell = (key, value) => {
+                const num = typeof value === 'number' && !Number.isNaN(value) ? value : Number(value);
+                const safe = Number.isNaN(num) ? 0 : num;
+                const isZero = safe === 0;
+                modalRoot.querySelectorAll(`[data-import-count-key="${key}"]`).forEach((el) => {
+                    el.textContent = String(safe);
+                    const row = el.closest('.data-import-row');
+                    if (row) {
+                        row.classList.toggle('data-import-row-zero-count', isZero);
+                    }
+                });
+            };
+            const ebs = d.emails_by_source && typeof d.emails_by_source === 'object' ? d.emails_by_source : {};
+            const gmailOnly = ebs.gmail != null ? Number(ebs.gmail) : 0;
+            let imapLike = 0;
+            Object.entries(ebs).forEach(([k, v]) => {
+                if (k !== 'gmail') imapLike += v != null ? Number(v) : 0;
+            });
+            setCell('email_processing', gmailOnly);
+            setCell('imap_processing', imapLike);
+            setCell('zip_whatsapp', n('WhatsApp'));
+            setCell('zip_instagram', n('Instagram'));
+            setCell('zip_imessage', imessageMsg);
+            setCell('zip_facebook', fbZipTotal);
+            const hasFsSplit = Object.prototype.hasOwnProperty.call(d, 'filesystem_images_embedded_count')
+                && Object.prototype.hasOwnProperty.call(d, 'filesystem_images_referenced_count');
+            let uploadPhotosCount;
+            let folderScanCount;
+            if (hasFsSplit) {
+                uploadPhotosCount = Number(d.filesystem_images_embedded_count) || 0;
+                folderScanCount = Number(d.filesystem_images_referenced_count) || 0;
+            } else {
+                uploadPhotosCount = d.imported_images != null ? Number(d.imported_images) : 0;
+                folderScanCount = d.reference_images != null ? Number(d.reference_images) : 0;
+            }
+            setCell('upload_photos', uploadPhotosCount);
+            setCell('filesystem', folderScanCount);
+            setCell('filesystem_reference', folderScanCount);
+            setCell('imported_images', uploadPhotosCount);
+            setCell('thumbnails', d.thumbnail_count != null ? Number(d.thumbnail_count) : 0);
+            setCell('reference_docs', d.reference_docs_count != null ? Number(d.reference_docs_count) : 0);
+            setCell('contacts', d.contacts_count != null ? Number(d.contacts_count) : 0);
+            setCell('reference_import_entries', d.reference_images != null ? Number(d.reference_images) : 0);
+            setCell('image_export_entries', d.total_images != null ? Number(d.total_images) : 0);
+        }
+
+        async function loadDataImportModalContent() {
+            const gen = ++importModalContentLoadGen;
+            showDataImportModalLoading(true);
+            try {
+                const statsRes = await fetch('/api/import-modal-stats', { credentials: 'same-origin' });
+                if (gen !== importModalContentLoadGen) return;
+                if (statsRes.ok) {
+                    applyImportModalStats(await statsRes.json());
+                }
+            } catch (e) {
+                console.warn('Failed to load import modal content:', e);
+            } finally {
+                if (gen === importModalContentLoadGen) showDataImportModalLoading(false);
+            }
+        }
+
+        function openDataImportModalUI() {
+            const modal = document.getElementById('data-import-modal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            if (typeof markOnboardingChecklistStepDone === 'function') markOnboardingChecklistStepDone('import_data');
+            if (typeof loadControlDefaults === 'function') void loadControlDefaults();
+            if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();
+            void loadDataImportModalContent();
+        }
+
+        async function openDataImportModalAfterKeyCheck() {
+            if (!(await ensureMasterKeyForDataImport())) return false;
+            openDataImportModalUI();
+            return true;
         }
 
         async function loadDataImportModalCounts() {
-            const modalRoot = document.getElementById('data-import-modal');
-            if (!modalRoot) return;
-            try {
-                const response = await fetch('/api/dashboard');
-                if (!response.ok) return;
-                const d = await response.json();
-                const mc = d.message_counts || {};
-                const n = (k) => {
-                    const v = mc[k];
-                    return v != null ? Number(v) : 0;
-                };
-                const imessageMsg = n('iMessage') + n('SMS') + n('MMS');
-                const fbZipTotal = n('Facebook Messenger') + (d.facebook_albums_count || 0) + (d.facebook_posts_count || 0) + (d.locations_count || 0);
-                const setCell = (key, value) => {
-                    const num = typeof value === 'number' && !Number.isNaN(value) ? value : Number(value);
-                    const safe = Number.isNaN(num) ? 0 : num;
-                    const isZero = safe === 0;
-                    modalRoot.querySelectorAll(`[data-import-count-key="${key}"]`).forEach((el) => {
-                        el.textContent = String(safe);
-                        const row = el.closest('.data-import-row');
-                        if (row) {
-                            row.classList.toggle('data-import-row-zero-count', isZero);
-                        }
-                    });
-                };
-                const ebs = d.emails_by_source && typeof d.emails_by_source === 'object' ? d.emails_by_source : {};
-                const gmailOnly = ebs.gmail != null ? Number(ebs.gmail) : 0;
-                let imapLike = 0;
-                Object.entries(ebs).forEach(([k, v]) => {
-                    if (k !== 'gmail') imapLike += v != null ? Number(v) : 0;
-                });
-                setCell('email_processing', gmailOnly);
-                setCell('imap_processing', imapLike);
-                setCell('zip_whatsapp', n('WhatsApp'));
-                setCell('zip_instagram', n('Instagram'));
-                setCell('zip_imessage', imessageMsg);
-                setCell('zip_facebook', fbZipTotal);
-                // Image rows: prefer filesystem-scoped split from API (matches DB is_referenced for source=filesystem).
-                // If the server predates those fields, use imported_images / reference_images so the table matches
-                // the Dashboard dialog (media_type image/*, is_referenced).
-                const hasFsSplit = Object.prototype.hasOwnProperty.call(d, 'filesystem_images_embedded_count')
-                    && Object.prototype.hasOwnProperty.call(d, 'filesystem_images_referenced_count');
-                let uploadPhotosCount;
-                let folderScanCount;
-               
-                if (hasFsSplit) {
-                    uploadPhotosCount = Number(d.filesystem_images_embedded_count) || 0;
-                    folderScanCount = Number(d.filesystem_images_referenced_count) || 0;
-                } else {
-                    uploadPhotosCount = d.imported_images != null ? Number(d.imported_images) : 0;
-                    folderScanCount = d.reference_images != null ? Number(d.reference_images) : 0;
-                }
-                setCell('upload_photos', uploadPhotosCount);
-                setCell('filesystem', folderScanCount);
-                setCell('filesystem_reference', folderScanCount);
-                setCell('imported_images', uploadPhotosCount);
-                setCell('thumbnails', d.thumbnail_count != null ? Number(d.thumbnail_count) : 0);
-                setCell('reference_docs', d.reference_docs_count != null ? Number(d.reference_docs_count) : 0);
-                setCell('contacts', d.contacts_count != null ? Number(d.contacts_count) : 0);
-                setCell('reference_import_entries', d.reference_images != null ? Number(d.reference_images) : 0);
-                setCell('image_export_entries', d.total_images != null ? Number(d.total_images) : 0);
-            } catch (e) {
-                console.warn('Failed to load data import counts:', e);
-            }
-        }
-
-        async function loadImportControlLastRun() {
-            try {
-                const response = await fetch('/api/import-control-last-run');
-                if (!response.ok) return;
-                const data = await response.json();
-                const importTypes = ['email_processing', 'imap_processing', 'filesystem', 'imported_images', 'filesystem_reference', 'reference_import', 'email_embeddings', 'message_embeddings', 'message_context_embeddings', 'image_tag_embeddings', 'facebook_post_text_embeddings', 'facebook_album_description_embeddings', 'image_export', 'contacts', 'image_ai_gemma_unclassified', 'zip_whatsapp', 'zip_instagram', 'zip_imessage', 'zip_facebook', 'upload_photos', 'upload_zip'];
-                for (const importType of importTypes) {
-                    const els = document.querySelectorAll(`[data-import-last-run="${importType}"]`);
-                    const info = data[importType];
-                    const formatted = (info && info.last_run_at) ? formatImportLastRunLocal(info.last_run_at) : null;
-                    const resultLabel = (info && info.result) ? ((info.result === 'success' || info.result === 'completed') ? 'success' : (info.result === 'cancelled' ? 'cancelled' : 'error')) : null;
-                    const text = formatted ? (resultLabel ? `${formatted} (${resultLabel})` : `${formatted}`) : '';
-                    const title = (info && info.result_message) ? info.result_message : '';
-                    els.forEach(el => {
-                        el.textContent = text;
-                        el.title = title;
-                    });
-                }
-                const thumbLR = data.thumbnails;
-                const asyncLR = data.thumbnails_async;
-                let mergedLR = (thumbLR && thumbLR.last_run_at) ? thumbLR : null;
-                if (asyncLR && asyncLR.last_run_at) {
-                    const tAt = mergedLR && mergedLR.last_run_at ? String(mergedLR.last_run_at) : '';
-                    const aAt = String(asyncLR.last_run_at);
-                    if (!mergedLR || !mergedLR.last_run_at || aAt > tAt) {
-                        mergedLR = asyncLR;
-                    }
-                }
-                let thumbText = '';
-                let thumbTitle = '';
-                if (mergedLR && mergedLR.last_run_at) {
-                    const formatted = formatImportLastRunLocal(mergedLR.last_run_at);
-                    const resultLabel = (mergedLR.result) ? ((mergedLR.result === 'success' || mergedLR.result === 'completed') ? 'success' : (mergedLR.result === 'cancelled' ? 'cancelled' : 'error')) : null;
-                    thumbText = formatted ? (resultLabel ? `${formatted} (${resultLabel})` : `${formatted}`) : '';
-                    thumbTitle = mergedLR.result_message ? mergedLR.result_message : '';
-                }
-                document.querySelectorAll('[data-import-last-run="thumbnails"]').forEach(el => {
-                    el.textContent = thumbText;
-                    el.title = thumbTitle;
-                });
-            } catch (e) {
-                console.warn('Failed to load import control last run:', e);
-            }
+            await loadDataImportModalContent();
         }
 
         // Empty Media Tables Button
@@ -2840,8 +2834,8 @@ const App = (() => {
                 renderJobLogDisplay();
                 syncLegacyConfigStatusLine();
             }
-            if (typeof loadImportControlLastRun === 'function') loadImportControlLastRun();
-            if (typeof loadDataImportModalCounts === 'function') void loadDataImportModalCounts();
+            const dim = document.getElementById('data-import-modal');
+            if (dim && dim.style.display !== 'none') void loadDataImportModalContent();
 
             void maybeAutoRunContactsExtract(importType || '');
 
@@ -3576,47 +3570,11 @@ const App = (() => {
             }
         }
 
-        function showThumbnailsRunModeModal() {
-            return new Promise((resolve) => {
-                importInputModalTitle.textContent = 'Thumbnails & location extraction';
-                importInputModalBody.innerHTML = '<p style="margin:0 0 12px; color:#444;">Choose how to run this job:</p>' +
-                    '<ul style="margin:0 0 16px 18px; color:#555; line-height:1.5;">' +
-                    '<li><strong>Continuous updates</strong> — live progress lines in the job log; you can cancel while it runs.</li>' +
-                    '<li><strong>Background</strong> — same work on the server without attaching the live stream (log shows start/finish only).</li>' +
-                    '</ul>' +
-                    '<div style="display:flex; flex-direction:column; gap:10px;">' +
-                    '<button type="button" id="thumbnails-run-mode-stream" class="modal-btn modal-btn-primary" style="width:100%;">Continuous updates</button>' +
-                    '<button type="button" id="thumbnails-run-mode-bg" class="modal-btn modal-btn-secondary" style="width:100%;">Background</button>' +
-                    '</div>';
-                const submitBtn = importInputModalSubmit;
-                const prevSubmitDisplay = submitBtn.style.display;
-                submitBtn.style.display = 'none';
-                importInputModal.style.display = 'flex';
-                importInputModal.style.alignItems = 'center';
-                importInputModal.style.justifyContent = 'center';
-                const streamBtn = document.getElementById('thumbnails-run-mode-stream');
-                const bgBtn = document.getElementById('thumbnails-run-mode-bg');
-                const finish = (value) => {
-                    submitBtn.style.display = prevSubmitDisplay || '';
-                    importInputModal.style.display = 'none';
-                    importInputModalCancel.onclick = null;
-                    importInputModal.onclick = null;
-                    resolve(value);
-                };
-                importInputModalCancel.onclick = () => finish(null);
-                importInputModal.onclick = (e) => { if (e.target === importInputModal) finish(null); };
-                if (streamBtn) streamBtn.onclick = () => finish('stream');
-                if (bgBtn) bgBtn.onclick = () => finish('background');
-            });
-        }
-
         async function triggerImport(importType) {
             if (!(await ensureMasterKeyForDataImport())) return;
             if (importType === 'thumbnails_prompt') {
                 if (runningJobs.has('thumbnails') || runningJobs.has('thumbnails_async')) return;
-                const mode = await showThumbnailsRunModeModal();
-                if (mode === 'stream') void runImport('thumbnails', {});
-                else if (mode === 'background') void runImport('thumbnails_async', {});
+                void runImport('thumbnails', {});
                 return;
             }
             const jobKey = makeJobKey(importType, {});
@@ -3702,7 +3660,6 @@ const App = (() => {
             const titleEl = modal.querySelector('.data-import-detail-title');
             const descEl = modal.querySelector('.data-import-detail-desc');
             const entriesEl = modal.querySelector('.data-import-detail-entries');
-            const lastRunEl = modal.querySelector('.data-import-detail-last-run');
 
             function resetSidebar() {
                 if (ph) ph.hidden = false;
@@ -3712,18 +3669,14 @@ const App = (() => {
             resetDataImportDetailSidebar = resetSidebar;
 
             function showCard(card) {
-                if (!card || !content || !ph || !titleEl || !descEl || !entriesEl || !lastRunEl) return;
+                if (!card || !content || !ph || !titleEl || !descEl || !entriesEl) return;
                 const titleSrc = card.querySelector('.data-import-card-title');
                 const detailBody = card.querySelector('.data-import-card-detail-body');
                 const metrics = card.querySelector('.data-import-card-metrics-source');
                 const cnt = metrics && metrics.querySelector('.data-import-count');
-                const lr = metrics && metrics.querySelector('.data-import-last-run');
                 titleEl.innerHTML = titleSrc ? titleSrc.innerHTML : '';
                 descEl.innerHTML = detailBody ? detailBody.innerHTML : '';
                 entriesEl.textContent = cnt ? cnt.textContent.trim() : '—';
-                lastRunEl.textContent = lr ? lr.textContent.trim() : '';
-                if (lr && lr.title) lastRunEl.title = lr.title;
-                else lastRunEl.removeAttribute('title');
                 ph.hidden = true;
                 content.hidden = false;
             }
@@ -3740,16 +3693,8 @@ const App = (() => {
                 if (openModal) {
                     if (openModal === 'data-import-modal') {
                         void (async () => {
-                            if (!(await ensureMasterKeyForDataImport())) return;
-                            const modal = document.getElementById(openModal);
-                            if (modal) {
-                                modal.style.display = 'flex';
-                                if (DOM.configPage) DOM.configPage.style.display = 'none';
-                                if (typeof loadControlDefaults === 'function') loadControlDefaults();
-                                if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();
-                                if (typeof loadDataImportModalCounts === 'function') void loadDataImportModalCounts();
-                                if (typeof loadImportControlLastRun === 'function') loadImportControlLastRun();
-                            }
+                            if (DOM.configPage) DOM.configPage.style.display = 'none';
+                            await openDataImportModalAfterKeyCheck();
                         })();
                         return;
                     }
@@ -3873,8 +3818,7 @@ const App = (() => {
                                 if (!res.ok) {
                                     throw new Error(body.detail || body.error || `HTTP ${res.status}`);
                                 }
-                                if (typeof loadDataImportModalCounts === 'function') void loadDataImportModalCounts();
-                                if (typeof loadImportControlLastRun === 'function') loadImportControlLastRun();
+                                void loadDataImportModalContent();
                             } catch (err) {
                                 console.error('Purge failed:', err);
                                 if (typeof UI !== 'undefined' && UI.displayError) UI.displayError(err.message || 'Delete failed');
@@ -4614,14 +4558,12 @@ const App = (() => {
         const closeDataImportModalBtn = document.getElementById('close-data-import-modal');
         if (dataImportSidebarBtn && dataImportModal) {
             dataImportSidebarBtn.addEventListener('click', () => {
-                void (async () => {
-                    if (!(await ensureMasterKeyForDataImport())) return;
-                    dataImportModal.style.display = 'flex';
-                    markOnboardingChecklistStepDone('import_data');
-                    loadControlDefaults();
-                    if (typeof loadDataImportModalCounts === 'function') void loadDataImportModalCounts();
-                    if (typeof loadImportControlLastRun === 'function') loadImportControlLastRun();
-                })();
+                if (isDataImportSidebarMasterUnlockVisible()) {
+                    dataImportMasterUnlockedCached = true;
+                    openDataImportModalUI();
+                    return;
+                }
+                void openDataImportModalAfterKeyCheck();
             });
         }
         const closeDataImportModal = () => {

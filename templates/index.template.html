@@ -1250,6 +1250,10 @@
                                 <button type="button" role="tab" class="data-import-category-tab" id="data-import-tab-maintenance" data-import-category-tab="maintenance" aria-selected="false" aria-controls="data-import-panel-maintenance">Data Maintenance</button>
                                 <button type="button" role="tab" class="data-import-category-tab" id="data-import-tab-background-jobs" data-import-category-tab="background-jobs" aria-selected="false" aria-controls="data-import-panel-background-jobs"><i class="fas fa-tasks" aria-hidden="true"></i> Scheduled  Data Maintenance Jobs</button>
                             </div>
+                            <div class="data-import-panels-wrap">
+                            <div id="data-import-modal-loading" class="data-import-modal-loading" hidden aria-live="polite">
+                                <i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading import data&hellip;
+                            </div>
                             <div class="data-import-panels-scroll">
                             <div id="data-import-panel-import" role="tabpanel" class="data-import-category-panel data-import-category-panel--active" data-import-category-panel="import" aria-labelledby="data-import-tab-import">
                                 <div class="data-import-cards-grid">
@@ -1259,7 +1263,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="email_processing">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="email_processing"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Sign in with Google (OAuth) and import Gmail into this archive. Messages are tagged by source so <strong>Clear Data</strong> only removes mail imported via Gmail, not other email sources.</p></div>
                                     <div class="data-import-actions-td">
@@ -1278,7 +1281,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="imap_processing">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="imap_processing"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import from any IMAP mailbox using server credentials and folder selection. Counts include non-Gmail IMAP and legacy email rows. <strong>Clear Data</strong> removes IMAP and legacy imports as described in the button tooltip.</p></div>
                                     <div class="data-import-actions-td">
@@ -1297,7 +1299,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="zip_whatsapp">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="zip_whatsapp"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import a WhatsApp export. Chats and media are parsed into the archive. Use <strong>Clear Data</strong> to remove only WhatsApp-imported content.</p></div>
                                     <div class="data-import-actions-td">
@@ -1316,7 +1317,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="zip_instagram">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="zip_instagram"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import a Meta Instagram data export. Posts and related metadata are imported. <strong>Clear Data</strong> removes Instagram-imported material.</p></div>
                                     <div class="data-import-actions-td">
@@ -1335,7 +1335,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="zip_imessage">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="zip_imessage"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import an Apple iMessage/SMS export. Message threads are merged into the archive. Entry counts combine iMessage, SMS, and MMS where applicable.</p></div>
                                     <div class="data-import-actions-td">
@@ -1354,7 +1353,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="zip_facebook">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="zip_facebook"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import a Facebook data export. Messenger, albums, posts, and places are imported.</p></div>
                                     <div class="data-import-actions-td">
@@ -1374,9 +1372,8 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="reference_docs">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="reference_import"></span>
                                     </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Open the reference documents manager to add PDFs, Word files, text, CSV, or JSON for AI context. Entries counts stored reference docs. Last run reflects linked-file import activity where applicable.</p></div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Open the reference documents manager to add PDFs, Word files, text, CSV, or JSON for AI context. Entries counts stored reference docs.</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
@@ -1397,7 +1394,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="reference_import_entries">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="reference_import"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Copy linked (referenced-on-disk) images into the database blobs so they travel with the archive. Entries shows reference-linked images. Runs as a background job.</p></div>
                                     <div class="data-import-actions-td">
@@ -1415,7 +1411,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="image_export_entries">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="image_export"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Write images from the database to a folder you choose on disk (local deployment). Entries is the total image count eligible for export.</p></div>
                                     <div class="data-import-actions-td">
@@ -1433,7 +1428,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="imported_images">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="imported_images"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Remove images that have been imported into the database. This function only offers <strong>Clear Data</strong> to remove filesystem-sourced library images; counts reflect embedded images for this archive.</p></div>
                                     <div class="data-import-actions-td">
@@ -1448,7 +1442,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="contacts">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="contacts"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Rebuild the contacts store from existing messages and related sources. Useful after large imports or if you have updated your contacts classification, emails matches or email exclusions</p></div>
                                     <div class="data-import-actions-td">
@@ -1466,9 +1459,8 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="thumbnails">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="thumbnails"></span>
                                     </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Generate thumbnails and read GPS/metadata from images. May run as an interactive prompt flow or async jobs. Last run merges thumbnail and async thumbnail timestamps when both exist.</p></div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Generate thumbnails and read GPS/metadata from images. May run as an interactive prompt flow or async jobs.</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
@@ -1485,7 +1477,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="message_context_embeddings"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Turns your messages and conversations into a format the app can search through quickly.</p></div>
                                     <div class="data-import-actions-td">
@@ -1504,7 +1495,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="facebook_post_text_embeddings"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed Facebook post text for semantic similarity search. You can reprocess all posts or only fill missing vectors.</p></div>
                                     <div class="data-import-actions-td">
@@ -1523,7 +1513,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="facebook_album_description_embeddings"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed Facebook album descriptions for semantic similarity search. You can reprocess all albums or only fill missing vectors.</p></div>
                                     <div class="data-import-actions-td">
@@ -1542,7 +1531,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="imported_images">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="image_ai_gemma_unclassified"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Use local AI (e.g. Gemma via Ollama) to tag images with the contents of the image for ones that are not yet classified</p></div>
                                     <div class="data-import-actions-td">
@@ -1560,7 +1548,6 @@
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count">—</span>
-                                        <span class="data-import-last-run" data-import-last-run="image_tag_embeddings"></span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed image tags for similarity search. You can reprocess all embeddings or skip unchanged tags when prompted.</p></div>
                                     <div class="data-import-actions-td">
@@ -1608,15 +1595,15 @@
                             </div>
                             </div>
                             </div>
+                            </div>
                             <aside class="data-import-detail-sidebar" aria-label="Import option details">
                                 <div class="data-import-detail-sidebar-inner">
-                                    <p class="data-import-detail-placeholder">Hover an option for a description, entry counts, and last run.</p>
+                                    <p class="data-import-detail-placeholder">Hover an option for a description and entry counts.</p>
                                     <div class="data-import-detail-content" hidden>
                                         <h4 class="data-import-detail-title"></h4>
                                         <div class="data-import-detail-desc"></div>
                                         <dl class="data-import-detail-stats">
                                             <div class="data-import-detail-stat-row"><dt>Entries</dt><dd class="data-import-detail-entries">—</dd></div>
-                                            <div class="data-import-detail-stat-row"><dt>Last run</dt><dd class="data-import-detail-last-run"></dd></div>
                                         </dl>
                                     </div>
                                 </div>
@@ -2550,6 +2537,9 @@
 
                     </div>
                     <div class="new-image-gallery-main">
+                        <div id="new-image-gallery-loading" class="new-image-gallery-loading loading-state" hidden aria-live="polite">
+                            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading images&hellip;
+                        </div>
                         <div class="new-image-gallery-thumbnail-grid" id="new-image-gallery-thumbnail-grid"></div>
                     </div>
                 </div>

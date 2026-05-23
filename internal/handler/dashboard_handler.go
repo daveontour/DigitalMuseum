@@ -28,6 +28,7 @@ func NewDashboardHandler(dashSvc *service.DashboardService, subjectSvc *service.
 // RegisterRoutes mounts the dashboard and subject-configuration routes.
 func (h *DashboardHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/dashboard", h.GetDashboard)
+	r.Get("/api/import-modal-stats", h.GetImportModalStats)
 	r.Get("/api/subject-configuration", h.GetSubjectConfiguration)
 	r.Post("/api/subject-configuration", h.UpsertSubjectConfiguration)
 	r.Put("/api/subject-configuration/writing-style-ai", h.PutWritingStyleAI)
@@ -40,6 +41,16 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 	resp, err := h.dashSvc.GetDashboard(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving dashboard: %s", err))
+		return
+	}
+	writeJSON(w, resp)
+}
+
+// GetImportModalStats handles GET /api/import-modal-stats.
+func (h *DashboardHandler) GetImportModalStats(w http.ResponseWriter, r *http.Request) {
+	resp, err := h.dashSvc.GetImportModalStats(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving import modal stats: %s", err))
 		return
 	}
 	writeJSON(w, resp)

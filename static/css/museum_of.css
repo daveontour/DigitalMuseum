@@ -775,6 +775,13 @@ body {
     border-bottom-right-radius: 4px;
 }
 
+.suggestion-message {
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+}
+
 .assistant-message {
     background-color: var(--color-chat-ai-msg);
     color: var(--color-text);
@@ -908,8 +915,14 @@ body {
     margin-left: auto;
 }
 .message-content[data-role="suggestion"] {
-    background-color: #4a4a00; /* yellow highlight toned for dark bg */
+    background-color: #fef3c7;
+    color: #422006;
+    border: 1px solid #f59e0b;
+    border-left: 4px solid #d97706;
     margin-left: auto;
+}
+.message-content[data-role="suggestion"] strong {
+    color: #78350f;
 }
 .message-content[data-role="assistant"] {
     background-color: var(--color-chat-ai-msg);
@@ -1096,27 +1109,41 @@ body {
 /* JSON Viewer */
 .json-wrapper {
     margin-top: 10px;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--color-border-subtle);
     padding-top: 10px;
     position: relative;
 }
 
 .json-toggle {
-    background: var(--color-bg-surface);
-    border: none;
+    background: rgba(143, 164, 200, 0.2);
+    border: 1px solid var(--color-text-muted);
     border-radius: 50%;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0;
-    transition: all 0.2s ease;
+    color: var(--color-text);
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.json-toggle i {
+    color: inherit;
+    font-size: 0.85rem;
 }
 
 .json-toggle:hover {
-    background: var(--color-bg-hover);
+    background: rgba(79, 156, 249, 0.22);
+    border-color: var(--color-blue);
+    color: #fff;
+}
+
+.json-toggle:focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
 }
 
 .json-content {
@@ -1546,13 +1573,14 @@ body {
     align-items: stretch;
     justify-content: flex-start;
     padding: 18px 20px 14px 20px;
-    background-color: rgba(19, 27, 46, 0.97);
-    border: 1px solid var(--color-border);
+    background-color: rgba(238, 244, 252, 0.98);
+    border: 1px solid #b8c8e0;
     border-radius: 12px;
-    box-shadow: var(--shadow-modal);
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.28);
     z-index: 1000;
     min-width: min(320px, calc(100vw - 32px));
     min-height: 168px;
+    color: #1e293b;
 }
 
 .loading-indicator-main {
@@ -1573,7 +1601,7 @@ body {
     flex: 0 0 auto;
     margin-top: auto;
     padding-top: 12px;
-    border-top: 1px solid var(--color-border);
+    border-top: 1px solid #cbd5e1;
 }
 
 .loading-indicator-provider {
@@ -1583,7 +1611,7 @@ body {
     margin-right: auto;
     font-size: var(--text-sm, 0.8125rem);
     font-weight: 600;
-    color: var(--color-text-muted);
+    color: #64748b;
     line-height: var(--line-height-snug, 1.25);
     letter-spacing: 0.02em;
 }
@@ -1596,15 +1624,15 @@ body {
     font-weight: 600;
     padding: 0.45em 0.9em;
     border-radius: 8px;
-    border: 1px solid var(--color-border);
-    background: var(--color-bg-surface);
-    color: var(--color-text);
+    border: 1px solid #94a3b8;
+    background: #fff;
+    color: #1e293b;
     cursor: pointer;
 }
 
 .loading-indicator-cancel-btn:hover {
-    background: var(--color-bg-hover);
-    border-color: var(--color-border-input);
+    background: #f8fafc;
+    border-color: #64748b;
 }
 
 .loading-indicator-cancel-btn:focus-visible {
@@ -1613,8 +1641,8 @@ body {
 }
 
 .thinking-text {
-    color: var(--color-text-muted);
-    font-weight: 500;
+    color: #334155;
+    font-weight: 600;
     font-size: 1.8em;
     line-height: 1;
     display: flex;
@@ -1642,7 +1670,7 @@ body {
 .dot {
     width: 18px;
     height: 18px;
-    background-color: var(--color-text-muted);
+    background-color: var(--color-blue);
     border-radius: 50%;
     animation: pulse 1.4s infinite ease-in-out;
     display: inline-block;
@@ -3454,6 +3482,28 @@ body {
     display: flex;
     flex-direction: column;
     background: var(--color-bg-base);
+}
+#data-import-modal .data-import-panels-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+#data-import-modal .data-import-modal-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    background: rgba(15, 23, 42, 0.55);
+    color: var(--color-text-muted);
+    font-size: var(--text-md);
+}
+#data-import-modal .data-import-modal-loading[hidden] {
+    display: none !important;
 }
 #data-import-modal .data-import-panels-scroll {
     flex: 1 1 auto;
@@ -7563,14 +7613,17 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     position: relative;
 }
 
-/* Thumbnail processing warning banner (full width, under header, dismissable) */
+/* Thumbnail processing warning — overlays top of gallery body (does not shift layout) */
 .image-gallery-thumbnail-warning-banner {
-    flex-shrink: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 4;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    width: 100%;
     padding: 12px 20px;
     background: rgba(251, 191, 36, 0.12);
     border-bottom: 1px solid rgba(251, 191, 36, 0.35);
@@ -7578,6 +7631,9 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     font-size: 0.95rem;
     font-weight: 500;
     box-sizing: border-box;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+    pointer-events: auto;
 }
 
 .image-gallery-thumbnail-warning-banner span {
@@ -7641,6 +7697,24 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+    position: relative;
+}
+
+.new-image-gallery-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    background: rgba(15, 23, 42, 0.45);
+    color: var(--color-text-muted);
+    font-size: var(--text-md);
+}
+
+.new-image-gallery-loading[hidden] {
+    display: none !important;
 }
 
 /* Sidebar sections with spacing */

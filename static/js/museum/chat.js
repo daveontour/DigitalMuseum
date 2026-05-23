@@ -9,8 +9,7 @@ const Chat = (() => {
 
     function _createMessageElement(role, messageId) {
         const messageElement = document.createElement('div');
-        messageElement.classList.add('message', role === 'suggestion' ? 'user-message' : `${role}-message`);
-        if (role === 'suggestion') messageElement.style.backgroundColor = "#f4f778";
+        messageElement.classList.add('message', role === 'suggestion' ? 'suggestion-message' : `${role}-message`);
         if (messageId) messageElement.id = messageId;
         return messageElement;
     }
@@ -121,8 +120,7 @@ const Chat = (() => {
     }
 
     function _renderMessageContent(contentElement, text, role, isMarkdown) {
-        contentElement.dataset.role = (role === 'suggestion') ? "user" : role;
-        if (role === 'suggestion') contentElement.style.backgroundColor = "#f4f778";
+        contentElement.dataset.role = role;
 
         if ((isMarkdown && role !== 'user') || role === 'suggestion') {
             const rawMarkdown = document.createElement('textarea');
@@ -170,7 +168,10 @@ const Chat = (() => {
             const jsonWrapper = document.createElement('div');
             jsonWrapper.className = 'json-wrapper';
             const jsonToggle = document.createElement('button');
+            jsonToggle.type = 'button';
             jsonToggle.className = 'json-toggle';
+            jsonToggle.title = 'Show embedded JSON';
+            jsonToggle.setAttribute('aria-label', 'Show embedded JSON');
             jsonToggle.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
             const jsonContent = document.createElement('div');
             jsonContent.className = 'json-content';

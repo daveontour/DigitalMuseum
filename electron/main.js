@@ -530,6 +530,8 @@ function createLoadingWindow() {
     center: true,
     show: true,
     backgroundColor: '#1a1a2e',
+    titleBarStyle: 'hidden',
+    ...(process.platform !== 'darwin' ? { titleBarOverlay: true } : {}),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

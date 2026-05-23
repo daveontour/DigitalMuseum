@@ -94,15 +94,29 @@ func (s *Scheduler) evaluateRow(ctx context.Context, row *model.BackgroundJob, n
 	uid := *row.UserID
 	key := runKey{userID: uid, jobName: row.JobName}
 
-	// 1) If we previously marked this row as running, check whether the
-	//    underlying singleton job is still in progress; record the outcome
-	//    when it transitions back to idle.
 	s.runningMu.Lock()
 	_, weStartedIt := s.running[key]
 	s.runningMu.Unlock()
 
+	// Rows left as 'running' in the DB while the singleton worker is idle are
+	// stale (e.g. server restart). Reconcile immediately unless we are already
+	// tracking an active run that will be completed below.
+	if row.LastRunResult != nil && *row.LastRunResult == "running" {
+		inProgress, _ := s.runner.Status(row.JobName)
+		if !inProgress && !weStartedIt {
+			result, msg := s.runner.IdleOutcome(row.JobName)
+			if err := s.repo.MarkCompleted(ctx, uid, row.JobName, result, msg, nil); err != nil {
+				slog.Warn("background jobs: reconcile stale running failed", "job", row.JobName, "err", err)
+			}
+			return
+		}
+	}
+
+	// 1) If we previously marked this row as running, check whether the
+	//    underlying singleton job is still in progress; record the outcome
+	//    when it transitions back to idle.
 	if weStartedIt {
-		inProgress, statusLine := s.runner.Status(row.JobName)
+		inProgress, _ := s.runner.Status(row.JobName)
 		if inProgress {
 			return
 		}
@@ -120,10 +134,7 @@ func (s *Scheduler) evaluateRow(ctx context.Context, row *model.BackgroundJob, n
 			t := now.Add(time.Duration(interval) * time.Second)
 			nextDue = &t
 		}
-		result := "completed"
-		if statusLine == "" {
-			statusLine = "completed"
-		}
+		result, statusLine := s.runner.IdleOutcome(row.JobName)
 		if err := s.repo.MarkCompleted(ctx, uid, row.JobName, result, statusLine, nextDue); err != nil {
 			slog.Warn("background jobs: mark completed failed", "job", row.JobName, "err", err)
 		}

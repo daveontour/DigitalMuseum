@@ -37,4 +37,9 @@ type JobRunner interface {
 	// Status reports whether the named job is currently running and the most
 	// recent status_line for display in the UI.
 	Status(jobName string) (inProgress bool, statusLine string)
+
+	// IdleOutcome returns the result/message to persist when a DB row is still
+	// marked running but the in-process worker is idle. Only valid when Status
+	// reports inProgress=false.
+	IdleOutcome(jobName string) (result, message string)
 }

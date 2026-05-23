@@ -721,6 +721,16 @@ Modals.NewImageGallery = (() => {
             }
         }
 
+        function _setGalleryLoading(show) {
+            const loadingEl = document.getElementById('new-image-gallery-loading');
+            const main = document.querySelector('.new-image-gallery-main');
+            if (loadingEl) {
+                loadingEl.hidden = !show;
+                loadingEl.style.display = show ? 'flex' : 'none';
+            }
+            if (main) main.setAttribute('aria-busy', show ? 'true' : 'false');
+        }
+
         /** Clears metadata / similar / filter inputs only (no grid refresh). Call after _setupFilters when selects exist. */
         function _resetGallerySearchCriteria() {
             if (DOM.newImageGalleryTitle) DOM.newImageGalleryTitle.value = '';
@@ -746,6 +756,11 @@ Modals.NewImageGallery = (() => {
             const resetCriteriaAndSearch = !!(options && options.resetCriteriaAndSearch);
             DOM.newImageGalleryModal.style.display = 'flex';
             _syncGalleryPickModeZIndex();
+            if (resetCriteriaAndSearch) {
+                imageData = [];
+                if (DOM.newImageGalleryThumbnailGrid) DOM.newImageGalleryThumbnailGrid.innerHTML = '';
+                _setGalleryLoading(true);
+            }
             await _setupFilters();
             if (resetCriteriaAndSearch) {
                 _resetGallerySearchCriteria();
@@ -832,7 +847,7 @@ Modals.NewImageGallery = (() => {
                 banner.className = 'image-gallery-thumbnail-warning-banner';
                 banner.innerHTML = '<span><i class="fas fa-info-circle"></i> Some thumbnails are still being created.</span><button class="image-gallery-thumbnail-warning-dismiss" type="button" aria-label="Dismiss"><i class="fas fa-times"></i></button>';
                 const body = modal.querySelector('.new-image-gallery-modal-body');
-                if (body) modalContent.insertBefore(banner, body);
+                if (body) body.appendChild(banner);
                 else modalContent.appendChild(banner);
                 banner.querySelector('.image-gallery-thumbnail-warning-dismiss').addEventListener('click', () => banner.remove());
             } catch (e) {
@@ -845,21 +860,7 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryTags) {
                 DOM.newImageGalleryTags.value = tags;
             }
-            const params = new URLSearchParams();
-            params.append('tags', tags);
-            try {
-                const response = await fetch('/images/search?' + params.toString());
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                imageData = data;
-                _renderThumbnailGrid();
-            } catch (error) {
-                console.error('Error loading image data:', error);
-                imageData = [];
-                _renderThumbnailGrid();
-            }
+            await _loadImageData();
         }
 
         async function openImagesFromDate(year, month) {
@@ -974,6 +975,7 @@ Modals.NewImageGallery = (() => {
         }
 
         async function _loadImageData() {
+            _setGalleryLoading(true);
             const params = new URLSearchParams();
             
             // Build query parameters from filter inputs
@@ -1024,6 +1026,8 @@ Modals.NewImageGallery = (() => {
                 console.error('Error loading image data:', error);
                 imageData = [];
                 _renderThumbnailGrid();
+            } finally {
+                _setGalleryLoading(false);
             }
         }
 
