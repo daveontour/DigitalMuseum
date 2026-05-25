@@ -263,6 +263,7 @@ const App = (() => {
                     mood: selectedMood,
                     companionMode: DOM.companionModeCheckbox ? DOM.companionModeCheckbox.checked : false,
                     allowExplicitContent: DOM.allowExplicitContentCheckbox ? DOM.allowExplicitContentCheckbox.checked : false,
+                    enableSnarkiness: DOM.enableSnarkinessCheckbox ? DOM.enableSnarkinessCheckbox.checked : false,
                     supplementary_prompt: supplementary_prompt,
                     temperature: parseFloat(DOM.creativityLevel ? DOM.creativityLevel.value : '0'),
                     conversation_id: conversationId,
@@ -336,6 +337,7 @@ const App = (() => {
                     mood: selectedMood,
                     companionMode: false,
                     allowExplicitContent: DOM.allowExplicitContentCheckbox ? DOM.allowExplicitContentCheckbox.checked : false,
+                    enableSnarkiness: DOM.enableSnarkinessCheckbox ? DOM.enableSnarkinessCheckbox.checked : false,
                     provider,
                     whos_asking: whosAsking,
                 }), chatCtrl.signal);
@@ -403,6 +405,7 @@ const App = (() => {
                     mood: selectedMood,
                     companionMode: false,
                     allowExplicitContent: DOM.allowExplicitContentCheckbox ? DOM.allowExplicitContentCheckbox.checked : false,
+                    enableSnarkiness: DOM.enableSnarkinessCheckbox ? DOM.enableSnarkinessCheckbox.checked : false,
                     temperature: parseFloat(DOM.creativityLevel ? DOM.creativityLevel.value : '0'),
                     conversation_id: conversationId,
                     clientId: AppState.clientId,
@@ -1072,6 +1075,9 @@ const App = (() => {
                     void onChatStatusBarRefsClick();
                 }
             });
+        }
+        if (typeof UI !== 'undefined' && UI.initChatToolCallsLogModal) {
+            UI.initChatToolCallsLogModal();
         }
 
         // Dashboard: load stats and render. prefix e.g. 'stats-' for Dashboard modal (ids: prefix + 'dashboard-stats', …).

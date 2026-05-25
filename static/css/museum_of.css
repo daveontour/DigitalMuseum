@@ -2474,13 +2474,15 @@ body {
     font-size: 0.9rem;
     border-radius: 6px;
     border: 1px solid var(--color-danger);
-    background: transparent;
-    color: var(--color-danger);
+    background: var(--color-danger);
+    color: #000;
     cursor: pointer;
 }
 
 .voice-settings-clear-history-btn:hover {
-    background: rgba(248, 113, 113, 0.12);
+    background: var(--color-danger-dark);
+    border-color: var(--color-danger-dark);
+    color: #000;
 }
 
 .config-modal-content {
@@ -9477,6 +9479,40 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     outline-offset: 2px;
 }
 
+.chat-tool-calls-log-body-wrap {
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chat-tool-calls-log-hint {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+.chat-tool-calls-log-body {
+    margin: 0;
+    padding: 12px 14px;
+    max-height: min(50vh, 420px);
+    overflow: auto;
+    background: var(--color-bg-alt, #f4f7fb);
+    border: 1px solid var(--color-border, #dfe6ef);
+    border-radius: var(--radius-md, 8px);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--text-sm);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--color-text);
+}
+
+.chat-tool-calls-log-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
 /* Interview messages — centered layout distinct from normal chat */
 .interview-question {
     max-width: 700px;
@@ -11831,12 +11867,12 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 .have-a-chat-claude {
-    background-color: rgba(26, 115, 232, 0.12);
+    background-color: rgba(20, 90, 200, 0.38);
     border-left: 4px solid #1a73e8;
 }
 
 .have-a-chat-gemini {
-    background-color: rgba(124, 58, 237, 0.12);
+    background-color: rgba(90, 40, 180, 0.38);
     border-left: 4px solid #7c3aed;
 }
 

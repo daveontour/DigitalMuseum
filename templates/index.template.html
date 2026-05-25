@@ -89,6 +89,10 @@
                             <input type="checkbox" id="allow-explicit-content" name="allow-explicit-content">
                             <span>Allow Explicit Content</span>
                         </label>
+                        <label class="work-mode-label">
+                            <input type="checkbox" id="enable-snarkiness" name="enable-snarkiness">
+                            <span>Enable Snarkiness</span>
+                        </label>
                         <div class="slider-container voice-settings-slider">
                             <label for="creativity-level">Creativity</label>
                             <input type="range" id="creativity-level" min="0" max="2" step="0.1" value="0">
@@ -327,7 +331,7 @@
                     </span>
                     <span class="chat-context-status-seg chat-context-status-last" title="Most recent chat completion">
                         Last request: <span id="chat-context-last-in">—</span> in / <span id="chat-context-last-out">—</span> out tokens
-                        · <span id="chat-context-last-toolcalls">—</span> tool calls
+                        · <span id="chat-context-last-toolcalls-seg" class="chat-context-status-clickable" role="button" tabindex="0" title="View tool call log for last request"><span id="chat-context-last-toolcalls">—</span> tool calls</span>
                     </span>
                 </span>
             </div>
@@ -527,6 +531,23 @@
                     <div style="display:flex; gap:10px; justify-content:flex-end;">
                         <button class="modal-btn modal-btn-secondary" id="have-a-chat-inject-cancel-btn">Cancel</button>
                         <button class="modal-btn modal-btn-primary" id="have-a-chat-inject-submit-btn"><i class="fas fa-paper-plane"></i> Inject</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last chat request — tool call log -->
+        <div id="chat-tool-calls-log-modal" class="modal" style="display:none;">
+            <div class="modal-content chat-tool-calls-log-content" style="max-width:640px; width:92vw;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-wrench"></i> Tool calls (last request)</h2>
+                    <button type="button" class="modal-close-btn" id="close-chat-tool-calls-log-modal">&times;</button>
+                </div>
+                <div class="modal-body chat-tool-calls-log-body-wrap">
+                    <p class="chat-tool-calls-log-hint">Each entry is a tool the model invoked and the parameters it passed.</p>
+                    <pre id="chat-tool-calls-log-body" class="chat-tool-calls-log-body"></pre>
+                    <div class="chat-tool-calls-log-actions">
+                        <button type="button" class="modal-btn modal-btn-secondary" id="chat-tool-calls-log-close-btn">Close</button>
                     </div>
                 </div>
             </div>

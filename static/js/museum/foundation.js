@@ -132,6 +132,7 @@ const DOM = {
     autoOpenSuggestions: document.getElementById('auto-open-suggestions'),
     companionModeCheckbox: document.getElementById('companion-mode'),
     allowExplicitContentCheckbox: document.getElementById('allow-explicit-content'),
+    enableSnarkinessCheckbox: document.getElementById('enable-snarkiness'),
     llmProviderSelect: document.getElementById('llm-provider-select'),
     profilesLlmProviderSelect: document.getElementById('profiles-llm-provider-select'),
     voiceRadios: document.querySelectorAll('input[name="voice"]'),
@@ -731,6 +732,65 @@ const UI = (() => {
 
     const DASH = '\u2014';
 
+    let lastChatFunctionCalls = null;
+
+    function formatChatToolCallsLog(calls) {
+        if (!Array.isArray(calls) || calls.length === 0) {
+            return 'No tool calls in the last chat request.';
+        }
+        return calls.map((call, idx) => {
+            const name = call && call.name ? String(call.name) : '(unknown)';
+            const iter = call && call.iteration != null ? call.iteration : '?';
+            const args = call && call.arguments != null ? call.arguments : {};
+            let argsText;
+            try {
+                argsText = JSON.stringify(args, null, 2);
+            } catch (_) {
+                argsText = String(args);
+            }
+            return `#${idx + 1} — ${name} (round ${iter})\n${argsText}`;
+        }).join('\n\n');
+    }
+
+    function openChatToolCallsLogModal() {
+        const modal = document.getElementById('chat-tool-calls-log-modal');
+        const body = document.getElementById('chat-tool-calls-log-body');
+        if (!modal || !body) return;
+        body.textContent = formatChatToolCallsLog(lastChatFunctionCalls);
+        modal.style.display = 'flex';
+    }
+
+    function closeChatToolCallsLogModal() {
+        const modal = document.getElementById('chat-tool-calls-log-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function initChatToolCallsLogModal() {
+        const seg = document.getElementById('chat-context-last-toolcalls-seg');
+        const modal = document.getElementById('chat-tool-calls-log-modal');
+        const closeBtn = document.getElementById('close-chat-tool-calls-log-modal');
+        const closeBtn2 = document.getElementById('chat-tool-calls-log-close-btn');
+        if (seg) {
+            seg.addEventListener('click', (e) => {
+                e.preventDefault();
+                openChatToolCallsLogModal();
+            });
+            seg.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openChatToolCallsLogModal();
+                }
+            });
+        }
+        if (closeBtn) closeBtn.addEventListener('click', closeChatToolCallsLogModal);
+        if (closeBtn2) closeBtn2.addEventListener('click', closeChatToolCallsLogModal);
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeChatToolCallsLogModal();
+            });
+        }
+    }
+
     function syncChatContextStatusBarVisibility() {
         const bar = DOM.chatContextStatusBar;
         if (!bar) return;
@@ -772,7 +832,14 @@ const UI = (() => {
         if (em) {
             if (typeof em.input_tokens === 'number') inT = em.input_tokens;
             if (typeof em.output_tokens === 'number') outT = em.output_tokens;
-            if (Array.isArray(em.function_calls)) nFc = em.function_calls.length;
+            if (Array.isArray(em.function_calls)) {
+                nFc = em.function_calls.length;
+                lastChatFunctionCalls = em.function_calls;
+            } else {
+                lastChatFunctionCalls = null;
+            }
+        } else {
+            lastChatFunctionCalls = null;
         }
         if (inEl) inEl.textContent = inT != null ? String(inT) : DASH;
         if (outEl) outEl.textContent = outT != null ? String(outT) : DASH;
@@ -787,7 +854,8 @@ const UI = (() => {
         updateChatContextStatusBarFromAvailability,
         setChatLastRequestStatsFromEmbedded,
         setChatProviderFailoverNotice,
-        clearChatProviderFailoverNotice
+        clearChatProviderFailoverNotice,
+        initChatToolCallsLogModal,
     };
 })();
 
@@ -823,6 +891,9 @@ const Config = (() => {
         if (settings.allowExplicitContent !== undefined && DOM.allowExplicitContentCheckbox) {
             DOM.allowExplicitContentCheckbox.checked = settings.allowExplicitContent;
         }
+        if (settings.enableSnarkiness !== undefined && DOM.enableSnarkinessCheckbox) {
+            DOM.enableSnarkinessCheckbox.checked = settings.enableSnarkiness;
+        }
 
         applySettings();
     }
@@ -837,6 +908,7 @@ const Config = (() => {
             autoVoiceShortResponses: DOM.autoVoiceShortResponses ? DOM.autoVoiceShortResponses.checked : false,
             autoOpenSuggestions: DOM.autoOpenSuggestions ? DOM.autoOpenSuggestions.checked : true,
             allowExplicitContent: DOM.allowExplicitContentCheckbox ? DOM.allowExplicitContentCheckbox.checked : false,
+            enableSnarkiness: DOM.enableSnarkinessCheckbox ? DOM.enableSnarkinessCheckbox.checked : false,
         };
         localStorage.setItem(CONSTANTS.LOCAL_STORAGE_KEYS.CHAT_SETTINGS, JSON.stringify(settings));
         applySettings();
@@ -844,7 +916,7 @@ const Config = (() => {
 
     function init() {
         loadSettings();
-        [DOM.messageFontSize, DOM.creativityLevel, DOM.showAudioTags, DOM.showImageTags, DOM.showJsonTags, DOM.companionModeCheckbox, DOM.allowExplicitContentCheckbox, DOM.autoVoiceShortResponses, DOM.autoOpenSuggestions].forEach(el => {
+        [DOM.messageFontSize, DOM.creativityLevel, DOM.showAudioTags, DOM.showImageTags, DOM.showJsonTags, DOM.companionModeCheckbox, DOM.allowExplicitContentCheckbox, DOM.enableSnarkinessCheckbox, DOM.autoVoiceShortResponses, DOM.autoOpenSuggestions].forEach(el => {
             if (el && el.type === 'checkbox') {
                 el.addEventListener('change', saveSettings);
             } else if (el) {

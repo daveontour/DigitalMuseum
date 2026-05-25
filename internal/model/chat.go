@@ -33,6 +33,7 @@ type ChatRequest struct {
 	Mood                 *string  `json:"mood"`
 	CompanionMode        bool     `json:"companionMode"`
 	AllowExplicitContent bool     `json:"allowExplicitContent"`
+	EnableSnarkiness     bool     `json:"enableSnarkiness"`
 	Provider             string   `json:"provider"` // gemini, claude, deepseek, or localai
 	WhosAsking           string   `json:"whos_asking"`
 	RepeatQuestion       bool     `json:"repeat_question"`

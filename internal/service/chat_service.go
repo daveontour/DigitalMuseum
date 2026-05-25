@@ -31,6 +31,16 @@ func appendExplicitContentPolicy(systemPrompt string, allow bool) string {
 	return systemPrompt + explicitContentInstruction
 }
 
+// snarkinessInstruction is appended when the client sends enableSnarkiness.
+const snarkinessInstruction = "\n\n**Tone (user preference):** Snarkiness is enabled. You may use dry wit, playful sarcasm, and lightly teasing humour when it fits the persona and moment. Stay clever rather than cruel; do not become insulting or demeaning toward the person asking."
+
+func appendSnarkinessPolicy(systemPrompt string, enable bool) string {
+	if !enable {
+		return systemPrompt
+	}
+	return systemPrompt + snarkinessInstruction
+}
+
 func readAuthSessionID(r *http.Request, override string) string {
 	if strings.TrimSpace(override) != "" {
 		return strings.TrimSpace(override)
@@ -583,6 +593,7 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 		systemPrompt += "\n\n**IMPORTANT Repeat Question:** Repeat the question in the same language and tone as the original question at the begining of the response"
 	}
 	systemPrompt = appendExplicitContentPolicy(systemPrompt, req.AllowExplicitContent)
+	systemPrompt = appendSnarkinessPolicy(systemPrompt, req.EnableSnarkiness)
 	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
 	// Load conversation history
 	var history []appai.ConvTurn
@@ -734,6 +745,7 @@ func (s *ChatService) GenerateRandomQuestion(ctx context.Context, r *http.Reques
 		"\n\n**Your Personae:**\n" + voiceText +
 		"\n\n**Who is asking:** " + whosAskingText
 	systemPrompt = appendExplicitContentPolicy(systemPrompt, req.AllowExplicitContent)
+	systemPrompt = appendSnarkinessPolicy(systemPrompt, req.EnableSnarkiness)
 	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
 
 	// Load conversation history
