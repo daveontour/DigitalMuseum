@@ -18,7 +18,6 @@ import (
 	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/database"
 	"github.com/daveontour/aimuseum/internal/repository"
-	"github.com/daveontour/aimuseum/internal/service"
 )
 
 func main() {
@@ -145,19 +144,6 @@ func run() error {
 
 		if err := database.SeedAppSystemInstructionsFromFiles(migrateCtx, db.Std, "static"); err != nil {
 			return fmt.Errorf("seed app system instructions: %w", err)
-		}
-
-		// Bootstrap admin from ADMIN_EMAIL / ADMIN_PASSWORD when none exists, then require ≥1 admin.
-		authSvc := service.NewAuthService(userRepo, cfg.Server.SessionCookieSecure)
-		if err := authSvc.EnsureAdminUser(migrateCtx, cfg.Server.AdminEmail, cfg.Server.AdminPassword); err != nil {
-			return fmt.Errorf("bootstrap admin user: %w", err)
-		}
-		hasAdmin, err := userRepo.AdminExists(migrateCtx)
-		if err != nil {
-			return fmt.Errorf("check admin user: %w", err)
-		}
-		if !hasAdmin {
-			return fmt.Errorf("no admin user in database: set ADMIN_EMAIL and ADMIN_PASSWORD to create the initial administrator, or sign in as an existing admin and create one under /admin")
 		}
 	}
 

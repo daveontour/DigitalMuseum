@@ -20,6 +20,9 @@ type DB struct {
 	Std *sql.DB
 }
 
+// ArchiveOpenHook runs after an archive SQLite file is opened and migrated.
+type ArchiveOpenHook func(ctx context.Context, db *sql.DB, profileID string) error
+
 var sqliteVecAutoOnce sync.Once
 
 func ensureSQLiteVecAuto() {

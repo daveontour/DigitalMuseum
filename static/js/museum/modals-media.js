@@ -1975,8 +1975,7 @@ Modals.ImageDetailModal = (() => {
                     // Add button to open Google Maps in new tab
                     const openMapsButton = document.createElement('button');
                     openMapsButton.type = 'button';
-                    openMapsButton.className = 'modal-btn modal-btn-secondary';
-                    openMapsButton.style.cssText = 'margin-left: 10px; padding: 0.3em 0.8em; font-size: 0.85em; display: inline-flex; align-items: center; gap: 0.3em;';
+                    openMapsButton.className = 'modal-btn image-detail-gps-btn image-detail-gps-btn--maps';
                     openMapsButton.innerHTML = '<i class="fas fa-map-marker-alt"></i> Open in Google Maps';
                     openMapsButton.onclick = function(e) {
                         e.preventDefault();
@@ -1986,8 +1985,7 @@ Modals.ImageDetailModal = (() => {
 
                     const findNearbyButton = document.createElement('button');
                     findNearbyButton.type = 'button';
-                    findNearbyButton.className = 'modal-btn modal-btn-secondary';
-                    findNearbyButton.style.cssText = 'margin-left: 10px; padding: 0.3em 0.8em; font-size: 0.85em; display: inline-flex; align-items: center; gap: 0.3em;';
+                    findNearbyButton.className = 'modal-btn image-detail-gps-btn image-detail-gps-btn--nearby';
                     findNearbyButton.innerHTML = '<i class="fas fa-search-location"></i> Find Nearby';
                     findNearbyButton.onclick = async function(e) {
                         e.preventDefault();

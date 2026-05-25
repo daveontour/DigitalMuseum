@@ -116,8 +116,8 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 | `TEMPLATES_DIR` | No | Override templates directory path |
 | `ASSET_STATIC_DIR` | No | Override static assets directory path |
 | `ENABLE_PPROF` | No | Set `true` to expose `/debug/pprof` on `:6060` |
-| `ADMIN_EMAIL` | No | Email for initial admin user (created if no admin exists) |
-| `ADMIN_PASSWORD` | No | Password for initial admin user |
+| `ADMIN_EMAIL` | No | Email for `/admin` login (not stored in archive SQLite) |
+| `ADMIN_PASSWORD` | No | Password for `/admin` login (not stored in archive SQLite) |
 | `TLS_CERT_FILE` | No | Path to TLS certificate file (both `TLS_CERT_FILE` and `TLS_KEY_FILE` required for HTTPS) |
 | `TLS_KEY_FILE` | No | Path to TLS private key file |
 | `TUS_CHUNK_SIZE_MB` | No | Chunk size (MB) for resumable tus uploads (default: 10) |
@@ -241,7 +241,8 @@ Select via `"provider": "deepseek"` in `POST /chat/generate` and `Have-a-Chat` r
 `internal/handler/admin_user_handler.go` provides a web-based admin panel at `/admin`:
 
 - **Separate session:** `dm_admin_sid` cookie, 2-hour TTL, RAM-only (not DB-backed)
-- **Authentication:** must have `is_admin = true` in the `users` table; initial admin is seeded at server startup from `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars (only while no admin row exists)
+- **Authentication:** `POST /admin/login` validates `ADMIN_EMAIL` / `ADMIN_PASSWORD` from server config only (not archive `users` rows)
+- **Archive users:** first real owner is always `users.id = 2`; `users.id = 1` is a reserved inactive placeholder (see `database.seedReservedUserSlot`)
 - **Routes:**
   - `GET /admin` — admin SPA page
   - `POST /admin/login` / `POST /admin/logout`

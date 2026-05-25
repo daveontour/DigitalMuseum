@@ -23,7 +23,7 @@ import (
 // The scheduler may be nil if construction fails non-fatally; callers should
 // nil-check before launching its goroutine.
 // When pool is nil (no main archive DB), a minimal router is returned that serves
-// /health, /, /login, /profiles, /static/*, /api/profiles, and /api/resolved-main-sqlite-path
+// /health, /, /login, /admin, /profiles, /static/*, /api/profiles, and /api/resolved-main-sqlite-path
 // (GET / redirects to /login).
 func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *backgroundjobs.Scheduler, error) {
 	r := chi.NewRouter()
@@ -38,11 +38,25 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	profileRepo := repository.NewProfileRepo(billingPool)
 
 	if pool == nil {
-		// No main archive DB — serve only what is needed to choose/create one.
+		// No user archive DB yet — billing DB + admin panel still work so operators can
+		// create the first archive before any user archive is opened at startup.
 		r.Get("/health", healthHandler)
 		r.Get("/api/resolved-main-sqlite-path", handler.ResolvedMainSQLitePath(cfg))
 
-		profileHandler := handler.NewProfileHandler(profileRepo, nil, nil)
+		billingRepo := repository.NewBillingRepo(billingPool)
+		adminUsersHandler := handler.NewAdminUsersHandler(
+			nil, nil, nil, nil,
+			billingRepo, nil, cfg.Server.SessionCookieSecure,
+		)
+		adminUsersHandler.WithBootstrapAdminCredentials(cfg.Server.AdminEmail, cfg.Server.AdminPassword)
+		adminUsersHandler.RegisterRoutes(r)
+
+		archiveProvision := service.NewArchiveProvisionService(
+			cfg.Server.SessionCookieSecure,
+			cfg.Crypto.KeyringPepper,
+			nil,
+		)
+		profileHandler := handler.NewProfileHandler(profileRepo, adminUsersHandler.RequireAdmin, archiveProvision)
 		profileHandler.RegisterRoutes(r)
 
 		templateHandler := handler.NewTemplateHandler(nil, nil, cfg)
@@ -243,14 +257,13 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	importDataPurgeHandler.RegisterRoutes(r)
 
 	// ── Admin user management ──────────────────────────────────────────────────
-	adminUsersHandler := handler.NewAdminUsersHandler(userRepo, authSvc, sensitiveSvc, subjectConfigSvc, dashboardSvc, billingRepo, appInstrRepo, cfg.Server.SessionCookieSecure)
+	adminUsersHandler := handler.NewAdminUsersHandler(userRepo, sensitiveSvc, subjectConfigSvc, dashboardSvc, billingRepo, appInstrRepo, cfg.Server.SessionCookieSecure)
+	adminUsersHandler.WithBootstrapAdminCredentials(cfg.Server.AdminEmail, cfg.Server.AdminPassword)
 	adminUsersHandler.RegisterRoutes(r)
 
 	// ── Archive profiles (billing DB) ─────────────────────────────────────────
 	archiveProvision := service.NewArchiveProvisionService(
 		cfg.Server.SessionCookieSecure,
-		cfg.Server.AdminEmail,
-		cfg.Server.AdminPassword,
 		cfg.Crypto.KeyringPepper,
 		sensitiveSvc,
 	)

@@ -20,11 +20,9 @@ import (
 const minArchiveOwnerPasswordLen = 12
 
 // ArchiveProvisionService creates new archive SQLite files with schema, seeds,
-// admin bootstrap, first owner registration, keyring init, and subject config.
+// first owner registration, keyring init, and subject config.
 type ArchiveProvisionService struct {
 	secure        bool
-	adminEmail    string
-	adminPassword string
 	keyringPepper string
 	sensitive     *SensitiveService // when non-nil, init keyring on the new archive DB (not the server main pool)
 }
@@ -33,21 +31,19 @@ type ArchiveProvisionService struct {
 // keyringPepper is mixed into key derivation (same as SensitiveService); may be empty.
 func NewArchiveProvisionService(
 	secure bool,
-	adminEmail, adminPassword, keyringPepper string,
+	keyringPepper string,
 	sensitive *SensitiveService,
 ) *ArchiveProvisionService {
 	return &ArchiveProvisionService{
 		secure:        secure,
-		adminEmail:    strings.TrimSpace(adminEmail),
-		adminPassword: adminPassword,
 		keyringPepper: keyringPepper,
 		sensitive:     sensitive,
 	}
 }
 
 // CreateArchiveWithFirstUser creates a new SQLite archive at dbPath, migrates and seeds it,
-// bootstraps admin from env when configured, registers the first non-admin owner, and
-// initialises keyring + subject configuration when the respective services are non-nil.
+// registers the first owner (users.id=2), and initialises keyring + subject configuration
+// when the respective services are non-nil.
 func (s *ArchiveProvisionService) CreateArchiveWithFirstUser(
 	ctx context.Context,
 	dbPath, displayName, familyName, username, password string,
@@ -116,11 +112,6 @@ func (s *ArchiveProvisionService) CreateArchiveWithFirstUser(
 
 	userRepo := repository.NewUserRepo(db)
 	authSvc := NewAuthService(userRepo, s.secure)
-	if s.adminEmail != "" && s.adminPassword != "" {
-		if err := authSvc.EnsureAdminUser(migrateCtx, s.adminEmail, s.adminPassword); err != nil {
-			return fmt.Errorf("bootstrap admin: %w", err)
-		}
-	}
 	user, err := authSvc.Register(migrateCtx, username, password, displayName, familyName)
 	if err != nil {
 		return fmt.Errorf("register owner: %w", err)

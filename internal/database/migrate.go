@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+// ReservedUserSlotID is the fixed users.id reserved so the first real archive owner gets id=2.
+const ReservedUserSlotID int64 = 1
+
+// ReservedUserEmail is the sentinel email for the id=1 placeholder row (not a login account).
+const ReservedUserEmail = "__dm_reserved__@digitalmuseum.invalid"
+
 // schemaDDL returns the complete CREATE TABLE and CREATE INDEX statements for a
 // fresh database (single source of truth for new installs). Incremental ALTERs
 // and data backfills run in MigrateSQLite() and dedicated helpers below.
@@ -1144,8 +1150,38 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 	if err := ensureMediaItemsSourceReferenceIndex(ctx, db); err != nil {
 		return err
 	}
+	if err := seedReservedUserSlot(ctx, db); err != nil {
+		return err
+	}
 
 	slog.Info("sqlite database migration complete")
+	return nil
+}
+
+// seedReservedUserSlot inserts an inactive placeholder at users.id=1 on fresh archives so the
+// first real owner account receives id=2. Skipped when id=1 already exists (legacy admin rows).
+func seedReservedUserSlot(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'users'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master users: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	res, err := db.ExecContext(ctx, `
+		INSERT INTO users (id, email, password_hash, display_name, is_active, is_admin)
+		SELECT ?1, ?2, 'unused', '', 0, 0
+		WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = ?1)`,
+		ReservedUserSlotID, ReservedUserEmail,
+	)
+	if err != nil {
+		return fmt.Errorf("seed reserved user slot: %w", err)
+	}
+	if rows, _ := res.RowsAffected(); rows > 0 {
+		slog.Info("sqlite migration: seeded reserved user slot", "id", ReservedUserSlotID)
+	}
 	return nil
 }
 

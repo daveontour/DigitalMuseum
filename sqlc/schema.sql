@@ -18,6 +18,8 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- ============================================================
 -- Identity tables  (no user_id FK — these ARE the identity layer)
 -- ============================================================
+-- SQLite runtime: users.id=1 is a reserved inactive placeholder (see migrate.go seedReservedUserSlot);
+-- the first real archive owner is always users.id=2. /admin auth uses ADMIN_EMAIL/PASSWORD, not is_admin.
 
 CREATE TABLE IF NOT EXISTS users (
     id                     BIGSERIAL    PRIMARY KEY,

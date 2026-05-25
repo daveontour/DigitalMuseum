@@ -63,10 +63,8 @@ type ServerConfig struct {
 	// SessionCookieSecure sets the Secure flag on session cookies.
 	// Enable when serving over HTTPS (SESSION_COOKIE_SECURE=true).
 	SessionCookieSecure bool
-	// AdminEmail and AdminPassword create the initial admin when the DB has none
-	// (see cmd/server startup: EnsureAdminUser then AdminExists check).
-	// Set via ADMIN_EMAIL and ADMIN_PASSWORD. After an admin row exists, startup
-	// succeeds without these vars; they are only used while no admin is present.
+	// AdminEmail and AdminPassword authenticate /admin (ADMIN_EMAIL / ADMIN_PASSWORD).
+	// They are not stored in archive SQLite; the first archive owner is users.id=2.
 	AdminEmail    string
 	AdminPassword string
 }
@@ -219,8 +217,8 @@ func Load() (*Config, error) {
 			TLSCertFile:         tlsCert,
 			TLSKeyFile:          tlsKey,
 			SessionCookieSecure: parseBool(getenv("SESSION_COOKIE_SECURE", "false")),
-			AdminEmail:          strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_EMAIL"))),
-			AdminPassword:       os.Getenv("ADMIN_PASSWORD"),
+			AdminEmail:          loadAdminEmail(),
+			AdminPassword:       loadAdminPassword(),
 		},
 		App: AppConfig{
 			PageTitle:        getenv("PAGE_TITLE", "Digital Museum of SUBJECT_NAME"),
@@ -398,29 +396,49 @@ func defaultTUSUploadDir() string {
 	return "tmp/tus_uploads"
 }
 
-// loadDotEnv tries multiple strategies to find and load a .env file.
+// loadDotEnv merges .env files so file values override stale OS environment variables.
+// Later files win: executable dir, then APPDATA user config, then every .env found walking
+// up from the working directory (nested cwd .env first, project root last).
 func loadDotEnv() {
-	candidates := []string{}
-
-	// 1. Same directory as the executable
-	if exe, err := os.Executable(); err == nil {
-		candidates = append(candidates, filepath.Join(filepath.Dir(exe), ".env"))
-	}
-
-	// 2. Working directory
-	if cwd, err := os.Getwd(); err == nil {
-		candidates = append(candidates, filepath.Join(cwd, ".env"))
-	}
-
-	for _, path := range candidates {
-		if _, err := os.Stat(path); err == nil {
-			_ = godotenv.Load(path)
+	tryLoadDotEnv := func(path string) {
+		if st, err := os.Stat(path); err != nil || st.IsDir() {
 			return
 		}
+		_ = godotenv.Overload(path)
 	}
 
-	// Fallback: let godotenv search upward
-	_ = godotenv.Load()
+	if exe, err := os.Executable(); err == nil {
+		tryLoadDotEnv(filepath.Join(filepath.Dir(exe), ".env"))
+	}
+	if appdata := strings.TrimSpace(os.Getenv("APPDATA")); appdata != "" {
+		tryLoadDotEnv(filepath.Join(appdata, "Digital Museum", ".env"))
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		dir := cwd
+		for {
+			tryLoadDotEnv(filepath.Join(dir, ".env"))
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+}
+
+func loadAdminEmail() string {
+	return strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_EMAIL")))
+}
+
+func loadAdminPassword() string {
+	return normalizeEnvSecret(os.Getenv("ADMIN_PASSWORD"))
+}
+
+// normalizeEnvSecret trims whitespace and stray CR bytes from env-provided secrets.
+func normalizeEnvSecret(v string) string {
+	v = strings.TrimSpace(v)
+	v = strings.TrimSuffix(v, "\r")
+	return v
 }
 
 // stripInlineEnvComment removes a shell-style trailing comment: an unquoted

@@ -125,8 +125,8 @@ The server reads `.env` from the executable directory or working directory. In E
 
 | Variable | Description |
 |---|---|
-| `ADMIN_EMAIL` | Email for initial admin user (created at startup if no admin exists) |
-| `ADMIN_PASSWORD` | Password for initial admin user |
+| `ADMIN_EMAIL` | Email for `/admin` login (not stored in archive SQLite) |
+| `ADMIN_PASSWORD` | Password for `/admin` login (not stored in archive SQLite) |
 
 ### Upload / Import
 

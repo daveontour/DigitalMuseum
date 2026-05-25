@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
@@ -23,11 +24,10 @@ const adminSessionCookieName = "dm_admin_sid"
 const adminSessionTTL = 2 * time.Hour
 
 // AdminUsersHandler provides the /admin UI and user-management API.
-// Authentication uses the users table: the caller must have is_admin = true.
+// Authentication validates ADMIN_EMAIL / ADMIN_PASSWORD from server config.
 // Admin sessions are kept in an in-process map — separate from user sessions.
 type AdminUsersHandler struct {
 	userRepo         *repository.UserRepo
-	authSvc          *service.AuthService
 	sensitiveSvc     *service.SensitiveService
 	subjectConfigSvc *service.SubjectConfigService
 	dashboardSvc     *service.DashboardService
@@ -35,12 +35,14 @@ type AdminUsersHandler struct {
 	appInstr         *repository.AppSystemInstructionsRepo
 	secure           bool
 	sessions         adminSessions
+	// Admin credentials from ADMIN_EMAIL / ADMIN_PASSWORD (server config).
+	bootstrapAdminEmail    string
+	bootstrapAdminPassword string
 }
 
 // NewAdminUsersHandler creates an AdminUsersHandler.
 func NewAdminUsersHandler(
 	userRepo *repository.UserRepo,
-	authSvc *service.AuthService,
 	sensitiveSvc *service.SensitiveService,
 	subjectConfigSvc *service.SubjectConfigService,
 	dashboardSvc *service.DashboardService,
@@ -50,7 +52,6 @@ func NewAdminUsersHandler(
 ) *AdminUsersHandler {
 	h := &AdminUsersHandler{
 		userRepo:         userRepo,
-		authSvc:          authSvc,
 		sensitiveSvc:     sensitiveSvc,
 		subjectConfigSvc: subjectConfigSvc,
 		dashboardSvc:     dashboardSvc,
@@ -61,6 +62,41 @@ func NewAdminUsersHandler(
 	h.sessions.m = make(map[string]time.Time)
 	go h.sessions.cleanupLoop()
 	return h
+}
+
+// WithBootstrapAdminCredentials sets ADMIN_EMAIL / ADMIN_PASSWORD used for /admin/login.
+func (h *AdminUsersHandler) WithBootstrapAdminCredentials(email, password string) {
+	h.bootstrapAdminEmail = strings.ToLower(strings.TrimSpace(email))
+	h.bootstrapAdminPassword = normalizeAdminSecret(password)
+}
+
+func normalizeAdminSecret(v string) string {
+	v = strings.TrimSpace(v)
+	v = strings.TrimSuffix(v, "\r")
+	return strings.ToLower(v)
+}
+
+func (h *AdminUsersHandler) bootstrapAdminOK(email, password string) bool {
+	if h.bootstrapAdminEmail == "" || h.bootstrapAdminPassword == "" {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(email), h.bootstrapAdminEmail) {
+		return false
+	}
+	a := normalizeAdminSecret(password)
+	b := h.bootstrapAdminPassword
+	if len(a) != len(b) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
+func (h *AdminUsersHandler) archiveUsersUnavailable(w http.ResponseWriter) bool {
+	if h.userRepo != nil {
+		return false
+	}
+	writeError(w, http.StatusServiceUnavailable, "no user archive is open — create an archive first")
+	return true
 }
 
 // RegisterRoutes mounts the admin routes.
@@ -186,7 +222,15 @@ func (h *AdminUsersHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if _, err := h.authSvc.AdminLogin(r.Context(), req.Email, req.Password); err != nil {
+
+	// slog.Info("Login", "email", req.Email, "password", req.Password)
+	// slog.Info("bootstrapAdminEmail", "bootstrapAdminEmail", h.bootstrapAdminEmail)
+	// slog.Info("bootstrapAdminPassword", "bootstrapAdminPassword", h.bootstrapAdminPassword)
+	if h.bootstrapAdminEmail == "" || h.bootstrapAdminPassword == "" {
+		writeError(w, http.StatusServiceUnavailable, "admin credentials not configured — set ADMIN_EMAIL and ADMIN_PASSWORD")
+		return
+	}
+	if !h.bootstrapAdminOK(req.Email, req.Password) {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -226,6 +270,10 @@ func (h *AdminUsersHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
+	if h.userRepo == nil {
+		writeJSON(w, []any{})
+		return
+	}
 	users, err := h.userRepo.ListAll(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list users")
@@ -262,6 +310,9 @@ func (h *AdminUsersHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
+	if h.archiveUsersUnavailable(w) {
+		return
+	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid user id")
@@ -293,6 +344,9 @@ func (h *AdminUsersHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
+	if h.archiveUsersUnavailable(w) {
+		return
+	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid user id")
@@ -308,6 +362,9 @@ func (h *AdminUsersHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // POST /admin/users — { "email": "...", "password": "...", "display_name": "...", "family_name": "...", "gender": "..." }
 func (h *AdminUsersHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
+		return
+	}
+	if h.archiveUsersUnavailable(w) {
 		return
 	}
 	var req struct {
@@ -377,6 +434,9 @@ func (h *AdminUsersHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // GET /admin/users/{id}/dashboard
 func (h *AdminUsersHandler) GetUserDashboard(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
+		return
+	}
+	if h.archiveUsersUnavailable(w) {
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
@@ -567,6 +627,9 @@ func (h *AdminUsersHandler) GetLLMUsageTimeseries(w http.ResponseWriter, r *http
 // GET /admin/llm-usage/users/{id}/bill.pdf?from=&to=
 func (h *AdminUsersHandler) GetLLMUsageBillPDF(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
+		return
+	}
+	if h.archiveUsersUnavailable(w) {
 		return
 	}
 	if h.billing == nil || h.billing.PgxPool() == nil {
