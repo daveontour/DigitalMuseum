@@ -2,22 +2,27 @@
 
 ## Project Overview
 
-Digital Museum is a multi-tenant AI-powered digital archive platform packaged as an
+Digital Museum is an AI-powered digital archive platform packaged as an
 **Electron desktop app**. Each registered user owns one archive containing their entire
 digital life (emails, messages, photos, Facebook, iMessage, WhatsApp, documents),
 imported into a SQLite database and queryable through an AI chat interface. Claude,
 Gemini, and a local Ollama/Gemma4 model can access the data via a tool-calling layer
 and answer questions, adopt personas, and explore the archive conversationally.
 
-Multiple users can be hosted on a single deployment. Every piece of archive data is
-scoped to its owning user via a `user_id` foreign key enforced at the repository layer.
+Additional features beyond the core chat interface include:
+- **Pam Bot** — dementia companion chat mode with a restricted, focussed tool set
+- **Have-a-Chat** — two-voice conversation sessions (two AI personas talking to each other)
+- **Interviews** — structured Q&A sessions driven by AI, saved for review
+- **Identity Profile Wizard** — AI-guided wizard that builds a textual profile of the archive subject
+- **Background Jobs** — per-user scheduled maintenance tasks (thumbnail generation, embedding, etc.)
+- **Vector Similarity Search** — embedding-based similarity search over messages, emails, and media
 
 ## Tech Stack
 
 - **Desktop shell:** Electron (Node.js) — `electron/main.js` manages the Go server process, Ollama, system tray, and IPC
 - **Backend:** Go 1.25, Chi v5 router, `database/sql` with `github.com/mattn/go-sqlite3` (CGO)
 - **Frontend:** Vanilla JavaScript (no framework), marked.js, highlight.js, Font Awesome
-- **Database:** SQLite (two files — main app DB and billing DB)
+- **Database:** SQLite (two files — main app DB and billing DB); vector fields use `sqlite-vec`
 - **AI Providers:** Anthropic Claude (`claude-sonnet-4-6`), Google Gemini (`gemini-2.5-flash`), DeepSeek (`deepseek-chat`) via Anthropic-compatible API, and local Ollama (`gemma4`) via native Ollama API
 - **Module:** `github.com/daveontour/aimuseum`
 
@@ -42,19 +47,20 @@ internal/
   config/           ← Env-var config loading
   crypto/           ← Encryption / key derivation (keyring scoped by user_id)
   database/         ← Connection pool, migrations
-  handler/          ← HTTP request handlers (~35 files)
+  handler/          ← HTTP request handlers (~47 files)
   keystore/         ← RAM master key (unlocks encrypted data per session)
   middleware/        ← Logger, Recoverer, AuthMiddleware
   model/            ← Shared data types / DTOs
-  repository/       ← Database access via database/sql (~17 repos, all user-scoped)
-  service/          ← Business logic (~20 services)
+  repository/       ← Database access via database/sql (~32 repos, all user-scoped)
+  service/          ← Business logic (~36 services)
+  service/background_jobs/ ← Job definitions, registry, and scheduler
   sqlutil/          ← SQLite dialect helpers: IsSQLite(), ParseSQLiteDatetime(), InClause()
 static/
   css/              ← museum_of.css (all styles, ~8000 lines)
   data/             ← voice_instructions.json, seed JSON files
   images/           ← Voice persona images
-  js/museum/        ← Frontend modules (foundation.js, app.js, chat.js, auth.js, …)
-templates/          ← index.template.html (SPA), login.html, share.html
+  js/museum/        ← Frontend modules (~22 JS files)
+templates/          ← index.template.html (SPA), login.html, share.html, plus 3 others
 sqlc/               ← schema.sql (full DB schema reference), sqlc.yaml
 ```
 
@@ -87,6 +93,7 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 | `SQLITE_PATH` | Yes | Absolute path to the main SQLite database file |
 | `ADMIN_SQLITE_PATH` | No | Billing/admin SQLite file; default `<exeDir>/data/admin.sqlite`. Optional override: absolute as-is, relative resolved against exe dir |
 | `HOST_PORT` | No | HTTP listen port (default: 8000; Electron overrides to 8081) |
+| `PAGE_TITLE` | No | Browser page title (default: `Digital Museum of SUBJECT_NAME`) |
 | `ANTHROPIC_API_KEY` | At least one AI key | Claude API |
 | `CLAUDE_MODEL_NAME` | No | Default: `claude-sonnet-4-6` |
 | `DEEPSEEK_API_KEY` | No | DeepSeek API key (Anthropic-compatible Messages API at `api.deepseek.com/anthropic`) |
@@ -120,6 +127,18 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 | `ATTACHMENT_MIN_SIZE` | No | Minimum attachment size in bytes (default: 0) |
 | `FILESYSTEM_IMPORT_EXCLUDE_PATTERNS` | No | Comma-separated glob patterns to skip during filesystem import |
 
+### Import UI Defaults (`DEFAULT_*`)
+
+These env vars pre-fill import dialog fields and are not required:
+
+`DEFAULT_PROCESS_ALL_FOLDERS`, `DEFAULT_NEW_ONLY_OPTION`, `DEFAULT_WHATSAPP_IMPORT_DIRECTORY`,
+`DEFAULT_FACEBOOK_IMPORT_DIRECTORY`, `DEFAULT_FACEBOOK_EXPORT_ROOT`, `DEFAULT_FACEBOOK_USER_NAME`,
+`DEFAULT_INSTAGRAM_IMPORT_DIRECTORY`, `DEFAULT_INSTAGRAM_EXPORT_ROOT`, `DEFAULT_INSTAGRAM_USER_NAME`,
+`DEFAULT_IMESSAGE_DIRECTORY_PATH`, `DEFAULT_FACEBOOK_ALBUMS_IMPORT_DIRECTORY`,
+`DEFAULT_FACEBOOK_ALBUMS_EXPORT_ROOT`, `DEFAULT_FILESYSTEM_IMPORT_DIRECTORY`,
+`DEFAULT_FILESYSTEM_IMPORT_MAX_IMAGES`, `DEFAULT_FILESYSTEM_IMPORT_CREATE_THUMBNAIL`,
+`DEFAULT_IMAGE_EXPORT_DIRECTORY`, `DEFAULT_IMAP_HOST`, `DEFAULT_IMAP_PORT`, `DEFAULT_IMAP_USERNAME`.
+
 ## Electron Desktop Shell
 
 `electron/main.js` is the Node.js main process. It:
@@ -137,12 +156,21 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 |---------|-----------|---------|
 | `show-open-dialog` | renderer→main | Native file-open dialog |
 | `show-save-dialog` | renderer→main | Native file-save dialog |
+| `confirm-continue-without-ai` | renderer→main | Warning dialog when no AI models configured |
 | `get-db-path` | renderer→main | Current SQLITE_PATH |
 | `get-log-level` | renderer→main | Current LOG_LEVEL |
 | `select-db` | renderer→main | Switch database + log level, restart Go server |
+| `get-profiles` | renderer→main | List archive profiles from billing DB |
+| `create-profile` | renderer→main | Create a new named archive profile |
+| `update-profile` | renderer→main | Update profile display name / metadata |
+| `get-profile-db-path` | renderer→main | Get SQLite path for a given profile ID |
+| `get-admin-data-dir` | renderer→main | Return the admin/billing data directory |
+| `suggest-archive-db-path` | renderer→main | Suggest a filesystem path for a new archive |
 | `check-ollama-model` | renderer→main | Check if gemma4 is in `~/.ollama/models/` |
 | `pull-ollama-model` | renderer→main | Run `ollama pull gemma4`, streams progress |
 | `start-ollama` | renderer→main | Start `ollama serve`, wait for health |
+| `get-auto-start-local-ai` | renderer→main | Read Ollama auto-start preference |
+| `set-auto-start-local-ai` | renderer→main | Persist Ollama auto-start preference |
 | `ollama-pull-progress` | main→renderer | Live pull progress lines |
 | `status-update` | main→renderer | Loading screen status messages |
 
@@ -153,6 +181,26 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 
 Selecting a new database writes `SQLITE_PATH` to `%APPDATA%\Digital Museum\.env` and
 restarts the Go server via `restartGoServer()` in `electron/main.js`.
+
+## No-Archive ("Minimal") Router Mode
+
+When `SQLITE_PATH` is not set or the file is absent, the router receives a `nil` pool.
+In this mode the server serves only a minimal set of routes: `/health`,
+`/api/resolved-main-sqlite-path`, `/api/profiles`, `/login`, `/`, and `/static/*`. All
+other routes return `503` with a JSON error. This allows the Electron shell to let the
+user create or select an archive before the full application starts.
+
+## Multi-Archive Profile Management
+
+The billing DB (`admin.sqlite`) stores a `profiles` table — one row per archive. Each
+profile holds a display name and the absolute path to its main SQLite file. The
+`ProfileHandler` (`internal/handler/profile_handler.go`) exposes CRUD routes under
+`/api/profiles` and a `/profiles` SPA page (served from `templates/non_user_init.template.html`).
+
+From the login screen users can switch between archives or create a new one; switching
+writes the new `SQLITE_PATH` to `%APPDATA%\Digital Museum\.env` and restarts the Go
+server (via the `select-db` IPC channel). The Electron `get-profiles` / `create-profile`
+/ `update-profile` IPC handlers read/write the billing DB directly.
 
 ## Local AI — Ollama / Gemma4
 
@@ -295,6 +343,7 @@ The codebase targets SQLite exclusively (via `github.com/mattn/go-sqlite3`). Key
 2. Add the execution case in `internal/ai/tools.go` — `NewToolExecutor()` switch statement
 3. All SQL in `tools.go` must include `AND user_id = $N` via `toolsUIDFilter(ctx, q, args)`
 4. Optionally add access-tier controls in `internal/ai/tool_access.go`
+5. For Pam Bot's restricted tool set, also update `internal/ai/pambot_tools.go`
 
 ### Database Migrations
 
@@ -304,10 +353,11 @@ The codebase targets SQLite exclusively (via `github.com/mattn/go-sqlite3`). Key
 
 ### Billing Database (LLM Usage)
 
-A **second SQLite file** (billing/admin DB: default `<exeDir>/data/admin.sqlite`, overridable via `ADMIN_SQLITE_PATH`) holds `llm_usage_events` — one row per
-completed LLM interaction with provider, model, token counts, user snapshot fields, and
-whether the server API key was used. Billing inserts are best-effort. Admin JSON/UI
-lives under `/admin/llm-usage/…`. Users can download their own PDF bill via
+A **second SQLite file** (billing/admin DB: default `<exeDir>/data/admin.sqlite`, overridable via `ADMIN_SQLITE_PATH`) holds:
+- `llm_usage_events` — one row per completed LLM interaction with provider, model, token counts, user snapshot fields, and whether the server API key was used. Billing inserts are best-effort.
+- `profiles` — one row per archive (display name + SQLite path), for multi-archive management.
+
+Admin JSON/UI lives under `/admin/llm-usage/…`. Users can download their own PDF bill via
 `GET /api/llm-usage/me/bill.pdf?period=current|previous`.
 
 ### Chat System
@@ -319,6 +369,59 @@ lives under `/admin/llm-usage/…`. Users can download their own PDF bill via
 - Tool loop: up to `maxToolCallIterations` per request in all providers
 - **Provider selection:** `"claude"`, `"gemini"`, `"deepseek"`, or `"localai"` in request body
 - All AI tool SQL is scoped by `user_id` via `toolsUIDFilter(ctx, q, args)` in `internal/ai/tools.go`
+
+### Pam Bot (Dementia Companion)
+
+`PamBotService` (`internal/service/pambot_service.go`) runs a separate, simplified chat
+loop with a restricted tool set defined in `internal/ai/pambot_tools.go`. Sessions and
+turns are persisted to `pam_bot_sessions` / `pam_bot_turns` / `pam_bot_subjects` tables.
+The handler (`internal/handler/pambot_handler.go`) exposes routes under `/api/pambot/…`.
+App-wide Pam Bot instructions are stored alongside the main system instructions in
+`app_system_instructions.pam_bot_instructions` and managed via `GET/PUT /admin/pambot-instructions`.
+
+### Have-a-Chat (Two-Voice Conversations)
+
+`HaveAChatHandler` (`internal/handler/have_a_chat_handler.go`) drives sessions where
+two AI personas converse with each other about the archive. Sessions are persisted to
+`have_a_chat_sessions`. The `ChatService` is reused for both turns; the handler sequences
+the turns and passes each response back as the next prompt. Routes under `/api/have-a-chat/…`.
+
+### Interviews
+
+`InterviewHandler` (`internal/handler/interview_handler.go`) manages structured Q&A
+sessions: the AI asks questions, the user answers, and the interview is saved for later
+review. State is persisted to `interviews` / `interview_turns` tables via
+`InterviewRepo`. Routes under `/api/interview/…`.
+
+### Identity Profile Wizard
+
+`IdentityProfileHandler` (`internal/handler/identity_profile_wizard.go`) is a guided,
+multi-step flow that uses `ChatService` to build a textual identity profile of the
+archive subject. It writes finished profiles to `complete_profiles` via `CompleteProfileRepo`.
+Routes under `/api/identity-profile/…`.
+
+### Background Jobs Scheduler
+
+`internal/service/background_jobs/` contains:
+- `definitions.go` — job definitions (thumbnail generation, embedding, etc.)
+- `registry.go` — job discovery and registration
+- `scheduler.go` — `Scheduler` struct that ticks periodically and runs due per-user jobs
+
+Jobs are persisted to the `background_jobs` table via `BackgroundJobRepo`. The
+`BackgroundJobsRunner` handler (`internal/handler/background_jobs_runner.go`) executes
+individual jobs on-demand; `BackgroundJobsHandler` exposes control routes under
+`/api/background-jobs/…`. The scheduler is started by `cmd/server/main.go` after the
+router is constructed.
+
+### Vector Embeddings & Similarity Search
+
+The `EmbeddingService` (`internal/service/`) wraps the Ollama embedding endpoint. A
+`MediaTagEmbeddingHelper` pre-computes tag embeddings for `media_items`. The
+`MessageSimilarityHandler` (`internal/handler/message_similarity_handler.go`) exposes
+embedding-based similarity search. Embedding vectors are stored in `embedding_vector`
+columns (type `vector(2560)`) on `emails`, `messages`, `facebook_albums`, and
+`facebook_posts` tables using `sqlite-vec`. Metadata for context-window management is
+tracked in `message_embedding_meta`.
 
 ### Suggestions library (chat sidebar)
 
@@ -396,14 +499,14 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 
 - **`--message-font-size`** — chat bubble text size (default 16px). The Settings UI range control and `foundation.js` read/write this; do not fold chat rendering into the rem UI scale unless intentionally changing product behaviour.
 
-**Intentional exceptions (do not “normalise” away)**
+**Intentional exceptions (do not "normalise" away)**
 
 - User-selectable message fonts in the chat UI, VT323 / retro blocks, `monospace` / `ui-monospace` for code and technical fields, and Font Awesome icon font rules keep their own `font-family` values.
 
 **Conventions for new work**
 
 - Prefer **`font-size: var(--text-…)`** (and existing colour tokens) in HTML `style` attributes or CSS when `museum_of.css` is on the page.
-- Use **`em`** only for sizes that must track a parent’s font size (e.g. a hint span under a micro label).
+- Use **`em`** only for sizes that must track a parent's font size (e.g. a hint span under a micro label).
 - Pages that **do not** load `museum_of.css` should not reference these variables; use plain **`rem`** (or page-local CSS) instead.
 
 ## Key Files Quick Reference
@@ -433,20 +536,45 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Local AI / Ollama provider | `internal/ai/localai.go` |
 | Tool definitions | `internal/ai/provider.go` → `GetToolDefinitions()` |
 | Tool execution | `internal/ai/tools.go` → `NewToolExecutor()` |
+| Pam Bot tool definitions | `internal/ai/pambot_tools.go` |
+| Tool access tiers | `internal/ai/tool_access.go` |
 | Chat orchestration | `internal/service/chat_service.go` |
 | Chat HTTP handler | `internal/handler/chat_handler.go` |
 | Reference doc system-prompt inlining | `internal/service/reference_prompt_inline.go` |
+| Pam Bot service | `internal/service/pambot_service.go` |
+| Pam Bot handler | `internal/handler/pambot_handler.go` |
+| Have-a-Chat handler | `internal/handler/have_a_chat_handler.go` |
+| Interview handler | `internal/handler/interview_handler.go` |
+| Identity Profile Wizard handler | `internal/handler/identity_profile_wizard.go` |
+| Background jobs scheduler | `internal/service/background_jobs/scheduler.go` |
+| Background jobs runner (handler) | `internal/handler/background_jobs_runner.go` |
+| Embedding service | `internal/service/` (EmbeddingService) |
+| Embedding handler | `internal/handler/embedding_handler.go` |
+| Message similarity handler | `internal/handler/message_similarity_handler.go` |
+| Archive profile handler | `internal/handler/profile_handler.go` |
+| Archive provision service | `internal/service/archive_provision.go` |
+| Config (key-value store) service | `internal/service/config_service.go` |
+| Dashboard service | `internal/service/dashboard_service.go` |
+| Voice service | `internal/service/voice_service.go` |
 | Admin user management handler | `internal/handler/admin_user_handler.go` |
 | Config loading | `internal/config/config.go` |
 | DB schema reference | `sqlc/schema.sql` |
 | Frontend main | `static/js/museum/app.js` |
 | Frontend auth | `static/js/museum/auth.js` |
 | Frontend chat renderer | `static/js/museum/chat.js` |
+| Frontend Pam Bot UI | `static/js/museum/pam-bot.js` |
+| Frontend Have-a-Chat UI | `static/js/museum/have-a-chat.js` |
+| Frontend Interview UI | `static/js/museum/interviewer.js` |
+| Frontend Identity Wizard UI | `static/js/museum/identity-profile-wizard.js` |
+| Frontend upload/import UI | `static/js/museum/upload-import.js` |
 | Constants / DOM cache | `static/js/museum/foundation.js` |
 | All styles; `:root` tokens (colours, spacing, **typography**: `--font-sans-ui`, `--text-*`, `--line-height-*`) | `static/css/museum_of.css` |
 | Main SPA template | `templates/index.template.html` |
 | Login / register page | `templates/login.html` |
 | Share visitor page | `templates/share.html` |
+| Profile selection / first-run page | `templates/non_user_init.template.html` |
+| Attachment viewer (standalone) | `templates/attachments_viewer.html` |
+| Image grid (standalone) | `templates/images_grid.html` |
 | Suggestions JSON + optional override | `static/data/suggestions.json`, `static/data/suggestions.override.json` (override gitignored) |
 
 ## Security Notes
