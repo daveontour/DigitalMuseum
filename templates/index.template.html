@@ -1197,9 +1197,9 @@
                     <section class="section-config">
                         <h1>AI Tool Access</h1>
                         <p style="color:var(--color-text-muted); margin-bottom:12px; line-height:1.45;">
-                            The AI can use tools defined within the system to get additional information of perform actions.
+                            The AI can use tools defined within the system to get additional information or perform actions.
                             <br/>
-                            Choose which kinds of browser session may use each tool type the during chat. If no box is ticked for a tool, it is not available to anyone until you enable it.
+                            Choose which tools are available during chat for your master-key session and for users who sign in with a visitor key. If no box is ticked for a tool in a column, that session type cannot use it.
                         </p>
                         </section>
                         <section class="config-section">
@@ -1215,7 +1215,8 @@
                                     <tr>
                                         <th>Tool</th>
                                         <th>Description</th>
-                                        <th>Enabled</th>
+                                        <th style="text-align:center;">Master key</th>
+                                        <th style="text-align:center;">Visitor key</th>
                                     </tr>
                                 </thead>
                                 <tbody id="llm-tools-access-tbody"></tbody>
@@ -1545,12 +1546,12 @@
                                 </article>
                                 <article class="data-import-card data-import-row" data-import="image_ai_gemma_unclassified">
                                     <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-tags"></i> Use AI to Classify Image Contents</h3>
+                                        <h3 class="data-import-card-title"><i class="fas fa-tags"></i> Use AI to Classify Image Contents and Add tags</h3>
                                     </div>
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="imported_images">—</span>
                                     </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Use local AI (e.g. Gemma via Ollama) to tag images with the contents of the image for ones that are not yet classified</p></div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Use local AI (e.g. Gemma via Ollama) and optionally cloud hosted services to tag images with the contents of the image for ones that are not yet classified</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
@@ -1567,7 +1568,7 @@
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count">—</span>
                                     </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed image tags for similarity search. You can reprocess all embeddings or skip unchanged tags when prompted.</p></div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed image tags for similarity search. Embeddings create a "vector" for the image tags that can be used to search for similar images. You can reprocess all embeddings or skip unchanged tags when prompted.</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
@@ -2168,9 +2169,6 @@
                     <button id="shuffle-photos-btn" class="modal-btn" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.9em; font-size: var(--text-md); flex-shrink: 0;">
                         <i class="fas fa-random" style="margin-right: 0.4em;"></i>Shuffle
                     </button>
-                    <button id="refresh-locations-btn" class="modal-btn" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.9em; font-size: var(--text-md); flex-shrink: 0;">
-                        <i class="fas fa-sync-alt" style="margin-right: 0.4em;"></i>Refresh
-                    </button>
                     <h2 style="text-align: center;"><i class="fas fa-map-marker-alt"></i> Locations Map</h2>
                     <button id="close-geo-metadata-modal" class="modal-close-btn">&times;</button>
                 </div>
@@ -2178,6 +2176,31 @@
                     <div id="map-view"></div>
                 </div>
                 <div id="geo-metadata-shown-count" style="padding: 1em; background-color: rgba(200, 200, 200, 0.3); position: absolute; bottom: 10px; left: 10px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Nearby Locations Modal -->
+        <div id="nearby-locations-modal" class="modal">
+            <div class="modal-content geo-metadata-modal-content">
+                <div class="modal-header">
+                    <div id="nearby-radius-control" style="display: flex; align-items: center; gap: 0.4em; flex-shrink: 0;">
+                        <label for="nearby-radius-input" style="font-size: var(--text-md); white-space: nowrap;">Radius (km)</label>
+                        <input type="number" id="nearby-radius-input" min="0.1" max="500" step="1" style="width: 4.5em; border-radius: 4px; border: 1px solid rgba(255,255,255,0.35); padding: 0.3em 0.4em; font-size: var(--text-md); background: rgba(255,255,255,0.12); color: #fff;">
+                        <button id="nearby-radius-update-btn" type="button" class="modal-btn" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.9em; font-size: var(--text-md); flex-shrink: 0;">
+                            <i class="fas fa-sync-alt" style="margin-right: 0.4em;"></i>Update
+                        </button>
+                    </div>
+                    <div style="text-align: center; flex: 1;">
+                        <h2 style="text-align: center; margin: 0;"><i class="fas fa-map-marker-alt"></i> Nearby Locations</h2>
+                        <div id="nearby-locations-limit-notice" style="display: none; margin-top: 0.35em; font-size: var(--text-sm); opacity: 0.9;"></div>
+                    </div>
+                    <button id="close-nearby-locations-modal" class="modal-close-btn">&times;</button>
+                </div>
+                <div class="geo-metadata-tab-content geo-tab-images" style="flex: 1; height: auto; position: relative;">
+                    <div id="nearby-map-view"></div>
+                </div>
+                <div id="nearby-locations-count" style="padding: 1em; background-color: rgba(200, 200, 200, 0.3); position: absolute; bottom: 10px; left: 10px;">
                 </div>
             </div>
         </div>
@@ -4157,13 +4180,13 @@
 
     <!-- ===== ADD DOCUMENT KEY MODAL ===== -->
     <div id="add-doc-key-modal" class="modal" style="display: none;">
-        <div class="modal-content sensitive-data-hints-content" style="max-width: 400px;">
+        <div class="modal-content sensitive-data-hints-content" style="max-width: 600px;">
             <div class="sensitive-data-hints-header">
                 <h3><i class="fas fa-plus"></i> Add Visitor Key</h3>
                 <button class="modal-close-btn" id="close-add-doc-key-modal">&times;</button>
             </div>
             <div class="sensitive-data-hints-body">
-                <p style="margin-bottom: 1rem;">Add a new visitor key to allow vistors to access your respositor.</p>
+                <p style="margin-bottom: 1rem;">Add a new visitor key to allow vistors to access your respository.</p>
                 <label class="artefact-field-label">Visitor Key</label>
                 <input type="password" id="add-doc-key-user-password" class="new-image-gallery-input"
                        placeholder="Visitor key to access your repository"
@@ -4180,8 +4203,7 @@
                     <legend style="font-size: var(--text-caption); color: #555;">Allow this visitor key to open (optional)</legend>
                     <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-can-messages-chat"/> Social Media Messages</label>
                     <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-can-emails"/> Emails &amp; IMAP/Gmail</label>
-                    <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-can-contacts"/> Contacts</label>
-                    <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-can-relationships"/> Relationship graph</label>
+                    <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-can-relationships"/> Contacts and Relationships</label>
                     <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-can-sensitive-private"/> Sensitive &amp; Private Data</label>
                 </fieldset>
                 <fieldset style="margin: 0 0 1rem 0; padding: 0.5rem 0.75rem; border: 1px solid #dee2e6; border-radius: 4px;">
@@ -4241,8 +4263,7 @@
                         <legend style="font-size: var(--text-caption); color: #555;">Visitor may open</legend>
                         <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-can-messages-chat"/> Social Media Messages</label>
                         <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-can-emails"/> Emails &amp; IMAP/Gmail</label>
-                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-can-contacts"/> Contacts</label>
-                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-can-relationships"/> Relationship graph</label>
+                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-can-relationships"/> Contacts and Relationships</label>
                         <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-can-sensitive-private"/> Sensitive &amp; Private Data</label>
                     </fieldset>
                     <fieldset style="flex: 1 1 220px; margin: 0; min-width: 0; padding: 0.5rem 0.75rem; border: 1px solid #dee2e6; border-radius: 4px;">
@@ -4299,8 +4320,7 @@
                         <legend style="font-size: var(--text-caption); color: #555;">Visitor may open</legend>
                         <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-can-messages-chat"/> Messages &amp; Chats dialog (SMS / iMessage gallery)</label>
                         <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-can-emails"/> Emails &amp; IMAP/Gmail import</label>
-                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-can-contacts"/> Contacts</label>
-                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-can-relationships"/> Relationship graph</label>
+                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-can-relationships"/> Contacts and Relationships</label>
                         <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-can-sensitive-private"/> Sensitive &amp; Private Data</label>
                     </fieldset>
                     <fieldset class="visitor-key-create-access-fieldset">

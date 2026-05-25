@@ -3,138 +3,56 @@
 Modals.Locations = (() => {
 
         let geoData = [];
-        let fbData =[];
-        let photoPlacesData = [];
+        let fbData = [];
         let mapViewInitialized = false;
+        let _suppressLayerEvents = false;
 
-        let selectedIdx = -1;
-        let map = null;
         let mapView = null;
         let photoMarkersLayer = null;
-        let currentPhotoIndex = 0;
+        let whatsappMarkersLayer = null;
+        let emailMarkersLayer = null;
+        let messageMarkersLayer = null;
+        let biographyMarkersLayer = null;
+        let fbMarkersLayer = null;
+        let otherMarkersLayer = null;
+        let darkBlueMarker = null;
         let layerControl = null;
 
-        let biographyMarkers = [];
-        let fbMarkers = []
-        let otherMarkers = []
-        let whatsappMarkers = []
-        let emailMarkers = []
-        let messageMarkers = []
-        let photoMarkers = []
-        let activePhotoMarkers = []
+        let fbMarkers = [];
+        let gpsCountBySource = [];
+        let sourceMap = new Map();
 
-        let biographItems = [];
-        let fbItems = []
-        let otherItems = []
-        let whatsappItems = []
-        let emailItems = []
-        let messageItems = []
-        let photoItems = []
+        const KNOWN_GPS_SOURCES = new Set([
+            'filesystem', 'biography', 'facebook_album', 'whatsapp',
+            'email_attachment', 'gmail_attachment',
+            'message', 'imessage', 'sms', 'message_attachment',
+        ]);
+
+        function _resetSourceMapCounts() {
+            KNOWN_GPS_SOURCES.forEach(src => sourceMap.set(src, 0));
+            sourceMap.set('other', 0);
+        }
+        _resetSourceMapCounts();
+
+        const SHUFFLE_MARKER_LIMIT = 500;
+        const DEFAULT_MARKER_LIMIT = 1000;
 
         function init() {
             if (DOM.geoMapFixedBtn) DOM.geoMapFixedBtn.addEventListener('click', _openGeoMapInNewTab);
             if (DOM.closeGeoMetadataModalBtn) DOM.closeGeoMetadataModalBtn.addEventListener('click', close);
             if (DOM.shufflePhotosBtn) DOM.shufflePhotosBtn.addEventListener('click', shufflePhotoMarkers);
-            if (DOM.refreshLocationsBtn) DOM.refreshLocationsBtn.addEventListener('click', refresh);
-        }
-
-
-        function shufflePhotoMarkers() {
-            if (!mapView || !photoMarkersLayer || !layerControl) return;
-            
-            // Remove existing photo markers layer from both map and layer control
-            mapView.removeLayer(photoMarkersLayer);
-            layerControl.removeLayer(photoMarkersLayer);
-            
-            // Create new photo markers with new random starting index
-            
-            //randomly select 200 markers from photoMarkers and add to activePhotoMarkers
-                             // Fisher-Yates shuffle function for uniform random distribution
-            function shuffleArray(array) {
-                                const shuffled = [...array]; // Create a copy to avoid mutating the original
-                                for (let i = shuffled.length - 1; i > 0; i--) {
-                                    const j = Math.floor(Math.random() * (i + 1));
-                                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                                }
-                                return shuffled;
-            }
-            //activePhotoMarkers = [...photoMarkers].sort(() => Math.random() - 0.5).slice(0, 200);
-            activePhotoMarkers = shuffleArray(photoMarkers).slice(0, 200);
-            
-            // Create new layer and add to map and layer control
-            photoMarkersLayer = L.layerGroup(activePhotoMarkers).addTo(mapView);
-            layerControl.addOverlay(photoMarkersLayer, 'GPS Photos Locations ('+photoMarkers.length+')');
-            
-            // Update the count display
-            document.getElementById('geo-metadata-shown-count').textContent = 'Showing 200 of '+photoItems.length+' photos (Shuffled!)';
-
-            mapView.invalidateSize();
         }
 
         function open() {
             Modals._openModal(DOM.geoMetadataModal);
-            // DOM.geoList.innerHTML = '';
-            if (geoData.length === 0 || photoPlacesData.length === 0) {
-                fetch('/getLocations').then(r => r.json()).then(data => {
-                    geoData = data.locations || [];
-                    mapViewInitialized = false;
-                    fetch('/facebook/places').then(r => r.json()).then(data => {
-                        fbData = data.places || [];
-                        _initMapView();
-                    });
-                });
-            } else {
-                if (geoData.length > 0) _selectLocation(selectedIdx >= 0 ? selectedIdx : 0);
+            if (!mapView || !layerControl) {
+                _loadLocationData(['all']);
+                return;
             }
-
-
+            const { activeMap, categories } = getActiveLayerMap();
+            _loadLocationData(categories.length > 0 ? categories : ['all'], activeMap);
         }
-        
-        function refresh() {
-            // Fetch fresh data from server
-            fetch('/getLocations').then(r => r.json()).then(data => {
-                geoData = data.locations || [];
-                
-                // Reset map state
-                mapViewInitialized = false;
-                
-                // Clear existing map if it exists
-                if (mapView) {
-                    mapView.remove();
-                    mapView = null;
-                }
-                
-                // Clear marker arrays
-                biographyMarkers = [];
-                fbMarkers = [];
-                otherMarkers = [];
-                whatsappMarkers = [];
-                emailMarkers = [];
-                messageMarkers = [];
-                photoMarkers = [];
-                activePhotoMarkers = [];
-                
-                // Clear item arrays
-                biographItems = [];
-                fbItems = [];
-                otherItems = [];
-                whatsappItems = [];
-                emailItems = [];
-                messageItems = [];
-                photoItems = [];
-                
-                // Reset other state
-                photoMarkersLayer = null;
-                layerControl = null;
-                selectedIdx = -1;
-                
-                // Reinitialize map with fresh data
-                _initMapView();
-            }).catch(error => {
-                console.error('Error refreshing location data:', error);
-            });
-        }
-        
+
         function close() {
             Modals._closeModal(DOM.geoMetadataModal);
         }
@@ -142,14 +60,310 @@ Modals.Locations = (() => {
         function openMapView() {
             open();
         }
-         function _initMapView() {
 
+        async function shufflePhotoMarkers() {
+            if (!mapView || !layerControl) return;
+            const { activeMap, categories } = getActiveLayerMap();
+            if (categories.length === 0) return;
+            await _loadLocationData(categories, activeMap, { limit: SHUFFLE_MARKER_LIMIT });
+        }
+
+        function _sourceToActiveCategory(source) {
+            const s = (source || '').toLowerCase();
+            switch (s) {
+                case 'filesystem':
+                    return 'filesystem';
+                case 'biography':
+                    return 'biography';
+                case 'whatsapp':
+                    return 'whatsapp';
+                case 'email_attachment':
+                case 'gmail_attachment':
+                    return 'email';
+                case 'message':
+                case 'imessage':
+                case 'sms':
+                case 'message_attachment':
+                    return 'message';
+                default:
+                    return 'other';
+            }
+        }
+
+        function _updateSourceMapFromCounts() {
+            _resetSourceMapCounts();
+            let otherTotal = 0;
+            gpsCountBySource.forEach(item => {
+                const src = item.source || '';
+                if (KNOWN_GPS_SOURCES.has(src)) {
+                    sourceMap.set(src, item.count);
+                } else {
+                    otherTotal += item.count;
+                }
+            });
+            sourceMap.set('other', otherTotal);
+        }
+
+        function _layerLabelCount(category) {
+            switch (category) {
+                case 'filesystem':
+                    return sourceMap.get('filesystem') || 0;
+                case 'whatsapp':
+                    return sourceMap.get('whatsapp') || 0;
+                case 'email':
+                    return (sourceMap.get('email_attachment') || 0) + (sourceMap.get('gmail_attachment') || 0);
+                case 'message':
+                    return (sourceMap.get('message') || 0)
+                        + (sourceMap.get('imessage') || 0)
+                        + (sourceMap.get('sms') || 0)
+                        + (sourceMap.get('message_attachment') || 0);
+                case 'biography':
+                    return sourceMap.get('biography') || 0;
+                case 'other':
+                    return sourceMap.get('other') || 0;
+                default:
+                    return 0;
+            }
+        }
+
+        async function _handleMarkerClick(item, allowRedirects = false) {
+            try {
+                const response = await fetch(`/images/${item.id}/metadata`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch image metadata: ${response.status}`);
+                }
+                const fullImageData = await response.json();
+                Modals.ImageDetailModal.open(fullImageData, {
+                    allowRedirects: allowRedirects
+                });
+            } catch (error) {
+                console.error('Error fetching image metadata:', error);
+                const imageUrl = `/images/${item.id}?type=metadata`;
+                const filename = item.title || item.source_reference || `Image ${item.id}`;
+                Modals.SingleImageDisplay.showSingleImageModal(
+                    filename,
+                    imageUrl,
+                    item.created_at,
+                    item.latitude,
+                    item.longitude
+                );
+            }
+        }
+
+        function _buildMarker(item, allowRedirects = false) {
+            const marker = L.marker([item.latitude, item.longitude], { icon: darkBlueMarker });
+            marker.on('click', function() {
+                _handleMarkerClick(item, allowRedirects);
+            });
+            if (item.destination) {
+                marker.bindPopup(item.destination);
+            }
+            return marker;
+        }
+
+        function _setLayerMarkers(layer, markers) {
+            if (!layer) return;
+            layer.clearLayers();
+            markers.forEach(marker => layer.addLayer(marker));
+        }
+
+        function getActiveLayerMap() {
+            const defaultActiveMap = {
+                filesystem: true,
+                whatsapp: true,
+                email: true,
+                message: true,
+                biography: true,
+                facebook: true,
+                other: true,
+            };
+            if (!mapView || !layerControl) {
+                return { activeMap: defaultActiveMap, categories: ['all'] };
+            }
+
+            const activeMap = {};
+            const layers = layerControl._layers || {};
+            for (const layerId of Object.keys(layers)) {
+                const { layer, name, overlay } = layers[layerId];
+                if (!overlay) continue;
+
+                const cleanName0 = name.replace(/\([^)]*\)/, '');
+                const cleanName = cleanName0.replace(/\s+/g, '');
+                switch (cleanName) {
+                    case 'GPSPhotosLocations':
+                        activeMap.filesystem = mapView.hasLayer(layer);
+                        break;
+                    case 'WhatsAppLocations':
+                        activeMap.whatsapp = mapView.hasLayer(layer);
+                        break;
+                    case 'EmailLocations':
+                        activeMap.email = mapView.hasLayer(layer);
+                        break;
+                    case 'MessageLocations':
+                        activeMap.message = mapView.hasLayer(layer);
+                        break;
+                    case 'BiographyLocations':
+                        activeMap.biography = mapView.hasLayer(layer);
+                        break;
+                    case 'FacebookLocations':
+                        activeMap.facebook = mapView.hasLayer(layer);
+                        break;
+                    case 'OtherLocations':
+                        activeMap.other = mapView.hasLayer(layer);
+                        break;
+                }
+            }
+
+            const categories = Object.keys(activeMap).filter(key => activeMap[key] && key !== 'facebook');
+            return { activeMap, categories };
+        }
+
+        async function _loadLocationData(categories, activeMapOverride, options = {}) {
+            const limit = options.limit || DEFAULT_MARKER_LIMIT;
+            try {
+                const [locationsData, placesData, gpsData] = await Promise.all([
+                    fetch('/getLocations/random', {
+                        method: 'POST',
+                        cache: 'no-store',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ categories, limit, _nonce: Date.now() }),
+                    }).then(r => {
+                        if (!r.ok) {
+                            throw new Error(`Failed to fetch random locations: ${r.status}`);
+                        }
+                        return r.json();
+                    }),
+                    fetch('/facebook/places').then(r => r.json()),
+                    fetch('/images/gps-count-by-source').then(r => r.json()),
+                ]);
+
+                geoData = locationsData.locations || [];
+                fbData = placesData.places || [];
+                gpsCountBySource = gpsData.by_source || [];
+                _updateSourceMapFromCounts();
+
+                _ensureMapView();
+
+                const activeMap = activeMapOverride || getActiveLayerMap().activeMap;
+                if (categories.length === 0) {
+                    _clearMediaMarkers(activeMap);
+                    return;
+                }
+                _applyLocationsToMap(activeMap);
+            } catch (error) {
+                console.error('Error loading location data:', error);
+            }
+        }
+
+        function _clearMediaMarkers(activeMap) {
+            _setLayerMarkers(photoMarkersLayer, []);
+            _setLayerMarkers(whatsappMarkersLayer, []);
+            _setLayerMarkers(emailMarkersLayer, []);
+            _setLayerMarkers(messageMarkersLayer, []);
+            _setLayerMarkers(biographyMarkersLayer, []);
+            _setLayerMarkers(otherMarkersLayer, []);
+
+            fbMarkers = [];
+            if (activeMap && activeMap.facebook) {
+                fbData.forEach(item => {
+                    if (!item.latitude || !item.longitude) return;
+                    const marker = L.marker([item.latitude, item.longitude], { icon: darkBlueMarker });
+                    marker.bindPopup(item.name || 'Facebook Place');
+                    fbMarkers.push(marker);
+                });
+                _setLayerMarkers(fbMarkersLayer, fbMarkers);
+            } else {
+                _setLayerMarkers(fbMarkersLayer, []);
+            }
+
+            const shownCount = document.getElementById('geo-metadata-shown-count');
+            if (shownCount) {
+                const shown = activeMap && activeMap.facebook ? fbMarkers.length : 0;
+                shownCount.textContent = shown > 0
+                    ? `Showing ${shown} GPS locations for selected layers`
+                    : 'No GPS location layers selected';
+            }
+            if (mapView) {
+                mapView.invalidateSize();
+            }
+        }
+
+        function _applyLocationsToMap(activeMap) {
+            const buckets = {
+                filesystem: [],
+                whatsapp: [],
+                email: [],
+                message: [],
+                biography: [],
+                other: [],
+            };
+            const latlngs = [];
+
+            geoData.forEach(item => {
+                if (!item.latitude || !item.longitude) return;
+                const category = _sourceToActiveCategory(item.source);
+                if (!buckets[category]) return;
+                buckets[category].push(_buildMarker(item, category === 'email'));
+                if (activeMap[category]) {
+                    latlngs.push([item.latitude, item.longitude]);
+                }
+            });
+
+            fbMarkers = [];
+            fbData.forEach(item => {
+                if (!item.latitude || !item.longitude) return;
+                const marker = L.marker([item.latitude, item.longitude], { icon: darkBlueMarker });
+                marker.bindPopup(item.name || 'Facebook Place');
+                fbMarkers.push(marker);
+                if (activeMap.facebook) {
+                    latlngs.push([item.latitude, item.longitude]);
+                }
+            });
+
+            _setLayerMarkers(photoMarkersLayer, activeMap.filesystem ? buckets.filesystem : []);
+            _setLayerMarkers(whatsappMarkersLayer, activeMap.whatsapp ? buckets.whatsapp : []);
+            _setLayerMarkers(emailMarkersLayer, activeMap.email ? buckets.email : []);
+            _setLayerMarkers(messageMarkersLayer, activeMap.message ? buckets.message : []);
+            _setLayerMarkers(biographyMarkersLayer, activeMap.biography ? buckets.biography : []);
+            _setLayerMarkers(otherMarkersLayer, activeMap.other ? buckets.other : []);
+            _setLayerMarkers(fbMarkersLayer, activeMap.facebook ? fbMarkers : []);
+
+            let shown = 0;
+            if (activeMap.filesystem) shown += buckets.filesystem.length;
+            if (activeMap.whatsapp) shown += buckets.whatsapp.length;
+            if (activeMap.email) shown += buckets.email.length;
+            if (activeMap.message) shown += buckets.message.length;
+            if (activeMap.biography) shown += buckets.biography.length;
+            if (activeMap.other) shown += buckets.other.length;
+            if (activeMap.facebook) shown += fbMarkers.length;
+
+            const shownCount = document.getElementById('geo-metadata-shown-count');
+            if (shownCount) {
+                shownCount.textContent = `Showing ${shown} GPS locations for selected layers`;
+            }
+
+            if (latlngs.length > 0) {
+                mapView.fitBounds(latlngs, { padding: [20, 20] });
+            }
+            mapView.invalidateSize();
+        }
+
+        async function layerFiltersChanged() {
+            if (!mapView || !layerControl || _suppressLayerEvents) return;
+            const { activeMap, categories } = getActiveLayerMap();
+            if (categories.length === 0) {
+                _clearMediaMarkers(activeMap);
+                return;
+            }
+            await _loadLocationData(categories, activeMap);
+        }
+
+        function _ensureMapView() {
             if (mapViewInitialized) {
                 setTimeout(() => { mapView.invalidateSize(); }, 100);
                 return;
-            } else {
-                setTimeout(() => { mapView.invalidateSize(); }, 1000);
             }
+
             mapView = L.map('map-view', {
                 minZoom: 1,
                 maxZoom: 19,
@@ -159,192 +373,262 @@ Modals.Locations = (() => {
                 attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             }).addTo(mapView);
 
-            // Add all markers and fit bounds
-            const latlngs = geoData.map(item => [item.latitude, item.longitude]);
-            if (latlngs.length > 0) {
-                mapView.fitBounds(latlngs, { padding: [20, 20] });
-            }else {
-                mapView.setView([0, 0], 1);
-            }
             layerControl = L.control.layers().addTo(mapView);
-            mapView.invalidateSize();
 
-            var darkBlueMarker = L.icon({
+            darkBlueMarker = L.icon({
                 iconUrl: '/static/images/marker-dark-blue.png',
                 iconSize: [25, 35],
                 iconAnchor: [12, 32],
                 popupAnchor: [0, -32]
             });
 
+            _suppressLayerEvents = true;
 
-            
-            // Create photo markers using the extracted function
-            //const { photoMarkers, photoShown, currentPhotoIndex } = _createPhotoMarkers();
+            photoMarkersLayer = L.layerGroup().addTo(mapView);
+            layerControl.addOverlay(photoMarkersLayer, 'GPS Photos Locations (' + _layerLabelCount('filesystem') + ')');
 
-            geoData.forEach(item => {
-                if (!item.latitude || !item.longitude) {
-                    return;
-                }
+            whatsappMarkersLayer = L.layerGroup().addTo(mapView);
+            layerControl.addOverlay(whatsappMarkersLayer, 'WhatsApp Locations (' + _layerLabelCount('whatsapp') + ')');
 
-                switch (item.source) {
-                    case 'Filesystem':
-                        photoItems.push(item);
-                        break;
-                    case 'biography':
-                        biographyItems.push(item);
-                        break;
-                    case 'facebook_album':
-                        console.log("FB Album Item")
-                        fbItems.push(item);
-                        break;
-                    case 'WhatsApp':
-                        whatsappItems.push(item);
-                        break;
-                    case 'email_attachment':
-                    case 'gmail_attachment':
-                        emailItems.push(item);
-                        break;
-                    case 'message':
-                    case 'imessage':
-                    case 'sms':
-                    case 'message_attachment':
-                        messageItems.push(item);
-                        break;
-                    default:
-                        otherItems.push(item);
-                        break;
-                }
+            emailMarkersLayer = L.layerGroup().addTo(mapView);
+            layerControl.addOverlay(emailMarkersLayer, 'Email Locations (' + _layerLabelCount('email') + ')');
+
+            messageMarkersLayer = L.layerGroup().addTo(mapView);
+            layerControl.addOverlay(messageMarkersLayer, 'Message Locations (' + _layerLabelCount('message') + ')');
+
+            biographyMarkersLayer = L.layerGroup().addTo(mapView);
+            layerControl.addOverlay(biographyMarkersLayer, 'Biography Locations (' + _layerLabelCount('biography') + ')');
+
+            fbMarkersLayer = L.layerGroup().addTo(mapView);
+            layerControl.addOverlay(fbMarkersLayer, 'Facebook Locations (' + fbData.length + ')');
+
+            otherMarkersLayer = L.layerGroup().addTo(mapView);
+            layerControl.addOverlay(otherMarkersLayer, 'Other Locations (' + _layerLabelCount('other') + ')');
+
+            _suppressLayerEvents = false;
+
+            mapView.on('overlayadd overlayremove baselayerchange', function() {
+                layerFiltersChanged();
             });
-
-            // Helper function to handle marker click - fetch full image data and open detail modal
-            async function handleMarkerClick(item, allowRedirects = false) {
-                try {
-                    // Fetch full image metadata from API
-                    const response = await fetch(`/images/${item.id}/metadata`);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch image metadata: ${response.status}`);
-                    }
-                    const fullImageData = await response.json();
-
-                    
-                    // Open detail modal with full image data (don't allow redirects from Locations)
-                    Modals.ImageDetailModal.open(fullImageData, {
-                        allowRedirects: allowRedirects
-                    });
-                } catch (error) {
-                    console.error('Error fetching image metadata:', error);
-                    // Fallback to basic display if fetch fails
-                    const imageUrl = `/images/${item.id}?type=metadata`;
-                    const filename = item.title || item.source_reference || `Image ${item.id}`;
-                    Modals.SingleImageDisplay.showSingleImageModal(
-                        filename,
-                        imageUrl,
-                        item.created_at,
-                        item.latitude,
-                        item.longitude
-                    );
-                }
-            }
-
-            photoItems.forEach(item => {
-                const marker = L.marker([item.latitude, item.longitude], {icon: darkBlueMarker});
-                
-                // Add click handler to display image in modal
-                marker.on('click', function() {
-                    handleMarkerClick(item);
-                });
-                
-                photoMarkers.push(marker);
-            });
-
-            messageItems.forEach(item => {
-                const marker = L.marker([item.latitude, item.longitude], {icon: darkBlueMarker});
-                marker.on('click', function() {
-                    handleMarkerClick(item);
-                });
-                messageMarkers.push(marker);
-            });
-
-            emailItems.forEach(item => {
-                const marker = L.marker([item.latitude, item.longitude], {icon: darkBlueMarker});
-                marker.on('click', function() {
-                    handleMarkerClick(item, true);
-                });
-                emailMarkers.push(marker);
-            });
-            biographItems.forEach(item => {
-                const marker = L.marker([item.latitude, item.longitude], {icon: darkBlueMarker});
-                marker.on('click', function() {
-                    handleMarkerClick(item);
-                });
-                marker.bindPopup(item.destination);
-                biographyMarkers.push(marker);
-            });
-            fbData.forEach(item => {
-                if (!item.latitude || !item.longitude) return; // Skip items without coordinates
-                const marker = L.marker([item.latitude, item.longitude], {icon: darkBlueMarker});
-                // marker.on('click', function() {
-                //     handleMarkerClick(item);
-                // });
-                marker.bindPopup(item.name || 'Facebook Place');
-                fbMarkers.push(marker);
-            });
-            otherItems.forEach(item => {
-                const marker = L.marker([item.latitude, item.longitude], {icon: darkBlueMarker});
-                marker.on('click', function() {
-                    handleMarkerClick(item);
-                });
-                marker.bindPopup(item.destination);
-                otherMarkers.push(marker);
-            });
-            whatsappItems.forEach(item => {
-                const marker = L.marker([item.latitude, item.longitude], {icon: darkBlueMarker});
-                marker.on('click', function() {
-                    handleMarkerClick(item);
-                });
-                marker.bindPopup(item.destination);
-                whatsappMarkers.push(marker);
-            });
-
-             
-             // Fisher-Yates shuffle function for uniform random distribution
-             function shuffleArray(array) {
-                 const shuffled = [...array]; // Create a copy to avoid mutating the original
-                 for (let i = shuffled.length - 1; i > 0; i--) {
-                     const j = Math.floor(Math.random() * (i + 1));
-                     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                 }
-                 return shuffled;
-             }
-             
-             // Initialize activePhotoMarkers with random 200 markers using uniform shuffle
-             activePhotoMarkers = shuffleArray(photoMarkers).slice(0, 200);
-             
-             photoMarkersLayer = L.layerGroup(activePhotoMarkers).addTo(mapView);
-             layerControl.addOverlay(photoMarkersLayer, 'GPS Photos Locations ('+photoMarkers.length+')');
-             var whatsappMarkersLayer = L.layerGroup(whatsappMarkers).addTo(mapView);
-             layerControl.addOverlay(whatsappMarkersLayer, 'WhatsApp Locations ('+whatsappMarkers.length+')');
-             var emailMarkersLayer = L.layerGroup(emailMarkers).addTo(mapView);
-             layerControl.addOverlay(emailMarkersLayer, 'Email Locations ('+emailMarkers.length+')');
-             var messageMarkersLayer = L.layerGroup(messageMarkers).addTo(mapView);
-             layerControl.addOverlay(messageMarkersLayer, 'Message Locations ('+messageMarkers.length+')');
-             var biographyMarkersLayer = L.layerGroup(biographyMarkers).addTo(mapView);
-             layerControl.addOverlay(biographyMarkersLayer, 'Biography Locations ('+biographyMarkers.length+')');
-            var fbMarkersLayer = L.layerGroup(fbMarkers).addTo(mapView);
-            layerControl.addOverlay(fbMarkersLayer, 'Facebook Locations ('+fbMarkers.length+')');
-             var otherMarkersLayer = L.layerGroup(otherMarkers).addTo(mapView);
-             layerControl.addOverlay(otherMarkersLayer, 'Other Locations ('+otherMarkers.length+')');
-
-
-            mapView.invalidateSize();
 
             mapViewInitialized = true;
-
-            //document.getElementById('geo-metadata-shown-count').textContent = 'Showing '+photoShown+' of '+currentPhotoIndex+' photos (Click Shuffle Photos to see different images)' ;
-            // setTimeout(() => { mapView.invalidateSize(); }, 100);
+            setTimeout(() => { mapView.invalidateSize(); }, 1000);
         }
 
-         return { init,open,openMapView,shufflePhotoMarkers,refresh};
+         return { init, open, openMapView, shufflePhotoMarkers };
+})();
+
+
+Modals.NearbyLocations = (() => {
+        let mapView = null;
+        let markersLayer = null;
+        let mapInitialized = false;
+        let darkBlueMarker = null;
+        let centerMarker = null;
+        let centerLat = null;
+        let centerLng = null;
+        let centerImageId = null;
+        let currentRadiusKm = 25;
+        let loadToken = 0;
+        const NEARBY_MARKER_LIMIT = 1000;
+
+        function init() {
+            if (DOM.closeNearbyLocationsModalBtn) {
+                DOM.closeNearbyLocationsModalBtn.addEventListener('click', close);
+            }
+            if (DOM.nearbyRadiusUpdateBtn) {
+                DOM.nearbyRadiusUpdateBtn.addEventListener('click', () => { void _applyRadiusFromControl(); });
+            }
+            if (DOM.nearbyRadiusInput) {
+                DOM.nearbyRadiusInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void _applyRadiusFromControl();
+                    }
+                });
+            }
+        }
+
+        function close() {
+            Modals._closeModal(DOM.nearbyLocationsModal);
+        }
+
+        function _parseRadius(raw) {
+            const radiusKm = parseFloat(String(raw).trim());
+            if (!Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 500) {
+                return null;
+            }
+            return radiusKm;
+        }
+
+        function _syncRadiusControl() {
+            if (DOM.nearbyRadiusInput) {
+                DOM.nearbyRadiusInput.value = String(currentRadiusKm);
+            }
+        }
+
+        function _updateLimitNotice(total) {
+            if (!DOM.nearbyLocationsLimitNotice) return;
+            if (total === NEARBY_MARKER_LIMIT) {
+                DOM.nearbyLocationsLimitNotice.textContent = `Showing Nearest ${NEARBY_MARKER_LIMIT} Locations`;
+                DOM.nearbyLocationsLimitNotice.style.display = 'block';
+                return;
+            }
+            DOM.nearbyLocationsLimitNotice.textContent = '';
+            DOM.nearbyLocationsLimitNotice.style.display = 'none';
+        }
+
+        function _restoreModalShell() {
+            if (!DOM.nearbyLocationsModal) return;
+            DOM.nearbyLocationsModal.querySelectorAll('.modal-content, .modal-header, .geo-metadata-tab-content').forEach(el => {
+                if (el.style.display === 'none') {
+                    el.style.display = '';
+                }
+            });
+        }
+
+        async function _loadNearbyLocations() {
+            if (centerLat == null || centerLng == null) return;
+            const token = ++loadToken;
+            _updateLimitNotice(0);
+            if (DOM.nearbyLocationsCount) {
+                DOM.nearbyLocationsCount.textContent = 'Loading nearby locations…';
+            }
+
+            try {
+                const response = await fetch('/images/locations/nearby', {
+                    method: 'POST',
+                    cache: 'no-store',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: centerLat,
+                        longitude: centerLng,
+                        radius_km: currentRadiusKm,
+                        limit: NEARBY_MARKER_LIMIT,
+                    }),
+                });
+                if (token !== loadToken) return;
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch nearby locations: ${response.status}`);
+                }
+                const data = await response.json();
+                if (token !== loadToken) return;
+                const locations = data.locations || [];
+                _ensureMap();
+                _renderMarkers(locations, centerImageId);
+                const total = data.total != null ? data.total : locations.length;
+                _updateLimitNotice(total);
+                if (DOM.nearbyLocationsCount) {
+                    DOM.nearbyLocationsCount.textContent = `${total} image${total === 1 ? '' : 's'} within ${currentRadiusKm} km`;
+                }
+            } catch (error) {
+                if (token !== loadToken) return;
+                console.error('Error loading nearby locations:', error);
+                _updateLimitNotice(0);
+                if (DOM.nearbyLocationsCount) {
+                    DOM.nearbyLocationsCount.textContent = 'Failed to load nearby locations';
+                }
+            }
+        }
+
+        async function _applyRadiusFromControl() {
+            if (!DOM.nearbyRadiusInput) return;
+            const parsed = _parseRadius(DOM.nearbyRadiusInput.value);
+            if (parsed == null) {
+                await AppDialogs.showAppAlert('Invalid radius', 'Enter a value between 0 and 500 km.');
+                _syncRadiusControl();
+                return;
+            }
+            currentRadiusKm = parsed;
+            _syncRadiusControl();
+            await _loadNearbyLocations();
+        }
+
+        async function open(centerLatArg, centerLngArg, radiusKm, centerImageIdArg) {
+            centerLat = centerLatArg;
+            centerLng = centerLngArg;
+            centerImageId = centerImageIdArg;
+            currentRadiusKm = _parseRadius(radiusKm) || 25;
+
+            if (typeof Modals.closeAll === 'function') {
+                Modals.closeAll({ keepOpen: DOM.nearbyLocationsModal });
+            }
+            Modals._openModal(DOM.nearbyLocationsModal);
+            _restoreModalShell();
+            _syncRadiusControl();
+            await _loadNearbyLocations();
+        }
+
+        async function _handleMarkerClick(item) {
+            try {
+                const response = await fetch(`/images/${item.id}/metadata`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch image metadata: ${response.status}`);
+                }
+                const fullImageData = await response.json();
+                Modals.ImageDetailModal.open(fullImageData);
+            } catch (error) {
+                console.error('Error fetching image metadata:', error);
+                await AppDialogs.showAppAlert('Error', 'Unable to open image details.');
+            }
+        }
+
+        function _ensureMap() {
+            if (mapInitialized) {
+                setTimeout(() => { mapView.invalidateSize(); }, 100);
+                return;
+            }
+
+            mapView = L.map('nearby-map-view', {
+                minZoom: 1,
+                maxZoom: 19,
+            });
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(mapView);
+
+            darkBlueMarker = L.icon({
+                iconUrl: '/static/images/marker-dark-blue.png',
+                iconSize: [25, 35],
+                iconAnchor: [12, 32],
+                popupAnchor: [0, -32]
+            });
+
+            centerMarker = L.divIcon({
+                className: 'nearby-center-marker',
+                html: '<div style="background:#c0392b;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,0.45);"></div>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9],
+            });
+
+            markersLayer = L.layerGroup().addTo(mapView);
+            mapInitialized = true;
+            setTimeout(() => { mapView.invalidateSize(); }, 100);
+        }
+
+        function _renderMarkers(locations, centerImageId) {
+            if (!mapView || !markersLayer) return;
+            markersLayer.clearLayers();
+            const latlngs = [];
+
+            locations.forEach(item => {
+                if (!item.latitude || !item.longitude) return;
+                const isCenter = centerImageId != null && item.id === centerImageId;
+                const icon = isCenter ? centerMarker : darkBlueMarker;
+                const marker = L.marker([item.latitude, item.longitude], { icon });
+                marker.on('click', () => _handleMarkerClick(item));
+                markersLayer.addLayer(marker);
+                latlngs.push([item.latitude, item.longitude]);
+            });
+
+            if (latlngs.length > 0) {
+                mapView.fitBounds(latlngs, { padding: [20, 20] });
+            }
+            mapView.invalidateSize();
+        }
+
+        return { init, open, close };
 })();
 
 

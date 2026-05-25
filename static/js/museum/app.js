@@ -5084,12 +5084,26 @@ const App = (() => {
         })();
     }
 
+    /** Visitor-key login (not share-link visitors): hide owner-only onboarding and profile UI. */
+    function applyVisitorKeyOwnerOnlyUI(isVisitorKeySession) {
+        const hidden = !!isVisitorKeySession;
+        const profileBtn = document.getElementById('identity-profile-wizard-btn');
+        if (profileBtn) {
+            profileBtn.hidden = hidden;
+            profileBtn.style.display = hidden ? 'none' : '';
+        }
+        const welcomeOverview = document.querySelector('.info-box-archive-overview');
+        if (welcomeOverview) welcomeOverview.hidden = hidden;
+    }
+
     async function applyVisitorFeatureGatingFromSession() {
         const deniedTitle = 'Not available for your visitor key. The owner can grant access under Settings → Manage Keys.';
         try {
             const res = await fetch('/auth/me', { credentials: 'same-origin' });
             if (!res.ok) return;
             const me = await res.json().catch(() => null);
+            const isVisitorKeySession = !!(me && me.is_visitor && me.visitor_access && me.visitor_access.restricted);
+            applyVisitorKeyOwnerOnlyUI(isVisitorKeySession);
             if (!me || !me.is_visitor) {
                 window.__visitorAccess = { restricted: false };
                 return;

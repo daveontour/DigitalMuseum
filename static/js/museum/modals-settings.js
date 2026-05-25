@@ -2162,11 +2162,12 @@ Modals.ManageKeys = (() => {
     }
 
     function _visitorAccessPayload(prefix) {
+        const contactsAndRelationships = !!document.getElementById(`${prefix}-can-relationships`)?.checked;
         return {
             can_messages_chat: !!document.getElementById(`${prefix}-can-messages-chat`)?.checked,
             can_emails: !!document.getElementById(`${prefix}-can-emails`)?.checked,
-            can_contacts: !!document.getElementById(`${prefix}-can-contacts`)?.checked,
-            can_relationships: !!document.getElementById(`${prefix}-can-relationships`)?.checked,
+            can_contacts: contactsAndRelationships,
+            can_relationships: contactsAndRelationships,
             can_sensitive_private: !!document.getElementById(`${prefix}-can-sensitive-private`)?.checked,
             llm_allow_owner_keys: !!document.getElementById(`${prefix}-llm-allow-owner-keys`)?.checked,
             llm_allow_server_keys: !!document.getElementById(`${prefix}-llm-allow-server-keys`)?.checked
@@ -2174,7 +2175,7 @@ Modals.ManageKeys = (() => {
     }
 
     function _clearVisitorAccessCheckboxes(prefix) {
-        ['can-messages-chat', 'can-emails', 'can-contacts', 'can-relationships', 'can-sensitive-private'].forEach(suf => {
+        ['can-messages-chat', 'can-emails', 'can-relationships', 'can-sensitive-private'].forEach(suf => {
             const el = document.getElementById(`${prefix}-${suf}`);
             if (el) el.checked = false;
         });
@@ -2188,8 +2189,6 @@ Modals.ManageKeys = (() => {
         const pairs = [
             ['can-messages-chat', 'can_messages_chat'],
             ['can-emails', 'can_emails'],
-            ['can-contacts', 'can_contacts'],
-            ['can-relationships', 'can_relationships'],
             ['can-sensitive-private', 'can_sensitive_private'],
             ['llm-allow-owner-keys', 'llm_allow_owner_keys'],
             ['llm-allow-server-keys', 'llm_allow_server_keys']
@@ -2204,13 +2203,15 @@ Modals.ManageKeys = (() => {
                 el.checked = !!v;
             }
         });
+        const relEl = document.getElementById(`${prefix}-can-relationships`);
+        if (relEl) relEl.checked = !!(h.can_contacts || h.can_relationships);
     }
 
     const _visitorKeyAccessColTitles = {
         can_messages_chat: 'Social media messages',
         can_emails: 'Emails & IMAP/Gmail',
         can_contacts: 'Contacts',
-        can_relationships: 'Relationship graph',
+        can_relationships: 'Contacts and Relationships',
         can_sensitive_private: 'Sensitive & private data',
         llm_allow_owner_keys: 'May use owner AI API keys',
         llm_allow_server_keys: 'May use server default AI keys'
@@ -3218,15 +3219,26 @@ Modals.LLMToolsAccess = (() => {
                 tdDesc.textContent = t.description || '';
                 tr.appendChild(tdName);
                 tr.appendChild(tdDesc);
-                const td = document.createElement('td');
-                const inp = document.createElement('input');
-                inp.type = 'checkbox';
-                inp.className = 'llm-tool-chk';
-                inp.dataset.name = name;
-                inp.dataset.flag = 'enabled';
-                inp.checked = !!t.enabled;
-                td.appendChild(inp);
-                tr.appendChild(td);
+                const tdMaster = document.createElement('td');
+                tdMaster.style.textAlign = 'center';
+                const masterChk = document.createElement('input');
+                masterChk.type = 'checkbox';
+                masterChk.className = 'llm-tool-chk';
+                masterChk.dataset.name = name;
+                masterChk.dataset.flag = 'enabled';
+                masterChk.checked = !!t.enabled;
+                tdMaster.appendChild(masterChk);
+                tr.appendChild(tdMaster);
+                const tdVisitor = document.createElement('td');
+                tdVisitor.style.textAlign = 'center';
+                const visitorChk = document.createElement('input');
+                visitorChk.type = 'checkbox';
+                visitorChk.className = 'llm-tool-chk';
+                visitorChk.dataset.name = name;
+                visitorChk.dataset.flag = 'visitor_enabled';
+                visitorChk.checked = !!t.visitor_enabled;
+                tdVisitor.appendChild(visitorChk);
+                tr.appendChild(tdVisitor);
                 tbody.appendChild(tr);
             }
         } catch (e) {
@@ -3246,9 +3258,10 @@ Modals.LLMToolsAccess = (() => {
             const flag = chk.dataset.flag;
             if (!name || !flag) return;
             if (!rows[name]) {
-                rows[name] = { name: name, enabled: false };
+                rows[name] = { name: name, enabled: false, visitor_enabled: false };
             }
             if (flag === 'enabled') rows[name].enabled = chk.checked;
+            if (flag === 'visitor_enabled') rows[name].visitor_enabled = chk.checked;
         });
         const tools = Object.values(rows);
         try {
@@ -3591,6 +3604,7 @@ Modals.initAll = () => {
         Modals.MultiImageDisplay.init();
         //Modals.HaveYourSay.init();
         Modals.Locations.init();
+        Modals.NearbyLocations.init();
         // Modals.ImageGallery.init();
         Modals.EmailGallery.init();
         Modals.EmailEditor.init();
@@ -3624,7 +3638,9 @@ Modals.initAll = () => {
         if (Modals.IdentityProfileWizard && Modals.IdentityProfileWizard.init) Modals.IdentityProfileWizard.init();
 };
 
-Modals.closeAll = () => {
+Modals.closeAll = (options) => {
+        const keepOpen = options && options.keepOpen ? options.keepOpen : null;
+
         // Close all modals that have a close function
         try {
             if (Modals.Suggestions && Modals.Suggestions.close) Modals.Suggestions.close();
@@ -3675,6 +3691,12 @@ Modals.closeAll = () => {
         try {
             if (Modals.Locations && Modals.Locations.close) Modals.Locations.close();
         } catch (e) { console.debug('Error closing Locations modal:', e); }
+
+        try {
+            if (Modals.NearbyLocations && Modals.NearbyLocations.close && keepOpen !== DOM.nearbyLocationsModal) {
+                Modals.NearbyLocations.close();
+            }
+        } catch (e) { console.debug('Error closing NearbyLocations modal:', e); }
         
         try {
             if (Modals.ConfirmationModal && Modals.ConfirmationModal.close) Modals.ConfirmationModal.close();
@@ -3707,10 +3729,11 @@ Modals.closeAll = () => {
             }
         } catch (e) { console.debug('Error closing MultiImageDisplay modal:', e); }
         
-        // Also close any other modals by checking DOM elements with modal class
+        // Close any other top-level modal shells still visible
         try {
-            const allModals = document.querySelectorAll('.modal, [class*="modal"], [id*="modal"], [id*="Modal"]');
+            const allModals = document.querySelectorAll('.modal');
             allModals.forEach(modal => {
+                if (keepOpen && modal === keepOpen) return;
                 if (modal && modal.style) {
                     const display = window.getComputedStyle(modal).display;
                     if (display === 'flex' || display === 'block') {

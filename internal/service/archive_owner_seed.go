@@ -25,7 +25,7 @@ func SeedNewOwnerArchiveDefaults(ctx context.Context, db *sql.DB, masterPassword
 			return fmt.Errorf("llm tools policy: %w", err)
 		}
 		privateStore := NewPrivateStoreService(repository.NewPrivateStoreRepo(db), db, pepper)
-		if err := privateStore.Upsert(ctx, appai.LLMToolsAccessStoreKey, policyJSON, mp); err != nil {
+		if err := privateStore.UpsertLLMToolsAccessPolicy(ctx, policyJSON, mp); err != nil {
 			return fmt.Errorf("seed llm tools access: %w", err)
 		}
 	}

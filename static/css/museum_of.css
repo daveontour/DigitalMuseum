@@ -4896,17 +4896,36 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     min-width: 0;
     height: 2.2rem;
     box-sizing: border-box;
-    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+    border: 1px solid var(--color-border-input);
+    background-color: var(--color-bg-surface);
+    color: var(--color-text);
+    caret-color: var(--color-text);
+    transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 #user-llm-settings-section .user-llm-field-input.user-llm-field-input--state-ok {
     background-color: var(--user-llm-field-bg-ok);
+    color: #14532d;
+    caret-color: #14532d;
 }
 #user-llm-settings-section .user-llm-field-input.user-llm-field-input--state-warn {
     background-color: var(--user-llm-field-bg-warn);
+    color: #92400e;
+    caret-color: #92400e;
 }
-#user-llm-settings-section .user-llm-field-input.user-llm-field-input--state-ok:focus,
+#user-llm-settings-section .user-llm-field-input:focus {
+    outline: none;
+    border-color: var(--color-blue);
+    box-shadow: var(--focus-ring);
+}
+#user-llm-settings-section .user-llm-field-input.user-llm-field-input--state-ok:focus {
+    background-color: var(--user-llm-field-bg-ok);
+    color: #14532d;
+    caret-color: #14532d;
+}
 #user-llm-settings-section .user-llm-field-input.user-llm-field-input--state-warn:focus {
-    background-color: var(--color-bg);
+    background-color: var(--user-llm-field-bg-warn);
+    color: #92400e;
+    caret-color: #92400e;
 }
 #user-llm-settings-section .user-llm-clear-btn {
     width: 100%;
@@ -6265,7 +6284,8 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     width:90%;
 } */
 
-#map-view{
+#map-view,
+#nearby-map-view{
     position: absolute;
     z-index: 10;
     bottom: 0%;
@@ -6273,6 +6293,11 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     right: 0%;
     height:100%;
     width:100%;
+}
+
+.leaflet-div-icon.nearby-center-marker {
+    background: transparent;
+    border: none;
 }
 
 /* Email Gallery Modal Styles */
@@ -11331,7 +11356,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 
 /* Hints Modal */
 .sensitive-data-hints-content {
-    width: 400px;
+    width: 600px;
     max-width: 95vw;
     padding: 0;
 }

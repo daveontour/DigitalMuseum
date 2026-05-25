@@ -557,7 +557,7 @@ func (s *SensitiveService) SetVisitorKeyFeatureFlags(ctx context.Context, hintID
 	var tag sql.Result
 	if uid > 0 {
 		tag, err = s.pool.ExecContext(ctx, `
-			UPDATE visitor_key_hints v SET
+			UPDATE visitor_key_hints SET
 				can_messages_chat = ?1,
 				can_emails = ?2,
 				can_contacts = ?3,
@@ -565,12 +565,14 @@ func (s *SensitiveService) SetVisitorKeyFeatureFlags(ctx context.Context, hintID
 				can_sensitive_private = ?5,
 				llm_allow_owner_keys = ?6,
 				llm_allow_server_keys = ?7
-			FROM sensitive_keyring k
-			WHERE v.id = ?8 AND v.keyring_id = k.id AND k.is_master = FALSE AND k.user_id = ?9`,
+			WHERE id = ?8 AND EXISTS (
+				SELECT 1 FROM sensitive_keyring k
+				WHERE k.id = visitor_key_hints.keyring_id AND k.is_master = FALSE AND k.user_id = ?9
+			)`,
 			f.CanMessagesChat, f.CanEmails, f.CanContacts, f.CanRelationships, f.CanSensitivePrivate, f.LLMAllowOwnerKeys, f.LLMAllowServerKeys, hintID, uid)
 	} else {
 		tag, err = s.pool.ExecContext(ctx, `
-			UPDATE visitor_key_hints v SET
+			UPDATE visitor_key_hints SET
 				can_messages_chat = ?1,
 				can_emails = ?2,
 				can_contacts = ?3,
@@ -578,8 +580,10 @@ func (s *SensitiveService) SetVisitorKeyFeatureFlags(ctx context.Context, hintID
 				can_sensitive_private = ?5,
 				llm_allow_owner_keys = ?6,
 				llm_allow_server_keys = ?7
-			FROM sensitive_keyring k
-			WHERE v.id = ?8 AND v.keyring_id = k.id AND k.is_master = FALSE AND k.user_id IS NULL`,
+			WHERE id = ?8 AND EXISTS (
+				SELECT 1 FROM sensitive_keyring k
+				WHERE k.id = visitor_key_hints.keyring_id AND k.is_master = FALSE AND k.user_id IS NULL
+			)`,
 			f.CanMessagesChat, f.CanEmails, f.CanContacts, f.CanRelationships, f.CanSensitivePrivate, f.LLMAllowOwnerKeys, f.LLMAllowServerKeys, hintID)
 	}
 	if err != nil {

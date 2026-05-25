@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/daveontour/aimuseum/internal/model"
 	"github.com/daveontour/aimuseum/internal/sqlutil"
@@ -82,6 +83,27 @@ func (r *ConfigRepo) List(ctx context.Context) ([]*model.AppConfiguration, error
 	return out, rows.Err()
 }
 
+// GetValueByKey returns the value for a configuration key, or nil if not set.
+func (r *ConfigRepo) GetValueByKey(ctx context.Context, key string) (*string, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT value FROM app_configuration WHERE key = ?1`
+	args := []any{key}
+	q, args = addUIDFilter(q, args, uid)
+	var val sql.NullString
+	err := r.pool.QueryRowContext(ctx, q, args...).Scan(&val)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("GetValueByKey %s: %w", key, err)
+	}
+	if !val.Valid || strings.TrimSpace(val.String) == "" {
+		return nil, nil
+	}
+	s := val.String
+	return &s, nil
+}
+
 // Upsert creates or updates a configuration key. Returns the row.
 func (r *ConfigRepo) Upsert(ctx context.Context, key string, value *string, isMandatory *bool, description *string) (*model.AppConfiguration, error) {
 	uid := uidFromCtx(ctx)
@@ -109,7 +131,11 @@ func (r *ConfigRepo) Upsert(ctx context.Context, key string, value *string, isMa
 	// SQLite requires the conflict target to include a matching WHERE clause.
 	conflictClause := `ON CONFLICT (key) DO UPDATE SET`
 	if sqlutil.IsSQLite(ctx, r.pool) {
-		conflictClause = `ON CONFLICT (key) WHERE user_id IS NULL DO UPDATE SET`
+		if uid > 0 {
+			conflictClause = `ON CONFLICT (key, user_id) WHERE user_id IS NOT NULL DO UPDATE SET`
+		} else {
+			conflictClause = `ON CONFLICT (key) WHERE user_id IS NULL DO UPDATE SET`
+		}
 	}
 	c, err := scanConfig(r.pool.QueryRowContext(ctx,
 		`INSERT INTO app_configuration (key, value, is_mandatory, description, user_id)

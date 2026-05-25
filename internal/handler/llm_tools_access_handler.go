@@ -64,10 +64,16 @@ func (h *LLMToolsAccessHandler) Get(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			policy = p
+			_ = h.privateStore.MirrorLLMToolsAccessPolicy(r.Context(), rec.Value)
 		}
 	} else if !ArchiveOwnerAuthenticated(r, h.authSvc) {
 		writeError(w, http.StatusForbidden, "keyring password required (unlock session or pass X-Master-Password)")
 		return
+	}
+	if policy == nil && h.privateStore != nil {
+		if p, err := h.privateStore.LoadLLMToolsAccessPolicyMirror(r.Context()); err == nil && p != nil {
+			policy = p
+		}
 	}
 	out := make([]map[string]any, 0)
 	for _, meta := range appai.AllToolMetas() {
@@ -78,9 +84,10 @@ func (h *LLMToolsAccessHandler) Get(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		out = append(out, map[string]any{
-			"name":        meta.Name,
-			"description": meta.Description,
-			"enabled":     rule.Enabled,
+			"name":             meta.Name,
+			"description":      meta.Description,
+			"enabled":          rule.Enabled,
+			"visitor_enabled":  rule.VisitorEnabled,
 		})
 	}
 	writeJSON(w, map[string]any{"tools": out})
@@ -89,8 +96,9 @@ func (h *LLMToolsAccessHandler) Get(w http.ResponseWriter, r *http.Request) {
 // PutBody is the JSON body for saving policy.
 type llmToolsPutBody struct {
 	Tools []struct {
-		Name    string `json:"name"`
-		Enabled bool   `json:"enabled"`
+		Name           string `json:"name"`
+		Enabled        bool   `json:"enabled"`
+		VisitorEnabled bool   `json:"visitor_enabled"`
 	} `json:"tools"`
 }
 
@@ -122,7 +130,8 @@ func (h *LLMToolsAccessHandler) Put(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		policy[name] = appai.ToolAccessRule{
-			Enabled: t.Enabled,
+			Enabled:        t.Enabled,
+			VisitorEnabled: t.VisitorEnabled,
 		}
 	}
 	raw, err := appai.MarshalToolAccessPolicyJSON(policy)
@@ -134,7 +143,7 @@ func (h *LLMToolsAccessHandler) Put(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "private store not configured")
 		return
 	}
-	if err := h.privateStore.Upsert(r.Context(), appai.LLMToolsAccessStoreKey, raw, mp); err != nil {
+	if err := h.privateStore.UpsertLLMToolsAccessPolicy(r.Context(), raw, mp); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("save policy: %s", err))
 		return
 	}

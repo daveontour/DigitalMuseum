@@ -12,6 +12,10 @@ import (
 // LLMToolsAccessStoreKey is the private_store key for LLM tool visibility policy.
 const LLMToolsAccessStoreKey = "llm_tools_access_v1"
 
+// LLMToolsAccessMirrorConfigKey holds the same JSON in app_configuration (plaintext, user-scoped)
+// so visitor-key sessions can read tool policy without the owner master password.
+const LLMToolsAccessMirrorConfigKey = "llm_tools_access_policy_v1"
+
 // UnlockTier describes how the browser session unlocked the keyring for policy checks.
 type UnlockTier int
 
@@ -38,7 +42,8 @@ func UnlockTierFromSession(store *keystore.SessionMasterStore, r *http.Request) 
 
 // ToolAccessRule is stored per tool name. Omitted tools default to denied for everyone.
 type ToolAccessRule struct {
-	Enabled bool `json:"enabled"`
+	Enabled        bool `json:"enabled"`         // master-key / owner session
+	VisitorEnabled bool `json:"visitor_enabled"` // visitor-key session
 }
 
 // ToolAccessPolicy maps tool name -> rule. Nil or missing entries mean "deny".
@@ -64,25 +69,39 @@ func ParseToolAccessPolicyJSON(raw string) (ToolAccessPolicy, error) {
 	}
 	out := make(ToolAccessPolicy, len(s.Tools))
 	for name, ruleRaw := range s.Tools {
-		// New shape: {"enabled": true}
-		var rule ToolAccessRule
-		if err := json.Unmarshal(ruleRaw, &rule); err == nil {
+		if rule, ok := parseToolAccessRule(ruleRaw); ok {
 			out[name] = rule
-			continue
 		}
-		// Backward compatibility for older stored JSON:
-		// {"visitor": bool, "master": bool, "no_key": bool}
-		var old struct {
-			Visitor bool `json:"visitor"`
-			Master  bool `json:"master"`
-		}
-		if err := json.Unmarshal(ruleRaw, &old); err == nil {
-			out[name] = ToolAccessRule{Enabled: old.Visitor || old.Master}
-			continue
-		}
-		// Ignore malformed per-tool entries; keep parsing remaining tools.
 	}
 	return out, nil
+}
+
+func parseToolAccessRule(ruleRaw json.RawMessage) (ToolAccessRule, bool) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(ruleRaw, &raw); err != nil || len(raw) == 0 {
+		return ToolAccessRule{}, false
+	}
+	rule := ToolAccessRule{}
+	if v, ok := raw["enabled"]; ok {
+		_ = json.Unmarshal(v, &rule.Enabled)
+	}
+	if v, ok := raw["visitor_enabled"]; ok {
+		_ = json.Unmarshal(v, &rule.VisitorEnabled)
+		return rule, true
+	}
+	if v, ok := raw["master"]; ok {
+		_ = json.Unmarshal(v, &rule.Enabled)
+	}
+	if v, ok := raw["visitor"]; ok {
+		_ = json.Unmarshal(v, &rule.VisitorEnabled)
+		return rule, true
+	}
+	// Legacy single enabled flag applied to both tiers.
+	if _, ok := raw["enabled"]; ok {
+		rule.VisitorEnabled = rule.Enabled
+		return rule, true
+	}
+	return rule, len(raw) > 0
 }
 
 // MarshalToolAccessPolicyJSON serialises policy for private_store.
@@ -114,7 +133,7 @@ func PolicyAllows(policy ToolAccessPolicy, toolName string, tier UnlockTier) boo
 		// Tools never run without an unlocked keyring.
 		return false
 	case TierVisitor:
-		return rule.Enabled
+		return rule.VisitorEnabled
 	case TierMaster:
 		return rule.Enabled
 	default:
@@ -148,7 +167,7 @@ type ToolMeta struct {
 func AllToolsEnabledPolicy() ToolAccessPolicy {
 	out := make(ToolAccessPolicy)
 	for _, m := range AllToolMetas() {
-		out[m.Name] = ToolAccessRule{Enabled: true}
+		out[m.Name] = ToolAccessRule{Enabled: true, VisitorEnabled: true}
 	}
 	return out
 }

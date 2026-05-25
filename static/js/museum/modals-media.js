@@ -1983,11 +1983,35 @@ Modals.ImageDetailModal = (() => {
                         e.stopPropagation();
                         window.open(googleMapsUrl, '_blank');
                     };
+
+                    const findNearbyButton = document.createElement('button');
+                    findNearbyButton.type = 'button';
+                    findNearbyButton.className = 'modal-btn modal-btn-secondary';
+                    findNearbyButton.style.cssText = 'margin-left: 10px; padding: 0.3em 0.8em; font-size: 0.85em; display: inline-flex; align-items: center; gap: 0.3em;';
+                    findNearbyButton.innerHTML = '<i class="fas fa-search-location"></i> Find Nearby';
+                    findNearbyButton.onclick = async function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const radiusStr = await AppDialogs.showAppPrompt(
+                            'Find Nearby',
+                            'Enter search radius in kilometers:',
+                            '25',
+                            { promptLabel: 'Radius (km)' }
+                        );
+                        if (radiusStr == null) return;
+                        const radiusKm = parseFloat(String(radiusStr).trim());
+                        if (!Number.isFinite(radiusKm) || radiusKm <= 0) {
+                            await AppDialogs.showAppAlert('Invalid radius', 'Please enter a positive number.');
+                            return;
+                        }
+                        Modals.NearbyLocations.open(image.latitude, image.longitude, radiusKm, image.id);
+                    };
                     
                     // Clear existing content and add coordinates and button
                     DOM.newImageDetailGps.innerHTML = '';
                     DOM.newImageDetailGps.appendChild(document.createTextNode(gpsText));
                     DOM.newImageDetailGps.appendChild(openMapsButton);
+                    DOM.newImageDetailGps.appendChild(findNearbyButton);
                 } else {
                     DOM.newImageDetailGps.textContent = 'GPS data available';
                 }

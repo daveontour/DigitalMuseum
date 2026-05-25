@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
+	appai "github.com/daveontour/aimuseum/internal/ai"
 	appcrypto "github.com/daveontour/aimuseum/internal/crypto"
 	"github.com/daveontour/aimuseum/internal/model"
 	"github.com/daveontour/aimuseum/internal/repository"
@@ -115,4 +117,44 @@ func (s *PrivateStoreService) Delete(ctx context.Context, key, masterPassword st
 		return fmt.Errorf("invalid master password")
 	}
 	return s.repo.Delete(ctx, key)
+}
+
+// UpsertLLMToolsAccessPolicy stores encrypted policy for the owner and a plaintext mirror for visitor sessions.
+func (s *PrivateStoreService) UpsertLLMToolsAccessPolicy(ctx context.Context, policyJSON, masterPassword string) error {
+	if err := s.Upsert(ctx, appai.LLMToolsAccessStoreKey, policyJSON, masterPassword); err != nil {
+		return err
+	}
+	return s.mirrorLLMToolsAccessPolicy(ctx, policyJSON)
+}
+
+// MirrorLLMToolsAccessPolicy writes the plaintext policy mirror (e.g. after loading from private_store).
+func (s *PrivateStoreService) MirrorLLMToolsAccessPolicy(ctx context.Context, policyJSON string) error {
+	return s.mirrorLLMToolsAccessPolicy(ctx, policyJSON)
+}
+
+func (s *PrivateStoreService) mirrorLLMToolsAccessPolicy(ctx context.Context, policyJSON string) error {
+	if s.pool == nil {
+		return fmt.Errorf("database not configured")
+	}
+	policyJSON = strings.TrimSpace(policyJSON)
+	if policyJSON == "" {
+		return fmt.Errorf("policy JSON is required")
+	}
+	cfg := repository.NewConfigRepo(s.pool)
+	desc := "LLM tool access policy mirror (visitor-readable)"
+	_, err := cfg.Upsert(ctx, appai.LLMToolsAccessMirrorConfigKey, &policyJSON, nil, &desc)
+	return err
+}
+
+// LoadLLMToolsAccessPolicyMirror reads the plaintext policy mirror for visitor-key sessions.
+func (s *PrivateStoreService) LoadLLMToolsAccessPolicyMirror(ctx context.Context) (appai.ToolAccessPolicy, error) {
+	if s.pool == nil {
+		return nil, nil
+	}
+	cfg := repository.NewConfigRepo(s.pool)
+	raw, err := cfg.GetValueByKey(ctx, appai.LLMToolsAccessMirrorConfigKey)
+	if err != nil || raw == nil {
+		return nil, err
+	}
+	return appai.ParseToolAccessPolicyJSON(*raw)
 }

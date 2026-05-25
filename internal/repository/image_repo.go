@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"math"
+	"sort"
 	"strings"
 
 	"github.com/daveontour/aimuseum/internal/model"
@@ -356,18 +358,228 @@ func (r *ImageRepo) ListImageIDsMissingTag(ctx context.Context, tag string) ([]i
 
 // GetLocations returns media_items with GPS data (has_gps=true or lat/lng non-null).
 func (r *ImageRepo) GetLocations(ctx context.Context) ([]*model.MediaItem, error) {
-	uid := uidFromCtx(ctx)
+	// uid := uidFromCtx(ctx)
 	q := `SELECT ` + mediaItemColumns + ` FROM media_items
 	      WHERE has_gps = TRUE
 	         OR (latitude IS NOT NULL AND longitude IS NOT NULL)`
 	args := []any{}
-	q, args = addUIDFilter(q, args, uid)
+	// q, args = addUIDFilter(q, args, uid)
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("GetLocations: %w", err)
 	}
 	defer rows.Close()
 	return scanMediaItems(rows)
+}
+
+var knownLocationCategorySources = []string{
+	"filesystem", "biography", "facebook_album", "whatsapp",
+	"email_attachment", "gmail_attachment",
+	"message", "imessage", "sms", "message_attachment",
+}
+
+const locationGPSPredicate = `(has_gps != 0 OR (latitude IS NOT NULL AND longitude IS NOT NULL))`
+
+func resolveLocationCategorySources(categories []string) (sources []string, includeOther bool) {
+	if len(categories) > 0 && strings.ToLower(strings.TrimSpace(categories[0])) == "all" {
+		return append([]string{}, knownLocationCategorySources...), true
+	}
+
+	seen := make(map[string]struct{})
+	add := func(source string) {
+		source = strings.ToLower(strings.TrimSpace(source))
+		if source == "" {
+			return
+		}
+		if _, ok := seen[source]; ok {
+			return
+		}
+		seen[source] = struct{}{}
+		sources = append(sources, source)
+	}
+
+	for _, cat := range categories {
+		switch strings.ToLower(strings.TrimSpace(cat)) {
+		case "filesystem":
+			add("filesystem")
+		case "biography":
+			add("biography")
+		case "whatsapp":
+			add("whatsapp")
+		case "email":
+			add("email_attachment")
+			add("gmail_attachment")
+		case "message":
+			add("message")
+			add("imessage")
+			add("sms")
+			add("message_attachment")
+		case "facebook":
+			add("facebook_album")
+		case "other":
+			includeOther = true
+		}
+	}
+	return sources, includeOther
+}
+
+func buildRandomLocationSourceFilter(sources []string, includeOther bool, start int) (sql string, args []any, next int) {
+	var parts []string
+	n := start
+
+	if len(sources) > 0 {
+		inCond, inArgs, nextN := sqlutil.StringIN(`LOWER(TRIM(COALESCE(source, '')))`, sources, n)
+		parts = append(parts, inCond)
+		args = append(args, inArgs...)
+		n = nextN
+	}
+
+	// if includeOther {
+	// 	ph := make([]string, len(knownLocationCategorySources))
+	// 	for i, src := range knownLocationCategorySources {
+	// 		ph[i] = fmt.Sprintf("?%d", n)
+	// 		args = append(args, src)
+	// 		n++
+	// 	}
+	// 	parts = append(parts, fmt.Sprintf(
+	// 		`(TRIM(COALESCE(source, '')) = '' OR LOWER(TRIM(COALESCE(source, ''))) NOT IN (%s))`,
+	// 		strings.Join(ph, ", "),
+	// 	))
+	// }
+
+	if len(parts) == 0 {
+		return "", nil, start
+	}
+	return "(" + strings.Join(parts, " OR ") + ")", args, n
+}
+
+// GetRandomLocationsByCategories returns up to limit random media_items with GPS for the given map categories.
+func (r *ImageRepo) GetRandomLocationsByCategories(ctx context.Context, categories []string, limit int) ([]*model.MediaItem, error) {
+	sources, includeOther := resolveLocationCategorySources(categories)
+	sourceSQL, sourceArgs, _ := buildRandomLocationSourceFilter(sources, includeOther, 1)
+	if sourceSQL == "" {
+		return []*model.MediaItem{}, nil
+	}
+	if limit <= 0 {
+		limit = 1000
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	args := append([]any{}, sourceArgs...)
+	limitIdx := len(args) + 1
+	args = append(args, limit)
+	q := fmt.Sprintf(`SELECT %s FROM media_items
+	      WHERE id IN (
+	        SELECT id FROM media_items
+	        WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+	          AND %s
+	        ORDER BY RANDOM()
+	        LIMIT ?%d
+	      )`, mediaItemColumns, sourceSQL, limitIdx)
+
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("GetRandomLocationsByCategories: %w", err)
+	}
+	defer rows.Close()
+	return scanMediaItems(rows)
+}
+
+// NearbyLocationRow is a media item with its distance from a search center (km).
+type NearbyLocationRow struct {
+	Item       *model.MediaItem
+	DistanceKm float64
+}
+
+// GetNearbyLocations returns GPS-tagged media_items within radiusKm of lat/lng, ordered by distance.
+func (r *ImageRepo) GetNearbyLocations(ctx context.Context, lat, lng, radiusKm float64, limit int) ([]NearbyLocationRow, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	latRad := lat * math.Pi / 180.0
+	latDelta := radiusKm / 111.0
+	lngDelta := radiusKm / 111.0
+	if cosLat := math.Cos(latRad); cosLat > 1e-6 {
+		lngDelta = radiusKm / (111.0 * cosLat)
+	}
+	if lngDelta > 180 {
+		lngDelta = 180
+	}
+	latMin := lat - latDelta
+	latMax := lat + latDelta
+	lngMin := lng - lngDelta
+	lngMax := lng + lngDelta
+
+	// Bounding-box prefilter in SQL; Haversine distance computed in Go because
+	// stock SQLite (go-sqlite3) does not expose acos/cos/sin.
+	q := `SELECT ` + mediaItemColumns + ` FROM media_items
+		WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+		  AND latitude BETWEEN ?1 AND ?2
+		  AND longitude BETWEEN ?3 AND ?4`
+
+	rows, err := r.pool.QueryContext(ctx, q, latMin, latMax, lngMin, lngMax)
+	if err != nil {
+		return nil, fmt.Errorf("GetNearbyLocations: %w", err)
+	}
+	defer rows.Close()
+
+	items, err := scanMediaItems(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []NearbyLocationRow
+	for _, item := range items {
+		if item.Latitude == nil || item.Longitude == nil {
+			continue
+		}
+		distanceKm := haversineKm(lat, lng, *item.Latitude, *item.Longitude)
+		if distanceKm > radiusKm {
+			continue
+		}
+		results = append(results, NearbyLocationRow{Item: item, DistanceKm: distanceKm})
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].DistanceKm < results[j].DistanceKm
+	})
+	if len(results) > limit {
+		results = results[:limit]
+	}
+	return results, nil
+}
+
+// CountGPSBySource returns counts of media_items with GPS data grouped by source.
+func (r *ImageRepo) CountGPSBySource(ctx context.Context) ([]model.GPSCountBySource, error) {
+	//uid := uidFromCtx(ctx)
+	q := `SELECT COALESCE(NULLIF(TRIM(source), ''), ''), COUNT(*)
+	      FROM media_items
+	      WHERE has_gps = TRUE
+	         OR (latitude IS NOT NULL AND longitude IS NOT NULL)`
+	args := []any{}
+	//q, args = addUIDFilter(q, args, uid)
+	q += ` GROUP BY 1 ORDER BY 2 DESC, 1 ASC`
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("CountGPSBySource: %w", err)
+	}
+	defer rows.Close()
+
+	var counts []model.GPSCountBySource
+	for rows.Next() {
+		var row model.GPSCountBySource
+		if err := rows.Scan(&row.Source, &row.Count); err != nil {
+			return nil, err
+		}
+		counts = append(counts, row)
+	}
+	return counts, rows.Err()
 }
 
 // GetFacebookPlaces returns all locations with source='facebook'.
@@ -1001,4 +1213,17 @@ func truncateForLog(s string, maxRunes int) string {
 		return s
 	}
 	return string(r[:maxRunes]) + "…"
+}
+
+func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
+	const earthRadiusKm = 6371.0
+	lat1Rad := lat1 * math.Pi / 180.0
+	lat2Rad := lat2 * math.Pi / 180.0
+	dLat := (lat2 - lat1) * math.Pi / 180.0
+	dLng := (lng2 - lng1) * math.Pi / 180.0
+
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Sin(dLng/2)*math.Sin(dLng/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return earthRadiusKm * c
 }

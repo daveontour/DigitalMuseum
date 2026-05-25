@@ -333,7 +333,7 @@ func (s *ChatService) perRequestGetRAM(r *http.Request) appai.RAMMasterGetter {
 	}
 }
 
-func (s *ChatService) loadToolAccessPolicy(ctx context.Context, masterPassword string) appai.ToolAccessPolicy {
+func (s *ChatService) loadToolAccessPolicyDecrypted(ctx context.Context, masterPassword string) appai.ToolAccessPolicy {
 	if s.privateStore == nil || strings.TrimSpace(masterPassword) == "" {
 		return nil
 	}
@@ -348,6 +348,20 @@ func (s *ChatService) loadToolAccessPolicy(ctx context.Context, masterPassword s
 	return p
 }
 
+func (s *ChatService) resolveToolAccessPolicy(ctx context.Context, unlockPassword string) appai.ToolAccessPolicy {
+	if policy := s.loadToolAccessPolicyDecrypted(ctx, unlockPassword); policy != nil {
+		return policy
+	}
+	if s.privateStore == nil {
+		return nil
+	}
+	policy, err := s.privateStore.LoadLLMToolsAccessPolicyMirror(ctx)
+	if err != nil || policy == nil {
+		return nil
+	}
+	return policy
+}
+
 // buildChatTools returns a policy-wrapped executor and filtered tool schemas for the current session tier.
 func (s *ChatService) buildChatTools(ctx context.Context, r *http.Request, subjectName string) (appai.ToolExecutor, *[]map[string]any) {
 	getRAM := s.perRequestGetRAM(r)
@@ -355,7 +369,9 @@ func (s *ChatService) buildChatTools(ctx context.Context, r *http.Request, subje
 	pw, ok := getRAM()
 	var policy appai.ToolAccessPolicy
 	if ok && pw != "" {
-		policy = s.loadToolAccessPolicy(ctx, pw)
+		policy = s.resolveToolAccessPolicy(ctx, pw)
+	} else if tier != appai.TierNone && s.privateStore != nil {
+		policy, _ = s.privateStore.LoadLLMToolsAccessPolicyMirror(ctx)
 	}
 	filtered := appai.FilterToolDefinitionsForTier(policy, tier)
 	_, _, _, _, tavily, _, _ := s.effectiveAIConfig(ctx, r, "")

@@ -160,6 +160,8 @@ func (h *ImageHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/images/search", h.Search)
 	r.Get("/images/years", h.GetYears)
 	r.Get("/images/tags", h.GetTags)
+	r.Get("/images/gps-count-by-source", h.GetGPSCountBySource)
+	r.Post("/images/locations/nearby", h.GetNearbyLocations)
 	r.Put("/images/bulk-update", h.BulkUpdate)
 	r.Delete("/images/bulk-delete", h.BulkDelete)
 	r.Delete("/images", h.DeleteByRange)
@@ -170,8 +172,9 @@ func (h *ImageHandler) RegisterRoutes(r chi.Router) {
 	r.Put("/images/{image_id}", h.UpdateMetadata)
 	r.Delete("/images/{image_id}", h.Delete)
 
-	// Location map endpoint
+	// Location map endpoints
 	r.Get("/getLocations", h.GetLocations)
+	r.Post("/getLocations/random", h.GetRandomLocations)
 
 	// Facebook album and posts read endpoints
 	r.Get("/facebook/albums", h.GetFacebookAlbums)
@@ -320,6 +323,24 @@ func (h *ImageHandler) GetTags(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"tags": tags})
 }
 
+// ── /images/gps-count-by-source ───────────────────────────────────────────────
+
+func (h *ImageHandler) GetGPSCountBySource(w http.ResponseWriter, r *http.Request) {
+	counts, err := h.svc.CountGPSBySource(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error counting GPS images by source: %s", err))
+		return
+	}
+	if counts == nil {
+		counts = []model.GPSCountBySource{}
+	}
+	var total int64
+	for _, row := range counts {
+		total += row.Count
+	}
+	writeJSON(w, map[string]any{"by_source": counts, "total": total})
+}
+
 // ── /facebook/places ──────────────────────────────────────────────────────────
 
 func (h *ImageHandler) GetFacebookPlaces(w http.ResponseWriter, r *http.Request) {
@@ -346,6 +367,74 @@ func (h *ImageHandler) GetLocations(w http.ResponseWriter, r *http.Request) {
 		locations = []model.LocationItem{}
 	}
 	writeJSON(w, map[string]any{"locations": locations})
+}
+
+// ── /getLocations/random ──────────────────────────────────────────────────────
+
+func (h *ImageHandler) GetRandomLocations(w http.ResponseWriter, r *http.Request) {
+	var req model.RandomLocationsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 1000
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	locations, err := h.svc.GetRandomLocationsByCategories(r.Context(), req.Categories, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving random locations: %s", err))
+		return
+	}
+	if locations == nil {
+		locations = []model.LocationItem{}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"locations": locations})
+}
+
+// ── /images/locations/nearby ──────────────────────────────────────────────────
+
+func (h *ImageHandler) GetNearbyLocations(w http.ResponseWriter, r *http.Request) {
+	var req model.NearbyLocationsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.RadiusKm <= 0 || req.RadiusKm > 500 {
+		writeError(w, http.StatusBadRequest, "radius_km must be greater than 0 and at most 500")
+		return
+	}
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 1000
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	locations, err := h.svc.GetNearbyLocations(r.Context(), req.Latitude, req.Longitude, req.RadiusKm, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving nearby locations: %s", err))
+		return
+	}
+	if locations == nil {
+		locations = []model.NearbyLocationItem{}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{
+		"locations": locations,
+		"center": map[string]float64{
+			"latitude":  req.Latitude,
+			"longitude": req.Longitude,
+		},
+		"radius_km": req.RadiusKm,
+		"total":     len(locations),
+	})
 }
 
 // ── /images/{image_id} ────────────────────────────────────────────────────────

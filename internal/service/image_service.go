@@ -192,12 +192,47 @@ func (s *ImageService) DeleteByIDRange(ctx context.Context, all bool, startID, e
 	return s.repo.DeleteByIDRange(ctx, all, startID, endID)
 }
 
+// CountGPSBySource returns counts of media_items with GPS data grouped by source.
+func (s *ImageService) CountGPSBySource(ctx context.Context) ([]model.GPSCountBySource, error) {
+	return s.repo.CountGPSBySource(ctx)
+}
+
 // GetLocations returns items that have GPS data, shaped for the map view.
 func (s *ImageService) GetLocations(ctx context.Context) ([]model.LocationItem, error) {
 	items, err := s.repo.GetLocations(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return locationItemsFromMediaItems(items), nil
+}
+
+// GetRandomLocationsByCategories returns up to limit random GPS items for the selected map categories.
+func (s *ImageService) GetRandomLocationsByCategories(ctx context.Context, categories []string, limit int) ([]model.LocationItem, error) {
+	items, err := s.repo.GetRandomLocationsByCategories(ctx, categories, limit)
+	if err != nil {
+		return nil, err
+	}
+	return locationItemsFromMediaItems(items), nil
+}
+
+// GetNearbyLocations returns GPS-tagged items within radiusKm of the given coordinates.
+func (s *ImageService) GetNearbyLocations(ctx context.Context, lat, lng, radiusKm float64, limit int) ([]model.NearbyLocationItem, error) {
+	rows, err := s.repo.GetNearbyLocations(ctx, lat, lng, radiusKm, limit)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]model.NearbyLocationItem, len(rows))
+	for i, row := range rows {
+		loc := locationItemsFromMediaItems([]*model.MediaItem{row.Item})
+		result[i] = model.NearbyLocationItem{
+			LocationItem: loc[0],
+			DistanceKm:   row.DistanceKm,
+		}
+	}
+	return result, nil
+}
+
+func locationItemsFromMediaItems(items []*model.MediaItem) []model.LocationItem {
 	result := make([]model.LocationItem, len(items))
 	for i, item := range items {
 		result[i] = model.LocationItem{
@@ -218,7 +253,7 @@ func (s *ImageService) GetLocations(ctx context.Context) ([]model.LocationItem, 
 			SourceReference: item.SourceReference,
 		}
 	}
-	return result, nil
+	return result
 }
 
 // GetImageContent fetches image bytes.

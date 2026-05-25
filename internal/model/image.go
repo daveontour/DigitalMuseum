@@ -102,6 +102,32 @@ type ImageSearchParams struct {
 	Region           *string
 }
 
+// GPSCountBySource is one row in GET /images/gps-count-by-source.
+type GPSCountBySource struct {
+	Source string `json:"source"`
+	Count  int64  `json:"count"`
+}
+
+// RandomLocationsRequest is the body for POST /getLocations/random.
+type RandomLocationsRequest struct {
+	Categories []string `json:"categories"`
+	Limit      int      `json:"limit"`
+}
+
+// NearbyLocationsRequest is the body for POST /images/locations/nearby.
+type NearbyLocationsRequest struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	RadiusKm  float64 `json:"radius_km"`
+	Limit     int     `json:"limit"`
+}
+
+// NearbyLocationItem is one GPS-tagged image within a radius search.
+type NearbyLocationItem struct {
+	LocationItem
+	DistanceKm float64 `json:"distance_km"`
+}
+
 // LocationItem is the shape returned by GET /getLocations.
 type LocationItem struct {
 	ID              int64              `json:"id"`
