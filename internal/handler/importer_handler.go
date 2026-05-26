@@ -30,6 +30,7 @@ import (
 	instagramimport "github.com/daveontour/aimuseum/internal/import/instagram"
 	thumbnailsimport "github.com/daveontour/aimuseum/internal/import/thumbnails"
 	whatsappimport "github.com/daveontour/aimuseum/internal/import/whatsapp"
+	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/importer"
 	"github.com/daveontour/aimuseum/internal/importstorage"
 	"github.com/daveontour/aimuseum/internal/keystore"
@@ -278,7 +279,7 @@ func (h *ImporterHandler) RegisterRoutes(r chi.Router) {
 	r.Post("/emails/process/cancel", h.EmailProcessCancel)
 	r.Get("/emails/process/status", h.EmailProcessStatus)
 
-	// Email embedding backfill (embed rows where embedding_vector is NULL)
+	// Email embedding backfill (SQLite: email_embeddings vec0; PG: emails.embedding_vector)
 	r.Post("/emails/embeddings/backfill", h.EmailEmbeddingBackfillStart)
 	r.Get("/emails/embeddings/backfill/stream", h.EmailEmbeddingBackfillStream)
 	r.Post("/emails/embeddings/backfill/cancel", h.EmailEmbeddingBackfillCancel)
@@ -538,9 +539,9 @@ func runThumbnailsInProcess(pool *sql.DB, job *importer.ImportJob, reprocess boo
 	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
 	defer job.Finish()
 
-	// Region updates before (match Python behavior)
-	_, _ = pool.ExecContext(ctx, "SELECT update_location_regions()")
-	_, _ = pool.ExecContext(ctx, "SELECT update_image_location_regions()")
+	// Region updates before (backfill GPS rows missing region)
+	_ = georegion.UpdateLocationRegions(ctx, pool)
+	_ = georegion.UpdateMediaItemRegions(ctx, pool)
 
 	progressCallback := func(stats thumbnailsimport.ImportStats) {
 		statusLine := fmt.Sprintf("Processing: %d/%d items (%.1f%%) | Processed: %d | Errors: %d",
@@ -560,9 +561,9 @@ func runThumbnailsInProcess(pool *sql.DB, job *importer.ImportJob, reprocess boo
 
 	stats, err := thumbnailsimport.ProcessThumbnailsAndExif(ctx, pool, reprocess, progressCallback, cancelledCheck)
 
-	// Region updates after (match Python behavior)
-	_, _ = pool.ExecContext(ctx, "SELECT update_location_regions()")
-	_, _ = pool.ExecContext(ctx, "SELECT update_image_location_regions()")
+	// Region updates after (backfill GPS rows missing region)
+	_ = georegion.UpdateLocationRegions(ctx, pool)
+	_ = georegion.UpdateMediaItemRegions(ctx, pool)
 
 	if job.IsCancelled() {
 		job.UpdateState(map[string]any{"status": "cancelled", "status_line": "Processing cancelled."})
@@ -1885,13 +1886,24 @@ func runEmailEmbeddingBackfill(pool *sql.DB, embeddingSvc *service.EmbeddingServ
 	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
 	defer job.Finish()
 
-	rows, err := pool.QueryContext(ctx, `
+	missingEmbedQuery := `
 		SELECT id, COALESCE(to_addresses, ''), COALESCE(from_address, ''), COALESCE(plain_text, '')
 		FROM emails
 		WHERE embedding_vector IS NULL
+		  AND user_deleted = FALSE
 		  AND COALESCE(user_id, 0) = ?1
-		ORDER BY id ASC
-	`, uid)
+		ORDER BY id ASC`
+	if sqlutil.IsSQLite(ctx, pool) {
+		missingEmbedQuery = `
+		SELECT id, COALESCE(to_addresses, ''), COALESCE(from_address, ''), COALESCE(plain_text, '')
+		FROM emails
+		WHERE user_deleted = FALSE
+		  AND COALESCE(user_id, 0) = ?1
+		  AND NOT EXISTS (SELECT 1 FROM email_embeddings ee WHERE ee.rowid = emails.id)
+		ORDER BY id ASC`
+	}
+
+	rows, err := pool.QueryContext(ctx, missingEmbedQuery, uid)
 	if err != nil {
 		msg := fmt.Sprintf("failed to query emails: %v", err)
 		job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
@@ -1993,24 +2005,64 @@ func runEmailEmbeddingBackfill(pool *sql.DB, embeddingSvc *service.EmbeddingServ
 			continue
 		}
 
-		vectorLiteral := float32SliceToVectorLiteral(vec)
-		// PostgreSQL (pgvector) uses $n placeholders; SQLite uses ?n (see go-sqlite3 $n binding).
-		emailEmbedSQL := `UPDATE emails SET embedding_vector = $1::vector, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND COALESCE(user_id, 0) = $3`
 		if sqlutil.IsSQLite(ctx, pool) {
-			emailEmbedSQL = `UPDATE emails SET embedding_vector = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND COALESCE(user_id, 0) = ?3`
-		}
-		if _, err := pool.ExecContext(ctx, emailEmbedSQL, vectorLiteral, c.id, uid); err != nil {
-			errorsCount++
-			job.UpdateState(map[string]any{
-				"processed":     i + 1,
-				"embedded":      embedded,
-				"skipped":       skipped,
-				"errors":        errorsCount,
-				"status_line":   fmt.Sprintf("Failed updating embedding for email %d: %v", c.id, err),
-				"error_message": fmt.Sprintf("Failed updating embedding for email %d: %v", c.id, err),
-			})
-			job.Broadcast("progress", job.GetState())
-			continue
+			vecBlob, serErr := sqlite_vec.SerializeFloat32(vec)
+			if serErr != nil {
+				errorsCount++
+				job.UpdateState(map[string]any{
+					"processed":     i + 1,
+					"embedded":      embedded,
+					"skipped":       skipped,
+					"errors":        errorsCount,
+					"status_line":   fmt.Sprintf("Failed to serialize embedding for email %d: %v", c.id, serErr),
+					"error_message": fmt.Sprintf("Failed to serialize embedding for email %d: %v", c.id, serErr),
+				})
+				job.Broadcast("progress", job.GetState())
+				continue
+			}
+			intIDsJSON, marshalErr := json.Marshal([]int64{c.id})
+			if marshalErr != nil {
+				errorsCount++
+				job.UpdateState(map[string]any{
+					"processed":     i + 1,
+					"embedded":      embedded,
+					"skipped":       skipped,
+					"errors":        errorsCount,
+					"status_line":   fmt.Sprintf("Failed to serialize email id for email %d: %v", c.id, marshalErr),
+					"error_message": fmt.Sprintf("Failed to serialize email id for email %d: %v", c.id, marshalErr),
+				})
+				job.Broadcast("progress", job.GetState())
+				continue
+			}
+			if err := sqlutil.Vec0Upsert(ctx, pool, "email_embeddings", c.id, vecBlob, string(intIDsJSON)); err != nil {
+				errorsCount++
+				job.UpdateState(map[string]any{
+					"processed":     i + 1,
+					"embedded":      embedded,
+					"skipped":       skipped,
+					"errors":        errorsCount,
+					"status_line":   fmt.Sprintf("Failed saving embedding for email %d: %v", c.id, err),
+					"error_message": fmt.Sprintf("Failed saving embedding for email %d: %v", c.id, err),
+				})
+				job.Broadcast("progress", job.GetState())
+				continue
+			}
+		} else {
+			vectorLiteral := float32SliceToVectorLiteral(vec)
+			emailEmbedSQL := `UPDATE emails SET embedding_vector = $1::vector, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND COALESCE(user_id, 0) = $3`
+			if _, err := pool.ExecContext(ctx, emailEmbedSQL, vectorLiteral, c.id, uid); err != nil {
+				errorsCount++
+				job.UpdateState(map[string]any{
+					"processed":     i + 1,
+					"embedded":      embedded,
+					"skipped":       skipped,
+					"errors":        errorsCount,
+					"status_line":   fmt.Sprintf("Failed updating embedding for email %d: %v", c.id, err),
+					"error_message": fmt.Sprintf("Failed updating embedding for email %d: %v", c.id, err),
+				})
+				job.Broadcast("progress", job.GetState())
+				continue
+			}
 		}
 
 		embedded++

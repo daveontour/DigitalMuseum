@@ -102,7 +102,7 @@ func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset i
 		dir = "DESC NULLS LAST"
 	}
 	q := `
-		SELECT ` + attachmentInfoCols + `, octet_length(mb.image_data) AS sz
+		SELECT ` + attachmentInfoCols + `, LENGTH(mb.image_data) AS sz
 		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		JOIN emails e ON e.id = ` + emailIDJoinExpr + `
@@ -112,7 +112,7 @@ func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset i
 	q, args = addUIDFilterQualified(q, args, uid, "mm")
 	args = append(args, offset)
 	q += fmt.Sprintf(`
-		ORDER BY octet_length(mb.image_data) %s
+		ORDER BY LENGTH(mb.image_data) %s
 		OFFSET ?%d
 		LIMIT 1`, dir, len(args))
 	var a model.AttachmentInfo
@@ -236,9 +236,9 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 	switch order {
 	case "size":
 		if direction == "desc" {
-			orderExpr = "octet_length(mb.image_data) DESC NULLS LAST"
+			orderExpr = "LENGTH(mb.image_data) DESC NULLS LAST"
 		} else {
-			orderExpr = "octet_length(mb.image_data) ASC NULLS LAST"
+			orderExpr = "LENGTH(mb.image_data) ASC NULLS LAST"
 		}
 	case "date":
 		if direction == "desc" {
@@ -276,7 +276,7 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 	listBase := fmt.Sprintf(`
 		SELECT mm.id, COALESCE(mm.title,'attachment'), COALESCE(mm.media_type,'application/octet-stream'),
 		       e.id, e.subject, e.from_address, e.date, e.folder,
-		       octet_length(mb.image_data) AS sz
+		       LENGTH(mb.image_data) AS sz
 		FROM media_items mm
 		JOIN media_blobs mb ON mb.id = mm.media_blob_id
 		JOIN emails e ON e.id = `+emailIDJoinExpr+`

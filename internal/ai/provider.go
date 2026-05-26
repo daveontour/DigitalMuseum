@@ -137,7 +137,7 @@ func toolDefinitions() []map[string]any {
 		},
 		{
 			"name":        "search_messages_by_similarity",
-			"description": "Vector similarity search over archived messages using embedding_vector. Accepts free text, embeds it, and returns the top 20 closest messages.",
+			"description": "Vector similarity search over archived messages using message_embeddings. Accepts free text, embeds it, and returns the top 20 closest messages.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -148,7 +148,7 @@ func toolDefinitions() []map[string]any {
 		},
 		{
 			"name":        "search_emails_by_similarity",
-			"description": "Vector similarity search over archived emails using embedding_vector. Accepts free text, embeds it, and returns the top 20 closest emails.",
+			"description": "Vector similarity search over archived emails using sqlite-vec email_embeddings. Accepts free text, embeds it, and returns the top 20 closest emails.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{

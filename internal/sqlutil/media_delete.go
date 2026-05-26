@@ -30,7 +30,7 @@ func DeleteMediaItemsByUserAndSourceTx(ctx context.Context, tx *sql.Tx, userID i
 	if _, err = tx.ExecContext(ctx, `DELETE FROM media_items WHERE user_id = ?1 AND source = ?2`, userID, source); err != nil {
 		return 0, fmt.Errorf("delete media_items source=%s: %w", source, err)
 	}
-	tag, err := tx.ExecContext(ctx, `DELETE FROM media_blobs WHERE id IN (SELECT blob_id FROM `+mediaItemsPurgeTempTable+`)`)
+	tag, err := tx.ExecContext(ctx, `DELETE FROM media_blobs WHERE id IN (SELECT blob_id FROM `+mediaItemsPurgeTempTable+`) AND NOT EXISTS (SELECT 1 FROM media_items WHERE media_blob_id = media_blobs.id)`)
 	if err != nil {
 		return 0, fmt.Errorf("delete media_blobs source=%s: %w", source, err)
 	}
@@ -70,9 +70,9 @@ func DeleteEmailAttachmentMediaBySourceRefsTx(ctx context.Context, tx *sql.Tx, r
 		return fmt.Errorf("delete email attachment media_items: %w", err)
 	}
 	deleteBlobsQ := `
-		DELETE FROM media_blobs b
-		WHERE b.id IN (SELECT blob_id FROM ` + emailAttachmentBlobPurgeTempTable + `)
-		  AND NOT EXISTS (SELECT 1 FROM media_items m WHERE m.media_blob_id = b.id)`
+		DELETE FROM media_blobs
+		WHERE id IN (SELECT blob_id FROM ` + emailAttachmentBlobPurgeTempTable + `)
+		  AND NOT EXISTS (SELECT 1 FROM media_items WHERE media_blob_id = media_blobs.id)`
 	if _, err := tx.ExecContext(ctx, deleteBlobsQ); err != nil {
 		return fmt.Errorf("delete unreferenced email attachment blobs: %w", err)
 	}

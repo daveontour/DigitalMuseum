@@ -197,6 +197,11 @@ func (s *ImageService) CountGPSBySource(ctx context.Context) ([]model.GPSCountBy
 	return s.repo.CountGPSBySource(ctx)
 }
 
+// CountGPSByRegion returns counts of GPS-tagged media_items grouped by region code.
+func (s *ImageService) CountGPSByRegion(ctx context.Context) ([]model.GPSRegionCount, error) {
+	return s.repo.CountGPSByRegion(ctx)
+}
+
 // GetLocations returns items that have GPS data, shaped for the map view.
 func (s *ImageService) GetLocations(ctx context.Context) ([]model.LocationItem, error) {
 	items, err := s.repo.GetLocations(ctx)
@@ -207,8 +212,8 @@ func (s *ImageService) GetLocations(ctx context.Context) ([]model.LocationItem, 
 }
 
 // GetRandomLocationsByCategories returns up to limit random GPS items for the selected map categories.
-func (s *ImageService) GetRandomLocationsByCategories(ctx context.Context, categories []string, limit int) ([]model.LocationItem, error) {
-	items, err := s.repo.GetRandomLocationsByCategories(ctx, categories, limit)
+func (s *ImageService) GetRandomLocationsByCategories(ctx context.Context, categories []string, region string, limit int) ([]model.LocationItem, error) {
+	items, err := s.repo.GetRandomLocationsByCategories(ctx, categories, region, limit)
 	if err != nil {
 		return nil, err
 	}

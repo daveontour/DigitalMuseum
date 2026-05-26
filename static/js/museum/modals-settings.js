@@ -3358,7 +3358,6 @@ Modals.BackgroundJobs = (() => {
         if (job.description) {
             const small = document.createElement('div');
             small.style.fontSize = '0.85em';
-            small.style.color = '#666';
             small.style.marginTop = '2px';
             small.textContent = job.description;
             tdName.appendChild(small);

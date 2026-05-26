@@ -36,6 +36,22 @@ function appendEmailSourceSearchParam(params, selectEl, elementId) {
     params.append('email_source', v);
 }
 
+/** Light canvas + dark text so email HTML remains readable in the dark UI. */
+function wrapEmailHtmlForIframeDisplay(html) {
+    const readabilityStyle = '<style data-dm-email-readability>html{color-scheme:light;}html,body{background-color:#f0f8ff!important;color:#1a1a1a!important;}body{padding:1rem 1.25rem;line-height:1.6;word-wrap:break-word;}a{color:#2563eb;}</style>';
+    const trimmed = String(html || '').trim();
+    if (!trimmed) {
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8">' + readabilityStyle + '</head><body></body></html>';
+    }
+    if (/<head[\s>]/i.test(trimmed)) {
+        return trimmed.replace(/<head([^>]*)>/i, '<head$1>' + readabilityStyle);
+    }
+    if (/<html[\s>]/i.test(trimmed)) {
+        return trimmed.replace(/<html([^>]*)>/i, '<html$1><head><meta charset="UTF-8">' + readabilityStyle + '</head>');
+    }
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8">' + readabilityStyle + '</head><body>' + trimmed + '</body></html>';
+}
+
 // Modals.Suggestions = (() => {
 //         function executeSuggestion(sugg, cat) {
 //             Modals._closeModal(DOM.suggestionsModal);
@@ -1071,33 +1087,20 @@ Modals.EmailGallery = (() => {
                     const response = await fetch(`/emails/${email.emailId}/html`);
                     if (response.ok) {
                         const htmlContent = await response.text();
-                        DOM.emailGalleryIframe.srcdoc = htmlContent;
+                        DOM.emailGalleryIframe.srcdoc = wrapEmailHtmlForIframeDisplay(htmlContent);
                         DOM.emailGalleryIframe.style.display = 'block';
                     } else {
                         // Fallback to plain text
                         const textResponse = await fetch(`/emails/${email.emailId}/text`);
                         if (textResponse.ok) {
                             const textContent = await textResponse.text();
-                            const wrappedHtml = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        line-height: 1.6;
-        max-width: 800px;
-        margin: 20px auto;
-        padding: 20px;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-    }
-</style>
-</head>
-<body>
-${textContent}
-</body>
-</html>`;
+                            const escaped = String(textContent)
+                                .replace(/&/g, '&amp;')
+                                .replace(/</g, '&lt;')
+                                .replace(/>/g, '&gt;');
+                            const wrappedHtml = wrapEmailHtmlForIframeDisplay(
+                                '<div style="white-space:pre-wrap;">' + escaped + '</div>'
+                            );
                             DOM.emailGalleryIframe.srcdoc = wrappedHtml;
                             DOM.emailGalleryIframe.style.display = 'block';
                         } else {

@@ -37,20 +37,178 @@ Modals.Locations = (() => {
         const SHUFFLE_MARKER_LIMIT = 500;
         const DEFAULT_MARKER_LIMIT = 1000;
 
+        const REGION_LABELS = {
+            aus: 'Australia',
+            dxb: 'Dubai',
+            eur: 'Europe',
+            usa: 'USA',
+            af: 'Africa',
+            me: 'Middle East',
+            asia: 'Asia',
+            central_america: 'Central America',
+            carribean: 'Caribbean',
+            nz: 'New Zealand',
+            south_america: 'South America',
+            oth: 'Other',
+        };
+
+        let selectedRegion = '';
+        let regionSelectorBound = false;
+
+        function _regionLabel(code) {
+            if (code == null || code === '') return 'Unknown';
+            const k = String(code).toLowerCase().trim();
+            return REGION_LABELS[k] || code;
+        }
+
+        function _isRegionFilterActive() {
+            return selectedRegion != null && String(selectedRegion).trim() !== '';
+        }
+
+        function _findFacebookLayerControlInput() {
+            if (!layerControl || !layerControl._container) return null;
+            const labels = layerControl._container.querySelectorAll('.leaflet-control-layers-overlays label');
+            for (const label of labels) {
+                if ((label.textContent || '').includes('Facebook Locations')) {
+                    return label.querySelector('input[type="checkbox"]');
+                }
+            }
+            return null;
+        }
+
+        function _syncFacebookLayerForRegionFilter() {
+            if (!mapView || !fbMarkersLayer) return;
+            const input = _findFacebookLayerControlInput();
+            const label = input && input.closest('label');
+            const regionActive = _isRegionFilterActive();
+
+            _suppressLayerEvents = true;
+            if (regionActive) {
+                if (mapView.hasLayer(fbMarkersLayer)) {
+                    mapView.removeLayer(fbMarkersLayer);
+                }
+                _setLayerMarkers(fbMarkersLayer, []);
+                if (input) {
+                    input.checked = false;
+                    input.disabled = true;
+                }
+                if (label) {
+                    label.classList.add('geo-layer-disabled');
+                    label.title = 'Hidden while a region filter is active';
+                }
+            } else if (input) {
+                input.disabled = false;
+                if (label) {
+                    label.classList.remove('geo-layer-disabled');
+                    label.removeAttribute('title');
+                }
+            }
+            _suppressLayerEvents = false;
+        }
+
+        function _bindRegionSelector(sel) {
+            if (!sel || regionSelectorBound) return;
+            regionSelectorBound = true;
+            sel.addEventListener('change', () => {
+                selectedRegion = sel.value;
+                _syncFacebookLayerForRegionFilter();
+                _reloadLocationDataForCurrentFilters();
+            });
+        }
+
+        function _setRegionSelectorOptions(sel, regions, preserveSelection) {
+            const prev = preserveSelection ? (sel.value || selectedRegion) : '';
+            sel.innerHTML = '';
+            const allOpt = document.createElement('option');
+            allOpt.value = '';
+            allOpt.textContent = 'All regions';
+            sel.appendChild(allOpt);
+            (regions || []).forEach(row => {
+                const code = row && row.region != null ? String(row.region).trim() : '';
+                if (!code) return;
+                const o = document.createElement('option');
+                o.value = code;
+                const count = row.count != null ? Number(row.count) : 0;
+                o.textContent = count > 0
+                    ? `${_regionLabel(code)} (${count.toLocaleString()})`
+                    : _regionLabel(code);
+                sel.appendChild(o);
+            });
+            if (prev && Array.from(sel.options).some(o => o.value === prev)) {
+                sel.value = prev;
+                selectedRegion = prev;
+            } else {
+                sel.value = '';
+                selectedRegion = '';
+            }
+        }
+
+        function _getRegionSelectEl() {
+            return DOM.geoMetadataRegionSelect
+                || document.getElementById('geo-metadata-region-select')
+                || (DOM.geoMetadataModal && DOM.geoMetadataModal.querySelector('#geo-metadata-region-select'));
+        }
+
+        async function _fetchGPSRegions() {
+            const response = await fetch('/images/gps-regions', { cache: 'no-store' });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch GPS regions: ${response.status}`);
+            }
+            const data = await response.json();
+            return Array.isArray(data.regions) ? data.regions : [];
+        }
+
+        async function _populateRegionSelector(preserveSelection) {
+            let regions = [];
+            try {
+                regions = await _fetchGPSRegions();
+            } catch (error) {
+                console.error('Error loading GPS regions for map filter:', error);
+                regions = Object.keys(REGION_LABELS).map(code => ({ region: code, count: 0 }));
+            }
+
+            const sel = _getRegionSelectEl();
+            if (!sel) {
+                console.warn('Locations map region selector element not found');
+                return regions;
+            }
+            _bindRegionSelector(sel);
+            _setRegionSelectorOptions(sel, regions, preserveSelection !== false);
+            _syncFacebookLayerForRegionFilter();
+            return regions;
+        }
+
+        async function _reloadLocationDataForCurrentFilters(options = {}) {
+            if (!mapView || !layerControl) {
+                await _loadLocationData(['all'], null, options);
+                return;
+            }
+            const { activeMap, categories } = getActiveLayerMap();
+            await _loadLocationData(
+                categories.length > 0 ? categories : ['all'],
+                activeMap,
+                options
+            );
+        }
+
         function init() {
-            if (DOM.geoMapFixedBtn) DOM.geoMapFixedBtn.addEventListener('click', _openGeoMapInNewTab);
             if (DOM.closeGeoMetadataModalBtn) DOM.closeGeoMetadataModalBtn.addEventListener('click', close);
             if (DOM.shufflePhotosBtn) DOM.shufflePhotosBtn.addEventListener('click', shufflePhotoMarkers);
         }
 
-        function open() {
+        async function open() {
+            if (!DOM.geoMetadataModal) {
+                console.error('Locations map modal element not found');
+                return;
+            }
             Modals._openModal(DOM.geoMetadataModal);
+            await _populateRegionSelector(true);
             if (!mapView || !layerControl) {
-                _loadLocationData(['all']);
+                await _loadLocationData(['all'], null, { region: selectedRegion });
                 return;
             }
             const { activeMap, categories } = getActiveLayerMap();
-            _loadLocationData(categories.length > 0 ? categories : ['all'], activeMap);
+            await _loadLocationData(categories.length > 0 ? categories : ['all'], activeMap, { region: selectedRegion });
         }
 
         function close() {
@@ -58,14 +216,14 @@ Modals.Locations = (() => {
         }
 
         function openMapView() {
-            open();
+            void open();
         }
 
         async function shufflePhotoMarkers() {
             if (!mapView || !layerControl) return;
             const { activeMap, categories } = getActiveLayerMap();
             if (categories.length === 0) return;
-            await _loadLocationData(categories, activeMap, { limit: SHUFFLE_MARKER_LIMIT });
+            await _loadLocationData(categories, activeMap, { limit: SHUFFLE_MARKER_LIMIT, region: selectedRegion });
         }
 
         function _sourceToActiveCategory(source) {
@@ -206,7 +364,9 @@ Modals.Locations = (() => {
                         activeMap.biography = mapView.hasLayer(layer);
                         break;
                     case 'FacebookLocations':
-                        activeMap.facebook = mapView.hasLayer(layer);
+                        activeMap.facebook = _isRegionFilterActive()
+                            ? false
+                            : mapView.hasLayer(layer);
                         break;
                     case 'OtherLocations':
                         activeMap.other = mapView.hasLayer(layer);
@@ -220,20 +380,25 @@ Modals.Locations = (() => {
 
         async function _loadLocationData(categories, activeMapOverride, options = {}) {
             const limit = options.limit || DEFAULT_MARKER_LIMIT;
+            const region = options.region != null ? options.region : selectedRegion;
+            const regionActive = region != null && String(region).trim() !== '';
             try {
+                const placesPromise = regionActive
+                    ? Promise.resolve({ places: [] })
+                    : fetch('/facebook/places').then(r => r.json());
                 const [locationsData, placesData, gpsData] = await Promise.all([
                     fetch('/getLocations/random', {
                         method: 'POST',
                         cache: 'no-store',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ categories, limit, _nonce: Date.now() }),
+                        body: JSON.stringify({ categories, limit, region, _nonce: Date.now() }),
                     }).then(r => {
                         if (!r.ok) {
                             throw new Error(`Failed to fetch random locations: ${r.status}`);
                         }
                         return r.json();
                     }),
-                    fetch('/facebook/places').then(r => r.json()),
+                    placesPromise,
                     fetch('/images/gps-count-by-source').then(r => r.json()),
                 ]);
 
@@ -247,9 +412,11 @@ Modals.Locations = (() => {
                 const activeMap = activeMapOverride || getActiveLayerMap().activeMap;
                 if (categories.length === 0) {
                     _clearMediaMarkers(activeMap);
+                    _syncFacebookLayerForRegionFilter();
                     return;
                 }
                 _applyLocationsToMap(activeMap);
+                _syncFacebookLayerForRegionFilter();
             } catch (error) {
                 console.error('Error loading location data:', error);
             }
@@ -264,7 +431,8 @@ Modals.Locations = (() => {
             _setLayerMarkers(otherMarkersLayer, []);
 
             fbMarkers = [];
-            if (activeMap && activeMap.facebook) {
+            const showFacebook = activeMap && activeMap.facebook && !_isRegionFilterActive();
+            if (showFacebook) {
                 fbData.forEach(item => {
                     if (!item.latitude || !item.longitude) return;
                     const marker = L.marker([item.latitude, item.longitude], { icon: darkBlueMarker });
@@ -278,7 +446,7 @@ Modals.Locations = (() => {
 
             const shownCount = document.getElementById('geo-metadata-shown-count');
             if (shownCount) {
-                const shown = activeMap && activeMap.facebook ? fbMarkers.length : 0;
+                const shown = showFacebook ? fbMarkers.length : 0;
                 shownCount.textContent = shown > 0
                     ? `Showing ${shown} GPS locations for selected layers`
                     : 'No GPS location layers selected';
@@ -310,12 +478,13 @@ Modals.Locations = (() => {
             });
 
             fbMarkers = [];
+            const showFacebook = activeMap.facebook && !_isRegionFilterActive();
             fbData.forEach(item => {
                 if (!item.latitude || !item.longitude) return;
                 const marker = L.marker([item.latitude, item.longitude], { icon: darkBlueMarker });
                 marker.bindPopup(item.name || 'Facebook Place');
                 fbMarkers.push(marker);
-                if (activeMap.facebook) {
+                if (showFacebook) {
                     latlngs.push([item.latitude, item.longitude]);
                 }
             });
@@ -326,7 +495,7 @@ Modals.Locations = (() => {
             _setLayerMarkers(messageMarkersLayer, activeMap.message ? buckets.message : []);
             _setLayerMarkers(biographyMarkersLayer, activeMap.biography ? buckets.biography : []);
             _setLayerMarkers(otherMarkersLayer, activeMap.other ? buckets.other : []);
-            _setLayerMarkers(fbMarkersLayer, activeMap.facebook ? fbMarkers : []);
+            _setLayerMarkers(fbMarkersLayer, showFacebook ? fbMarkers : []);
 
             let shown = 0;
             if (activeMap.filesystem) shown += buckets.filesystem.length;
@@ -335,7 +504,7 @@ Modals.Locations = (() => {
             if (activeMap.message) shown += buckets.message.length;
             if (activeMap.biography) shown += buckets.biography.length;
             if (activeMap.other) shown += buckets.other.length;
-            if (activeMap.facebook) shown += fbMarkers.length;
+            if (showFacebook) shown += fbMarkers.length;
 
             const shownCount = document.getElementById('geo-metadata-shown-count');
             if (shownCount) {
@@ -350,12 +519,15 @@ Modals.Locations = (() => {
 
         async function layerFiltersChanged() {
             if (!mapView || !layerControl || _suppressLayerEvents) return;
+            if (_isRegionFilterActive()) {
+                _syncFacebookLayerForRegionFilter();
+            }
             const { activeMap, categories } = getActiveLayerMap();
             if (categories.length === 0) {
                 _clearMediaMarkers(activeMap);
                 return;
             }
-            await _loadLocationData(categories, activeMap);
+            await _loadLocationData(categories, activeMap, { region: selectedRegion });
         }
 
         function _ensureMapView() {
@@ -406,6 +578,8 @@ Modals.Locations = (() => {
             layerControl.addOverlay(otherMarkersLayer, 'Other Locations (' + _layerLabelCount('other') + ')');
 
             _suppressLayerEvents = false;
+
+            _syncFacebookLayerForRegionFilter();
 
             mapView.on('overlayadd overlayremove baselayerchange', function() {
                 layerFiltersChanged();

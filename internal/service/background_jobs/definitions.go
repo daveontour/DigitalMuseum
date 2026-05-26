@@ -37,8 +37,8 @@ var DefaultDefinitions = []JobDef{
 	},
 	{
 		Name:                   JobEmailEmbeddings,
-		Title:                  "Email Content Encoding",
-		Description:            "Encode email bodies so to enable similarity searches.",
+		Title:                  "Optimise Emails for Searching",
+		Description:            "Embed email bodies for semantic similarity search.",
 		DefaultIntervalSeconds: 600,
 	},
 }

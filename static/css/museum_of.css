@@ -3132,7 +3132,7 @@ body {
 .config-section {
     margin-bottom: 0px;
     padding: 20px;
-    background: var(--color-bg-alt);
+    background: aliceblue;
     border-radius: 8px;
 }
 
@@ -4110,6 +4110,22 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 #data-import-modal .data-import-table-scroll-region--background-jobs .data-import-detail-sidebar {
     display: none;
+}
+#background-jobs-table td:first-child {
+    max-width: 320px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+#background-jobs-table td:nth-child(6) {
+    max-width: 280px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 #data-import-modal .data-import-cards-grid {
     display: grid;
@@ -6018,6 +6034,23 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
   flex-direction: column;
   padding: 0;
 }
+.geo-metadata-region-select {
+  min-width: 9em;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  padding: 0.3em 0.4em;
+  font-size: var(--text-md);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.geo-metadata-region-select option {
+  color: #1e293b;
+  background: #fff;
+}
+.leaflet-control-layers-overlays label.geo-layer-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .geo-metadata-modal-body {
   display: flex;
   flex-direction: row;
@@ -6740,7 +6773,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     gap: 0.5rem;
     margin-top: 0.15rem;
     padding-top: 0.35rem;
-    border-top: 1px solid #e8eaed;
+    border-top: 0px solid #e8eaed;
 }
 
 .email-gallery-button-row:has(.email-gallery-sort-inline) {
@@ -7202,6 +7235,37 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     white-space: nowrap;
 }
 
+/* Email Manager dialog — table chrome */
+#email-editor-modal table.email-editor-table,
+#email-editor-modal table.email-editor-table thead tr,
+#email-editor-modal table.email-editor-table thead th,
+#email-editor-modal table.email-editor-table tbody td {
+    background-color: aliceblue !important;
+    color: #000 !important;
+}
+
+#email-editor-modal table.email-editor-table thead th {
+    color: #000 !important;
+}
+
+#email-editor-modal table.email-editor-table tbody tr:nth-child(odd),
+#email-editor-modal table.email-editor-table tbody tr:nth-child(even) {
+    background-color: aliceblue !important;
+}
+
+#email-editor-modal table.email-editor-table tbody tr:hover,
+#email-editor-modal table.email-editor-table td.email-editor-col-personal:hover,
+#email-editor-modal table.email-editor-table td.email-editor-col-business:hover,
+#email-editor-modal table.email-editor-table td.email-editor-col-important:hover,
+#email-editor-modal table.email-editor-table td.email-editor-col-use-by-ai:hover {
+    background-color: #d4e8ff !important;
+}
+
+#email-editor-modal table.email-editor-table tbody tr.selected {
+    background-color: #b8d4f0 !important;
+    border-left: 3px solid var(--color-blue);
+}
+
 /* Pagination Styles */
 .email-editor-pagination {
     flex-shrink: 0;
@@ -7578,7 +7642,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     margin: 0.75rem 1.25rem 1rem;
     border: 1px solid var(--color-border);
     border-radius: 8px;
-    background: var(--color-bg-base);
+    background: aliceblue;
     display: flex;
     flex-direction: column;
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -7591,7 +7655,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     display: block;
     flex: 1;
     min-height: 0;
-    background: var(--color-bg-elevated);
+    background-color: aliceblue;
     border-radius: 6px;
 }
 
@@ -7618,6 +7682,10 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 1em;
     padding: 0.5em 0;
+    padding-left:5px;
+    padding-right: 5px;;
+    background-color: aliceblue;
+    border-radius: 6px;
 }
 
 /* New Image Gallery Styles */
@@ -10002,6 +10070,19 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     min-height: 0;
     overflow-y: auto;
 }
+
+/* Contacts and Relationships dialog — table chrome */
+#contacts-modal table.contacts-table,
+#contacts-modal table.contacts-table thead tr,
+#contacts-modal table.contacts-table thead th,
+#contacts-modal table.contacts-table tbody td {
+    background-color: aliceblue !important;
+    color: #000 !important;
+}
+#contacts-modal table.manage-contacts-data-table.contacts-table thead th {
+    color: #000 !important;
+}
+
 .contacts-table thead th {
     position: sticky;
     top: 0;
@@ -10009,11 +10090,17 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     z-index: 1;
     box-shadow: 0 1px 0 0 var(--color-border);
 }
+#contacts-modal table.contacts-table thead th {
+    background: aliceblue !important;
+}
 #contacts-pagination-bottom {
     display: none !important;
 }
 .contacts-table td, .contacts-table th {
     border-bottom: 1px solid #e9ecef;
+}
+#contacts-modal .contacts-table tbody tr:hover {
+    background-color: #d4e8ff !important;
 }
 .contacts-table tbody tr:hover {
     background-color: var(--color-bg-alt);
@@ -10023,6 +10110,9 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 .contacts-sortable-header:hover {
     background-color: #e8ecf2 !important;
+}
+#contacts-modal .contacts-sortable-header:hover {
+    background-color: #c8e0f8 !important;
 }
 .contacts-sortable-header.contacts-sort-asc::after {
     content: ' \25B2';

@@ -180,6 +180,14 @@ func (r *ImageRepo) Search(ctx context.Context, p model.ImageSearchParams) ([]*m
 	if p.HasGPS != nil {
 		addEq("has_gps", *p.HasGPS)
 	}
+	if p.HasThumbnail != nil && *p.HasThumbnail {
+		conds = append(conds, `EXISTS (
+			SELECT 1 FROM media_blobs mb
+			WHERE mb.id = media_items.media_blob_id
+			  AND mb.thumbnail_data IS NOT NULL
+			  AND LENGTH(mb.thumbnail_data) > 0
+		)`)
+	}
 	if p.AvailableForTask != nil {
 		addEq("available_for_task", *p.AvailableForTask)
 	}
@@ -454,9 +462,9 @@ func buildRandomLocationSourceFilter(sources []string, includeOther bool, start 
 }
 
 // GetRandomLocationsByCategories returns up to limit random media_items with GPS for the given map categories.
-func (r *ImageRepo) GetRandomLocationsByCategories(ctx context.Context, categories []string, limit int) ([]*model.MediaItem, error) {
+func (r *ImageRepo) GetRandomLocationsByCategories(ctx context.Context, categories []string, region string, limit int) ([]*model.MediaItem, error) {
 	sources, includeOther := resolveLocationCategorySources(categories)
-	sourceSQL, sourceArgs, _ := buildRandomLocationSourceFilter(sources, includeOther, 1)
+	sourceSQL, sourceArgs, nextN := buildRandomLocationSourceFilter(sources, includeOther, 1)
 	if sourceSQL == "" {
 		return []*model.MediaItem{}, nil
 	}
@@ -468,6 +476,12 @@ func (r *ImageRepo) GetRandomLocationsByCategories(ctx context.Context, categori
 	}
 
 	args := append([]any{}, sourceArgs...)
+	whereSQL := sourceSQL
+	if region = strings.TrimSpace(region); region != "" {
+		whereSQL += fmt.Sprintf(" AND region = ?%d", nextN)
+		args = append(args, region)
+		nextN++
+	}
 	limitIdx := len(args) + 1
 	args = append(args, limit)
 	q := fmt.Sprintf(`SELECT %s FROM media_items
@@ -477,7 +491,7 @@ func (r *ImageRepo) GetRandomLocationsByCategories(ctx context.Context, categori
 	          AND %s
 	        ORDER BY RANDOM()
 	        LIMIT ?%d
-	      )`, mediaItemColumns, sourceSQL, limitIdx)
+	      )`, mediaItemColumns, whereSQL, limitIdx)
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -575,6 +589,33 @@ func (r *ImageRepo) CountGPSBySource(ctx context.Context) ([]model.GPSCountBySou
 	for rows.Next() {
 		var row model.GPSCountBySource
 		if err := rows.Scan(&row.Source, &row.Count); err != nil {
+			return nil, err
+		}
+		counts = append(counts, row)
+	}
+	return counts, rows.Err()
+}
+
+// CountGPSByRegion returns counts of GPS-tagged media_items grouped by region code.
+func (r *ImageRepo) CountGPSByRegion(ctx context.Context) ([]model.GPSRegionCount, error) {
+	q := `SELECT TRIM(region), COUNT(*)
+	      FROM media_items
+	      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+	        AND region IS NOT NULL AND TRIM(region) != ''`
+	args := []any{}
+	// uid := uidFromCtx(ctx)
+	// q, args = addUIDFilter(q, args, uid)
+	q += ` GROUP BY TRIM(region) ORDER BY COUNT(*) DESC, TRIM(region) ASC`
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("CountGPSByRegion: %w", err)
+	}
+	defer rows.Close()
+
+	var counts []model.GPSRegionCount
+	for rows.Next() {
+		var row model.GPSRegionCount
+		if err := rows.Scan(&row.Region, &row.Count); err != nil {
 			return nil, err
 		}
 		counts = append(counts, row)

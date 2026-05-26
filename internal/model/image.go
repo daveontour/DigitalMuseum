@@ -94,6 +94,7 @@ type ImageSearchParams struct {
 	Year             *int
 	Month            *int
 	HasGPS           *bool
+	HasThumbnail     *bool
 	Rating           *int
 	RatingMin        *int
 	RatingMax        *int
@@ -108,10 +109,17 @@ type GPSCountBySource struct {
 	Count  int64  `json:"count"`
 }
 
+// GPSRegionCount is one row in GET /images/gps-regions.
+type GPSRegionCount struct {
+	Region string `json:"region"`
+	Count  int64  `json:"count"`
+}
+
 // RandomLocationsRequest is the body for POST /getLocations/random.
 type RandomLocationsRequest struct {
 	Categories []string `json:"categories"`
 	Limit      int      `json:"limit"`
+	Region     string   `json:"region,omitempty"`
 }
 
 // NearbyLocationsRequest is the body for POST /images/locations/nearby.

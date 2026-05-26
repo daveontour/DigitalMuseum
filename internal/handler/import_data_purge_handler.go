@@ -160,6 +160,16 @@ func (h *ImportDataPurgeHandler) Purge(w http.ResponseWriter, r *http.Request) {
 					SELECT id FROM messages WHERE COALESCE(user_id, 0) = ?1
 				)`, uid)
 		}
+	case "email_embeddings":
+		tag, e := h.pool.ExecContext(ctx, `
+			DELETE FROM email_embeddings
+			WHERE rowid IN (
+				SELECT id FROM emails WHERE COALESCE(user_id, 0) = ?1
+			)`, uid)
+		err = e
+		if err == nil {
+			deleted = sqlutil.RowsAffected(tag)
+		}
 	case "media_tag_embeddings":
 		tag, e := h.pool.ExecContext(ctx, `
 			DELETE FROM media_tag_embeddings

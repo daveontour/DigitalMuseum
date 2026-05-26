@@ -1529,6 +1529,24 @@
                                         </div>
                                     </div>
                                 </article>
+                                <article class="data-import-card data-import-row" data-import="email_embeddings">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-envelope"></i> Optimise Emails for Searching</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed email bodies for semantic similarity search. Only emails missing vectors are processed.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="email_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="email_embeddings" title="Deletes all email embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
                                 <article class="data-import-card data-import-row" data-import="facebook_post_text_embeddings">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-file-alt"></i> Optimise Facebook Post Text for Searching</h3>
@@ -2187,9 +2205,17 @@
         <div id="geo-metadata-modal" class="modal">
             <div class="modal-content geo-metadata-modal-content">
                 <div class="modal-header">
-                    <button id="shuffle-photos-btn" class="modal-btn" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.9em; font-size: var(--text-md); flex-shrink: 0;">
-                        <i class="fas fa-random" style="margin-right: 0.4em;"></i>Shuffle
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 0.75em; flex-shrink: 0;">
+                        <button id="shuffle-photos-btn" class="modal-btn" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.9em; font-size: var(--text-md); flex-shrink: 0;">
+                            <i class="fas fa-random" style="margin-right: 0.4em;"></i>Shuffle
+                        </button>
+                        <div id="geo-metadata-region-control" style="display: flex; align-items: center; gap: 0.4em; flex-shrink: 0;">
+                            <label for="geo-metadata-region-select" style="font-size: var(--text-md); white-space: nowrap;">Region</label>
+                            <select id="geo-metadata-region-select" class="geo-metadata-region-select" aria-label="Filter by region">
+                                <option value="" selected>All regions</option>
+                            </select>
+                        </div>
+                    </div>
                     <h2 style="text-align: center;"><i class="fas fa-map-marker-alt"></i> Locations Map</h2>
                     <button id="close-geo-metadata-modal" class="modal-close-btn">&times;</button>
                 </div>
@@ -2539,6 +2565,10 @@
                                     <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
                                         <input type="checkbox" id="new-image-gallery-has-gps">
                                         Has GPS
+                                    </label>
+                                    <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
+                                        <input type="checkbox" id="new-image-gallery-has-thumbnail">
+                                        Has Thumbnail
                                     </label>
                                 </div>
                                 <div class="new-image-gallery-button-row email-gallery-button-row">
@@ -3790,7 +3820,7 @@
     <script src="/static/js/museum/modals-media.js" defer></script>
     <script src="/static/js/museum/modals-suggestions.js" defer></script>
     <script src="/static/js/museum/modals-email.js" defer></script>
-    <script src="/static/js/museum/modals-comms.js" defer></script>
+    <script src="/static/js/museum/modals-comms.js?v={{ static_modals_comms_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-people.js" defer></script>
     <script src="/static/js/museum/modals-artefacts.js" defer></script>
     <script src="/static/js/museum/modals-sensitive.js" defer></script>

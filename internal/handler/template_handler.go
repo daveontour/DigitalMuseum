@@ -160,6 +160,12 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 	} else {
 		extras["static_modals_settings_js_cache_bust"] = "0"
 	}
+	// Bust cache for modals-comms.js (Locations map, SMS, etc.).
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "modals-comms.js")); err == nil {
+		extras["static_modals_comms_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		extras["static_modals_comms_js_cache_bust"] = "0"
+	}
 	// Non-local deployments hide server filesystem path import tiles; local shows them.
 	if h.deploymentNatureLocal {
 		extras["deployment_nature_body_class"] = ""

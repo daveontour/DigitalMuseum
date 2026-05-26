@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/daveontour/aimuseum/internal/georegion"
 )
 
 const coordTolerance = 0.0001 // ~11 meters
@@ -81,10 +83,9 @@ func (s *FacebookPlacesStorage) SaveOrUpdateLocation(ctx context.Context, name, 
 	return true, nil
 }
 
-// UpdateLocationRegions calls the database function update_location_regions().
+// UpdateLocationRegions sets locations.region from latitude/longitude bounding boxes.
 func (s *FacebookPlacesStorage) UpdateLocationRegions(ctx context.Context) error {
-	_, err := s.pool.ExecContext(ctx, "SELECT update_location_regions()")
-	if err != nil {
+	if err := georegion.UpdateLocationRegions(ctx, s.pool); err != nil {
 		return fmt.Errorf("update_location_regions failed: %w", err)
 	}
 	return nil

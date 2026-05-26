@@ -161,6 +161,7 @@ func (h *ImageHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/images/years", h.GetYears)
 	r.Get("/images/tags", h.GetTags)
 	r.Get("/images/gps-count-by-source", h.GetGPSCountBySource)
+	r.Get("/images/gps-regions", h.GetGPSRegions)
 	r.Post("/images/locations/nearby", h.GetNearbyLocations)
 	r.Put("/images/bulk-update", h.BulkUpdate)
 	r.Delete("/images/bulk-delete", h.BulkDelete)
@@ -270,6 +271,14 @@ func (h *ImageHandler) Search(w http.ResponseWriter, r *http.Request) {
 		}
 		p.HasGPS = &b
 	}
+	if v := q.Get("has_thumbnail"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "has_thumbnail must be true or false")
+			return
+		}
+		p.HasThumbnail = &b
+	}
 	if v := q.Get("available_for_task"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
@@ -341,6 +350,20 @@ func (h *ImageHandler) GetGPSCountBySource(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, map[string]any{"by_source": counts, "total": total})
 }
 
+// ── /images/gps-regions ───────────────────────────────────────────────────────
+
+func (h *ImageHandler) GetGPSRegions(w http.ResponseWriter, r *http.Request) {
+	regions, err := h.svc.CountGPSByRegion(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error counting GPS images by region: %s", err))
+		return
+	}
+	if regions == nil {
+		regions = []model.GPSRegionCount{}
+	}
+	writeJSON(w, map[string]any{"regions": regions})
+}
+
 // ── /facebook/places ──────────────────────────────────────────────────────────
 
 func (h *ImageHandler) GetFacebookPlaces(w http.ResponseWriter, r *http.Request) {
@@ -385,7 +408,7 @@ func (h *ImageHandler) GetRandomLocations(w http.ResponseWriter, r *http.Request
 		limit = 1000
 	}
 
-	locations, err := h.svc.GetRandomLocationsByCategories(r.Context(), req.Categories, limit)
+	locations, err := h.svc.GetRandomLocationsByCategories(r.Context(), req.Categories, strings.TrimSpace(req.Region), limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving random locations: %s", err))
 		return

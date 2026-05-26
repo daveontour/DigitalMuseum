@@ -369,8 +369,156 @@ func searchMessagesBySimilarity(ctx context.Context, pool *sql.DB, text string) 
 }
 
 func searchEmailsBySimilarity(ctx context.Context, pool *sql.DB, text string) (map[string]any, error) {
-	_, _, _ = ctx, pool, text
-	return map[string]any{"error": "vector similarity search is not available in this build", "emails": []any{}}, nil
+	queryText := strings.TrimSpace(text)
+	if queryText == "" {
+		return map[string]any{"error": "text is required", "emails": []any{}}, nil
+	}
+	if pool == nil {
+		return map[string]any{"error": "email similarity search not configured", "emails": []any{}}, nil
+	}
+
+	vec, err := toolEmbedText(ctx, queryText)
+	if err != nil {
+		return map[string]any{"error": fmt.Sprintf("embedding failed: %v", err), "emails": []any{}}, nil
+	}
+	vecBlob, err := sqlite_vec.SerializeFloat32(vec)
+	if err != nil {
+		return map[string]any{"error": fmt.Sprintf("failed to serialize embedding: %v", err), "emails": []any{}}, nil
+	}
+
+	const topN = 20
+	rows, err := pool.QueryContext(ctx, `
+		SELECT rowid, int_ids
+		FROM email_embeddings
+		WHERE embedding MATCH ? AND k = ?
+		ORDER BY distance ASC
+	`, vecBlob, topN)
+	if err != nil {
+		return map[string]any{"error": fmt.Sprintf("vector search failed: %v", err), "emails": []any{}}, nil
+	}
+
+	combinedIDs := make([]int64, 0, topN)
+	seen := make(map[int64]struct{}, topN)
+	for rows.Next() {
+		var (
+			rowID    int64
+			intIDsJS string
+			ids      []int64
+		)
+		if err := rows.Scan(&rowID, &intIDsJS); err != nil {
+			_ = rows.Close()
+			return map[string]any{"error": fmt.Sprintf("scan match row: %v", err), "emails": []any{}}, nil
+		}
+		if rowID > 0 {
+			if _, ok := seen[rowID]; !ok {
+				seen[rowID] = struct{}{}
+				combinedIDs = append(combinedIDs, rowID)
+			}
+		}
+		if strings.TrimSpace(intIDsJS) == "" {
+			continue
+		}
+		if err := json.Unmarshal([]byte(intIDsJS), &ids); err != nil {
+			_ = rows.Close()
+			return map[string]any{"error": fmt.Sprintf("parse int_ids for row %d: %v", rowID, err), "emails": []any{}}, nil
+		}
+		for _, id := range ids {
+			if id <= 0 {
+				continue
+			}
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			combinedIDs = append(combinedIDs, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return map[string]any{"error": fmt.Sprintf("iterate vector results: %v", err), "emails": []any{}}, nil
+	}
+	_ = rows.Close()
+
+	if len(combinedIDs) == 0 {
+		return map[string]any{
+			"query_text":  queryText,
+			"match_count": 0,
+			"emails":      []any{},
+		}, nil
+	}
+
+	uid := appctx.UserIDFromCtx(ctx)
+	placeholders := make([]string, len(combinedIDs))
+	args := make([]any, 0, len(combinedIDs)+1)
+	for i, id := range combinedIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	args = append(args, uid)
+
+	q := fmt.Sprintf(`
+		SELECT id, date, from_address, to_addresses, subject, plain_text, snippet, has_attachments
+		FROM emails
+		WHERE id IN (%s)
+		  AND user_deleted = FALSE
+		  AND COALESCE(user_id, 0) = ?
+	`, strings.Join(placeholders, ","))
+	emailRows, err := pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return map[string]any{"error": fmt.Sprintf("load emails failed: %v", err), "emails": []any{}}, nil
+	}
+	defer emailRows.Close()
+
+	byID := make(map[int64]map[string]any, len(combinedIDs))
+	for emailRows.Next() {
+		var (
+			id             int64
+			date           sqlutil.NullDBTime
+			fromAddr       *string
+			toAddrs        *string
+			subject        *string
+			plainText      *string
+			snippet        *string
+			hasAttachments bool
+		)
+		if err := emailRows.Scan(&id, &date, &fromAddr, &toAddrs, &subject, &plainText, &snippet, &hasAttachments); err != nil {
+			return map[string]any{"error": fmt.Sprintf("scan email row failed: %v", err), "emails": []any{}}, nil
+		}
+		textBody := ""
+		if plainText != nil && *plainText != "" {
+			textBody = *plainText
+		} else if snippet != nil {
+			textBody = *snippet
+		}
+		e := map[string]any{
+			"id":              id,
+			"date":            nil,
+			"from_address":    strVal(fromAddr, ""),
+			"to_addresses":    strVal(toAddrs, ""),
+			"subject":         strVal(subject, ""),
+			"plain_text":      textBody,
+			"has_attachments": hasAttachments,
+		}
+		if date.Valid {
+			e["date"] = date.Time.Format(time.RFC3339)
+		}
+		byID[id] = e
+	}
+	if err := emailRows.Err(); err != nil {
+		return map[string]any{"error": fmt.Sprintf("iterate email rows failed: %v", err), "emails": []any{}}, nil
+	}
+
+	emails := make([]any, 0, len(combinedIDs))
+	for _, id := range combinedIDs {
+		if e, ok := byID[id]; ok {
+			emails = append(emails, e)
+		}
+	}
+	return map[string]any{
+		"query_text":  queryText,
+		"match_count": len(emails),
+		"emails":      emails,
+	}, nil
 }
 
 // visitorKeyMayReadSensitiveReferenceDoc is true for non-restricted sessions (owner or share visitor).

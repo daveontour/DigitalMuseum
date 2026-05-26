@@ -53,7 +53,7 @@ const AppActions = {
     //     }
     // },
     ["showFBAlbumsOptions"]: () => Modals.FBAlbums.open(),    // showFBAlbumsOptions
-    ["openGeoModal"]: () => Modals.Locations.open(), // showGeoMetadataOptions
+    ["openGeoModal"]: () => { void Modals.Locations.open(); }, // showGeoMetadataOptions
     ["showEmailGallery"]: () => Modals.EmailGallery.open(), // showEmailGalleryOptions
     //[CONSTANTS.FUNCTION_NAMES.FifthFunction]: () => SSE.browserFunctions.showLocationInfo(), // showTileAlbumOptions
     ["showImageGallery"]: () => Modals.ImageGallery.open(),
@@ -1244,7 +1244,8 @@ const App = (() => {
         const REGION_NAME_MAP = {
             eur: 'Europe', dxb: 'Dubai', af: 'Africa', me: 'Middle East',
             aus: 'Australia', asia: 'Asia', usa: 'USA', south_america: 'South America',
-            oth: 'Other', carribean: 'Caribbean', nz: 'New Zealand'
+            oth: 'Other', carribean: 'Caribbean', nz: 'New Zealand',
+            central_america: 'Central America'
         };
         function regionDisplayName(key) {
             if (key == null || key === '') return 'Unknown';
@@ -2173,7 +2174,7 @@ const App = (() => {
             if (sidebarBackgroundJobsPollTimer) return;
             sidebarBackgroundJobsPollTimer = setInterval(() => {
                 void refreshSidebarBackgroundJobsState();
-            }, 8000);
+            }, 15000);
         }
 
         function makeJobKey(importType, extra = {}) {
@@ -2198,7 +2199,7 @@ const App = (() => {
                 thumbnails: 'Thumbnails',
                 thumbnails_async: 'Thumbnails',
                 reference_import: 'Reference Images',
-                email_embeddings: 'Email Embeddings',
+                email_embeddings: 'Optimise Emails',
                 message_embeddings: 'Message Embeddings',
                 message_context_embeddings: 'Message Context Embeddings',
                 image_export: 'Export Images',
@@ -2860,7 +2861,7 @@ const App = (() => {
             filesystem: { needsInput: true, title: 'Filesystem Image Import', fields: [{ id: 'root_directory', key: 'filesystem_import_directory', label: 'Folder to scan', placeholder: 'Choose a folder or type a full path', required: true, type: 'folder', folderDialogTitle: 'Select folder to import (reference only)' }, { id: 'max_images', key: 'filesystem_import_max_images', label: 'Max Images (Optional)', placeholder: 'Leave empty for all', required: false, type: 'number' }, { id: 'import_db_after_link', key: 'filesystem_import_db_after_link', label: 'Import to Database After Linking', required: false, type: 'checkbox' }], run: async (vals) => { const body = { root_directory: vals.root_directory, create_thumb_and_get_exif: false, reference_mode: true }; if (vals.max_images) body.max_images = parseInt(vals.max_images, 10); const r = await fetch('/images/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/images/import/stream' },
             filesystem_reference: { needsInput: true, title: 'Reference images on filesystem (local)', fields: [{ id: 'root_directory', key: 'filesystem_reference_import_directory', label: 'Folder(s) on this machine — separate with semicolons. Each folder is scanned recursively; only paths are stored in the archive (images stay on disk).', placeholder: 'e.g., C:\\Photos\\Vacation; D:\\Pictures', required: true }, { id: 'max_images', key: 'filesystem_reference_import_max_images', label: 'Max images (optional)', placeholder: 'Leave empty for all', required: false, type: 'number' }], run: async (vals) => { const body = { root_directory: vals.root_directory, create_thumb_and_get_exif: false, reference_mode: true }; if (vals.max_images) body.max_images = parseInt(vals.max_images, 10); const r = await fetch('/images/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/images/import/stream' },
             reference_import: { needsInput: false, title: 'Import Reference Images to Database', run: async () => { const r = await fetch('/images/import-reference', { method: 'POST' }); return r; }, stream: '/images/import-reference/stream' },
-            email_embeddings: { needsInput: false, title: 'Generate missing email embedding vectors', run: async () => { const r = await fetch('/emails/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/emails/embeddings/backfill/stream' },
+            email_embeddings: { needsInput: false, title: 'Optimise Emails for Searching', run: async () => { const r = await fetch('/emails/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/emails/embeddings/backfill/stream' },
             message_embeddings: { needsInput: false, title: 'Generate missing message embedding vectors', run: async () => { const r = await fetch('/messages/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/messages/embeddings/backfill/stream' },
             message_context_embeddings: { needsInput: false, title: 'Build message context embeddings', run: async () => { const r = await fetch('/messages/context-embeddings/backfill', { method: 'POST' }); return r; }, stream: '/messages/context-embeddings/backfill/stream' },
             image_export: { needsInput: true, title: 'Export Images to Filesystem', fields: [{ id: 'target_directory', key: 'image_export_directory', label: 'Target Directory', placeholder: 'e.g., C:\\Users\\Dave\\Exports\\images', required: true }], run: async (vals) => { const r = await fetch('/images/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target_directory: vals.target_directory }) }); return r; }, stream: '/images/export/stream' },
@@ -4015,7 +4016,7 @@ const App = (() => {
 
         if (DOM.locationsSidebarBtn) {
             DOM.locationsSidebarBtn.addEventListener('click', () => {
-                Modals.Locations.open();
+                void Modals.Locations.open();
             });
         }
 

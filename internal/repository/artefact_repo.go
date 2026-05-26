@@ -33,7 +33,7 @@ func (r *ArtefactRepo) ListSummaries(ctx context.Context, search, tags string) (
 		        JOIN media_blobs mb ON mb.id = mi.media_blob_id
 		        WHERE am.artefact_id = a.id
 		          AND (
-		            (mb.thumbnail_data IS NOT NULL AND octet_length(mb.thumbnail_data) > 0)
+		            (mb.thumbnail_data IS NOT NULL AND LENGTH(mb.thumbnail_data) > 0)
 		            OR (mi.media_type IS NOT NULL AND mi.media_type LIKE 'image/%')
 		          )
 		        ORDER BY am.sort_order
@@ -109,7 +109,7 @@ func (r *ArtefactRepo) GetByID(ctx context.Context, id int64) (*model.Artefact, 
 func (r *ArtefactRepo) GetMediaItems(ctx context.Context, artefactID int64) ([]*model.ArtefactMediaItem, error) {
 	rows, err := r.pool.QueryContext(ctx,
 		`SELECT am.id, am.media_item_id, mi.media_blob_id, am.sort_order, mi.media_type, mi.title,
-		        CAST(COALESCE(octet_length(mb.thumbnail_data), 0) AS INTEGER) AS thumb_len
+		        CAST(COALESCE(LENGTH(mb.thumbnail_data), 0) AS INTEGER) AS thumb_len
 		 FROM artefact_media am
 		 JOIN media_items mi ON mi.id = am.media_item_id
 		 JOIN media_blobs mb ON mb.id = mi.media_blob_id

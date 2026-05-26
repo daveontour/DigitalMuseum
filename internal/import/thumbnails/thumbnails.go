@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/daveontour/aimuseum/internal/georegion"
 )
 
 const progressCallbackInterval = 5
@@ -265,13 +267,15 @@ func processMediaItem(ctx context.Context, pool *sql.DB, processor *Processor, w
 			latitude = COALESCE(?4, latitude),
 			longitude = COALESCE(?5, longitude),
 			has_gps = COALESCE(?6, has_gps),
+			region = COALESCE(?7, region),
 			updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?7`
+		WHERE id = ?8`
 
 	var description *string
 	var year, month *int
 	var latitude, longitude *float64
 	var hasGPS *bool
+	var region *string
 
 	if exifData != nil {
 		if exifData.Description != "" {
@@ -297,10 +301,12 @@ func processMediaItem(ctx context.Context, pool *sql.DB, processor *Processor, w
 			longitude = exifData.LongitudeDecimal
 			hasGPSVal := true
 			hasGPS = &hasGPSVal
+			regionVal := georegion.RegionFromLatLng(*latitude, *longitude)
+			region = &regionVal
 		}
 	}
 
-	_, err = tx.ExecContext(ctx, updateItemQuery, description, year, month, latitude, longitude, hasGPS, work.MediaItemID)
+	_, err = tx.ExecContext(ctx, updateItemQuery, description, year, month, latitude, longitude, hasGPS, region, work.MediaItemID)
 	if err != nil {
 		return processResult{Success: false, Error: fmt.Errorf("failed to update media item: %w", err)}
 	}
