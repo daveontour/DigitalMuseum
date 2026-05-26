@@ -866,3 +866,11 @@ CREATE TABLE IF NOT EXISTS suggestions (
     text  TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_suggestions_key ON suggestions (key);
+
+-- Deployment-wide interactive guide topics (no user_id).
+CREATE TABLE IF NOT EXISTS guide_topics (
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    key  TEXT NOT NULL,
+    text TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_guide_topics_key ON guide_topics (key);

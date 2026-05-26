@@ -85,8 +85,9 @@ type AppConfig struct {
 	TemplatesDir     string // path to Jinja2 HTML templates
 	AssetStaticDir       string // path to Python static directory (JS/data files for templating)
 	RegionsConfigPath    string // optional override; default is AssetStaticDir/data/regions.json
-	SuggestionsConfigPath string // optional override; default is AssetStaticDir/data/suggestions.json
-	DeploymentNature     string // "local" = show filesystem path import tiles; unset/other = hide them
+	SuggestionsConfigPath  string // optional override; default is AssetStaticDir/data/suggestions.json
+	GuideTopicsConfigPath  string // optional override; default is AssetStaticDir/data/guide_topics.json
+	DeploymentNature      string // "local" = show filesystem path import tiles; unset/other = hide them
 }
 
 // RegionsConfigFile returns the path to regions.json (REGIONS_CONFIG_PATH or AssetStaticDir/data/regions.json).
@@ -103,6 +104,14 @@ func (a AppConfig) SuggestionsConfigFile() string {
 		return p
 	}
 	return filepath.Join(a.AssetStaticDir, "data", "suggestions.json")
+}
+
+// GuideTopicsConfigFile returns the path to guide_topics.json (GUIDE_TOPICS_CONFIG_PATH or AssetStaticDir/data/guide_topics.json).
+func (a AppConfig) GuideTopicsConfigFile() string {
+	if p := strings.TrimSpace(a.GuideTopicsConfigPath); p != "" {
+		return p
+	}
+	return filepath.Join(a.AssetStaticDir, "data", "guide_topics.json")
 }
 
 // DefaultsConfig holds default values shown in the control panel UI.
@@ -244,6 +253,7 @@ func Load() (*Config, error) {
 			AssetStaticDir:    getenv("ASSET_STATIC_DIR", "../src/api/static"),
 			RegionsConfigPath:     os.Getenv("REGIONS_CONFIG_PATH"),
 			SuggestionsConfigPath: os.Getenv("SUGGESTIONS_CONFIG_PATH"),
+			GuideTopicsConfigPath: os.Getenv("GUIDE_TOPICS_CONFIG_PATH"),
 			DeploymentNature:  getenv("DEPLOYMENT_NATURE", "web"),
 		},
 		Crypto:      cryptoCfg,

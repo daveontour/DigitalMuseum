@@ -34,7 +34,9 @@
       "Bash(make build-exe *)",
       "Bash(git checkout *)",
       "Bash(go list *)",
-      "Bash(powershell -Command \"Get-ChildItem -Recurse -Path 'c:\\\\NonOneDrive\\\\ElectronMuseum' -Filter '*identity*' | Select-Object FullName\")"
+      "Bash(powershell -Command \"Get-ChildItem -Recurse -Path 'c:\\\\NonOneDrive\\\\ElectronMuseum' -Filter '*identity*' | Select-Object FullName\")",
+      "Bash(go test *)",
+      "Bash(git stash *)"
     ]
   }
 }

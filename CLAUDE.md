@@ -432,6 +432,55 @@ tracked in `message_embedding_meta`.
 - Configuration UI: **Configuration → Suggestions** ([`static/js/museum/modals-suggestions-config.js`](static/js/museum/modals-suggestions-config.js)) — CRUD, export, import with per-key conflict resolution. Admin API under `/api/suggestions/*`.
 - Chat sidebar UI: [`static/js/museum/modals-suggestions.js`](static/js/museum/modals-suggestions.js); optional per-item fields include `action_label`, `description`, `requires`, `sensitivity`, and `function` (must match a key on `AppActions` in [`static/js/museum/app.js`](static/js/museum/app.js)).
 
+### Guide system (interactive help)
+
+The guide provides step-by-step help topics accessible from the Guide button in the top bar. Topics and their steps are stored in the database and seeded from a JSON file at startup — the same insert-if-missing pattern as Suggestions.
+
+**Data flow:**
+- `guide_topics` table: `id`, `key` (unique string), `text` (JSON blob containing title, description, category, recommended, steps array)
+- Startup seeds from [`static/data/guide_topics.json`](static/data/guide_topics.json) (insert-if-missing). Optional **`GUIDE_TOPICS_CONFIG_PATH`** env var overrides the seed file path.
+- Runtime API: **`GET /api/guide-topics`** → returns `{ topics: { KeyName: { title, category, steps, … } } }` consumed by `guide.js`.
+- Admin CRUD API under `/api/guide-topics/*` (list, create, update, delete, export, import/preview/apply).
+- Configuration UI: **Configuration → Guide Topics** ([`static/js/museum/modals-guide-topics-config.js`](static/js/museum/modals-guide-topics-config.js)) — per-topic step editor, export/import with conflict resolution.
+
+**Guide topic JSON fields** (stored in `text` column):
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `key` | string | Unique identifier (e.g. `"GettingStarted"`) |
+| `title` | string | Display name in the guide modal |
+| `description` | string | Subtitle shown under title |
+| `category` | string | Groups topics: `Getting Started`, `Daily Use`, `Setup & Import`, `Troubleshooting` |
+| `recommended` | bool | Shown with "Recommended first" badge and sorted to top |
+| `steps` | array | Ordered list of step objects (see below) |
+
+**Step object fields:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `text` | string | Instruction text shown to the user |
+| `glow` | string | CSS selector of element to highlight with a pulsing outline |
+| `position` | string | Dialog position: `middle-center` (default), `top-left/center/right`, `middle-left/right`, `bottom-left/center/right` |
+| `navigate_action` | string | Named action key — see Navigation actions below |
+| `fallback_text` | string | Extra text appended when `glow` target is not found in the DOM |
+| `image` | string | Optional image URL displayed below the step text |
+
+**Navigation actions** — defined in the `NavActions` dictionary in [`static/js/museum/guide.js`](static/js/museum/guide.js):
+
+| Key | What it does |
+|-----|-------------|
+| `showGettingStartedDialog` | Opens the Getting Started overlay dialog |
+| `openDataImport` | Clicks the Import & Manage Data sidebar button |
+| `openSettingsManageKeys` | Opens Configuration, then switches to the Manage Visitor Keys tab |
+
+To add a new navigation action: (1) add an entry to `Guide.NavActions` in `guide.js`; (2) add the key to the `NAV_ACTIONS` array in `modals-guide-topics-config.js` so it appears in the admin UI dropdown.
+
+**Frontend module** — [`static/js/museum/guide.js`](static/js/museum/guide.js):
+- `Guide.fetchTopics()` — fetches from `GET /api/guide-topics`, caches in `Guide._topics`. Call `Guide.invalidateCache()` after any admin write to force a fresh fetch.
+- `Guide.openGuideModal()` — fetches topics then renders the topic list.
+- `Guide.onTopicSelected(key)` — starts a step-through session for the given topic key.
+- `Guide.topicAliases` — maps legacy string keys (e.g. `'Browsing images'`) to canonical DB keys for backward compatibility.
+
 ### Import Pipeline
 
 | Tier | Mechanism | Endpoint |
@@ -578,6 +627,7 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Attachment viewer (standalone) | `templates/attachments_viewer.html` |
 | Image grid (standalone) | `templates/images_grid.html` |
 | Suggestions (DB + seed JSON) | `static/data/suggestions.json`, `internal/service/suggestions_service.go`, `static/js/museum/modals-suggestions-config.js` |
+| Guide system (DB + seed JSON) | `static/data/guide_topics.json`, `internal/service/guide_topics_service.go`, `static/js/museum/guide.js`, `static/js/museum/modals-guide-topics-config.js` |
 
 ## Security Notes
 

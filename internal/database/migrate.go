@@ -847,6 +847,14 @@ func schemaDDL() []string {
 			text  TEXT NOT NULL
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_suggestions_key ON suggestions (key)`,
+
+		// ── Guide topics (deployment-wide interactive help) ───────────────────
+		`CREATE TABLE IF NOT EXISTS guide_topics (
+			id   INTEGER PRIMARY KEY AUTOINCREMENT,
+			key  TEXT NOT NULL,
+			text TEXT NOT NULL
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_guide_topics_key ON guide_topics (key)`,
 	}
 }
 

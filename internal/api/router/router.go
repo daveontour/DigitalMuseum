@@ -162,6 +162,12 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	suggestionsHandler := handler.NewSuggestionsHandler(suggestionsSvc)
 	suggestionsHandler.RegisterRoutes(r)
 
+	// ── Guide topics (deployment-wide interactive help) ────────────────────────
+	guideTopicsRepo := repository.NewGuideTopicsRepo(pool)
+	guideTopicsSvc := service.NewGuideTopicsService(guideTopicsRepo)
+	guideTopicsHandler := handler.NewGuideTopicsHandler(guideTopicsSvc)
+	guideTopicsHandler.RegisterRoutes(r)
+
 	// ── Templated endpoints (GET /, suggestions, JS files) ───────────────────
 	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, userRepo, suggestionsSvc, cfg)
 	templateHandler.RegisterRoutes(r)

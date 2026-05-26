@@ -1011,6 +1011,9 @@ const App = (() => {
                 if (targetTab === 'suggestions-config') {
                     if (Modals.SuggestionsConfig && Modals.SuggestionsConfig.load) void Modals.SuggestionsConfig.load();
                 }
+                if (targetTab === 'guide-topics-config') {
+                    if (Modals.GuideTopicsConfig && Modals.GuideTopicsConfig.load) void Modals.GuideTopicsConfig.load();
+                }
                 if (targetTab === 'settings' || targetTab === 'api-keys') {
                     if (Modals.UserLLMSettings && Modals.UserLLMSettings.load) void Modals.UserLLMSettings.load();
                     if (targetTab === 'settings') void loadLLMProviderAvailability();

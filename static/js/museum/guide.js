@@ -6,248 +6,29 @@ const Guide = {
     _lastFocusedElement: null,
     _focusTrapHandler: null,
     _escHandler: null,
+    _topics: null, // cached from API
 
-    topics: {
-        GettingStarted: {
-            title: 'Getting started',
-            description: 'Fast orientation to chat, sidebars, and key actions.',
-            category: 'Getting Started',
-            recommended: true,
-            steps: [{ navigate() { Guide._showGettingStartedDialog(); } }]
+    // Named navigation actions referenced by guide steps stored in the database.
+    NavActions: {
+        showGettingStartedDialog: () => Guide._showGettingStartedDialog(),
+        openDataImport: () => document.getElementById('data-import-sidebar-btn')?.click(),
+        openSettingsManageKeys: () => {
+            document.getElementById('settings-data-import-sidebar-btn')?.click();
+            setTimeout(() => {
+                document.querySelector('.config-tab-button[data-tab="manage-keys"]')?.click();
+            }, 120);
         },
-        FirstRunQuickSetup: {
-            title: 'Quick setup checklist',
-            description: 'A short first-run flow: import, configure, ask a question, unlock.',
-            category: 'Getting Started',
-            recommended: true,
-            steps: [
-                {
-                    // text: 'Open Import & Manage Data and run at least one import.',
-                    glow: '#data-import-sidebar-btn',
-                    navigate() {
-                        const btn = document.getElementById('data-import-sidebar-btn');
-                        if (btn) btn.click();
-                    }
-                },
-                // {
-                //     text: 'Open Configuration and review Subject Configuration details.',
-                //     glow: '#settings-data-import-sidebar-btn',
-                //     navigate() {
-                //         const cfgBtn = document.getElementById('settings-data-import-sidebar-btn');
-                //         if (cfgBtn) cfgBtn.click();
-                //         setTimeout(() => {
-                //             const subjectTab = document.querySelector('.config-tab-button[data-tab="subject-configuration"]');
-                //             if (subjectTab) subjectTab.click();
-                //         }, 120);
-                //     }
-                // },
-                // { text: 'Ask your first question in chat to verify everything is working.', glow: '#user-input' },
-                // {
-                //     text: 'Optional: unlock encryption for sensitive-data tools and private store access.',
-                //     glow: '#master-key-unlock-submit',
-                //     position: 'middle-center',
-                //     navigate() {
-                //         const modal = document.getElementById('master-key-unlock-modal');
-                //         const input = document.getElementById('master-key-unlock-input');
-                //         if (modal) modal.style.display = 'flex';
-                //         if (input) input.focus();
-                //     }
-                // }
-            ]
-        },
-        AskingQuestions: {
-            title: 'Asking questions',
-            description: 'Get better answers and steer perspective and tone.',
-            category: 'Daily Use',
-            steps: [
-                { text: 'Type your question in chat and press Send. Try: "Show me photos from last summer" or "Who have I emailed most?"', glow: '#user-input' },
-                { text: 'Use AI Personality settings to change the response style and mood.', glow: '#voice-settings-trigger', position: 'top-center' },
-                { text: 'Switch "Who\'s Asking?" to frame answers from visitor or owner perspective.', glow: '#its-me-visitor-switch', position: 'middle-right' },
-                { text: 'Reference documents can improve answers for specific, factual, or long-form questions.', position: 'middle-center' }
-            ]
-        },
-        'Browsing images': {
-            title: 'Browsing images',
-            description: 'Find memories in photo galleries, albums, and posts.',
-            category: 'Daily Use',
-            steps: [
-                { text: 'Open Images in the left sidebar to browse your main photo collection.', glow: '#new-image-gallery-sidebar-btn' },
-                { text: 'Open Facebook Albums to browse imported album collections.', glow: '#fb-albums-sidebar-btn' },
-                { text: 'Open Facebook Posts to browse imported posts that may contain photos.', glow: '#fb-posts-sidebar-btn' },
-                { text: 'You can also ask AI directly: "Find photos with John" or "Show me photos from last Christmas".', glow: '#user-input' }
-            ]
-        },
-        'Managing contacts': {
-            title: 'Managing contacts',
-            description: 'Use Contacts and Relationships, Profiles, and contact tools effectively.',
-            category: 'Daily Use',
-            steps: [
-                { text: 'Open Contacts and Relationships in the right sidebar to browse people or open the Relationships tab for the connection map.', glow: '#contacts-sidebar-btn' },
-                { text: 'Open Profiles to view detailed notes and relationship context.', glow: '#profiles-sidebar-btn' },
-                { text: 'Use the Relationships tab for a visual network of people and connection strength.', glow: '#contacts-sidebar-btn' },
-                { text: 'Use Configuration to classify contacts and tune contact recognition.', glow: '#settings-data-import-sidebar-btn', position: 'bottom-center' }
-            ]
-        },
-        'Voice and AI settings': {
-            title: 'Voice and AI settings',
-            description: 'Choose provider, voice, mood, and response style.',
-            category: 'Daily Use',
-            steps: [
-                { text: 'Open voice settings from the top bar image.', glow: '#voice-settings-trigger', position: 'top-center' },
-                { text: 'Choose a voice or custom persona to control speaking style.' },
-                { text: 'When using owner voice, set a mood to shape tone.' },
-                { text: 'Companion Mode makes responses more conversational.' },
-                { text: 'Creativity controls factual vs expressive response style.' },
-                { text: 'Switch providers (Gemini, Claude, DeepSeek, Local AI) as needed.' }
-            ]
-        },
-        "Today's Thing of Interest": {
-            title: "Today's Thing of Interest",
-            description: 'Generate fresh prompts based on interests.',
-            category: 'Daily Use',
-            steps: [
-                { text: "Today's Thing suggests memory prompts based on subject interests.", glow: '#todays-thing-sidebar-btn' },
-                { text: 'Click repeatedly for different suggestions.' },
-                { text: 'Add more interests in Configuration for better variety.', glow: '#settings-data-import-sidebar-btn', position: 'bottom-center' }
-            ]
-        },
-        'Email catchup': {
-            title: 'Email catchup',
-            description: 'Summarize and explore imported email quickly.',
-            category: 'Daily Use',
-            steps: [
-                { text: 'Open Emails from the left sidebar.', glow: '#email-gallery-sidebar-btn' },
-                { text: 'Ask for a recent summary: "Summarise my emails from this week".', glow: '#user-input' },
-                { text: 'Drill into a sender or topic for deeper summaries.', glow: '#user-input' }
-            ]
-        },
-        ArchiveSelectionLogin: {
-            title: 'Archive selection at sign-in',
-            description: 'Choose the right user archive before entering password.',
-            category: 'Getting Started',
-            steps: [
-                { text: 'On the login screen, the selected user determines which archive database is active.' },
-                { text: 'If multiple users exist, confirm the selected name before signing in.' },
-                { text: 'If sign-in fails unexpectedly, switch away and back to the target user once, then try again.' }
-            ]
-        },
-        LocalAISetupHealth: {
-            title: 'Local AI setup and health',
-            description: 'Understand Ollama readiness and required models.',
-            category: 'Setup & Import',
-            steps: [
-                { text: 'Local AI depends on the Ollama server plus two models: gemma4 and embeddinggemma.' },
-                { text: 'On login, open AI & Setup to confirm server status and model availability.' },
-                { text: 'If a model is missing, use Download required models. Initial download can take several minutes.' },
-                { text: 'Some AI features may be unavailable when Local AI is not ready.' }
-            ]
-        },
-        LocalAITroubleshooting: {
-            title: 'Local AI troubleshooting',
-            description: 'Recover quickly from common Local AI issues.',
-            category: 'Troubleshooting',
-            steps: [
-                { text: 'If Local AI is unavailable, verify Ollama is running and both models are installed.' },
-                { text: 'Re-open AI & Setup and refresh statuses after model downloads complete.' },
-                { text: 'If issues persist, use a cloud provider temporarily and retry Local AI later from AI & Setup.' }
-            ]
-        },
-        SettingsAndDataImport: {
-            title: 'Settings and data import',
-            description: 'Configure app behavior and import source archives.',
-            category: 'Setup & Import',
-            steps: [
-                { text: 'Open Configuration from the left sidebar.', glow: '#settings-data-import-sidebar-btn', position: 'bottom-center' },
-                { text: 'Use chat settings, subject configuration, custom voices, and key management in this dialog.' },
-                { text: 'Open Import & Manage Data for file imports and maintenance jobs.', glow: '#data-import-sidebar-btn', position: 'bottom-center' }
-            ]
-        },
-        ImportPathsOverview: {
-            title: 'Import paths overview',
-            description: 'Know which import flow to use for each source.',
-            category: 'Setup & Import',
-            steps: [
-                { text: 'Use ZIP upload imports for Facebook, Instagram, WhatsApp, and iMessage exports.', glow: '#data-import-sidebar-btn' },
-                { text: 'Use email import for mailbox data and follow-up embedding jobs.' },
-                { text: 'Use filesystem/photo imports when source data already exists on local disk.' }
-            ]
-        },
-        CreateAndSwitchArchives: {
-            title: 'Create and switch archives',
-            description: 'Manage archive profiles safely across users.',
-            category: 'Setup & Import',
-            steps: [
-                { text: 'Use login profile controls or admin archives to create and manage archive entries.' },
-                { text: 'Switching archive changes the active SQLite database used for sign-in and chat.' },
-                { text: 'Disabling an archive hides it from login selection without deleting data.' }
-            ]
-        },
-        SharePrivacyVisitorAccess: {
-            title: 'Share and privacy basics',
-            description: 'Understand visitor scope and sensitive access.',
-            category: 'Troubleshooting',
-            steps: [
-                {
-                    text: 'To manage visitor access, open Configuration and switch to the "Manage Visitor Keys" tab.',
-                    glow: '.config-tab-button[data-tab="manage-keys"]',
-                    position: 'middle-right',
-                    fallbackText: 'Click Configuration in the left sidebar, then choose Manage Visitor Keys.',
-                    navigate() {
-                        const configBtn = document.getElementById('settings-data-import-sidebar-btn');
-                        if (configBtn) configBtn.click();
-                        setTimeout(() => {
-                            const manageKeysTab = document.querySelector('.config-tab-button[data-tab="manage-keys"]');
-                            if (manageKeysTab) manageKeysTab.click();
-                        }, 120);
-                    }
-                },
-                { text: 'Sensitive/private data and some tools may require owner master unlock.' },
-                { text: 'If a feature is missing, verify current role and access tier first.' }
-            ]
-        },
-        ImportFacebookArchive: {
-            title: 'Import Facebook archive',
-            description: 'Step-by-step Facebook ZIP import flow.',
-            category: 'Setup & Import',
-            steps: [
-                { text: 'Request a Facebook data download in JSON format and unzip it locally.' },
-                { text: 'Open Import & Manage Data from the left sidebar.', glow: '#data-import-sidebar-btn', position: 'bottom-center' },
-                {
-                    text: 'Click Upload on the Facebook row and select the exported folder.',
-                    position: 'top-right',
-                    glow: '#data-import-modal .data-import-row[data-import="upload_zip"][data-zip-archive-type="facebook"]',
-                    fallbackText: 'Open Import & Manage Data first, then use Upload on Facebook row.',
-                    navigate() {
-                        const btn = document.getElementById('data-import-sidebar-btn');
-                        if (btn) btn.click();
-                    }
-                }
-            ]
-        },
-        ImportInstagramArchive: {
-            title: 'Import Instagram archive',
-            description: 'Step-by-step Instagram ZIP import flow.',
-            category: 'Setup & Import',
-            steps: [
-                { text: 'Request an Instagram data download and unzip it locally.' },
-                { text: 'Open Import & Manage Data from the left sidebar.', glow: '#data-import-sidebar-btn', position: 'bottom-center' },
-                {
-                    text: 'Click Upload on the Instagram row and select the exported folder.',
-                    position: 'top-right',
-                    glow: '#data-import-modal .data-import-row[data-import="upload_zip"][data-zip-archive-type="instagram"]',
-                    fallbackText: 'Open Import & Manage Data first, then use Upload on Instagram row.',
-                    navigate() {
-                        const btn = document.getElementById('data-import-sidebar-btn');
-                        if (btn) btn.click();
-                    }
-                }
-            ]
-        }
     },
+
     topicAliases: {
         'Settings and data import': 'SettingsAndDataImport',
         Settings: 'SettingsAndDataImport',
-        'Data import': 'SettingsAndDataImport'
+        'Data import': 'SettingsAndDataImport',
+        'Browsing images': 'BrowsingImages',
+        'Managing contacts': 'ManagingContacts',
+        'Voice and AI settings': 'VoiceAndAISettings',
+        "Today's Thing of Interest": 'TodaysThingOfInterest',
+        'Email catchup': 'EmailCatchup',
     },
 
     _positions: {
@@ -262,13 +43,32 @@ const Guide = {
         'bottom-right':  { top: 'auto', bottom: '5%',   left: 'auto', right: '5%',   transform: 'none' },
     },
 
+    invalidateCache() {
+        this._topics = null;
+    },
+
+    async fetchTopics() {
+        if (this._topics !== null) return this._topics;
+        try {
+            const resp = await fetch('/api/guide-topics');
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            this._topics = (data && data.topics) ? data.topics : {};
+        } catch (err) {
+            console.error('Guide: failed to load topics', err);
+            this._topics = {};
+        }
+        return this._topics;
+    },
+
     _positionDialog(dialog, position) {
         const pos = this._positions[position] || this._positions['middle-center'];
         Object.assign(dialog.style, pos);
     },
     _getTopicConfig(topicKey) {
+        const topics = this._topics || {};
         const key = this.topicAliases[topicKey] || topicKey;
-        return { key, config: this.topics[key] };
+        return { key, config: topics[key] };
     },
 
     _clearGlows() {
@@ -380,7 +180,8 @@ const Guide = {
     },
 
     _showStep(stepIndex) {
-        const topicConfig = this.topics[this._currentTopic];
+        const topics = this._topics || {};
+        const topicConfig = topics[this._currentTopic];
         const steps = topicConfig && topicConfig.steps;
         if (!steps || stepIndex >= steps.length) { this._closeExplanation(); return; }
 
@@ -399,14 +200,20 @@ const Guide = {
 
         this._currentStep = stepIndex;
 
+        // Support both camelCase (JS) and snake_case (DB-stored JSON) step fields.
+        const glowSel     = step.glow || '';
+        const fallbackTxt = step.fallback_text || step.fallbackText || '';
+        const navAction   = step.navigate_action || step.navigateAction || '';
+        const position    = step.position || 'middle-center';
+
         const applyGlowAndShow = () => {
             this._clearGlows();
-            const glowOk = this._applyGlow(step.glow);
+            const glowOk = this._applyGlow(glowSel);
 
             textEl.textContent = step.text || '';
-            if (step.glow && !glowOk && step.fallbackText) {
-                textEl.textContent += '\n\n' + step.fallbackText;
-            } else if (step.glow && !glowOk) {
+            if (glowSel && !glowOk && fallbackTxt) {
+                textEl.textContent += '\n\n' + fallbackTxt;
+            } else if (glowSel && !glowOk) {
                 textEl.textContent += '\n\nOpen the related section first, then continue this guide step.';
             }
             if (progressEl) progressEl.textContent = topicConfig.title + ' — Step ' + (stepIndex + 1) + ' of ' + steps.length;
@@ -435,7 +242,7 @@ const Guide = {
             closeBtn.onclick       = () => this._closeExplanation();
             dialog.classList.toggle('guide-explanation-dialog-has-close', true);
 
-            this._positionDialog(dialog, step.position);
+            this._positionDialog(dialog, position);
             overlay.style.display = 'block';
             dialog.style.display  = 'block';
             this._focusTrap(dialog);
@@ -443,26 +250,27 @@ const Guide = {
             overlay.onclick = () => this._closeExplanation();
         };
 
-        if (step.navigate) {
+        if (navAction) {
+            const fn = this.NavActions[navAction];
             overlay.style.display = 'none';
             dialog.style.display  = 'none';
-            step.navigate();
+            if (fn) fn();
             if (step.text) {
                 setTimeout(applyGlowAndShow, 120);
-            } 
+            }
         } else {
             if (step.text) {
-                applyGlowAndShow()
+                applyGlowAndShow();
             }
-           
         }
     },
 
-    onTopicSelected(topic) {
+    async onTopicSelected(topic) {
         const guideModal = document.getElementById('guide-modal');
         if (guideModal) guideModal.style.display = 'none';
         document.querySelectorAll('.guide-topic-btn').forEach(b => b.classList.remove('guide-topic-glow'));
         this._lastFocusedElement = document.getElementById('guide-sidebar-btn') || document.activeElement;
+        await this.fetchTopics();
         const resolved = this._getTopicConfig(topic);
         if (!resolved.config) {
             this._showUnknownTopic(resolved.key || topic);
@@ -497,10 +305,11 @@ const Guide = {
     renderTopicList() {
         const container = document.getElementById('guide-topics-list');
         if (!container) return;
+        const topics = this._topics || {};
         const byCategory = {};
         this._categoryOrder.forEach((c) => { byCategory[c] = []; });
-        Object.keys(this.topics).forEach((key) => {
-            const t = this.topics[key];
+        Object.keys(topics).forEach((key) => {
+            const t = topics[key];
             const category = byCategory[t.category] ? t.category : 'Daily Use';
             byCategory[category].push({
                 key: key,
@@ -519,12 +328,12 @@ const Guide = {
 
         let html = '';
         this._categoryOrder.forEach((category) => {
-            const topics = byCategory[category];
-            if (!topics || topics.length === 0) return;
+            const items = byCategory[category];
+            if (!items || items.length === 0) return;
             html += '<section class="guide-topic-group">' +
                 '<h3 class="guide-topic-group-title">' + category + '</h3>' +
                 '<ul class="guide-topic-group-list">';
-            topics.forEach((t) => {
+            items.forEach((t) => {
                 html += '<li class="guide-topic-item">' +
                     '<button type="button" class="guide-topic-btn" data-topic="' + t.key.replace(/"/g, '&quot;') + '">' +
                     '<span class="guide-topic-btn-title" style="display:block;">' + t.title + (t.recommended ? ' <span class="guide-topic-badge">Recommended first</span>' : '') + '</span>' +
@@ -544,24 +353,11 @@ const Guide = {
             });
         });
     },
-    validateTopicBindings() {
-        const btns = document.querySelectorAll('.guide-topic-btn[data-topic]');
-        btns.forEach((btn) => {
-            const topic = btn.dataset.topic || '';
-            const resolved = this._getTopicConfig(topic);
-            if (!resolved.config) {
-                console.warn('Guide topic button missing config:', topic);
-            }
-        });
-    },
-    openGuideModal() {
+    async openGuideModal() {
+        await this.fetchTopics();
         const guideModal = document.getElementById('guide-modal');
         if (!guideModal) return;
-        const topicsContainer = document.getElementById('guide-topics-list');
-        if (topicsContainer && !topicsContainer.querySelector('.guide-topic-btn')) {
-            this.renderTopicList();
-            this.validateTopicBindings();
-        }
+        this.renderTopicList();
         this._lastFocusedElement = document.activeElement;
         guideModal.style.display = 'flex';
         const dialog = guideModal.querySelector('.guide-modal-content');
@@ -573,10 +369,10 @@ const Guide = {
         if (guideModal) guideModal.style.display = 'none';
         this._closeExplanation();
     },
-    init() {
+    async init() {
         try {
+            await this.fetchTopics();
             this.renderTopicList();
-            this.validateTopicBindings();
         } catch (err) {
             console.error('Guide init failed:', err);
         }
