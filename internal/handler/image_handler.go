@@ -162,6 +162,7 @@ func (h *ImageHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/images/tags", h.GetTags)
 	r.Get("/images/gps-count-by-source", h.GetGPSCountBySource)
 	r.Get("/images/gps-regions", h.GetGPSRegions)
+	r.Get("/images/regions", h.GetImageRegions)
 	r.Post("/images/locations/nearby", h.GetNearbyLocations)
 	r.Put("/images/bulk-update", h.BulkUpdate)
 	r.Delete("/images/bulk-delete", h.BulkDelete)
@@ -360,6 +361,20 @@ func (h *ImageHandler) GetGPSRegions(w http.ResponseWriter, r *http.Request) {
 	}
 	if regions == nil {
 		regions = []model.GPSRegionCount{}
+	}
+	writeJSON(w, map[string]any{"regions": regions})
+}
+
+// ── /images/regions ───────────────────────────────────────────────────────────
+
+func (h *ImageHandler) GetImageRegions(w http.ResponseWriter, r *http.Request) {
+	regions, err := h.svc.CountImagesByRegion(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error counting images by region: %s", err))
+		return
+	}
+	if regions == nil {
+		regions = []model.ImageRegionCount{}
 	}
 	writeJSON(w, map[string]any{"regions": regions})
 }

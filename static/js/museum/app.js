@@ -1242,10 +1242,26 @@ const App = (() => {
         }
 
         const REGION_NAME_MAP = {
-            eur: 'Europe', dxb: 'Dubai', af: 'Africa', me: 'Middle East',
-            aus: 'Australia', asia: 'Asia', usa: 'USA', south_america: 'South America',
-            oth: 'Other', carribean: 'Caribbean', nz: 'New Zealand',
-            central_america: 'Central America'
+            aus: 'Australia',
+            dxb: 'Dubai',
+            ireland: 'Ireland',
+            uk: 'United Kingdom',
+            scandinavia: 'Scandinavia',
+            eur: 'Europe',
+            canada: 'Canada',
+            usa: 'USA',
+            af: 'Africa',
+            me: 'Middle East',
+            malaysia: 'Malaysia',
+            indonesia: 'Indonesia',
+            india: 'India',
+            thailand: 'Thailand',
+            asia: 'Asia',
+            central_america: 'Central America',
+            carribean: 'Caribbean',
+            nz: 'New Zealand',
+            south_america: 'South America',
+            oth: 'Other',
         };
         function regionDisplayName(key) {
             if (key == null || key === '') return 'Unknown';
@@ -1657,6 +1673,7 @@ const App = (() => {
             setCell('contacts', d.contacts_count != null ? Number(d.contacts_count) : 0);
             setCell('reference_import_entries', d.reference_images != null ? Number(d.reference_images) : 0);
             setCell('image_export_entries', d.total_images != null ? Number(d.total_images) : 0);
+            setCell('gps_images', d.gps_images_count != null ? Number(d.gps_images_count) : 0);
         }
 
         async function loadDataImportModalContent() {
@@ -2199,6 +2216,7 @@ const App = (() => {
                 thumbnails: 'Thumbnails',
                 thumbnails_async: 'Thumbnails',
                 reference_import: 'Reference Images',
+                image_regions_recalc: 'Image Regions',
                 email_embeddings: 'Optimise Emails',
                 message_embeddings: 'Message Embeddings',
                 message_context_embeddings: 'Message Context Embeddings',
@@ -2561,6 +2579,7 @@ const App = (() => {
             imap_processing: '/imap/process/cancel',
             filesystem: '/images/import/cancel',
             reference_import: '/images/import-reference/cancel',
+            image_regions_recalc: '/images/recalculate-regions/cancel',
             email_embeddings: '/emails/embeddings/backfill/cancel',
             message_embeddings: '/messages/embeddings/backfill/cancel',
             message_context_embeddings: '/messages/context-embeddings/backfill/cancel',
@@ -2752,6 +2771,8 @@ const App = (() => {
                     return `File: ${data.current_file || '-'} | ${data.files_processed || 0}/${data.total_files || 0} | ${data.images_imported || 0} imported, ${data.images_referenced || 0} referenced, ${data.images_updated || 0} updated | ${data.errors || 0} errors`;
                 case 'reference_import':
                     return `Item: ${data.processed || 0}/${data.total || 0} | ${data.imported || 0} imported, ${data.skipped || 0} skipped | ${data.errors || 0} errors`;
+                case 'image_regions_recalc':
+                    return `Item: ${data.processed || 0}/${data.total || 0} | ${data.updated || 0} updated`;
                 case 'email_embeddings':
                     return `Email: ${data.processed || 0}/${data.total || 0} | ${data.embedded || 0} embedded, ${data.skipped || 0} skipped | ${data.errors || 0} errors`;
                 case 'message_embeddings':
@@ -2861,6 +2882,7 @@ const App = (() => {
             filesystem: { needsInput: true, title: 'Filesystem Image Import', fields: [{ id: 'root_directory', key: 'filesystem_import_directory', label: 'Folder to scan', placeholder: 'Choose a folder or type a full path', required: true, type: 'folder', folderDialogTitle: 'Select folder to import (reference only)' }, { id: 'max_images', key: 'filesystem_import_max_images', label: 'Max Images (Optional)', placeholder: 'Leave empty for all', required: false, type: 'number' }, { id: 'import_db_after_link', key: 'filesystem_import_db_after_link', label: 'Import to Database After Linking', required: false, type: 'checkbox' }], run: async (vals) => { const body = { root_directory: vals.root_directory, create_thumb_and_get_exif: false, reference_mode: true }; if (vals.max_images) body.max_images = parseInt(vals.max_images, 10); const r = await fetch('/images/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/images/import/stream' },
             filesystem_reference: { needsInput: true, title: 'Reference images on filesystem (local)', fields: [{ id: 'root_directory', key: 'filesystem_reference_import_directory', label: 'Folder(s) on this machine — separate with semicolons. Each folder is scanned recursively; only paths are stored in the archive (images stay on disk).', placeholder: 'e.g., C:\\Photos\\Vacation; D:\\Pictures', required: true }, { id: 'max_images', key: 'filesystem_reference_import_max_images', label: 'Max images (optional)', placeholder: 'Leave empty for all', required: false, type: 'number' }], run: async (vals) => { const body = { root_directory: vals.root_directory, create_thumb_and_get_exif: false, reference_mode: true }; if (vals.max_images) body.max_images = parseInt(vals.max_images, 10); const r = await fetch('/images/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/images/import/stream' },
             reference_import: { needsInput: false, title: 'Import Reference Images to Database', run: async () => { const r = await fetch('/images/import-reference', { method: 'POST' }); return r; }, stream: '/images/import-reference/stream' },
+            image_regions_recalc: { needsInput: false, title: 'Recalculate Image Regions', run: async () => { const r = await fetch('/images/recalculate-regions', { method: 'POST' }); return r; }, stream: '/images/recalculate-regions/stream' },
             email_embeddings: { needsInput: false, title: 'Optimise Emails for Searching', run: async () => { const r = await fetch('/emails/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/emails/embeddings/backfill/stream' },
             message_embeddings: { needsInput: false, title: 'Generate missing message embedding vectors', run: async () => { const r = await fetch('/messages/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/messages/embeddings/backfill/stream' },
             message_context_embeddings: { needsInput: false, title: 'Build message context embeddings', run: async () => { const r = await fetch('/messages/context-embeddings/backfill', { method: 'POST' }); return r; }, stream: '/messages/context-embeddings/backfill/stream' },
@@ -3839,13 +3861,14 @@ const App = (() => {
         })();
 
         async function checkInitialImportStatus() {
-            const types = ['upload_zip','email_processing','imap_processing','filesystem','reference_import','email_embeddings','message_embeddings','message_context_embeddings','image_tag_embeddings','facebook_post_text_embeddings','facebook_album_description_embeddings','image_export','thumbnails','contacts','image_ai_gemma_unclassified'];
+            const types = ['upload_zip','email_processing','imap_processing','filesystem','reference_import','image_regions_recalc','email_embeddings','message_embeddings','message_context_embeddings','image_tag_embeddings','facebook_post_text_embeddings','facebook_album_description_embeddings','image_export','thumbnails','contacts','image_ai_gemma_unclassified'];
             const statusEndpoints = {
                 upload_zip: '/import/upload/status',
                 email_processing: '/gmail/process/status',
                 imap_processing: '/imap/process/status',
                 filesystem: '/images/import/status',
                 reference_import: '/images/import-reference/status',
+                image_regions_recalc: '/images/recalculate-regions/status',
                 email_embeddings: '/emails/embeddings/backfill/status',
                 message_embeddings: '/messages/embeddings/backfill/status',
                 message_context_embeddings: '/messages/context-embeddings/backfill/status',

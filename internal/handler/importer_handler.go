@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -131,6 +132,11 @@ var (
 		"imported": 0, "skipped": 0, "errors": 0, "error_message": nil, "error_messages": []string{},
 	})
 
+	imageRegionsRecalcJob = importer.NewImportJob("Image region recalculation", map[string]any{
+		"status": "idle", "status_line": nil, "total": 0, "processed": 0,
+		"updated": 0, "error_message": nil,
+	})
+
 	imageExportJob = importer.NewImportJob("Image export", map[string]any{
 		"status": "idle", "status_line": nil, "total": 0, "processed": 0,
 		"exported": 0, "skipped": 0, "errors": 0, "error_message": nil, "error_messages": []string{},
@@ -242,6 +248,12 @@ func (h *ImporterHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/images/import-reference/stream", h.ReferenceImportStream)
 	r.Post("/images/import-reference/cancel", h.ReferenceImportCancel)
 	r.Get("/images/import-reference/status", h.ReferenceImportStatus)
+
+	// Image region recalculation (GPS → region code)
+	r.Post("/images/recalculate-regions", h.ImageRegionsRecalcStart)
+	r.Get("/images/recalculate-regions/stream", h.ImageRegionsRecalcStream)
+	r.Post("/images/recalculate-regions/cancel", h.ImageRegionsRecalcCancel)
+	r.Get("/images/recalculate-regions/status", h.ImageRegionsRecalcStatus)
 
 	// Image export (export images to filesystem)
 	r.Post("/images/export", h.ImageExportStart)
@@ -991,6 +1003,121 @@ func (h *ImporterHandler) ReferenceImportCancel(w http.ResponseWriter, r *http.R
 }
 func (h *ImporterHandler) ReferenceImportStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, referenceImportJob.Status())
+}
+
+// ── Image region recalculation ────────────────────────────────────────────────
+
+func (h *ImporterHandler) ImageRegionsRecalcStart(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	if err := imageRegionsRecalcJob.AssertNotRunning(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if h.pool == nil {
+		writeError(w, http.StatusServiceUnavailable, "region recalculation not configured")
+		return
+	}
+
+	imageRegionsRecalcJob.Start()
+	imageRegionsRecalcJob.UpdateState(map[string]any{
+		"status": "in_progress", "status_line": "Starting region recalculation...",
+		"total": 0, "processed": 0, "updated": 0, "error_message": nil,
+	})
+	imageRegionsRecalcJob.Broadcast("status", map[string]any{"status_line": "Starting region recalculation..."})
+
+	uid := appctx.UserIDFromCtx(r.Context())
+	go runImageRegionsRecalc(h.pool, imageRegionsRecalcJob, uid)
+
+	writeJSON(w, map[string]any{"message": "Region recalculation started", "status": "started"})
+}
+
+func runImageRegionsRecalc(pool *sql.DB, job *importer.ImportJob, uid int64) {
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
+	defer job.Finish()
+
+	countGPS := func() int {
+		q := `SELECT COUNT(id) FROM media_items
+		      WHERE media_type LIKE 'image/%'
+		        AND latitude IS NOT NULL AND longitude IS NOT NULL`
+		args := []any{}
+		if uid > 0 {
+			q += " AND user_id = ?"
+			args = append(args, uid)
+		}
+		var total int
+		if err := pool.QueryRowContext(ctx, q, args...).Scan(&total); err != nil {
+			return 0
+		}
+		return total
+	}
+
+	total := countGPS()
+	job.UpdateState(map[string]any{
+		"total": total,
+		"status_line": fmt.Sprintf("Recalculating regions for %d GPS-tagged images", total),
+	})
+	job.Broadcast("progress", job.GetState())
+
+	if total == 0 {
+		statusLine := "Completed: no GPS-tagged images to update"
+		job.UpdateState(map[string]any{
+			"status": "completed", "status_line": statusLine,
+			"processed": 0, "updated": 0, "error_message": nil,
+		})
+		job.Broadcast("completed", job.GetState())
+		return
+	}
+
+	updated, err := georegion.RecalculateImageRegions(ctx, pool, &georegion.RegionRecalcOptions{
+		Progress: func(processed, total int) {
+			job.UpdateState(map[string]any{
+				"processed": processed,
+				"updated":   processed,
+				"status_line": fmt.Sprintf("Item %d/%d: recalculating regions", processed, total),
+			})
+			job.Broadcast("progress", job.GetState())
+		},
+		Cancel: job.IsCancelled,
+	})
+	if err != nil {
+		if errors.Is(err, georegion.ErrRegionRecalcCancelled) {
+			job.UpdateState(map[string]any{
+				"status": "cancelled", "status_line": "Processing cancelled.",
+				"processed": updated, "updated": updated,
+			})
+			job.Broadcast("cancelled", job.GetState())
+			return
+		}
+		job.UpdateState(map[string]any{
+			"status": "error", "error_message": err.Error(), "status_line": err.Error(),
+		})
+		job.Broadcast("error", job.GetState())
+		return
+	}
+
+	statusLine := fmt.Sprintf("Completed: %d regions recalculated", updated)
+	job.UpdateState(map[string]any{
+		"status": "completed", "status_line": statusLine,
+		"processed": updated, "updated": updated, "error_message": nil,
+	})
+	job.Broadcast("completed", job.GetState())
+}
+
+func (h *ImporterHandler) ImageRegionsRecalcStream(w http.ResponseWriter, r *http.Request) {
+	imageRegionsRecalcJob.ServeSSE(w, r)
+}
+
+func (h *ImporterHandler) ImageRegionsRecalcCancel(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	writeJSON(w, imageRegionsRecalcJob.Cancel())
+}
+
+func (h *ImporterHandler) ImageRegionsRecalcStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, imageRegionsRecalcJob.Status())
 }
 
 // ── Image export ───────────────────────────────────────────────────────────────

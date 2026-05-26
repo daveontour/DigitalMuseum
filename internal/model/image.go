@@ -115,6 +115,12 @@ type GPSRegionCount struct {
 	Count  int64  `json:"count"`
 }
 
+// ImageRegionCount is one row in GET /images/regions.
+type ImageRegionCount struct {
+	Region string `json:"region"`
+	Count  int64  `json:"count"`
+}
+
 // RandomLocationsRequest is the body for POST /getLocations/random.
 type RandomLocationsRequest struct {
 	Categories []string `json:"categories"`

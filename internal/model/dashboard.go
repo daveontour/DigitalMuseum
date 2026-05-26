@@ -61,6 +61,7 @@ type ImportModalStatsResponse struct {
 	ContactsCount                   int64            `json:"contacts_count"`
 	EmailsBySource                  map[string]int64 `json:"emails_by_source"`
 	ReferenceDocsCount              int64            `json:"reference_docs_count"`
+	GpsImagesCount                  int64            `json:"gps_images_count"`
 }
 
 // OwnerContactSuggestion is a short contact row for linking the archive owner.

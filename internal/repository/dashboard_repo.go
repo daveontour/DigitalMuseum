@@ -451,6 +451,16 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportM
 			return nil, fmt.Errorf("thumbnail count: %w", err)
 		}
 	}
+	{
+		uidCond, args := makeUIDCond(nil)
+		if err := r.pool.QueryRowContext(ctx,
+			`SELECT COUNT(id) FROM media_items
+			 WHERE media_type LIKE 'image/%'
+			   AND latitude IS NOT NULL AND longitude IS NOT NULL`+uidCond, args...,
+		).Scan(&out.GpsImagesCount); err != nil {
+			return nil, fmt.Errorf("gps images count: %w", err)
+		}
+	}
 
 	// Facebook / locations / reference docs
 	{

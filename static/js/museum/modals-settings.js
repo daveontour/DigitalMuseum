@@ -3215,7 +3215,6 @@ Modals.LLMToolsAccess = (() => {
                 const tdDesc = document.createElement('td');
                 tdDesc.style.maxWidth = '320px';
                 tdDesc.style.fontSize = '0.9em';
-                tdDesc.style.color = '#555';
                 tdDesc.textContent = t.description || '';
                 tr.appendChild(tdName);
                 tr.appendChild(tdDesc);

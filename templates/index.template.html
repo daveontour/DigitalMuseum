@@ -1511,6 +1511,23 @@
                                         </div>
                                     </div>
                                 </article>
+                                <article class="data-import-card data-import-row" data-import="image_regions_recalc">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-globe-americas"></i> Recalculate Image Regions</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count" data-import-count-key="gps_images">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Recompute world region codes for all images that have GPS coordinates, using the current region bounding boxes. Entries shows GPS-tagged images. Safe to run after region definitions change.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_regions_recalc"><i class="fas fa-play"></i> Recalculate</button>
+                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
                                 <article class="data-import-card data-import-row" data-import="message_context_embeddings">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-vector-square"></i> Optimise Message and Conversation for Searching</h3>
@@ -2335,14 +2352,26 @@
                                                 <option value="all" selected>All Locations</option>
                                                 <option value="loc">GPS Data</option>
                                                 <option value="non">No GPS Data</option>
-                                                <option value="aus">Australian Locations</option>
-                                                <option value="dxb">Dubai Locations</option>
+                                                <option value="aus">Australia</option>
+                                                <option value="dxb">Dubai</option>
+                                                <option value="ireland">Ireland</option>
+                                                <option value="uk">United Kingdom</option>
+                                                <option value="scandinavia">Scandinavia</option>
+                                                <option value="eur">Europe</option>
+                                                <option value="canada">Canada</option>
+                                                <option value="usa">USA</option>
+                                                <option value="af">Africa</option>
                                                 <option value="me">Middle East</option>
-                                                <option value="eur">European Locations</option>
-                                                <option value="usa">USA Locations & Canada</option>
-                                                <option value="af">African Locations</option>
-                                                <option value="asia">Asian Locations</option>
-                                                <option value="oth">Other Locations</option>
+                                                <option value="malaysia">Malaysia</option>
+                                                <option value="indonesia">Indonesia</option>
+                                                <option value="india">India</option>
+                                                <option value="thailand">Thailand</option>
+                                                <option value="asia">Asia</option>
+                                                <option value="central_america">Central America</option>
+                                                <option value="carribean">Caribbean</option>
+                                                <option value="nz">New Zealand</option>
+                                                <option value="south_america">South America</option>
+                                                <option value="oth">Other</option>
                                             </select>
                                             <select id="image-gallery-source-filter" style="border-radius: 4px; border: 1px solid #bfc9da; padding: 0.3em; font-size: var(--text-md);">
                                                 <option value="" selected>All sources</option>
@@ -2555,6 +2584,11 @@
                                         <option value="facebook_messenger">Facebook Messenger</option>
                                         <option value="facebook_post">Facebook Post</option>
                                         <option value="facebook_album">Facebook Album</option>
+                                    </select>
+                                </div>
+                                <div class="new-image-gallery-search-row email-gallery-search-row">
+                                    <select id="new-image-gallery-region-filter" class="new-image-gallery-select email-gallery-select" aria-label="Region">
+                                        <option value="" selected>All regions</option>
                                     </select>
                                 </div>
                                 <div class="new-image-gallery-filter-row email-gallery-filter-row email-gallery-filter-year-month-row">

@@ -202,6 +202,11 @@ func (s *ImageService) CountGPSByRegion(ctx context.Context) ([]model.GPSRegionC
 	return s.repo.CountGPSByRegion(ctx)
 }
 
+// CountImagesByRegion returns counts of image media_items grouped by region code.
+func (s *ImageService) CountImagesByRegion(ctx context.Context) ([]model.ImageRegionCount, error) {
+	return s.repo.CountImagesByRegion(ctx)
+}
+
 // GetLocations returns items that have GPS data, shaped for the map view.
 func (s *ImageService) GetLocations(ctx context.Context) ([]model.LocationItem, error) {
 	items, err := s.repo.GetLocations(ctx)

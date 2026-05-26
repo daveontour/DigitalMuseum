@@ -3144,6 +3144,86 @@ body {
     color: var(--color-navy)
 }
 
+/* Configuration dialog — dark content panels (theme text is light-on-dark) */
+#config-modal-overlay .config-section {
+    background: var(--color-bg-base);
+    color: var(--color-text);
+    border: 1px solid var(--color-border-subtle);
+}
+
+#config-modal-overlay .section-config {
+    background: var(--color-bg-elevated);
+    color: var(--color-text);
+    border: 1px solid var(--color-border-subtle);
+}
+
+#config-modal-overlay .config-tab-content h1,
+#config-modal-overlay .section-config h1,
+#config-modal-overlay .config-section h2,
+#config-modal-overlay .config-section h3 {
+    color: var(--color-text);
+}
+
+#config-modal-overlay .section-config p,
+#config-modal-overlay .config-section p,
+#config-modal-overlay .config-tab-lead {
+    color: var(--color-text-muted);
+}
+
+#config-modal-overlay #interests-suggest-ai-require-contact-hint,
+#config-modal-overlay #writing-style-require-contact-hint,
+#config-modal-overlay #psychological-profile-require-contact-hint {
+    color: var(--color-text-muted) !important;
+}
+
+#config-modal-overlay .sensitive-data-table th {
+    background: var(--color-bg-surface);
+    color: var(--color-text);
+}
+
+#config-modal-overlay .sensitive-data-table td {
+    color: var(--color-text) !important;
+    background: transparent;
+}
+
+#config-modal-overlay .sensitive-data-table td code {
+    color: var(--color-text);
+}
+
+#config-modal-overlay .sensitive-data-table tbody tr {
+    cursor: default;
+}
+
+#config-modal-overlay .sensitive-data-table tbody tr:hover {
+    background: var(--color-bg-hover);
+}
+
+#config-modal-overlay .contacts-table,
+#config-modal-overlay table.manage-contacts-data-table.contacts-table {
+    color: var(--color-text);
+}
+
+#config-modal-overlay .contacts-table thead th,
+#config-modal-overlay table.manage-contacts-data-table.contacts-table thead th {
+    background: var(--color-bg-surface) !important;
+    color: var(--color-text-muted) !important;
+}
+
+#config-modal-overlay .contacts-table tbody td,
+#config-modal-overlay table.manage-contacts-data-table.contacts-table tbody td {
+    color: var(--color-text);
+    background: transparent;
+}
+
+#config-modal-overlay .contacts-table tbody tr:hover,
+#config-modal-overlay table.manage-contacts-data-table.contacts-table tbody tr:hover {
+    background: var(--color-bg-hover);
+}
+
+#config-modal-overlay .config-content {
+    background: var(--color-bg-alt);
+}
+
 #subject-configuration-tab .subject-config-details-grid {
     display: grid;
     width: 100%;

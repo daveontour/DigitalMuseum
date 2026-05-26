@@ -17,7 +17,9 @@ func TestRegionFromLatLng(t *testing.T) {
 	}{
 		{name: "australia", lat: -33.8688, lng: 151.2093, want: "aus"},
 		{name: "dubai", lat: 25.2048, lng: 55.2708, want: "dxb"},
-		{name: "europe", lat: 51.5074, lng: -0.1278, want: "eur"},
+		{name: "ireland", lat: 53.3498, lng: -6.2603, want: "ireland"},
+		{name: "uk", lat: 51.5074, lng: -0.1278, want: "uk"},
+		{name: "europe", lat: 48.8566, lng: 2.3522, want: "eur"},
 		{name: "usa", lat: 40.7128, lng: -74.0060, want: "usa"},
 		{name: "africa", lat: -1.2921, lng: 36.8219, want: "af"},
 		{name: "middle_east", lat: 35.6892, lng: 51.3890, want: "me"},
@@ -107,7 +109,7 @@ func TestUpdateLocationRegions(t *testing.T) {
 			region TEXT
 		);
 		INSERT INTO locations (id, latitude, longitude, region) VALUES
-			(1, 51.5074, -0.1278, NULL);
+			(1, 48.8566, 2.3522, NULL);
 	`)
 	if err != nil {
 		t.Fatal(err)

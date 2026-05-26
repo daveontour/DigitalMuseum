@@ -391,6 +391,7 @@ const DOM = {
     newImageGallerySimilarHint: document.getElementById('new-image-gallery-similar-hint'),
     newImageGalleryAuthor: document.getElementById('new-image-gallery-author'),
     newImageGallerySource: document.getElementById('new-image-gallery-source'),
+    newImageGalleryRegionFilter: document.getElementById('new-image-gallery-region-filter'),
     newImageGalleryYearFilter: document.getElementById('new-image-gallery-year-filter'),
     newImageGalleryMonthFilter: document.getElementById('new-image-gallery-month-filter'),
     newImageGalleryRating: document.getElementById('new-image-gallery-rating'),

@@ -596,6 +596,33 @@ func (r *ImageRepo) CountGPSBySource(ctx context.Context) ([]model.GPSCountBySou
 	return counts, rows.Err()
 }
 
+// CountImagesByRegion returns counts of image media_items grouped by region code.
+func (r *ImageRepo) CountImagesByRegion(ctx context.Context) ([]model.ImageRegionCount, error) {
+	q := `SELECT TRIM(region), COUNT(*)
+	      FROM media_items
+	      WHERE media_type LIKE 'image/%'
+	        AND region IS NOT NULL AND TRIM(region) != ''`
+	args := []any{}
+	// uid := uidFromCtx(ctx)
+	// q, args = addUIDFilter(q, args, uid)
+	q += ` GROUP BY TRIM(region) ORDER BY COUNT(*) DESC, TRIM(region) ASC`
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("CountImagesByRegion: %w", err)
+	}
+	defer rows.Close()
+
+	var counts []model.ImageRegionCount
+	for rows.Next() {
+		var row model.ImageRegionCount
+		if err := rows.Scan(&row.Region, &row.Count); err != nil {
+			return nil, err
+		}
+		counts = append(counts, row)
+	}
+	return counts, rows.Err()
+}
+
 // CountGPSByRegion returns counts of GPS-tagged media_items grouped by region code.
 func (r *ImageRepo) CountGPSByRegion(ctx context.Context) ([]model.GPSRegionCount, error) {
 	q := `SELECT TRIM(region), COUNT(*)

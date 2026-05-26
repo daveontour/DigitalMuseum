@@ -531,6 +531,35 @@ Modals.NewImageGallery = (() => {
         let _isPickMode = false;
         let _pickModeCallback = null;
 
+        const REGION_LABELS = {
+            aus: 'Australia',
+            dxb: 'Dubai',
+            ireland: 'Ireland',
+            uk: 'United Kingdom',
+            scandinavia: 'Scandinavia',
+            eur: 'Europe',
+            canada: 'Canada',
+            usa: 'USA',
+            af: 'Africa',
+            me: 'Middle East',
+            malaysia: 'Malaysia',
+            indonesia: 'Indonesia',
+            india: 'India',
+            thailand: 'Thailand',
+            asia: 'Asia',
+            central_america: 'Central America',
+            carribean: 'Caribbean',
+            nz: 'New Zealand',
+            south_america: 'South America',
+            oth: 'Other',
+        };
+
+        function _regionLabel(code) {
+            if (code == null || code === '') return 'Unknown';
+            const k = String(code).toLowerCase().trim();
+            return REGION_LABELS[k] || code;
+        }
+
         function formatDate(year, month) {
             if (!year && !month) return 'No Date';
             const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -569,6 +598,7 @@ Modals.NewImageGallery = (() => {
                 DOM.newImageGalleryTags,
                 DOM.newImageGalleryAuthor,
                 DOM.newImageGallerySource,
+                DOM.newImageGalleryRegionFilter,
                 DOM.newImageGalleryYearFilter,
                 DOM.newImageGalleryMonthFilter,
                 DOM.newImageGalleryRating,
@@ -741,6 +771,7 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGallerySimilarN) DOM.newImageGallerySimilarN.value = '25';
             if (DOM.newImageGalleryAuthor) DOM.newImageGalleryAuthor.value = '';
             if (DOM.newImageGallerySource) DOM.newImageGallerySource.value = '';
+            if (DOM.newImageGalleryRegionFilter) DOM.newImageGalleryRegionFilter.value = '';
             if (DOM.newImageGalleryYearFilter) DOM.newImageGalleryYearFilter.value = '0';
             if (DOM.newImageGalleryMonthFilter) DOM.newImageGalleryMonthFilter.value = '0';
             if (DOM.newImageGalleryRating) DOM.newImageGalleryRating.value = '';
@@ -948,6 +979,45 @@ Modals.NewImageGallery = (() => {
                 // Continue without tags datalist if API call fails
             }
 
+            // Setup region filter — distinct regions from archive
+            try {
+                const regionResponse = await fetch('/images/regions', { cache: 'no-store' });
+                if (!regionResponse.ok) {
+                    throw new Error(`Failed to fetch regions: ${regionResponse.statusText}`);
+                }
+                const regionData = await regionResponse.json();
+                const distinctRegions = regionData.regions || [];
+                const prevRegion = DOM.newImageGalleryRegionFilter
+                    ? (DOM.newImageGalleryRegionFilter.value || '')
+                    : '';
+                if (DOM.newImageGalleryRegionFilter) {
+                    DOM.newImageGalleryRegionFilter.innerHTML = '';
+                    const allOpt = document.createElement('option');
+                    allOpt.value = '';
+                    allOpt.textContent = 'All regions';
+                    DOM.newImageGalleryRegionFilter.appendChild(allOpt);
+                    distinctRegions.forEach(row => {
+                        const code = row && row.region != null ? String(row.region).trim() : '';
+                        if (!code) return;
+                        const option = document.createElement('option');
+                        option.value = code;
+                        const count = row.count != null ? Number(row.count) : 0;
+                        option.textContent = count > 0
+                            ? `${_regionLabel(code)} (${count.toLocaleString()})`
+                            : _regionLabel(code);
+                        DOM.newImageGalleryRegionFilter.appendChild(option);
+                    });
+                    if (prevRegion && Array.from(DOM.newImageGalleryRegionFilter.options).some(o => o.value === prevRegion)) {
+                        DOM.newImageGalleryRegionFilter.value = prevRegion;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading regions:', error);
+                if (DOM.newImageGalleryRegionFilter && DOM.newImageGalleryRegionFilter.options.length === 0) {
+                    DOM.newImageGalleryRegionFilter.innerHTML = '<option value="" selected>All regions</option>';
+                }
+            }
+
             // Setup month filter
             const months = [
                 { value: 0, text: 'All Months' },
@@ -996,6 +1066,10 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGallerySource) {
                 const src = (DOM.newImageGallerySource.value || '').trim();
                 if (src) params.append('source', src);
+            }
+            if (DOM.newImageGalleryRegionFilter) {
+                const region = (DOM.newImageGalleryRegionFilter.value || '').trim();
+                if (region) params.append('region', region);
             }
             if (DOM.newImageGalleryYearFilter && DOM.newImageGalleryYearFilter.value && DOM.newImageGalleryYearFilter.value !== '0') {
                 params.append('year', DOM.newImageGalleryYearFilter.value);
