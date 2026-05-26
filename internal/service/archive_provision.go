@@ -13,6 +13,7 @@ import (
 	"github.com/daveontour/aimuseum/internal/config"
 	appcrypto "github.com/daveontour/aimuseum/internal/crypto"
 	"github.com/daveontour/aimuseum/internal/database"
+	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/repository"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -22,22 +23,29 @@ const minArchiveOwnerPasswordLen = 12
 // ArchiveProvisionService creates new archive SQLite files with schema, seeds,
 // first owner registration, keyring init, and subject config.
 type ArchiveProvisionService struct {
-	secure        bool
-	keyringPepper string
-	sensitive     *SensitiveService // when non-nil, init keyring on the new archive DB (not the server main pool)
+	secure                bool
+	keyringPepper         string
+	regionsConfigFile     string
+	suggestionsConfigFile string
+	sensitive             *SensitiveService // when non-nil, init keyring on the new archive DB (not the server main pool)
 }
 
 // NewArchiveProvisionService wires optional sensitive service (nil skips keyring init).
 // keyringPepper is mixed into key derivation (same as SensitiveService); may be empty.
+// regionsConfigFile and suggestionsConfigFile seed insert-if-missing rows on new archives.
 func NewArchiveProvisionService(
 	secure bool,
 	keyringPepper string,
+	regionsConfigFile string,
+	suggestionsConfigFile string,
 	sensitive *SensitiveService,
 ) *ArchiveProvisionService {
 	return &ArchiveProvisionService{
-		secure:        secure,
-		keyringPepper: keyringPepper,
-		sensitive:     sensitive,
+		secure:                secure,
+		keyringPepper:         keyringPepper,
+		regionsConfigFile:     regionsConfigFile,
+		suggestionsConfigFile: suggestionsConfigFile,
+		sensitive:             sensitive,
 	}
 }
 
@@ -108,6 +116,15 @@ func (s *ArchiveProvisionService) CreateArchiveWithFirstUser(
 	}
 	if err := database.SeedAppSystemInstructionsFromFiles(migrateCtx, db, "static"); err != nil {
 		return fmt.Errorf("seed app system instructions: %w", err)
+	}
+	if err := database.SeedRegionsFromFileIfMissing(migrateCtx, db, s.regionsConfigFile); err != nil {
+		return fmt.Errorf("seed regions: %w", err)
+	}
+	if err := georegion.ReloadFromDB(migrateCtx, db); err != nil {
+		return fmt.Errorf("load regions from db: %w", err)
+	}
+	if err := database.SeedSuggestionsFromFileIfMissing(migrateCtx, db, s.suggestionsConfigFile); err != nil {
+		return fmt.Errorf("seed suggestions: %w", err)
 	}
 
 	userRepo := repository.NewUserRepo(db)

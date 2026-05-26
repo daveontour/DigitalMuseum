@@ -1,6 +1,8 @@
 package georegion
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -38,8 +40,62 @@ type Registry struct {
 var defaultRegistry *Registry
 
 // Load reads and validates regions.json from path and sets the package default registry.
+// Used by unit tests; production loads via ReloadFromDB after DB seed.
 func Load(path string) error {
 	reg, err := loadRegistry(path)
+	if err != nil {
+		return err
+	}
+	defaultRegistry = reg
+	return nil
+}
+
+// ReloadFromDB reads all region rows and rebuilds the in-memory default registry.
+func ReloadFromDB(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, `SELECT key, text FROM regions ORDER BY sort_order, id`)
+	if err != nil {
+		return fmt.Errorf("query regions: %w", err)
+	}
+	defer rows.Close()
+
+	cfg := Config{}
+	for rows.Next() {
+		var key, text string
+		if err := rows.Scan(&key, &text); err != nil {
+			return fmt.Errorf("scan region row: %w", err)
+		}
+		key = strings.TrimSpace(key)
+		switch key {
+		case KeyDefaultRegion:
+			var code string
+			if err := json.Unmarshal([]byte(text), &code); err != nil {
+				return fmt.Errorf("parse %s: %w", KeyDefaultRegion, err)
+			}
+			cfg.DefaultRegion = code
+		case KeyDefaultLabel:
+			var label string
+			if err := json.Unmarshal([]byte(text), &label); err != nil {
+				return fmt.Errorf("parse %s: %w", KeyDefaultLabel, err)
+			}
+			cfg.DefaultLabel = label
+		default:
+			var def RegionDefinition
+			if err := json.Unmarshal([]byte(text), &def); err != nil {
+				return fmt.Errorf("parse region key %q: %w", key, err)
+			}
+			if strings.TrimSpace(def.Code) == "" {
+				def.Code = key
+			}
+			cfg.Regions = append(cfg.Regions, def)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate regions: %w", err)
+	}
+	if err := ValidateConfig(&cfg); err != nil {
+		return fmt.Errorf("validate regions from db: %w", err)
+	}
+	reg, err := registryFromConfig(cfg)
 	if err != nil {
 		return err
 	}
@@ -67,7 +123,10 @@ func loadRegistry(path string) (*Registry, error) {
 	if err := validateConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("validate regions config %s: %w", path, err)
 	}
+	return registryFromConfig(cfg)
+}
 
+func registryFromConfig(cfg Config) (*Registry, error) {
 	reg := &Registry{
 		config: cfg,
 		labels: make(map[string]string, len(cfg.Regions)),
@@ -87,6 +146,11 @@ func loadRegistry(path string) (*Registry, error) {
 		}
 	}
 	return reg, nil
+}
+
+// ValidateConfig checks a parsed regions document.
+func ValidateConfig(cfg *Config) error {
+	return validateConfig(cfg)
 }
 
 func validateConfig(cfg *Config) error {

@@ -281,5 +281,9 @@ Modals.Suggestions = (() => {
         }
     }
 
-    return { init, open, close };
+    function invalidateCache() {
+        cachedPayload = null;
+    }
+
+    return { init, open, close, invalidateCache };
 })();

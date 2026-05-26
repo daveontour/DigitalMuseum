@@ -91,10 +91,6 @@ func run() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	if err := georegion.Load(cfg.App.RegionsConfigFile()); err != nil {
-		return fmt.Errorf("load regions config: %w", err)
-	}
-
 	// ── Database ───────────────────────────────────────────────────────────────
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -149,6 +145,15 @@ func run() error {
 
 		if err := database.SeedAppSystemInstructionsFromFiles(migrateCtx, db.Std, "static"); err != nil {
 			return fmt.Errorf("seed app system instructions: %w", err)
+		}
+		if err := database.SeedRegionsFromFileIfMissing(migrateCtx, db.Std, cfg.App.RegionsConfigFile()); err != nil {
+			return fmt.Errorf("seed regions: %w", err)
+		}
+		if err := georegion.ReloadFromDB(migrateCtx, db.Std); err != nil {
+			return fmt.Errorf("load regions from db: %w", err)
+		}
+		if err := database.SeedSuggestionsFromFileIfMissing(migrateCtx, db.Std, cfg.App.SuggestionsConfigFile()); err != nil {
+			return fmt.Errorf("seed suggestions: %w", err)
 		}
 	}
 

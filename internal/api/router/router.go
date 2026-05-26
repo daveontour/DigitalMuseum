@@ -54,12 +54,14 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		archiveProvision := service.NewArchiveProvisionService(
 			cfg.Server.SessionCookieSecure,
 			cfg.Crypto.KeyringPepper,
+			cfg.App.RegionsConfigFile(),
+			cfg.App.SuggestionsConfigFile(),
 			nil,
 		)
 		profileHandler := handler.NewProfileHandler(profileRepo, adminUsersHandler.RequireAdmin, archiveProvision)
 		profileHandler.RegisterRoutes(r)
 
-		templateHandler := handler.NewTemplateHandler(nil, nil, cfg)
+		templateHandler := handler.NewTemplateHandler(nil, nil, nil, cfg)
 		r.Get("/login", templateHandler.GetLogin)
 		// Desktop shell and browsers open "/"; send them to the login / first-run flow.
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -154,8 +156,14 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	dashboardHandler := handler.NewDashboardHandler(dashboardSvc, subjectConfigSvc, sessionMasterStore)
 	dashboardHandler.RegisterRoutes(r)
 
+	// ── Suggestions (deployment-wide config) ──────────────────────────────────
+	suggestionsRepo := repository.NewSuggestionsRepo(pool)
+	suggestionsSvc := service.NewSuggestionsService(suggestionsRepo)
+	suggestionsHandler := handler.NewSuggestionsHandler(suggestionsSvc)
+	suggestionsHandler.RegisterRoutes(r)
+
 	// ── Templated endpoints (GET /, suggestions, JS files) ───────────────────
-	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, userRepo, cfg)
+	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, userRepo, suggestionsSvc, cfg)
 	templateHandler.RegisterRoutes(r)
 
 	// ── Static files (must be after template routes so /static/js/museum/foundation.js
@@ -193,6 +201,12 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	interestSvc := service.NewInterestService(interestRepo)
 	interestHandler := handler.NewInterestHandler(interestSvc, sessionMasterStore)
 	interestHandler.RegisterRoutes(r)
+
+	// ── Regions (deployment-wide config) ──────────────────────────────────────
+	regionsRepo := repository.NewRegionsRepo(pool)
+	regionsSvc := service.NewRegionsService(regionsRepo, pool)
+	regionsHandler := handler.NewRegionsHandler(regionsSvc)
+	regionsHandler.RegisterRoutes(r)
 
 	// ── Saved responses ───────────────────────────────────────────────────────
 	savedResponseRepo := repository.NewSavedResponseRepo(pool)
@@ -265,6 +279,8 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	archiveProvision := service.NewArchiveProvisionService(
 		cfg.Server.SessionCookieSecure,
 		cfg.Crypto.KeyringPepper,
+		cfg.App.RegionsConfigFile(),
+		cfg.App.SuggestionsConfigFile(),
 		sensitiveSvc,
 	)
 	profileHandler := handler.NewProfileHandler(profileRepo, adminUsersHandler.RequireAdmin, archiveProvision)

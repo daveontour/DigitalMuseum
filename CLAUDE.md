@@ -426,10 +426,11 @@ tracked in `message_embedding_meta`.
 
 ### Suggestions library (chat sidebar)
 
-- **`GET /api/suggestions`** — [`internal/handler/template_handler.go`](internal/handler/template_handler.go) renders [`static/data/suggestions.json`](static/data/suggestions.json) with Jinja subject variables from `buildContext` (`owner`, `owners`, `full_name`, `he` / `him` / `his` / `himself`, `owner_gender`, `deployment_nature_local`, image tokens, etc.).
-- Optional **`static/data/suggestions.override.json`** (gitignored): same top-level shape as `suggestions.json`. Categories with the same `category` name **append** their `suggestions` arrays to the base file; new category names are appended whole. Lets operators add prompts without editing the stock file.
+- **`GET /api/suggestions`** — [`internal/handler/template_handler.go`](internal/handler/template_handler.go) assembles categories from the deployment-wide `suggestions` SQLite table via [`internal/service/suggestions_service.go`](internal/service/suggestions_service.go), then renders Jinja subject variables from `buildContext` (`owner`, `owners`, `full_name`, `he` / `him` / `his` / `himself`, `owner_gender`, `deployment_nature_local`, image tokens, etc.).
+- Startup seeds missing rows from [`static/data/suggestions.json`](static/data/suggestions.json) (insert-if-missing only; key = `{category}::{title}`). Optional **`SUGGESTIONS_CONFIG_PATH`** overrides the seed file path.
 - The JSON response includes **`_meta.deployment_nature_local`** (`True` / `False` strings) for client-side rules (e.g. `requires: ["local_only"]` on an item).
-- UI: [`static/js/museum/modals-suggestions.js`](static/js/museum/modals-suggestions.js); optional per-item fields include `action_label`, `description`, `requires`, `sensitivity`, and `function` (must match a key on `AppActions` in [`static/js/museum/app.js`](static/js/museum/app.js)).
+- Configuration UI: **Configuration → Suggestions** ([`static/js/museum/modals-suggestions-config.js`](static/js/museum/modals-suggestions-config.js)) — CRUD, export, import with per-key conflict resolution. Admin API under `/api/suggestions/*`.
+- Chat sidebar UI: [`static/js/museum/modals-suggestions.js`](static/js/museum/modals-suggestions.js); optional per-item fields include `action_label`, `description`, `requires`, `sensitivity`, and `function` (must match a key on `AppActions` in [`static/js/museum/app.js`](static/js/museum/app.js)).
 
 ### Import Pipeline
 
@@ -576,7 +577,7 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Profile selection / first-run page | `templates/non_user_init.template.html` |
 | Attachment viewer (standalone) | `templates/attachments_viewer.html` |
 | Image grid (standalone) | `templates/images_grid.html` |
-| Suggestions JSON + optional override | `static/data/suggestions.json`, `static/data/suggestions.override.json` (override gitignored) |
+| Suggestions (DB + seed JSON) | `static/data/suggestions.json`, `internal/service/suggestions_service.go`, `static/js/museum/modals-suggestions-config.js` |
 
 ## Security Notes
 

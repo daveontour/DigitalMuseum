@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,18 +14,20 @@ import (
 	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/repository"
+	"github.com/daveontour/aimuseum/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 
 // TemplateHandler serves the templated endpoints:
 //   - GET /                              → index.template.html (or non_user_init)
-//   - GET /api/suggestions               → suggestions.json rendered with subject vars
-//   - GET /api/regions                   → regions.json loaded at startup
+//   - GET /api/suggestions               → suggestions from DB, rendered with subject vars
+//   - GET /api/regions                   → in-memory registry (loaded from DB at startup)
 //   - GET /static/js/museum/foundation.js
 //   - GET /static/js/museum/modals-people.js
 type TemplateHandler struct {
 	subjectRepo           *repository.SubjectConfigRepo
 	userRepo              *repository.UserRepo
+	suggestionsSvc        *service.SuggestionsService
 	templatesDir          string
 	pythonStaticDir       string
 	defaultGeminiOK       bool
@@ -38,10 +39,11 @@ type TemplateHandler struct {
 }
 
 // NewTemplateHandler creates a TemplateHandler.
-func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, userRepo *repository.UserRepo, cfg *config.Config) *TemplateHandler {
+func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, userRepo *repository.UserRepo, suggestionsSvc *service.SuggestionsService, cfg *config.Config) *TemplateHandler {
 	return &TemplateHandler{
 		subjectRepo:           subjectRepo,
 		userRepo:              userRepo,
+		suggestionsSvc:        suggestionsSvc,
 		templatesDir:          cfg.App.TemplatesDir,
 		pythonStaticDir:       cfg.App.AssetStaticDir,
 		defaultGeminiOK:       cfg.AI.GeminiAPIKey != "",
@@ -200,39 +202,30 @@ func (h *TemplateHandler) GetRegions(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetSuggestions handles GET /api/suggestions.
-// It renders static/data/suggestions.json with subject Jinja variables, optionally merges
-// static/data/suggestions.override.json (same shape; categories with matching names append suggestions),
-// and injects _meta.deployment_nature_local for client-side filtering.
+// It assembles categories from the database, renders Jinja subject variables, and injects _meta.
 func (h *TemplateHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
+	if h.suggestionsSvc == nil {
+		writeError(w, http.StatusServiceUnavailable, "suggestions not available")
+		return
+	}
 	ctx := h.buildContext(r)
 
-	content, err := h.readFile(h.pythonStaticDir, filepath.Join("data", "suggestions.json"))
+	root, err := h.suggestionsSvc.BuildCategoriesDocument(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error reading suggestions: %s", err))
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error loading suggestions: %s", err))
 		return
 	}
 
-	rendered := renderJinja(content, ctx, nil)
-	root, err := unmarshalSuggestionsJSON(rendered)
+	raw, err := json.Marshal(root)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error encoding suggestions: %s", err))
+		return
+	}
+	rendered := renderJinja(string(raw), ctx, nil)
+	root, err = unmarshalSuggestionsJSON(rendered)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("suggestions template produced invalid JSON: %s", err))
 		return
-	}
-
-	overridePath := filepath.Join(h.pythonStaticDir, "data", "suggestions.override.json")
-	ob, errRead := os.ReadFile(overridePath)
-	if errRead == nil {
-		ren := renderJinja(string(ob), ctx, nil)
-		oroot, errO := unmarshalSuggestionsJSON(ren)
-		if errO == nil {
-			if baseCats, ok := root["categories"].([]any); ok {
-				if ovrCats, ok := oroot["categories"].([]any); ok && len(ovrCats) > 0 {
-					root["categories"] = mergeSuggestionCategoryLists(baseCats, ovrCats)
-				}
-			}
-		}
-	} else if !errors.Is(errRead, os.ErrNotExist) {
-		// Optional file; ignore missing only.
 	}
 
 	meta := map[string]any{
@@ -264,49 +257,6 @@ func unmarshalSuggestionsJSON(rendered string) (map[string]any, error) {
 		return nil, err
 	}
 	return root, nil
-}
-
-// mergeSuggestionCategoryLists appends suggestions from override categories onto base categories
-// when category names match (trimmed); unmatched override categories are appended as new categories.
-func mergeSuggestionCategoryLists(base, override []any) []any {
-	out := append([]any(nil), base...)
-	byName := make(map[string]int, len(out))
-	for i, item := range out {
-		m, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		name, _ := m["category"].(string)
-		name = strings.TrimSpace(name)
-		if name != "" {
-			byName[name] = i
-		}
-	}
-	for _, item := range override {
-		om, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		name, _ := om["category"].(string)
-		name = strings.TrimSpace(name)
-		add, ok := om["suggestions"].([]any)
-		if !ok || len(add) == 0 || name == "" {
-			continue
-		}
-		if idx, found := byName[name]; found {
-			bm, ok := out[idx].(map[string]any)
-			if !ok {
-				continue
-			}
-			existing, _ := bm["suggestions"].([]any)
-			bm["suggestions"] = append(existing, add...)
-			out[idx] = bm
-		} else {
-			out = append(out, om)
-			byName[name] = len(out) - 1
-		}
-	}
-	return out
 }
 
 // GetFoundationJS handles GET /static/js/museum/foundation.js.

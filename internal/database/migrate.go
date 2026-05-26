@@ -833,6 +833,20 @@ func schemaDDL() []string {
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_background_jobs_global_name
 			ON background_jobs (job_name)
 			WHERE user_id IS NULL`,
+		`CREATE TABLE IF NOT EXISTS regions (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			key         TEXT NOT NULL,
+			sort_order  INTEGER NOT NULL DEFAULT 0,
+			text        TEXT NOT NULL
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_regions_key ON regions (key)`,
+		`CREATE INDEX IF NOT EXISTS idx_regions_sort ON regions (sort_order, id)`,
+		`CREATE TABLE IF NOT EXISTS suggestions (
+			id    INTEGER PRIMARY KEY AUTOINCREMENT,
+			key   TEXT NOT NULL,
+			text  TEXT NOT NULL
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_suggestions_key ON suggestions (key)`,
 	}
 }
 

@@ -1005,6 +1005,12 @@ const App = (() => {
                 if (targetTab === 'tools-access') {
                     if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.load) void Modals.LLMToolsAccess.load();
                 }
+                if (targetTab === 'regions-config') {
+                    if (Modals.RegionsConfig && Modals.RegionsConfig.load) void Modals.RegionsConfig.load();
+                }
+                if (targetTab === 'suggestions-config') {
+                    if (Modals.SuggestionsConfig && Modals.SuggestionsConfig.load) void Modals.SuggestionsConfig.load();
+                }
                 if (targetTab === 'settings' || targetTab === 'api-keys') {
                     if (Modals.UserLLMSettings && Modals.UserLLMSettings.load) void Modals.UserLLMSettings.load();
                     if (targetTab === 'settings') void loadLLMProviderAvailability();

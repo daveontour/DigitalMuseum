@@ -847,3 +847,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_background_jobs_user_name
 CREATE UNIQUE INDEX IF NOT EXISTS uq_background_jobs_global_name
     ON background_jobs (job_name)
     WHERE user_id IS NULL;
+
+-- Deployment-wide region definitions (no user_id). Reserved keys __default_region__ and
+-- __default_label__ store JSON string values; normal keys store RegionDefinition JSON.
+CREATE TABLE IF NOT EXISTS regions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    key         TEXT NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    text        TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_regions_key ON regions (key);
+CREATE INDEX IF NOT EXISTS idx_regions_sort ON regions (sort_order, id);
+
+-- Deployment-wide chat sidebar suggestion prompts (no user_id).
+CREATE TABLE IF NOT EXISTS suggestions (
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    key   TEXT NOT NULL,
+    text  TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_suggestions_key ON suggestions (key);

@@ -263,7 +263,7 @@
                 </div>
                 <div class="loading-indicator-footer">
                     <div id="loading-indicator-provider" class="loading-indicator-provider"></div>
-                    <button type="button" id="loading-indicator-cancel-btn" class="loading-indicator-cancel-btn">Cancel</button>
+                    <button type="button" id="loading-indicator-cancel-btn" class="loading-indicator-cancel-btn modal-btn modal-btn-secondary">Cancel</button>
                 </div>
             </div>
 
@@ -712,6 +712,12 @@
                         <button type="button" class="config-tab-button" data-tab="api-keys">
                             <i class="fas fa-plug"></i> API Keys
                         </button>
+                        <button type="button" class="config-tab-button" data-tab="regions-config">
+                            <i class="fas fa-globe-americas"></i> Regions
+                        </button>
+                        <button type="button" class="config-tab-button" data-tab="suggestions-config">
+                            <i class="fas fa-lightbulb"></i> Suggestions
+                        </button>
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="subject-configuration">
                             <i class="fas fa-user"></i> Subject Configuration
                         </button>
@@ -901,6 +907,81 @@
                             <button type="button" class="modal-btn modal-btn-primary" id="user-llm-save-btn">Save AI API Settings</button>
                             <span id="user-llm-status" role="status" aria-live="polite" style="font-size:var(--text-md);color:var(--color-text-muted);min-height:1.35em;display:inline-block;"></span>
                         </div>
+                    </section>
+                </div>
+                <div class="config-tab-content" id="regions-config-tab">
+                    <section class="section-config">
+                        <h1>Regions</h1>
+                        <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body);">
+                            Manage GPS bounding boxes used to assign world regions to photos. Changes take effect immediately; run <strong>Recalculate Image Regions</strong> in Data Maintenance after editing boxes.
+                        </p>
+                    </section>
+                    <section class="config-section">
+                        <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; justify-content:space-between; margin-bottom: 0.75rem;">
+                            <h3 style="margin:0;">Region boxes</h3>
+                            <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+                                <button type="button" class="modal-btn modal-btn-primary" id="regions-config-add-btn"><i class="fas fa-plus" aria-hidden="true"></i> Add region</button>
+                                <button type="button" class="modal-btn modal-btn-secondary" id="regions-config-download-btn"><i class="fas fa-download" aria-hidden="true"></i> Download</button>
+                                <label class="modal-btn modal-btn-secondary" style="margin:0; cursor:pointer;">
+                                    <i class="fas fa-upload" aria-hidden="true"></i> Upload
+                                    <input type="file" id="regions-config-upload-input" accept="application/json,.json" hidden>
+                                </label>
+                            </div>
+                        </div>
+                        <div id="regions-config-loading" style="padding: 1rem; color: var(--color-text-muted);">Loading regions…</div>
+                        <div id="regions-config-table-wrap" style="display:none;">
+                            <table class="manage-contacts-data-table contacts-table" style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Label</th>
+                                        <th>BBox [min lon, min lat, max lon, max lat]</th>
+                                        <th>Order</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="regions-config-tbody"></tbody>
+                            </table>
+                            <p id="regions-config-empty" style="display:none; margin-top:0.75rem; color:var(--color-text-muted);">No regions defined yet.</p>
+                        </div>
+                        <p id="regions-config-status" role="status" aria-live="polite" style="margin-top:0.75rem; min-height:1.35em; font-size:var(--text-md);"></p>
+                    </section>
+                </div>
+                <div class="config-tab-content" id="suggestions-config-tab">
+                    <section class="section-config">
+                        <h1>Suggestions</h1>
+                        <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body);">
+                            Manage chat sidebar suggestion prompts. Changes take effect immediately in the suggestions library. Prompts may include subject placeholders such as <code>{{owner}}</code> and <code>{{his}}</code>.
+                        </p>
+                    </section>
+                    <section class="config-section">
+                        <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; justify-content:space-between; margin-bottom: 0.75rem;">
+                            <h3 style="margin:0;">Suggestion entries</h3>
+                            <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+                                <button type="button" class="modal-btn modal-btn-primary" id="suggestions-config-add-btn"><i class="fas fa-plus" aria-hidden="true"></i> Add suggestion</button>
+                                <button type="button" class="modal-btn modal-btn-secondary" id="suggestions-config-download-btn"><i class="fas fa-download" aria-hidden="true"></i> Download</button>
+                                <label class="modal-btn modal-btn-secondary" style="margin:0; cursor:pointer;">
+                                    <i class="fas fa-upload" aria-hidden="true"></i> Upload
+                                    <input type="file" id="suggestions-config-upload-input" accept="application/json,.json" hidden>
+                                </label>
+                            </div>
+                        </div>
+                        <div id="suggestions-config-loading" style="padding: 1rem; color: var(--color-text-muted);">Loading suggestions…</div>
+                        <div id="suggestions-config-table-wrap" style="display:none;">
+                            <table class="manage-contacts-data-table contacts-table" style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Title</th>
+                                        <th>Prompt preview</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="suggestions-config-tbody"></tbody>
+                            </table>
+                            <p id="suggestions-config-empty" style="display:none; margin-top:0.75rem; color:var(--color-text-muted);">No suggestions defined yet.</p>
+                        </div>
+                        <p id="suggestions-config-status" role="status" aria-live="polite" style="margin-top:0.75rem; min-height:1.35em; font-size:var(--text-md);"></p>
                     </section>
                 </div>
                 <div class="config-tab-content" id="subject-configuration-tab">
@@ -1518,7 +1599,7 @@
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="gps_images">—</span>
                                     </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Recompute world region codes for all images that have GPS coordinates, using the bounding boxes in <code>static/data/regions.json</code>. Entries shows GPS-tagged images. After editing region definitions, restart the server and run this job to refresh stored values.</p></div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Recompute world region codes for all images that have GPS coordinates, using the bounding boxes in <strong>Configuration → Regions</strong>. Entries shows GPS-tagged images. After editing region definitions, run this job to refresh stored values (no server restart required).</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
@@ -3440,6 +3521,159 @@
             </div>
         </div>
 
+        <!-- Regions config edit modal -->
+        <div id="regions-config-edit-modal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 520px; padding: 0;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-globe-americas"></i> <span id="regions-config-edit-title">Add Region</span></h2>
+                    <button type="button" class="modal-close-btn" id="regions-config-edit-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="regions-config-edit-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
+                    <div class="setting-group">
+                        <label for="regions-config-edit-code" class="artefact-field-label">Code</label>
+                        <input type="text" id="regions-config-edit-code" class="form-control" placeholder="aus">
+                    </div>
+                    <div class="setting-group">
+                        <label for="regions-config-edit-label" class="artefact-field-label">Label</label>
+                        <input type="text" id="regions-config-edit-label" class="form-control" placeholder="Australia">
+                    </div>
+                    <div class="setting-group">
+                        <span class="artefact-field-label" style="display:block; margin-bottom:0.5rem;">Bounding box</span>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                            <div>
+                                <label for="regions-config-edit-min-lon" class="artefact-field-label">Min longitude</label>
+                                <input type="number" step="any" id="regions-config-edit-min-lon" class="form-control" placeholder="-180">
+                            </div>
+                            <div>
+                                <label for="regions-config-edit-min-lat" class="artefact-field-label">Min latitude</label>
+                                <input type="number" step="any" id="regions-config-edit-min-lat" class="form-control" placeholder="-90">
+                            </div>
+                            <div>
+                                <label for="regions-config-edit-max-lon" class="artefact-field-label">Max longitude</label>
+                                <input type="number" step="any" id="regions-config-edit-max-lon" class="form-control" placeholder="180">
+                            </div>
+                            <div>
+                                <label for="regions-config-edit-max-lat" class="artefact-field-label">Max latitude</label>
+                                <input type="number" step="any" id="regions-config-edit-max-lat" class="form-control" placeholder="90">
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
+                        <button type="button" id="regions-config-edit-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
+                        <button type="button" id="regions-config-edit-save" class="modal-btn modal-btn-primary">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Regions import conflict modal -->
+        <div id="regions-config-import-modal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 720px; padding: 0;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-upload"></i> Import Regions</h2>
+                    <button type="button" class="modal-close-btn" id="regions-config-import-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-top:0;">Some region codes already exist. Choose whether to keep the current definition or use the uploaded one for each conflict.</p>
+                    <table class="manage-contacts-data-table contacts-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Existing</th>
+                                <th>Resolution</th>
+                            </tr>
+                        </thead>
+                        <tbody id="regions-config-import-conflicts-tbody"></tbody>
+                    </table>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
+                        <button type="button" id="regions-config-import-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
+                        <button type="button" id="regions-config-import-apply" class="modal-btn modal-btn-primary">Apply import</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suggestions config edit modal -->
+        <div id="suggestions-config-edit-modal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 640px; padding: 0;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-lightbulb"></i> <span id="suggestions-config-edit-title">Add Suggestion</span></h2>
+                    <button type="button" class="modal-close-btn" id="suggestions-config-edit-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="suggestions-config-edit-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
+                    <div class="setting-group">
+                        <label for="suggestions-config-edit-category" class="artefact-field-label">Category</label>
+                        <input type="text" id="suggestions-config-edit-category" class="form-control" placeholder="Getting started">
+                    </div>
+                    <div class="setting-group">
+                        <label for="suggestions-config-edit-title-input" class="artefact-field-label">Title</label>
+                        <input type="text" id="suggestions-config-edit-title-input" class="form-control" placeholder="Early life overview">
+                    </div>
+                    <div class="setting-group">
+                        <label for="suggestions-config-edit-prompt" class="artefact-field-label">Prompt</label>
+                        <textarea id="suggestions-config-edit-prompt" class="form-control" rows="4" placeholder="Summarise what the archive suggests about {{owner}}'s early life…"></textarea>
+                    </div>
+                    <div class="setting-group">
+                        <label for="suggestions-config-edit-description" class="artefact-field-label">Description (optional)</label>
+                        <input type="text" id="suggestions-config-edit-description" class="form-control">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                        <div class="setting-group">
+                            <label for="suggestions-config-edit-action-label" class="artefact-field-label">Action label (optional)</label>
+                            <input type="text" id="suggestions-config-edit-action-label" class="form-control" placeholder="Ask in chat">
+                        </div>
+                        <div class="setting-group">
+                            <label for="suggestions-config-edit-function" class="artefact-field-label">Function (optional)</label>
+                            <input type="text" id="suggestions-config-edit-function" class="form-control" placeholder="AppActions key">
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                        <div class="setting-group">
+                            <label for="suggestions-config-edit-requires" class="artefact-field-label">Requires (optional, comma-separated)</label>
+                            <input type="text" id="suggestions-config-edit-requires" class="form-control" placeholder="local_only">
+                        </div>
+                        <div class="setting-group">
+                            <label for="suggestions-config-edit-sensitivity" class="artefact-field-label">Sensitivity (optional)</label>
+                            <input type="text" id="suggestions-config-edit-sensitivity" class="form-control" placeholder="mature">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
+                        <button type="button" id="suggestions-config-edit-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
+                        <button type="button" id="suggestions-config-edit-save" class="modal-btn modal-btn-primary">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suggestions import conflict modal -->
+        <div id="suggestions-config-import-modal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 720px; padding: 0;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-upload"></i> Import Suggestions</h2>
+                    <button type="button" class="modal-close-btn" id="suggestions-config-import-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-top:0;">Some suggestion keys already exist. Choose whether to keep the current entry or use the uploaded one for each conflict.</p>
+                    <table class="manage-contacts-data-table contacts-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Existing</th>
+                                <th>Resolution</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suggestions-config-import-conflicts-tbody"></tbody>
+                    </table>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
+                        <button type="button" id="suggestions-config-import-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
+                        <button type="button" id="suggestions-config-import-apply" class="modal-btn modal-btn-primary">Apply import</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Interest Create/Edit Modal -->
         <div id="interest-modal" class="modal" style="display: none;">
             <div class="modal-content" style="max-width: 450px; padding: 0;">
@@ -3840,6 +4074,8 @@
     <script src="/static/js/museum/modals-artefacts.js" defer></script>
     <script src="/static/js/museum/modals-sensitive.js" defer></script>
     <script src="/static/js/museum/modals-settings.js?v={{ static_modals_settings_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/modals-regions.js" defer></script>
+    <script src="/static/js/museum/modals-suggestions-config.js" defer></script>
     <script src="/static/js/museum/identity-profile-wizard.js" defer></script>
     <script src="/static/js/museum/guide.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/interviewer.js" defer></script>

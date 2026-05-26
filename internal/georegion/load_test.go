@@ -1,17 +1,104 @@
 package georegion
 
 import (
+	"context"
+	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestMain(m *testing.M) {
-	path := filepath.Join("testdata", "regions_test.json")
-	if err := Load(path); err != nil {
-		panic(err)
+func setupTestRegistryFromDB(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	for _, stmt := range []string{
+		`CREATE TABLE regions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			key TEXT NOT NULL,
+			sort_order INTEGER NOT NULL DEFAULT 0,
+			text TEXT NOT NULL
+		)`,
+		`CREATE UNIQUE INDEX uq_regions_key ON regions (key)`,
+	} {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	path := filepath.Join("testdata", "regions_test.json")
+	if err := seedTestRegionsFromFile(ctx, db, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := ReloadFromDB(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func seedTestRegionsFromFile(ctx context.Context, db *sql.DB, path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+	if err := ValidateConfig(&cfg); err != nil {
+		return err
+	}
+	if err := insertTestRegionKey(ctx, db, KeyDefaultRegion, 0, cfg.DefaultRegion); err != nil {
+		return err
+	}
+	if err := insertTestRegionKey(ctx, db, KeyDefaultLabel, 1, cfg.DefaultLabel); err != nil {
+		return err
+	}
+	for i, r := range cfg.Regions {
+		if err := insertTestRegionKey(ctx, db, r.Code, i+2, r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertTestRegionKey(ctx context.Context, db *sql.DB, key string, sortOrder int, value any) error {
+	var exists int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(1) FROM regions WHERE key = ?`, key).Scan(&exists); err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+	text, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx, `INSERT INTO regions (key, sort_order, text) VALUES (?, ?, ?)`, key, sortOrder, string(text))
+	return err
+}
+
+func TestMain(m *testing.M) {
+	// File-based validation tests do not need the default registry.
 	os.Exit(m.Run())
+}
+
+func TestReloadFromDB(t *testing.T) {
+	setupTestRegistryFromDB(t)
+	reg := Default()
+	if reg.Label("aus") != "Australia" {
+		t.Fatalf("Label(aus) = %q, want Australia", reg.Label("aus"))
+	}
+	if reg.RegionFromLatLng(-33.8688, 151.2093) != "aus" {
+		t.Fatalf("unexpected australia lookup")
+	}
 }
 
 func TestLoadValidation(t *testing.T) {
@@ -54,6 +141,7 @@ func TestLoadValidation(t *testing.T) {
 }
 
 func TestLabel(t *testing.T) {
+	setupTestRegistryFromDB(t)
 	reg := Default()
 	if got := reg.Label("aus"); got != "Australia" {
 		t.Fatalf("Label(aus) = %q, want Australia", got)

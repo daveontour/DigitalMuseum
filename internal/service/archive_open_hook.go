@@ -4,27 +4,29 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/database"
+	"github.com/daveontour/aimuseum/internal/georegion"
 )
 
-// NewArchiveOpenHook seeds a newly opened archive file (app system instructions).
+// NewArchiveOpenHook seeds a newly opened archive file (app system instructions, regions, suggestions).
 func NewArchiveOpenHook(cfg *config.Config) database.ArchiveOpenHook {
-	_ = cfg
+	regionsFile := cfg.App.RegionsConfigFile()
+	suggestionsFile := cfg.App.SuggestionsConfigFile()
 	return func(ctx context.Context, db *sql.DB, profileID string) error {
 		if err := database.SeedAppSystemInstructionsFromFiles(ctx, db, "static"); err != nil {
 			return fmt.Errorf("seed app system instructions: %w", err)
 		}
+		if err := database.SeedRegionsFromFileIfMissing(ctx, db, regionsFile); err != nil {
+			return fmt.Errorf("seed regions: %w", err)
+		}
+		if err := georegion.ReloadFromDB(ctx, db); err != nil {
+			return fmt.Errorf("load regions from db: %w", err)
+		}
+		if err := database.SeedSuggestionsFromFileIfMissing(ctx, db, suggestionsFile); err != nil {
+			return fmt.Errorf("seed suggestions: %w", err)
+		}
 		return nil
 	}
-}
-
-// ResolveRequestArchiveProfileID reads X-Archive-Profile-Id, falling back to JSON/form field names when provided.
-func ResolveRequestArchiveProfileID(rHeader string, bodyFallback string) string {
-	if id := strings.TrimSpace(rHeader); id != "" {
-		return id
-	}
-	return strings.TrimSpace(bodyFallback)
 }

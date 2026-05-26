@@ -9,6 +9,7 @@ import (
 )
 
 func TestRegionFromLatLng(t *testing.T) {
+	setupTestRegistryFromDB(t)
 	tests := []struct {
 		name string
 		lat  float64
@@ -42,6 +43,7 @@ func TestRegionFromLatLng(t *testing.T) {
 }
 
 func TestUpdateMediaItemRegions(t *testing.T) {
+	setupTestRegistryFromDB(t)
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -95,6 +97,7 @@ func TestUpdateMediaItemRegions(t *testing.T) {
 }
 
 func TestUpdateLocationRegions(t *testing.T) {
+	setupTestRegistryFromDB(t)
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)

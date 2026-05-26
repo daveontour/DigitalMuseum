@@ -59,6 +59,10 @@
     --color-border-subtle: #253355;   /* faint dividers */
     --color-chat-user-msg: #1a3a5c;   /* user chat bubble */
     --color-chat-ai-msg:   #1a2540;   /* assistant chat bubble */
+    --color-chat-suggestion-msg: #1c3354; /* automated suggestion / prompt bubble */
+    --color-chat-suggestion-border: rgba(251, 191, 36, 0.22);
+    --color-chat-cancelled-msg: #1a3048; /* LLM request cancelled notice */
+    --color-chat-cancelled-border: rgba(251, 191, 36, 0.18);
     --color-warning:       #fbbf24;
     --color-accent-subtle: #1a2d4a;   /* blue-tinted bg for highlights */
 
@@ -800,17 +804,25 @@ body {
 .cancelled-message {
     align-self: flex-start;
     max-width: 85%;
-    background-color: #fef3c7;
-    border: 1px solid #fcd34d;
-    border-left: 4px solid #d97706;
+    background-color: var(--color-chat-cancelled-msg);
+    border: 1px solid var(--color-chat-cancelled-border);
+    border-radius: 14px;
     border-bottom-left-radius: 4px;
-    color: #78350f;
-    font-size: var(--text-sm, 0.8125rem);
-    line-height: var(--line-height-snug, 1.35);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    line-height: var(--line-height-snug);
 }
 
 .cancelled-message .message-content {
     background-color: transparent;
+    color: inherit;
+}
+
+.cancelled-message strong,
+.message-content[data-role="cancelled"] strong {
+    color: var(--color-warning);
+    font-weight: 600;
 }
 
 
@@ -915,14 +927,19 @@ body {
     margin-left: auto;
 }
 .message-content[data-role="suggestion"] {
-    background-color: #fef3c7;
-    color: #422006;
-    border: 1px solid #f59e0b;
-    border-left: 4px solid #d97706;
+    background-color: var(--color-chat-suggestion-msg);
+    color: var(--color-text);
+    border: 1px solid var(--color-chat-suggestion-border);
+    border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
     margin-left: auto;
+    padding: 8px 12px;
+    font-size: var(--text-sm);
+    line-height: var(--line-height-snug);
 }
 .message-content[data-role="suggestion"] strong {
-    color: #78350f;
+    color: var(--color-warning);
+    font-weight: 600;
 }
 .message-content[data-role="assistant"] {
     background-color: var(--color-chat-ai-msg);
@@ -935,8 +952,9 @@ body {
 
 .message-content[data-role="cancelled"] {
     background-color: transparent;
-    padding: 8px 10px;
+    padding: 8px 12px;
     min-height: auto;
+    color: inherit;
 }
 
 
@@ -1562,7 +1580,7 @@ body {
 }
 
 /* --- UI Elements --- */
-/* Loading Indicator (Original complex one) */
+/* Loading Indicator (LLM "Thinking" overlay) */
 #loading-indicator {
     position: absolute;
     top: 50%;
@@ -1572,15 +1590,16 @@ body {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    padding: 18px 20px 14px 20px;
-    background-color: rgba(238, 244, 252, 0.98);
-    border: 1px solid #b8c8e0;
+    padding: var(--space-4) var(--space-5) var(--space-3);
+    background: var(--color-bg-elevated);
+    border: var(--modal-border-width) solid var(--color-modal-border);
     border-radius: 12px;
-    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.28);
-    z-index: 1000;
+    box-shadow: var(--shadow-modal);
+    z-index: var(--z-overlay);
     min-width: min(320px, calc(100vw - 32px));
-    min-height: 168px;
-    color: #1e293b;
+    min-height: 140px;
+    color: var(--color-text);
+    font-family: var(--font-sans-ui);
 }
 
 .loading-indicator-main {
@@ -1589,6 +1608,7 @@ body {
     align-items: center;
     justify-content: center;
     min-height: 0;
+    padding: var(--space-2) 0 var(--space-3);
 }
 
 .loading-indicator-footer {
@@ -1596,12 +1616,12 @@ body {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
     width: 100%;
     flex: 0 0 auto;
     margin-top: auto;
-    padding-top: 12px;
-    border-top: 1px solid #cbd5e1;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
 }
 
 .loading-indicator-provider {
@@ -1609,77 +1629,67 @@ body {
     min-width: 0;
     text-align: left;
     margin-right: auto;
-    font-size: var(--text-sm, 0.8125rem);
-    font-weight: 600;
-    color: #64748b;
-    line-height: var(--line-height-snug, 1.25);
-    letter-spacing: 0.02em;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    line-height: var(--line-height-snug);
+    letter-spacing: 0.01em;
 }
 
-.loading-indicator-cancel-btn {
+.loading-indicator-cancel-btn.modal-btn {
     flex: 0 0 auto;
     margin-left: auto;
-    font-family: var(--font-sans-ui, ui-sans-serif, system-ui, sans-serif);
-    font-size: var(--text-sm, 0.8125rem);
-    font-weight: 600;
-    padding: 0.45em 0.9em;
-    border-radius: 8px;
-    border: 1px solid #94a3b8;
-    background: #fff;
-    color: #1e293b;
-    cursor: pointer;
-}
-
-.loading-indicator-cancel-btn:hover {
-    background: #f8fafc;
-    border-color: #64748b;
+    font-size: var(--text-sm);
+    padding: 0.45em 1em;
 }
 
 .loading-indicator-cancel-btn:focus-visible {
-    outline: 2px solid #3b82f6;
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 .thinking-text {
-    color: #334155;
+    color: var(--color-text);
     font-weight: 600;
-    font-size: 1.8em;
-    line-height: 1;
+    font-size: var(--text-xl);
+    line-height: var(--line-height-tight);
     display: flex;
     align-items: center;
-    margin-bottom: 15px;
 }
 
 .thinking-dots {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 9px;
+    gap: var(--space-2);
     line-height: 1;
 }
 
 .loading-voice-image {
-    width: 60px;
-    height: 60px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
     object-fit: cover;
-    box-shadow: var(--shadow-sm);
-    margin-right: 16px; /* Or remove if centered above text */
+    border: 2px solid var(--color-border-subtle);
+    box-shadow: 0 0 0 2px rgba(79, 156, 249, 0.12);
+    margin-right: var(--space-2);
+    flex-shrink: 0;
 }
 
-.dot {
-    width: 18px;
-    height: 18px;
+.thinking-dots .dot {
+    width: 8px;
+    height: 8px;
     background-color: var(--color-blue);
     border-radius: 50%;
     animation: pulse 1.4s infinite ease-in-out;
     display: inline-block;
     vertical-align: middle;
-    margin-bottom: 9px;
+    opacity: 0.85;
 }
-.dot:nth-child(1) { animation-delay: 0s; }
-.dot:nth-child(2) { animation-delay: 0.2s; }
-.dot:nth-child(3) { animation-delay: 0.4s; }
+
+.thinking-dots .dot:nth-child(3) { animation-delay: 0s; }
+.thinking-dots .dot:nth-child(4) { animation-delay: 0.2s; }
+.thinking-dots .dot:nth-child(5) { animation-delay: 0.4s; }
 
 
 /* Simpler Spinner (if preferred over the dots) */
@@ -2209,6 +2219,7 @@ body {
 /* Sidebar tiles: beat `.sidebar button` font-size so label size applies */
 .sidebar .more-options-btn {
     font-size: 16.2px; /* was 10.8px; +50% */
+    color:ghostwhite;
 }
 
 /* Short viewports: compress sidebar tile buttons (~40% shorter than default min-height/padding/gap) */
@@ -3339,6 +3350,75 @@ body {
 }
 #contacts-modal table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn:hover i,
 #subject-configuration-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn:hover i {
+    color: var(--color-danger-dark);
+}
+
+/* Regions + Suggestions config tables — action buttons side by side */
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table tbody td:last-child,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table tbody td:last-child {
+    text-align: center;
+    vertical-align: middle;
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-actions-cell,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-actions-cell {
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: nowrap;
+    width: auto;
+    min-height: calc(1.5 * 1.25rem);
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn.modal-btn,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn.modal-btn {
+    padding: 2px 5px;
+    min-width: calc(1.5 * 1.15rem);
+    line-height: 1;
+    font-size: calc(1.5 * 0.65rem);
+    font-weight: 500;
+    vertical-align: middle;
+    margin: 0;
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn i,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn i {
+    font-size: 0.85em;
+    vertical-align: -0.06em;
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .regions-config-edit-btn.modal-btn,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .suggestions-config-edit-btn.modal-btn {
+    background: rgba(79, 156, 249, 0.18);
+    color: var(--color-blue);
+    border: 1px solid rgba(79, 156, 249, 0.35);
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .regions-config-edit-btn.modal-btn:hover,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .suggestions-config-edit-btn.modal-btn:hover {
+    background: rgba(79, 156, 249, 0.28);
+    color: var(--color-blue-dark);
+    border-color: rgba(79, 156, 249, 0.55);
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .regions-config-edit-btn.modal-btn i,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .suggestions-config-edit-btn.modal-btn i {
+    color: var(--color-blue);
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn {
+    background: rgba(248, 113, 113, 0.10);
+    color: var(--color-danger);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn:hover,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn:hover {
+    background: rgba(248, 113, 113, 0.18);
+    color: var(--color-danger-dark);
+    border-color: rgba(248, 113, 113, 0.40);
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn i,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn i {
+    color: var(--color-danger);
+}
+#config-modal-overlay #regions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn:hover i,
+#config-modal-overlay #suggestions-config-tab table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn:hover i {
     color: var(--color-danger-dark);
 }
 
@@ -5268,6 +5348,11 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     overflow-y: auto;
     flex: 1 1 auto;
     min-height: 0;
+    text-align: left;
+}
+
+#save-response-title-modal .confirmation-modal-body {
+    text-align: left;
 }
 
 /* Data Import entry points when session has no unlocked key */

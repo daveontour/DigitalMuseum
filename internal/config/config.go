@@ -83,9 +83,10 @@ type CryptoConfig struct {
 type AppConfig struct {
 	PageTitle        string
 	TemplatesDir     string // path to Jinja2 HTML templates
-	AssetStaticDir     string // path to Python static directory (JS/data files for templating)
-	RegionsConfigPath  string // optional override; default is AssetStaticDir/data/regions.json
-	DeploymentNature   string // "local" = show filesystem path import tiles; unset/other = hide them
+	AssetStaticDir       string // path to Python static directory (JS/data files for templating)
+	RegionsConfigPath    string // optional override; default is AssetStaticDir/data/regions.json
+	SuggestionsConfigPath string // optional override; default is AssetStaticDir/data/suggestions.json
+	DeploymentNature     string // "local" = show filesystem path import tiles; unset/other = hide them
 }
 
 // RegionsConfigFile returns the path to regions.json (REGIONS_CONFIG_PATH or AssetStaticDir/data/regions.json).
@@ -94,6 +95,14 @@ func (a AppConfig) RegionsConfigFile() string {
 		return p
 	}
 	return filepath.Join(a.AssetStaticDir, "data", "regions.json")
+}
+
+// SuggestionsConfigFile returns the path to suggestions.json (SUGGESTIONS_CONFIG_PATH or AssetStaticDir/data/suggestions.json).
+func (a AppConfig) SuggestionsConfigFile() string {
+	if p := strings.TrimSpace(a.SuggestionsConfigPath); p != "" {
+		return p
+	}
+	return filepath.Join(a.AssetStaticDir, "data", "suggestions.json")
 }
 
 // DefaultsConfig holds default values shown in the control panel UI.
@@ -233,7 +242,8 @@ func Load() (*Config, error) {
 			PageTitle:         getenv("PAGE_TITLE", "Digital Museum of SUBJECT_NAME"),
 			TemplatesDir:      getenv("TEMPLATES_DIR", "../src/api/templates"),
 			AssetStaticDir:    getenv("ASSET_STATIC_DIR", "../src/api/static"),
-			RegionsConfigPath: os.Getenv("REGIONS_CONFIG_PATH"),
+			RegionsConfigPath:     os.Getenv("REGIONS_CONFIG_PATH"),
+			SuggestionsConfigPath: os.Getenv("SUGGESTIONS_CONFIG_PATH"),
 			DeploymentNature:  getenv("DEPLOYMENT_NATURE", "web"),
 		},
 		Crypto:      cryptoCfg,
