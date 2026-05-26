@@ -132,3 +132,16 @@ func (r *GuideTopicsRepo) Delete(ctx context.Context, id int64) (bool, error) {
 	}
 	return n > 0, nil
 }
+
+// DeleteAll removes every guide topic row.
+func (r *GuideTopicsRepo) DeleteAll(ctx context.Context) (int64, error) {
+	res, err := r.pool.ExecContext(ctx, `DELETE FROM guide_topics`)
+	if err != nil {
+		return 0, fmt.Errorf("DeleteAll guide_topics: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}

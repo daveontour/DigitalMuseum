@@ -111,6 +111,11 @@ func (s *GuideTopicsService) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
+// DeleteAll removes every guide topic row.
+func (s *GuideTopicsService) DeleteAll(ctx context.Context) (int64, error) {
+	return s.repo.DeleteAll(ctx)
+}
+
 // ExportDocument returns the guide_topics.json interchange shape.
 func (s *GuideTopicsService) ExportDocument(ctx context.Context) (map[string]any, error) {
 	rows, err := s.repo.ListAll(ctx)

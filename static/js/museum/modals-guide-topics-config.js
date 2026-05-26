@@ -36,6 +36,7 @@ Modals.GuideTopicsConfig = (() => {
         'openInterviewer',
         'openConfigAppearance',
         'openConfigApiKeys',
+        'openConfigAiSetup',
         'openConfigSubjectConfiguration',
         'openConfigRegions',
         'openConfigSuggestions',
@@ -45,6 +46,11 @@ Modals.GuideTopicsConfig = (() => {
         'openConfigToolsAccess',
         'openSettingsManageKeys',
         'openReferenceDocuments',
+        'closeOpenDialog',
+        'pause0_5s',
+        'pause1s',
+        'pause2s',
+        'pause5s',
     ];
 
     const POSITIONS = [
@@ -364,6 +370,37 @@ Modals.GuideTopicsConfig = (() => {
         }
     }
 
+    async function clearAllTopics() {
+        if (!rows || rows.length === 0) {
+            showStatus('No guide topics to clear.', false);
+            return;
+        }
+        const count = rows.length;
+        const confirmFn = (typeof AppDialogs !== 'undefined' && AppDialogs.showAppConfirm)
+            ? AppDialogs.showAppConfirm.bind(AppDialogs)
+            : null;
+        const message = `Delete all ${count} guide topic${count === 1 ? '' : 's'} from the database?\n\nThe Guide will be empty until you add topics again. On the next application restart, guide topics will be reloaded from the guide_topics.json file on the filesystem (inserting any keys that are still missing).`;
+        let confirmed = false;
+        if (confirmFn) {
+            confirmed = await confirmFn('Clear all guide topics?', message, { danger: true, confirmLabel: 'Clear All' });
+        } else {
+            confirmed = window.confirm(`Clear all guide topics?\n\n${message}`);
+        }
+        if (!confirmed) return;
+        try {
+            const response = await fetch('/api/guide-topics/all', { method: 'DELETE' });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || err.detail || `HTTP ${response.status}`);
+            }
+            showStatus('All guide topics cleared.', false);
+            await load();
+            invalidateGuideCache();
+        } catch (err) {
+            showStatus(err.message, true);
+        }
+    }
+
     async function deleteTopic(id) {
         const row = rows.find((r) => r.id === id);
         const name = row ? `${row.key} — ${row.title}` : 'this topic';
@@ -475,6 +512,9 @@ Modals.GuideTopicsConfig = (() => {
         if (downloadBtn) {
             downloadBtn.addEventListener('click', () => { window.location.href = '/api/guide-topics/export'; });
         }
+
+        const clearAllBtn = getEl('guide-topics-config-clear-all-btn');
+        if (clearAllBtn) clearAllBtn.addEventListener('click', () => { void clearAllTopics(); });
 
         const uploadInput = getEl('guide-topics-config-upload-input');
         if (uploadInput) {

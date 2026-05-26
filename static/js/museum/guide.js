@@ -26,9 +26,80 @@ const Guide = {
         }, 120);
     },
 
+    _runNavActions(navActionRaw) {
+        if (!navActionRaw || typeof navActionRaw !== 'string') return Promise.resolve();
+        const parts = navActionRaw.split(';').map((part) => part.trim()).filter(Boolean);
+        return parts.reduce((chain, name) => chain.then(async () => {
+            const fn = this.NavActions[name];
+            if (!fn) {
+                console.warn('Guide: unknown navigate_action:', name);
+                return;
+            }
+            const result = fn();
+            if (result && typeof result.then === 'function') {
+                await result;
+            }
+        }), Promise.resolve());
+    },
+
+    _pauseNavActions(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    },
+
+    _closeOpenDialog() {
+        const excludeIds = new Set([
+            'guide-modal',
+            'guide-explanation-overlay',
+            'guide-explanation-dialog',
+            'getting-started-overlay',
+            'getting-started-dialog',
+            'loading-indicator',
+        ]);
+
+        const isVisible = (el) => {
+            if (!el || excludeIds.has(el.id)) return false;
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden') return false;
+            return style.display === 'flex' || style.display === 'block';
+        };
+
+        const zIndexOf = (el) => {
+            const z = parseInt(window.getComputedStyle(el).zIndex, 10);
+            return Number.isFinite(z) ? z : 0;
+        };
+
+        const candidates = [];
+        document.querySelectorAll('.modal, .config-modal-overlay').forEach((el) => {
+            if (isVisible(el)) candidates.push(el);
+        });
+        if (!candidates.length) return;
+
+        candidates.sort((a, b) => zIndexOf(b) - zIndexOf(a));
+        const top = candidates[0];
+
+        const closeBtn = top.querySelector('.modal-header .modal-close-btn')
+            || top.querySelector('.modal-close-btn')
+            || (top.id === 'config-modal-overlay' ? document.getElementById('close-config') : null);
+        if (closeBtn) {
+            closeBtn.click();
+            return;
+        }
+
+        if (typeof Modals !== 'undefined' && Modals._closeModal) {
+            Modals._closeModal(top);
+        } else {
+            top.style.display = 'none';
+        }
+    },
+
     // Named navigation actions referenced by guide steps stored in the database.
     NavActions: {
         showGettingStartedDialog: () => Guide._showGettingStartedDialog(),
+        closeOpenDialog: () => Guide._closeOpenDialog(),
+        pause0_5s: () => Guide._pauseNavActions(500),
+        pause1s: () => Guide._pauseNavActions(1000),
+        pause2s: () => Guide._pauseNavActions(2000),
+        pause5s: () => Guide._pauseNavActions(5000),
         // Left sidebar — explore
         openSmsMessages: () => Guide._clickSidebarButton('sms-messages-sidebar-btn'),
         openEmailGallery: () => Guide._clickSidebarButton('email-gallery-sidebar-btn'),
@@ -61,6 +132,7 @@ const Guide = {
         // Configuration — tabs
         openConfigAppearance: () => Guide._openConfigurationTab('settings'),
         openConfigApiKeys: () => Guide._openConfigurationTab('api-keys'),
+        openConfigAiSetup: () => Guide._openConfigurationTab('ai-setup-config'),
         openConfigSubjectConfiguration: () => Guide._openConfigurationTab('subject-configuration'),
         openConfigRegions: () => Guide._openConfigurationTab('regions-config'),
         openConfigSuggestions: () => Guide._openConfigurationTab('suggestions-config'),
@@ -306,13 +378,13 @@ const Guide = {
         };
 
         if (navAction) {
-            const fn = this.NavActions[navAction];
             overlay.style.display = 'none';
             dialog.style.display  = 'none';
-            if (fn) fn();
-            if (step.text) {
-                setTimeout(applyGlowAndShow, 120);
-            }
+            void this._runNavActions(navAction).then(() => {
+                if (step.text) {
+                    setTimeout(applyGlowAndShow, 120);
+                }
+            });
         } else {
             if (step.text) {
                 applyGlowAndShow();

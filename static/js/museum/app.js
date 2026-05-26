@@ -1014,6 +1014,9 @@ const App = (() => {
                 if (targetTab === 'guide-topics-config') {
                     if (Modals.GuideTopicsConfig && Modals.GuideTopicsConfig.load) void Modals.GuideTopicsConfig.load();
                 }
+                if (targetTab === 'ai-setup-config') {
+                    if (typeof LocalAiSetup !== 'undefined' && LocalAiSetup.refresh) void LocalAiSetup.refresh();
+                }
                 if (targetTab === 'settings' || targetTab === 'api-keys') {
                     if (Modals.UserLLMSettings && Modals.UserLLMSettings.load) void Modals.UserLLMSettings.load();
                     if (targetTab === 'settings') void loadLLMProviderAvailability();

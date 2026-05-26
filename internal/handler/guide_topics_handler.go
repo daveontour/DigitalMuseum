@@ -30,6 +30,7 @@ func (h *GuideTopicsHandler) RegisterRoutes(r chi.Router) {
 	r.Post("/api/guide-topics/import/preview", h.ImportPreview)
 	r.Post("/api/guide-topics/import", h.ImportApply)
 	r.Post("/api/guide-topics", h.Create)
+	r.Delete("/api/guide-topics/all", h.DeleteAll)
 	r.Patch("/api/guide-topics/{id}", h.Update)
 	r.Delete("/api/guide-topics/{id}", h.Delete)
 }
@@ -136,6 +137,16 @@ func (h *GuideTopicsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, item)
+}
+
+// DeleteAll handles DELETE /api/guide-topics/all.
+func (h *GuideTopicsHandler) DeleteAll(w http.ResponseWriter, r *http.Request) {
+	n, err := h.svc.DeleteAll(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error clearing guide topics: %s", err))
+		return
+	}
+	writeJSON(w, map[string]any{"deleted": n})
 }
 
 // Delete handles DELETE /api/guide-topics/{id}.

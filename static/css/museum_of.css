@@ -3221,6 +3221,110 @@ body {
     color: var(--color-text-muted);
 }
 
+/* Configuration → AI & Setup (Local AI / Ollama — mirrors login advanced panel) */
+.local-ai-setup-panel {
+    padding: 20px;
+}
+
+.local-ai-setup-no-electron {
+    color: var(--color-text-muted);
+    font-size: var(--text-md);
+    line-height: var(--line-height-body);
+}
+
+.local-ai-setup-heading {
+    margin: 0 0 4px;
+    font-size: var(--text-md);
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.local-ai-setup-lead {
+    margin: 0 0 12px;
+    color: var(--color-text-muted);
+    font-size: var(--text-md);
+    line-height: var(--line-height-body);
+    max-width: none;
+}
+
+.local-ai-setup-status-rows {
+    margin-top: 4px;
+}
+
+.local-ai-setup-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: var(--text-md);
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-deep);
+    border: 1px solid var(--color-border-subtle);
+}
+
+.local-ai-setup-status-row:first-child {
+    margin-top: 0;
+}
+
+.local-ai-setup-status-label {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.local-ai-setup-status-value {
+    font-weight: 600;
+    text-align: right;
+    color: var(--color-text-muted);
+}
+
+.local-ai-setup-download-btn {
+    margin-top: 12px;
+    white-space: nowrap;
+}
+
+.local-ai-setup-msg {
+    font-size: var(--text-md);
+    margin-top: 8px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.local-ai-setup-progress-wrap {
+    display: none;
+    margin-top: 10px;
+}
+
+.local-ai-setup-progress-bar {
+    width: 100%;
+    height: 10px;
+    border-radius: 5px;
+    accent-color: var(--color-blue);
+}
+
+.local-ai-setup-progress-label {
+    display: flex;
+    justify-content: space-between;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    margin-top: 4px;
+}
+
+.local-ai-setup-footer-hint {
+    margin: 12px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-border-subtle);
+    color: var(--color-text-light);
+    font-size: var(--text-sm);
+    line-height: var(--line-height-body);
+    max-width: none;
+}
+
+.local-ai-setup-footer-hint strong {
+    color: var(--color-text-muted);
+}
+
 #config-modal-overlay #interests-suggest-ai-require-contact-hint,
 #config-modal-overlay #writing-style-require-contact-hint,
 #config-modal-overlay #psychological-profile-require-contact-hint {

@@ -440,8 +440,8 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 - `guide_topics` table: `id`, `key` (unique string), `text` (JSON blob containing title, description, category, recommended, steps array)
 - Startup seeds from [`static/data/guide_topics.json`](static/data/guide_topics.json) (insert-if-missing). Optional **`GUIDE_TOPICS_CONFIG_PATH`** env var overrides the seed file path.
 - Runtime API: **`GET /api/guide-topics`** → returns `{ topics: { KeyName: { title, category, steps, … } } }` consumed by `guide.js`.
-- Admin CRUD API under `/api/guide-topics/*` (list, create, update, delete, export, import/preview/apply).
-- Configuration UI: **Configuration → Guide Topics** ([`static/js/museum/modals-guide-topics-config.js`](static/js/museum/modals-guide-topics-config.js)) — per-topic step editor, export/import with conflict resolution.
+- Admin CRUD API under `/api/guide-topics/*` (list, create, update, delete, export, import/preview/apply, **`DELETE /api/guide-topics/all`** to clear all rows).
+- Configuration UI: **Configuration → Guide Topics** ([`static/js/museum/modals-guide-topics-config.js`](static/js/museum/modals-guide-topics-config.js)) — per-topic step editor, export/import with conflict resolution, **Clear All** (with confirmation; on next restart, missing keys are re-seeded from the filesystem JSON).
 
 **Guide topic JSON fields** (stored in `text` column):
 
@@ -461,15 +461,22 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `text` | string | Instruction text shown to the user |
 | `glow` | string | CSS selector of element to highlight with a pulsing outline |
 | `position` | string | Dialog position: `middle-center` (default), `top-left/center/right`, `middle-left/right`, `bottom-left/center/right` |
-| `navigate_action` | string | Named action key — see Navigation actions below |
+| `navigate_action` | string | One or more named action keys, separated by `;` — see Navigation actions below. Actions run in order; pause keys block until elapsed. |
 | `fallback_text` | string | Extra text appended when `glow` target is not found in the DOM |
 | `image` | string | Optional image URL displayed below the step text |
 
-**Navigation actions** — defined in the `NavActions` dictionary in [`static/js/museum/guide.js`](static/js/museum/guide.js):
+**Navigation actions** — defined in the `NavActions` dictionary in [`static/js/museum/guide.js`](static/js/museum/guide.js). Steps call `Guide._runNavActions()`, which splits `navigate_action` on `;`, trims each part, and runs matching handlers **sequentially** (awaiting promises from pause actions). After the chain completes, the step dialog appears following a short DOM settle delay.
+
+**Multiple actions:** combine keys with semicolons, e.g. `"closeOpenDialog;pause0_5s;openImageGallery"`. Use pause actions between UI opens/closes when modals or tabs need time to render. The admin step editor dropdown selects one key at a time; for chains, edit the JSON directly or type a semicolon-separated value into exported topic data before import.
 
 | Key | What it does |
 |-----|-------------|
 | `showGettingStartedDialog` | Opens the Getting Started overlay dialog |
+| `closeOpenDialog` | Closes the topmost visible modal/overlay (excluding guide UI) |
+| `pause0_5s` | Waits 0.5 seconds before the next action |
+| `pause1s` | Waits 1.0 second before the next action |
+| `pause2s` | Waits 2.0 seconds before the next action |
+| `pause5s` | Waits 5.0 seconds before the next action |
 | `openSmsMessages` | Clicks the Messages sidebar button |
 | `openEmailGallery` | Clicks the Emails sidebar button |
 | `openImageGallery` | Clicks the Images sidebar button |
@@ -496,6 +503,7 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `openInterviewer` | Clicks the Interviewer sidebar button |
 | `openConfigAppearance` | Opens Configuration on the Appearance/Settings tab |
 | `openConfigApiKeys` | Opens Configuration on the API Keys tab |
+| `openConfigAiSetup` | Opens Configuration on the AI & Setup tab |
 | `openConfigSubjectConfiguration` | Opens Configuration on the Subject Configuration tab |
 | `openConfigRegions` | Opens Configuration on the Regions tab |
 | `openConfigSuggestions` | Opens Configuration on the Suggestions tab |
@@ -512,6 +520,7 @@ To add a new navigation action: (1) add an entry to `Guide.NavActions` in `guide
 - `Guide.fetchTopics()` — fetches from `GET /api/guide-topics`, caches in `Guide._topics`. Call `Guide.invalidateCache()` after any admin write to force a fresh fetch.
 - `Guide.openGuideModal()` — fetches topics then renders the topic list.
 - `Guide.onTopicSelected(key)` — starts a step-through session for the given topic key.
+- `Guide._runNavActions(navActionRaw)` — runs semicolon-separated `navigate_action` keys in order (used internally by `_showStep`).
 - `Guide.topicAliases` — maps legacy string keys (e.g. `'Browsing images'`) to canonical DB keys for backward compatibility.
 
 ### Import Pipeline

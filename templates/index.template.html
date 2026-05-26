@@ -712,6 +712,9 @@
                         <button type="button" class="config-tab-button" data-tab="api-keys">
                             <i class="fas fa-plug"></i> API Keys
                         </button>
+                        <button type="button" class="config-tab-button" data-tab="ai-setup-config">
+                            <i class="fas fa-microchip"></i> AI &amp; Setup
+                        </button>
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="subject-configuration">
                             <i class="fas fa-user"></i> Subject Configuration
                         </button>
@@ -912,6 +915,54 @@
                         </div>
                     </section>
                 </div>
+                <div class="config-tab-content" id="ai-setup-config-tab">
+                    <section class="section-config">
+                        <h1>AI &amp; Setup</h1>
+                        <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body);">
+                            Check Local AI (Ollama) status and download required models for chat, image classification, and similarity search on this computer.
+                        </p>
+                    </section>
+                    <section class="config-section local-ai-setup-panel" id="ai-setup-config-root">
+                        <div class="local-ai-setup-no-electron" data-local-ai-no-electron hidden>
+                            Advanced setup is only available in the Digital Museum desktop app.
+                        </div>
+                        <div class="local-ai-setup-ollama-block" data-local-ai-ollama-block>
+                            <h3 class="local-ai-setup-heading">Local AI</h3>
+                            <p class="local-ai-setup-lead">
+                                Runs privately on your computer. The app starts the Ollama server when you open Digital Museum. The Ollama server makes the Local AI available to the app.
+                                Downloads of the required models may take several minutes.
+                            </p>
+                            <div class="local-ai-setup-status-rows">
+                                <div class="local-ai-setup-status-row">
+                                    <span class="local-ai-setup-status-label">Ollama server</span>
+                                    <span class="local-ai-setup-status-value" data-local-ai-server-value>…</span>
+                                </div>
+                                <div class="local-ai-setup-status-row">
+                                    <span class="local-ai-setup-status-label">Chat and Image Classification (gemma4)</span>
+                                    <span class="local-ai-setup-status-value" data-local-ai-gemma-value>—</span>
+                                </div>
+                                <div class="local-ai-setup-status-row">
+                                    <span class="local-ai-setup-status-label">Vectorisation for Similarity Searches (embeddinggemma)</span>
+                                    <span class="local-ai-setup-status-value" data-local-ai-embed-value>—</span>
+                                </div>
+                            </div>
+                            <button type="button" class="modal-btn modal-btn-primary local-ai-setup-download-btn" data-local-ai-download style="display:none;">
+                                <i class="fas fa-download" aria-hidden="true"></i> Download required models
+                            </button>
+                            <div class="local-ai-setup-msg" data-local-ai-msg style="display:none;"></div>
+                            <div class="local-ai-setup-progress-wrap" data-local-ai-progress-wrap style="display:none;">
+                                <progress class="local-ai-setup-progress-bar" data-local-ai-progress-bar value="0" max="100"></progress>
+                                <div class="local-ai-setup-progress-label">
+                                    <span data-local-ai-progress-status>Preparing…</span>
+                                    <span data-local-ai-progress-size></span>
+                                </div>
+                            </div>
+                            <p class="local-ai-setup-footer-hint">
+                                Prefer more capable cloud AI? Add a Claude, Gemini, or DeepSeek API key in <strong>API Keys</strong>.
+                            </p>
+                        </div>
+                    </section>
+                </div>
                 <div class="config-tab-content" id="regions-config-tab">
                     <section class="section-config">
                         <h1>Regions</h1>
@@ -1004,6 +1055,7 @@
                                     <i class="fas fa-upload" aria-hidden="true"></i> Upload
                                     <input type="file" id="guide-topics-config-upload-input" accept="application/json,.json" hidden>
                                 </label>
+                                <button type="button" class="modal-btn modal-btn-danger" id="guide-topics-config-clear-all-btn"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear All</button>
                             </div>
                         </div>
                         <div id="guide-topics-config-loading" style="padding: 1rem; color: var(--color-text-muted);">Loading guide topics…</div>
@@ -2746,7 +2798,7 @@
                                     <span id="new-image-gallery-selected-count">0</span> image(s) selected
                                 </div>
                                 <input type="text" id="new-image-gallery-bulk-tags" placeholder="Enter tags to apply..." class="new-image-gallery-input email-gallery-input" style="width: 100%; box-sizing: border-box; margin-bottom: 0.5em;">
-                                <div class="new-image-gallery-bulk-actions">
+                                <div class="new-image-gallery-bulk-actions" id="new-image-gallery-bulk-actions">
                                     <button id="new-image-gallery-apply-tags-btn" class="modal-btn modal-btn-primary" disabled>
                                         <i class="fas fa-tags"></i> Apply Tags
                                     </button>
@@ -4191,6 +4243,7 @@
     <script src="/static/js/museum/modals-artefacts.js" defer></script>
     <script src="/static/js/museum/modals-sensitive.js" defer></script>
     <script src="/static/js/museum/modals-settings.js?v={{ static_modals_settings_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/local-ai-setup.js" defer></script>
     <script src="/static/js/museum/modals-regions.js" defer></script>
     <script src="/static/js/museum/modals-suggestions-config.js" defer></script>
     <script src="/static/js/museum/modals-guide-topics-config.js" defer></script>

@@ -42,8 +42,7 @@
       "steps": [
         { "text": "Type your question in chat and press Send. Try: \"Show me photos from last summer\" or \"Who have I emailed most?\"", "glow": "#user-input" },
         { "text": "Use AI Personality settings to change the response style and mood.", "glow": "#voice-settings-trigger", "position": "top-center" },
-        { "text": "Switch \"Who's Asking?\" to frame answers from visitor or owner perspective.", "glow": "#its-me-visitor-switch", "position": "middle-right" },
-        { "text": "Reference documents can improve answers for specific, factual, or long-form questions.", "position": "middle-center" }
+        { "text": "Switch \"Who's Asking?\" to frame answers from visitor or owner perspective.", "glow": "#its-me-visitor-switch", "position": "top-center" }
       ]
     },
     {
@@ -54,41 +53,41 @@
       "steps": [
         {
           "text": "Open Emails in the left sidebar to browse your imported email collection.",
-          "glow": "#email-gallery-sidebar-btn",
-          "navigate_action": "openEmailGallery"
+          "glow": "#email-gallery-sidebar-btn"
         },
         {
           "text": "Type a keyword, sender name, or subject in the Search box and press the search button to filter results.",
           "glow": "#email-gallery-search",
           "navigate_action": "openEmailGallery",
-          "position": "top-left",
+          "position": "top-right",
           "fallback_text": "Open Emails, then type in the Search box at the top."
         },
         {
           "text": "Use the Year filter to narrow down emails to a particular year.",
           "glow": "#email-gallery-year-filter",
           "navigate_action": "openEmailGallery",
-          "position": "top-left",
+          "position": "top-right",
           "fallback_text": "Open Emails and use the Year dropdown to filter by year."
         },
         {
           "text": "Change the Sort order (newest first, oldest first) to control how results are listed.",
           "glow": "#email-gallery-sort",
           "navigate_action": "openEmailGallery",
-          "position": "top-left",
+          "position": "top-right",
           "fallback_text": "Open Emails and use the Sort dropdown to change the order."
         },
         {
           "text": "Click any email in the list to open and read its full content, including attachments.",
           "glow": "#email-gallery-list",
           "navigate_action": "openEmailGallery",
-          "position": "top-left",
+          "position": "top-right",
           "fallback_text": "Open Emails and click any item in the list."
         },
         {
           "text": "You can also ask the AI directly: \"Summarise emails from Alice in March\" or \"Find emails about the conference booking\".",
           "glow": "#user-input",
-          "position": "bottom-center"
+          "navigate_action": "closeOpenDialog",
+          "position": "middle-center"
         }
       ]
     },
@@ -98,12 +97,14 @@
       "description": "Find memories in photo galleries, albums, and posts.",
       "category": "Daily Use",
       "steps": [
-        { "text": "Open Images in the left sidebar to browse your main photo collection.", "glow": "#new-image-gallery-sidebar-btn", "navigate_action": "openImageGallery" },
+        { "text": "Open Images in the left sidebar to browse your main photo collection.", "glow": "#new-image-gallery-sidebar-btn" },
         { "text": "Use the Search box to find photos by caption, description, or tag.", "glow": "#new-image-gallery-search-btn", "navigate_action": "openImageGallery", "position": "top-left", "fallback_text": "Open Images and use the Search button." },
         { "text": "Use the Similar button to find photos visually similar to a selected image.", "glow": "#new-image-gallery-similar-btn", "navigate_action": "openImageGallery", "position": "top-left", "fallback_text": "Open Images and use the Similar button." },
+        { "text": "Click on any image to open the image and see it in fullsize"},
+        { "text": "Ctrl+Click on any image to select it and then apply one of the Bulk Actions to it. Ctrl+Shift+Click on any image to select a range of images.","glow":"#new-image-gallery-bulk-actions"},       
         { "text": "Open Facebook Albums to browse imported album collections.", "glow": "#fb-albums-sidebar-btn", "navigate_action": "openFacebookAlbums" },
-        { "text": "Open Facebook Posts to browse imported posts that may contain photos.", "glow": "#fb-posts-sidebar-btn", "navigate_action": "openFacebookPosts" },
-        { "text": "Ask the AI: \"Find photos with John\" or \"Show me photos from last Christmas\".", "glow": "#user-input", "position": "bottom-center" }
+        { "text": "Open Facebook Posts to browse imported posts that may contain photos.", "glow": "#fb-posts-sidebar-btn", "navigate_action": "closeOpenDialog;pause1s;openFacebookPosts" },
+        { "text": "Ask the AI: \"Find photos with John\" or \"Show me photos from last Christmas\".", "navigate_action": "closeOpenDialog", "glow": "#user-input", "position": "middle-center" }
       ]
     },
     {
@@ -675,25 +676,25 @@
         {
           "text": "Open the Dashboard from the right sidebar (the Statistics button). It shows a high-level view of your archive: record counts, import history, and data composition.",
           "glow": "#statistics-sidebar-btn",
-          "navigate_action": "openDashboard",
-          "position": "middle-right"
+          "position": "middle-center"
         },
         {
           "text": "The dashboard shows counts for emails, messages, photos, contacts, and other imported data types — useful for confirming that imports completed successfully.",
           "navigate_action": "openDashboard",
-          "position": "middle-right",
+          "position": "middle-center",
           "fallback_text": "Open the Dashboard to see record counts for each data type."
         },
         {
           "text": "Import activity and job history give a timeline of when data was added to the archive.",
           "navigate_action": "openDashboard",
-          "position": "middle-right",
+          "position": "middle-center",
           "fallback_text": "Open the Dashboard and scroll down to see import activity."
         },
         {
           "text": "Ask the AI for richer summaries: \"What is the earliest record in my archive?\" or \"How many emails do I have from 2020?\"",
+          "navigate_action": "closeOpenDialog",
           "glow": "#user-input",
-          "position": "bottom-center"
+          "position": "middle-center"
         }
       ]
     },
