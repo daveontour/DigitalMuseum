@@ -8,16 +8,69 @@ const Guide = {
     _escHandler: null,
     _topics: null, // cached from API
 
+    _clickSidebarButton(buttonId) {
+        document.getElementById(buttonId)?.click();
+    },
+
+    _openConfigurationTab(tabName) {
+        Guide._clickSidebarButton('settings-data-import-sidebar-btn');
+        setTimeout(() => {
+            document.querySelector(`.config-tab-button[data-tab="${tabName}"]`)?.click();
+        }, 120);
+    },
+
+    _openDataImportTab(tabName) {
+        Guide._clickSidebarButton('data-import-sidebar-btn');
+        setTimeout(() => {
+            document.querySelector(`.data-import-category-tab[data-import-category-tab="${tabName}"]`)?.click();
+        }, 120);
+    },
+
     // Named navigation actions referenced by guide steps stored in the database.
     NavActions: {
         showGettingStartedDialog: () => Guide._showGettingStartedDialog(),
-        openDataImport: () => document.getElementById('data-import-sidebar-btn')?.click(),
-        openSettingsManageKeys: () => {
-            document.getElementById('settings-data-import-sidebar-btn')?.click();
-            setTimeout(() => {
-                document.querySelector('.config-tab-button[data-tab="manage-keys"]')?.click();
-            }, 120);
-        },
+        // Left sidebar — explore
+        openSmsMessages: () => Guide._clickSidebarButton('sms-messages-sidebar-btn'),
+        openEmailGallery: () => Guide._clickSidebarButton('email-gallery-sidebar-btn'),
+        openImageGallery: () => Guide._clickSidebarButton('new-image-gallery-sidebar-btn'),
+        openFacebookAlbums: () => Guide._clickSidebarButton('fb-albums-sidebar-btn'),
+        openFacebookPosts: () => Guide._clickSidebarButton('fb-posts-sidebar-btn'),
+        openMultiSourceSearch: () => Guide._clickSidebarButton('message-similarity-sidebar-btn'),
+        openLocations: () => Guide._clickSidebarButton('locations-sidebar-btn'),
+        openArtefacts: () => Guide._clickSidebarButton('artefacts-sidebar-btn'),
+        // Left sidebar — bottom
+        openIdentityProfile: () => Guide._clickSidebarButton('identity-profile-wizard-btn'),
+        openDataImport: () => Guide._clickSidebarButton('data-import-sidebar-btn'),
+        // Import & Manage Data — tabs
+        openDataImportImport: () => Guide._openDataImportTab('import'),
+        openDataImportMaintenance: () => Guide._openDataImportTab('maintenance'),
+        openDataImportBackgroundJobs: () => Guide._openDataImportTab('background-jobs'),
+        openConfiguration: () => Guide._clickSidebarButton('settings-data-import-sidebar-btn'),
+        // Right sidebar — tools
+        openPreviousResponses: () => Guide._clickSidebarButton('previous-responses-sidebar-btn'),
+        openSuggestions: () => Guide._clickSidebarButton('suggestions-sidebar-btn'),
+        openContacts: () => Guide._clickSidebarButton('contacts-sidebar-btn'),
+        openProfiles: () => Guide._clickSidebarButton('profiles-sidebar-btn'),
+        openSensitiveData: () => Guide._clickSidebarButton('sensitive-data-sidebar-btn'),
+        openDashboard: () => Guide._clickSidebarButton('statistics-sidebar-btn'),
+        // Right sidebar — bottom
+        openHaveAChat: () => Guide._clickSidebarButton('have-a-chat-sidebar-btn'),
+        openRandomQuestion: () => Guide._clickSidebarButton('random-question-sidebar-btn'),
+        openTodaysThing: () => Guide._clickSidebarButton('todays-thing-sidebar-btn'),
+        openInterviewer: () => Guide._clickSidebarButton('interviewer-sidebar-btn'),
+        // Configuration — tabs
+        openConfigAppearance: () => Guide._openConfigurationTab('settings'),
+        openConfigApiKeys: () => Guide._openConfigurationTab('api-keys'),
+        openConfigSubjectConfiguration: () => Guide._openConfigurationTab('subject-configuration'),
+        openConfigRegions: () => Guide._openConfigurationTab('regions-config'),
+        openConfigSuggestions: () => Guide._openConfigurationTab('suggestions-config'),
+        openConfigGuideTopics: () => Guide._openConfigurationTab('guide-topics-config'),
+        openConfigCustomVoices: () => Guide._openConfigurationTab('custom-voices'),
+        openConfigManageVisitorKeys: () => Guide._openConfigurationTab('manage-keys'),
+        openConfigToolsAccess: () => Guide._openConfigurationTab('tools-access'),
+        openSettingsManageKeys: () => Guide._openConfigurationTab('manage-keys'),
+        // Chat area
+        openReferenceDocuments: () => document.getElementById('chat-context-status-refs-seg')?.click(),
     },
 
     topicAliases: {
@@ -26,6 +79,8 @@ const Guide = {
         'Data import': 'SettingsAndDataImport',
         'Browsing images': 'BrowsingImages',
         'Managing contacts': 'ManagingContacts',
+        'Create a profile for a contact': 'CreateContactProfile',
+        'Contact profiles': 'CreateContactProfile',
         'Voice and AI settings': 'VoiceAndAISettings',
         "Today's Thing of Interest": 'TodaysThingOfInterest',
         'Email catchup': 'EmailCatchup',
@@ -310,7 +365,8 @@ const Guide = {
         this._categoryOrder.forEach((c) => { byCategory[c] = []; });
         Object.keys(topics).forEach((key) => {
             const t = topics[key];
-            const category = byCategory[t.category] ? t.category : 'Daily Use';
+            const category = (t.category && t.category.trim()) || 'Daily Use';
+            if (!byCategory[category]) byCategory[category] = [];
             byCategory[category].push({
                 key: key,
                 title: t.title || key,
@@ -326,8 +382,12 @@ const Guide = {
             });
         });
 
+        const knownSet = new Set(this._categoryOrder);
+        const extraCategories = Object.keys(byCategory).filter((c) => !knownSet.has(c)).sort();
+        const renderOrder = [...this._categoryOrder, ...extraCategories];
+
         let html = '';
-        this._categoryOrder.forEach((category) => {
+        renderOrder.forEach((category) => {
             const items = byCategory[category];
             if (!items || items.length === 0) return;
             html += '<section class="guide-topic-group">' +

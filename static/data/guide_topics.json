@@ -1,0 +1,1349 @@
+{
+  "topics": [
+    {
+      "key": "GettingStarted",
+      "title": "Getting started",
+      "description": "Fast orientation to chat, sidebars, and key actions.",
+      "category": "Getting Started",
+      "recommended": true,
+      "steps": [
+        { "navigate_action": "showGettingStartedDialog" }
+      ]
+    },
+    {
+      "key": "FirstRunQuickSetup",
+      "title": "Quick setup checklist",
+      "description": "A short first-run flow: import, configure, ask a question, unlock.",
+      "category": "Getting Started",
+      "recommended": true,
+      "steps": [
+        {
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "openDataImport"
+        }
+      ]
+    },
+    {
+      "key": "ArchiveSelectionLogin",
+      "title": "Archive selection at sign-in",
+      "description": "Choose the right user archive before entering password.",
+      "category": "Getting Started",
+      "steps": [
+        { "text": "On the login screen, the selected user determines which archive database is active." },
+        { "text": "If multiple users exist, confirm the selected name before signing in." },
+        { "text": "If sign-in fails unexpectedly, switch away and back to the target user once, then try again." }
+      ]
+    },
+    {
+      "key": "AskingQuestions",
+      "title": "Asking questions",
+      "description": "Get better answers and steer perspective and tone.",
+      "category": "Daily Use",
+      "steps": [
+        { "text": "Type your question in chat and press Send. Try: \"Show me photos from last summer\" or \"Who have I emailed most?\"", "glow": "#user-input" },
+        { "text": "Use AI Personality settings to change the response style and mood.", "glow": "#voice-settings-trigger", "position": "top-center" },
+        { "text": "Switch \"Who's Asking?\" to frame answers from visitor or owner perspective.", "glow": "#its-me-visitor-switch", "position": "middle-right" },
+        { "text": "Reference documents can improve answers for specific, factual, or long-form questions.", "position": "middle-center" }
+      ]
+    },
+    {
+      "key": "BrowsingEmails",
+      "title": "Browsing emails",
+      "description": "Search, filter, sort, and read your imported email archive.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Emails in the left sidebar to browse your imported email collection.",
+          "glow": "#email-gallery-sidebar-btn",
+          "navigate_action": "openEmailGallery"
+        },
+        {
+          "text": "Type a keyword, sender name, or subject in the Search box and press the search button to filter results.",
+          "glow": "#email-gallery-search",
+          "navigate_action": "openEmailGallery",
+          "position": "top-left",
+          "fallback_text": "Open Emails, then type in the Search box at the top."
+        },
+        {
+          "text": "Use the Year filter to narrow down emails to a particular year.",
+          "glow": "#email-gallery-year-filter",
+          "navigate_action": "openEmailGallery",
+          "position": "top-left",
+          "fallback_text": "Open Emails and use the Year dropdown to filter by year."
+        },
+        {
+          "text": "Change the Sort order (newest first, oldest first) to control how results are listed.",
+          "glow": "#email-gallery-sort",
+          "navigate_action": "openEmailGallery",
+          "position": "top-left",
+          "fallback_text": "Open Emails and use the Sort dropdown to change the order."
+        },
+        {
+          "text": "Click any email in the list to open and read its full content, including attachments.",
+          "glow": "#email-gallery-list",
+          "navigate_action": "openEmailGallery",
+          "position": "top-left",
+          "fallback_text": "Open Emails and click any item in the list."
+        },
+        {
+          "text": "You can also ask the AI directly: \"Summarise emails from Alice in March\" or \"Find emails about the conference booking\".",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "BrowsingImages",
+      "title": "Browsing images",
+      "description": "Find memories in photo galleries, albums, and posts.",
+      "category": "Daily Use",
+      "steps": [
+        { "text": "Open Images in the left sidebar to browse your main photo collection.", "glow": "#new-image-gallery-sidebar-btn", "navigate_action": "openImageGallery" },
+        { "text": "Use the Search box to find photos by caption, description, or tag.", "glow": "#new-image-gallery-search-btn", "navigate_action": "openImageGallery", "position": "top-left", "fallback_text": "Open Images and use the Search button." },
+        { "text": "Use the Similar button to find photos visually similar to a selected image.", "glow": "#new-image-gallery-similar-btn", "navigate_action": "openImageGallery", "position": "top-left", "fallback_text": "Open Images and use the Similar button." },
+        { "text": "Open Facebook Albums to browse imported album collections.", "glow": "#fb-albums-sidebar-btn", "navigate_action": "openFacebookAlbums" },
+        { "text": "Open Facebook Posts to browse imported posts that may contain photos.", "glow": "#fb-posts-sidebar-btn", "navigate_action": "openFacebookPosts" },
+        { "text": "Ask the AI: \"Find photos with John\" or \"Show me photos from last Christmas\".", "glow": "#user-input", "position": "bottom-center" }
+      ]
+    },
+    {
+      "key": "BrowsingMessages",
+      "title": "Browsing messages",
+      "description": "Navigate your imported SMS, WhatsApp, Facebook, and iMessage conversations.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Messages in the left sidebar to browse your imported SMS and chat conversations. This covers WhatsApp, iMessage, and direct messages imported into your archive.",
+          "glow": "#sms-messages-sidebar-btn",
+          "navigate_action": "openSmsMessages"
+        },
+        {
+          "text": "Conversations are grouped by contact. Scroll through the list or search by name to find a specific person.",
+          "navigate_action": "openSmsMessages",
+          "fallback_text": "Open Messages, then scroll the contact list on the left."
+        },
+        {
+          "text": "Click any conversation to open the full message thread. Each message shows its timestamp and direction (sent/received).",
+          "navigate_action": "openSmsMessages",
+          "fallback_text": "Open Messages and click a conversation name to read it."
+        },
+        {
+          "text": "Ask the AI about your messages: \"What did Bob last say to me?\" or \"Show conversations about the holiday from 2023\".",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "ExploringLocations",
+      "title": "Exploring locations",
+      "description": "Browse geographic locations extracted from your photos and archive data.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Locations in the left sidebar to browse places from your archive — GPS coordinates from photos, location tags, and check-ins.",
+          "glow": "#locations-sidebar-btn",
+          "navigate_action": "openLocations"
+        },
+        {
+          "text": "Locations are grouped by category and region. Browse by area to revisit places you have been.",
+          "navigate_action": "openLocations",
+          "fallback_text": "Open Locations and browse the grouped list."
+        },
+        {
+          "text": "Click a location to see related photos or archive items from that place.",
+          "navigate_action": "openLocations",
+          "fallback_text": "Open Locations and click any entry to see related items."
+        },
+        {
+          "text": "Ask the AI for location-based summaries: \"Where have I travelled most?\" or \"Show me photos from Paris\".",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "BrowsingArtefacts",
+      "title": "Artefacts — notes and custom items",
+      "description": "Create, search, import, and export personal artefact records in your archive.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Artefacts from the left sidebar. Artefacts are personal notes, items, and custom records you attach to your archive — think of them as a private annotation layer.",
+          "glow": "#artefacts-sidebar-btn",
+          "navigate_action": "openArtefacts"
+        },
+        {
+          "text": "Click \"+ New Artefact\" to create a new record. Each artefact can have a name, description, tags, images, and a story section.",
+          "glow": "#artefacts-new-btn",
+          "navigate_action": "openArtefacts",
+          "position": "top-left",
+          "fallback_text": "Open Artefacts first, then click + New Artefact."
+        },
+        {
+          "text": "Use the Search box to find artefacts by name, description, tags, or story text.",
+          "glow": "#artefacts-search",
+          "navigate_action": "openArtefacts",
+          "position": "top-left",
+          "fallback_text": "Open Artefacts and type in the Search box."
+        },
+        {
+          "text": "Use Export to download all artefacts as a JSON file, or Import to load artefacts from a previously exported file.",
+          "glow": "#artefacts-export-btn",
+          "navigate_action": "openArtefacts",
+          "position": "top-left",
+          "fallback_text": "Open Artefacts and use the Export or Import buttons in the toolbar."
+        },
+        {
+          "text": "Artefacts are searchable by the AI: ask \"Tell me about my artefact about the vintage watch\" or \"List artefacts tagged family\".",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "ManagingContacts",
+      "title": "Managing contacts",
+      "description": "Use Contacts and Relationships, Profiles, and contact tools effectively.",
+      "category": "Daily Use",
+      "steps": [
+        { "text": "Open Contacts and Relationships in the right sidebar to browse people or open the Relationships tab for the connection map.", "glow": "#contacts-sidebar-btn", "navigate_action": "openContacts" },
+        { "text": "Open Profiles to view detailed notes and relationship context.", "glow": "#profiles-sidebar-btn", "navigate_action": "openProfiles" },
+        { "text": "Use the Relationships tab for a visual network of people and connection strength.", "glow": "#contacts-sidebar-btn", "navigate_action": "openContacts" },
+        { "text": "Use Configuration to classify contacts and tune contact recognition.", "glow": "#settings-data-import-sidebar-btn", "position": "bottom-center" }
+      ]
+    },
+    {
+      "key": "RelationshipMap",
+      "title": "Relationship map",
+      "description": "Visualise your social network and connection strengths.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Contacts and Relationships in the right sidebar to access the relationship tools.",
+          "glow": "#contacts-sidebar-btn",
+          "navigate_action": "openContacts",
+          "position": "middle-right"
+        },
+        {
+          "text": "Switch to the Relationships tab inside the Contacts dialog. This shows a visual network map of people connected to you.",
+          "navigate_action": "openContacts",
+          "fallback_text": "Open Contacts and Relationships and click the Relationships tab."
+        },
+        {
+          "text": "Node size and link thickness reflect connection strength — people you communicate with most appear more prominently.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Click any node in the network to highlight that person and their direct connections.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Ask the AI about your relationships: \"Who am I closest to based on my messages?\" or \"Who connects me to the Smith family?\"",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "CreateContactProfile",
+      "title": "Create a profile for a contact",
+      "description": "Generate, review, and edit AI-written complete profiles for people in your archive.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "A complete profile is an AI-written summary of one contact drawn from their messages, emails, and other archive material. It helps you (and the chat AI) understand who someone is, how they relate to you, and how they communicate.",
+          "position": "middle-center"
+        },
+        {
+          "text": "The contact must already exist in your archive—usually from an import (Gmail, WhatsApp, Facebook, and so on). More messages and emails generally produce a richer profile.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Open Profiles from the right sidebar. This is the main place to create and manage complete profiles.",
+          "glow": "#profiles-sidebar-btn",
+          "navigate_action": "openProfiles",
+          "position": "middle-right"
+        },
+        {
+          "text": "Choose the AI provider used to write the profile. Gemini, Claude, and DeepSeek need a configured API key under Configuration → API Keys; Local AI needs Ollama running with a chat model installed.",
+          "glow": "#profiles-llm-provider-select",
+          "navigate_action": "openProfiles",
+          "position": "top-right",
+          "fallback_text": "Open Profiles first, then pick an AI provider at the top of the dialog."
+        },
+        {
+          "text": "Click the Contact field and type part of a name to filter the list. Tick one or more checkboxes to select who should get a new profile. You can select several people and create profiles for all of them in one go.",
+          "glow": "#profiles-contact-input",
+          "navigate_action": "openProfiles",
+          "position": "top-right",
+          "fallback_text": "Open Profiles, click Contact, type to search, then tick the people you want."
+        },
+        {
+          "text": "When at least one contact is selected, click Create profile. Generation runs in the background and may take several minutes per person—you can keep using the app while it works.",
+          "glow": "#profiles-create-btn",
+          "navigate_action": "openProfiles",
+          "position": "top-right",
+          "fallback_text": "Select contacts in the Contact field first—the Create profile button stays disabled until you tick at least one name."
+        },
+        {
+          "text": "Watch the Contacts with complete profiles table below. While a profile is being written, the name shows (generating…). The list refreshes automatically every few seconds while this dialog stays open.",
+          "glow": "#profiles-table-container",
+          "navigate_action": "openProfiles",
+          "position": "bottom-right",
+          "fallback_text": "After starting generation, scroll down in Profiles to the table of contacts with complete profiles."
+        },
+        {
+          "text": "When generation finishes, click a contact name in that table to open their profile, or use Actions → View profile on their row.",
+          "glow": "#profiles-table-body",
+          "navigate_action": "openProfiles",
+          "position": "bottom-right",
+          "fallback_text": "Open Profiles and click a finished contact in the lower table, or use the Actions menu on their row."
+        },
+        {
+          "text": "The profile opens in a View tab with rendered Markdown—sections about the person, your relationship, communication style, and themes from their archive data.",
+          "glow": "#complete-profile-view-pane",
+          "position": "middle-center",
+          "fallback_text": "Open a finished profile from the Profiles table to read it in the View tab."
+        },
+        {
+          "text": "To adjust the text yourself, switch to the Edit tab. You can fix facts, add private context, or trim sections the AI overstated. Profiles still generating cannot be edited yet.",
+          "glow": ".complete-profile-tab[data-tab=\"edit\"]",
+          "position": "middle-center",
+          "fallback_text": "Open a finished profile, then choose the Edit tab."
+        },
+        {
+          "text": "Click Save to store your edits. Switch back to View to see the rendered Markdown after saving.",
+          "glow": "#complete-profile-save-btn",
+          "position": "bottom-center",
+          "fallback_text": "On the Edit tab, change the Markdown, then click Save."
+        },
+        {
+          "text": "To replace an existing profile with a fresh AI pass, open Actions on that row in Profiles and choose Regenerate…. The old text is overwritten when the new generation completes.",
+          "glow": "#profiles-table-body",
+          "navigate_action": "openProfiles",
+          "position": "bottom-right",
+          "fallback_text": "In Profiles, use Actions → Regenerate… on a contact who already has a complete profile."
+        },
+        {
+          "text": "Shortcut from the contact directory: open Contacts and Relationships, find someone, and click the sync icon on their row to start profile generation using your current chat AI provider.",
+          "glow": "#contacts-sidebar-btn",
+          "navigate_action": "openContacts",
+          "position": "middle-right",
+          "fallback_text": "Open Contacts and Relationships and use the small sync icon on a contact row."
+        },
+        {
+          "text": "In Contacts, use Search to filter by name or email when the directory is long. Only contacts with imported conversation history can produce a meaningful profile.",
+          "glow": "#contacts-search",
+          "navigate_action": "openContacts",
+          "position": "top-left",
+          "fallback_text": "Open Contacts and Relationships and use the Search box on the Contacts tab."
+        },
+        {
+          "text": "You can ask the chat AI about someone once a profile exists—for example: \"Summarise my relationship with [name]\" or \"How does [name] usually communicate with me?\"",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "VoiceAndAISettings",
+      "title": "Voice and AI settings",
+      "description": "Choose provider, voice, mood, and response style.",
+      "category": "Daily Use",
+      "steps": [
+        { "text": "Open voice settings from the top bar image.", "glow": "#voice-settings-trigger", "position": "top-center" },
+        { "text": "Choose a voice or custom persona to control speaking style." },
+        { "text": "When using owner voice, set a mood to shape tone." },
+        { "text": "Companion Mode makes responses more conversational." },
+        { "text": "Creativity controls factual vs expressive response style." },
+        { "text": "Switch providers (Gemini, Claude, DeepSeek, Local AI) as needed." }
+      ]
+    },
+    {
+      "key": "SwitchingAIProvider",
+      "title": "Switching AI provider",
+      "description": "Choose between Claude, Gemini, DeepSeek, and Local AI at any time.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "The AI provider can be switched at any time without restarting. Open the voice and AI settings panel from the top bar.",
+          "glow": "#llm-provider-select",
+          "position": "top-right"
+        },
+        {
+          "text": "The Provider dropdown lists all configured providers: Claude (Anthropic), Gemini (Google), DeepSeek, and Local AI (Ollama). Select a different one to switch immediately.",
+          "position": "top-right",
+          "fallback_text": "Open voice settings from the top bar, then change the Provider dropdown."
+        },
+        {
+          "text": "Cloud providers (Claude, Gemini, DeepSeek) require an API key set in Configuration → API Keys. If a provider is greyed out or unavailable, check that its key is entered.",
+          "position": "top-right"
+        },
+        {
+          "text": "Local AI (Ollama/Gemma4) requires Ollama to be running and the required models downloaded. Use Configuration → AI & Setup to check status.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Each provider has different strengths: Claude and Gemini excel at reasoning and long context; DeepSeek is cost-effective; Local AI is fully private with no internet required.",
+          "position": "middle-center"
+        }
+      ]
+    },
+    {
+      "key": "ChatContextBar",
+      "title": "Understanding the context bar",
+      "description": "Use the chat context bar to manage AI tools and reference documents.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "The context status bar sits just above the chat input and shows your current AI tool and reference document configuration at a glance.",
+          "glow": "#chat-context-status-bar",
+          "position": "bottom-center"
+        },
+        {
+          "text": "The Tools segment shows how many AI tools are currently active for this session. Click it to open the Tools Access configuration.",
+          "glow": "#chat-context-status-tools-seg",
+          "navigate_action": "openConfigToolsAccess",
+          "position": "bottom-center",
+          "fallback_text": "The Tools count appears in the context bar above the chat input."
+        },
+        {
+          "text": "The Ref Docs segment shows how many reference documents are available. Click it to open the Reference Documents manager.",
+          "glow": "#chat-context-status-refs-seg",
+          "navigate_action": "openReferenceDocuments",
+          "position": "bottom-center",
+          "fallback_text": "The Ref Docs count appears in the context bar above the chat input."
+        },
+        {
+          "text": "A warning icon on either segment means something may need attention — for example, no tools are enabled or no documents are loaded. Click the segment to resolve it.",
+          "glow": "#chat-context-status-bar",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "SavedResponses",
+      "title": "Saved responses",
+      "description": "Browse and revisit your previously saved AI chat responses.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Previous Responses in the right sidebar to browse AI answers you have saved from past chat sessions.",
+          "glow": "#previous-responses-sidebar-btn",
+          "navigate_action": "openPreviousResponses",
+          "position": "top-center"
+        },
+        {
+          "text": "Responses are listed in reverse chronological order. Each entry shows the question asked and a preview of the AI's answer.",
+          "navigate_action": "openPreviousResponses",
+          "fallback_text": "Open Previous Responses to see your saved chat turns.",
+          "position": "top-center"
+        },
+        {
+          "text": "Click any saved response to expand it and read the full content, including any images or formatted sections.",
+          "navigate_action": "openPreviousResponses",
+          "fallback_text": "Open Previous Responses and click any entry to expand it.",
+          "position": "top-center"
+        },
+        {
+          "text": "To save a new response, use the save (bookmark) icon that appears on an AI chat bubble after the response completes.",
+          "glow": "#user-input",
+          "position": "top-center"
+        }
+      ]
+    },
+    {
+      "key": "UsingSuggestions",
+      "title": "Using suggestions",
+      "description": "Discover pre-written prompts organised by topic to jumpstart conversations.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Suggestions from the right sidebar to browse a library of ready-made prompts grouped by topic.",
+          "glow": "#suggestions-sidebar-btn",
+          "navigate_action": "openSuggestions",
+          "position": "middle-right"
+        },
+        {
+          "text": "Suggestions are grouped into categories such as Messages, Emails, Photos, and Relationships. Scroll or expand a category to see individual prompts.",
+          "navigate_action": "openSuggestions",
+          "fallback_text": "Open Suggestions and scroll through the categories."
+        },
+        {
+          "text": "Click any suggestion to send it directly to the chat input. The suggestion text is pre-filled — you can edit it before sending or send it as-is.",
+          "navigate_action": "openSuggestions",
+          "fallback_text": "Open Suggestions and click any prompt to populate the chat input."
+        },
+        {
+          "text": "Administrators can customise the suggestion library via Configuration → Suggestions — adding, editing, and removing prompts, or importing a new set.",
+          "glow": "#settings-data-import-sidebar-btn",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "TodaysThingOfInterest",
+      "title": "Today's Thing of Interest",
+      "description": "Generate fresh prompts based on interests.",
+      "category": "Daily Use",
+      "steps": [
+        { "text": "Today's Thing suggests memory prompts based on subject interests.", "glow": "#todays-thing-sidebar-btn", "navigate_action": "openTodaysThing" },
+        { "text": "Click repeatedly for different suggestions." },
+        { "text": "Add more interests in Configuration → Subject Configuration for better variety.", "glow": "#settings-data-import-sidebar-btn", "position": "bottom-center" }
+      ]
+    },
+    {
+      "key": "EmailCatchup",
+      "title": "Email catchup",
+      "description": "Summarize and explore imported email quickly.",
+      "category": "Daily Use",
+      "steps": [
+        { "text": "Open Emails from the left sidebar.", "glow": "#email-gallery-sidebar-btn", "navigate_action": "openEmailGallery" },
+        { "text": "Ask for a recent summary: \"Summarise my emails from this week\".", "glow": "#user-input" },
+        { "text": "Drill into a sender or topic for deeper summaries.", "glow": "#user-input" }
+      ]
+    },
+    {
+      "key": "SimilaritySearch",
+      "title": "Semantic similarity search",
+      "description": "Find related messages, emails, photos, and posts using AI embedding search.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Multi-Source Search from the left sidebar. This uses AI embeddings to find content that is conceptually similar to your query — not just keyword matches.",
+          "glow": "#message-similarity-sidebar-btn",
+          "navigate_action": "openMultiSourceSearch"
+        },
+        {
+          "text": "Type a concept, phrase, or sentence in the search box. For example: \"arguments about money\" or \"planning a holiday\" or \"feeling sad about dad\".",
+          "glow": "#message-similarity-text",
+          "navigate_action": "openMultiSourceSearch",
+          "position": "middle-center",
+          "fallback_text": "Open Multi-Source Search and type your concept in the text area."
+        },
+        {
+          "text": "Set the number of results (default 25). More results give broader coverage but may include less relevant items.",
+          "glow": "#message-similarity-n",
+          "navigate_action": "openMultiSourceSearch",
+          "position": "middle-center",
+          "fallback_text": "Open Multi-Source Search and adjust the result count number."
+        },
+        {
+          "text": "Click Search to run the query. Results are returned across all source types — messages, emails, Facebook posts, and albums — and grouped by tab.",
+          "glow": "#message-similarity-run-btn",
+          "navigate_action": "openMultiSourceSearch",
+          "position": "middle-center",
+          "fallback_text": "Open Multi-Source Search, enter a concept, and click Search."
+        },
+        {
+          "text": "Switch between the result tabs (Messages, Emails, Posts, Albums) to see which sources had the most relevant matches.",
+          "glow": "#message-similarity-tabs",
+          "navigate_action": "openMultiSourceSearch",
+          "position": "top-center",
+          "fallback_text": "After running a search, use the tabs above the results to filter by source type."
+        },
+        {
+          "text": "Similarity search requires embeddings to be generated for your archive data. If results are sparse, run the embedding background jobs in Import & Manage Data → Background Jobs.",
+          "position": "middle-center"
+        }
+      ]
+    },
+    {
+      "key": "HaveAChat",
+      "title": "Have-a-Chat — two AI voices",
+      "description": "Watch two AI personas have a conversation about your archive.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Have-a-Chat from the right sidebar. This feature runs a conversation between two AI voices about your archive data — like listening to two people discuss your memories.",
+          "glow": "#have-a-chat-sidebar-btn",
+          "navigate_action": "openHaveAChat",
+          "position": "middle-right"
+        },
+        {
+          "text": "Enter a topic or question to guide the conversation. For example: \"Discuss the most important relationships in the archive\" or \"What do the messages reveal about work stress?\" Leave blank to let the AIs explore freely.",
+          "glow": "#have-a-chat-topic",
+          "navigate_action": "openHaveAChat",
+          "position": "top-center",
+          "fallback_text": "Open Have-a-Chat and type a topic in the Topic box, or leave it blank."
+        },
+        {
+          "text": "Choose the voice and AI provider for each participant (Voice A and Voice B). Each can use a different provider and persona — for instance, Claude as the archive subject and Gemini as an interviewer.",
+          "glow": "#have-a-chat-voice-a",
+          "navigate_action": "openHaveAChat",
+          "position": "top-center",
+          "fallback_text": "Open Have-a-Chat and use the Voice A / Voice B dropdowns to pick personas."
+        },
+        {
+          "text": "Optionally enable Banter Mode for a more playful exchange, or adjust Temperature to control how creative the conversation becomes.",
+          "glow": "#have-a-chat-banter-mode",
+          "navigate_action": "openHaveAChat",
+          "position": "middle-center",
+          "fallback_text": "Open Have-a-Chat and look for the Banter Mode checkbox and Temperature slider."
+        },
+        {
+          "text": "Set Free-Run Rounds to let the conversation continue automatically for a set number of exchanges before pausing for your review.",
+          "glow": "#have-a-chat-free-run-rounds",
+          "navigate_action": "openHaveAChat",
+          "position": "middle-center",
+          "fallback_text": "Open Have-a-Chat and adjust the Free Run Rounds number."
+        },
+        {
+          "text": "Click Start Chat to begin. The conversation appears in the main chat area. You can Pause at any point or Inject a comment to steer the discussion.",
+          "glow": "#have-a-chat-start-btn",
+          "navigate_action": "openHaveAChat",
+          "position": "top-center",
+          "fallback_text": "Open Have-a-Chat and click Start Chat when you are ready."
+        },
+        {
+          "text": "While running, use Inject Comment to add your own message into the conversation, or Stop to end the session. You will be asked whether to save the conversation.",
+          "glow": "#have-a-chat-inject-btn",
+          "position": "top-center",
+          "fallback_text": "During a Have-a-Chat session, the Inject Comment and Stop buttons appear at the top."
+        },
+        {
+          "text": "Review previous conversations via the Previous Conversations button. Saved sessions can be downloaded as Markdown.",
+          "glow": "#have-a-chat-previous-sessions-btn",
+          "navigate_action": "openHaveAChat",
+          "position": "top-center",
+          "fallback_text": "Open Have-a-Chat and click Previous Conversations to see saved sessions."
+        }
+      ]
+    },
+    {
+      "key": "Interviewer",
+      "title": "Interviewer",
+      "description": "Conduct a structured AI-driven Q&A session and save the results.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Interviewer from the right sidebar. The Interviewer runs a structured question-and-answer session where the AI asks questions and you (or the archive subject) answer them.",
+          "glow": "#interviewer-sidebar-btn",
+          "navigate_action": "openInterviewer",
+          "position": "middle-right"
+        },
+        {
+          "text": "Choose an interview topic or theme. The AI will ask a series of questions based on your archive data, tailored to the subject's history and relationships.",
+          "navigate_action": "openInterviewer",
+          "position": "middle-right",
+          "fallback_text": "Open Interviewer and choose a topic to get started."
+        },
+        {
+          "text": "Answer each question in the input box and press Send. The AI reads your answer and asks a follow-up question, building a narrative conversation.",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        },
+        {
+          "text": "When the interview is complete, it is saved to your archive. You can review past interviews at any time from the Interviewer panel.",
+          "navigate_action": "openInterviewer",
+          "position": "middle-right",
+          "fallback_text": "Open Interviewer to view saved interviews from previous sessions."
+        }
+      ]
+    },
+    {
+      "key": "RandomQuestion",
+      "title": "Random question",
+      "description": "Get a spontaneous question about your archive to spark a conversation.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open Random Question from the right sidebar. This feature generates a random, archive-aware question to start a conversation — useful when you do not know what to ask.",
+          "glow": "#random-question-sidebar-btn",
+          "navigate_action": "openRandomQuestion",
+          "position": "middle-right"
+        },
+        {
+          "text": "A question is generated based on your archive contents and subject configuration. Click it to send it to the chat, or click Generate Another to get a different question.",
+          "navigate_action": "openRandomQuestion",
+          "position": "middle-right",
+          "fallback_text": "Open Random Question to see the generated question, then click it to send."
+        },
+        {
+          "text": "Questions are drawn from your actual data — contacts, events, photos, and message themes — so each one is unique to your archive.",
+          "position": "middle-center"
+        }
+      ]
+    },
+    {
+      "key": "ArchiveDashboard",
+      "title": "Archive dashboard",
+      "description": "View statistics and a summary of what is in your archive.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open the Dashboard from the right sidebar (the Statistics button). It shows a high-level view of your archive: record counts, import history, and data composition.",
+          "glow": "#statistics-sidebar-btn",
+          "navigate_action": "openDashboard",
+          "position": "middle-right"
+        },
+        {
+          "text": "The dashboard shows counts for emails, messages, photos, contacts, and other imported data types — useful for confirming that imports completed successfully.",
+          "navigate_action": "openDashboard",
+          "position": "middle-right",
+          "fallback_text": "Open the Dashboard to see record counts for each data type."
+        },
+        {
+          "text": "Import activity and job history give a timeline of when data was added to the archive.",
+          "navigate_action": "openDashboard",
+          "position": "middle-right",
+          "fallback_text": "Open the Dashboard and scroll down to see import activity."
+        },
+        {
+          "text": "Ask the AI for richer summaries: \"What is the earliest record in my archive?\" or \"How many emails do I have from 2020?\"",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "IdentityProfileWizard",
+      "title": "Identity Profile Wizard",
+      "description": "Use an AI-guided wizard to build a detailed identity profile of the archive subject.",
+      "category": "Daily Use",
+      "steps": [
+        {
+          "text": "Open the Identity Profile Wizard from the bottom of the left sidebar. This wizard uses the AI to build a rich, structured profile of the archive owner — their personality, values, life story, and more.",
+          "glow": "#identity-profile-wizard-btn",
+          "navigate_action": "openIdentityProfile",
+          "position": "bottom-left"
+        },
+        {
+          "text": "The wizard walks you through a series of AI-generated questions based on your archive data. Each section builds a different aspect of the identity profile.",
+          "navigate_action": "openIdentityProfile",
+          "fallback_text": "Open the Identity Profile Wizard to see the guided questions."
+        },
+        {
+          "text": "Answer the questions in your own words. The AI uses your answers, along with archive evidence, to write each section of the profile.",
+          "navigate_action": "openIdentityProfile",
+          "fallback_text": "Open the Identity Profile Wizard and start answering the guided questions."
+        },
+        {
+          "text": "You can pause and resume the wizard at any point — progress is saved between sessions.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Once complete, the identity profile is stored in your archive and used to enrich AI responses — the AI will have a much deeper understanding of who the subject is.",
+          "position": "middle-center"
+        }
+      ]
+    },
+    {
+      "key": "LocalAISetupHealth",
+      "title": "Local AI setup and health",
+      "description": "Understand Ollama readiness and required models.",
+      "category": "Setup & Import",
+      "steps": [
+        { "text": "Local AI depends on the Ollama server plus two models: gemma4 and embeddinggemma." },
+        { "text": "On login, open AI & Setup to confirm server status and model availability." },
+        { "text": "If a model is missing, use Download required models. Initial download can take several minutes." },
+        { "text": "Some AI features may be unavailable when Local AI is not ready." }
+      ]
+    },
+    {
+      "key": "SettingsAndDataImport",
+      "title": "Settings and data import",
+      "description": "Configure app behavior and import source archives.",
+      "category": "Setup & Import",
+      "steps": [
+        { "text": "Open Configuration from the left sidebar.", "glow": "#settings-data-import-sidebar-btn", "position": "bottom-center" },
+        { "text": "Use chat settings, subject configuration, custom voices, and key management in this dialog." },
+        { "text": "Open Import & Manage Data for file imports and maintenance jobs.", "glow": "#data-import-sidebar-btn", "position": "bottom-center" }
+      ]
+    },
+    {
+      "key": "APIKeySetup",
+      "title": "Setting up AI provider API keys",
+      "description": "Enter API keys for Claude, Gemini, and DeepSeek to enable cloud AI providers.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Open Configuration from the left sidebar, then switch to the API Keys tab.",
+          "glow": "#settings-data-import-sidebar-btn",
+          "navigate_action": "openConfigApiKeys",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Enter your Anthropic API key to enable Claude. Get a key at console.anthropic.com by creating an account and generating a key under API Keys.",
+          "glow": "#api-keys-tab",
+          "navigate_action": "openConfigApiKeys",
+          "position": "middle-center",
+          "fallback_text": "Open Configuration → API Keys and paste your Anthropic key in the Claude field."
+        },
+        {
+          "text": "Enter your Google Gemini API key to enable Gemini. Keys are available from Google AI Studio (aistudio.google.com).",
+          "glow": "#api-keys-tab",
+          "navigate_action": "openConfigApiKeys",
+          "position": "middle-center",
+          "fallback_text": "Open Configuration → API Keys and paste your Gemini key in the Google field."
+        },
+        {
+          "text": "Enter your DeepSeek API key to enable DeepSeek — a cost-effective alternative that uses the same format as Claude but is typically much cheaper per token.",
+          "glow": "#api-keys-tab",
+          "navigate_action": "openConfigApiKeys",
+          "position": "middle-center",
+          "fallback_text": "Open Configuration → API Keys and paste your DeepSeek key."
+        },
+        {
+          "text": "Keys are stored encrypted in your archive. They are never sent anywhere except directly to the respective AI provider when you make a request.",
+          "position": "middle-center"
+        },
+        {
+          "text": "After saving, switch the AI provider in the voice settings panel and verify that a test question returns a response.",
+          "glow": "#voice-settings-trigger",
+          "position": "top-center"
+        }
+      ]
+    },
+    {
+      "key": "SubjectConfiguration",
+      "title": "Subject configuration",
+      "description": "Set the archive subject's name, pronouns, interests, and personality details.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Open Configuration from the left sidebar, then switch to the Subject Configuration tab.",
+          "glow": "#settings-data-import-sidebar-btn",
+          "navigate_action": "openConfigSubjectConfiguration",
+          "position": "bottom-center"
+        },
+        {
+          "text": "On the Subject Details and Interests subtab, enter the subject's full name, preferred pronouns, and date of birth. The AI uses these details in every response.",
+          "glow": "#subject-configuration-tab",
+          "navigate_action": "openConfigSubjectConfiguration",
+          "position": "middle-center",
+          "fallback_text": "Open Configuration → Subject Configuration and fill in the Subject Details subtab."
+        },
+        {
+          "text": "Add interests and topics the subject cares about. These are used by Today's Thing of Interest and to personalise AI responses.",
+          "glow": "#subject-config-subtab-details",
+          "navigate_action": "openConfigSubjectConfiguration",
+          "position": "middle-center",
+          "fallback_text": "On the Subject Details subtab, add interests in the Interests section."
+        },
+        {
+          "text": "Switch to the Writing Style subtab to describe how the subject typically writes and communicates — formal, casual, uses humour, etc. This shapes the AI's voice when speaking as the subject.",
+          "glow": "#subject-config-subtab-btn-writing",
+          "navigate_action": "openConfigSubjectConfiguration",
+          "position": "middle-center",
+          "fallback_text": "Open Configuration → Subject Configuration and click the Writing Style subtab."
+        },
+        {
+          "text": "Switch to the Psychological Profile subtab for deeper personality context — traits, values, and how the subject handles emotions. This enriches AI responses in companion or interview modes.",
+          "glow": "#subject-config-subtab-btn-psych",
+          "navigate_action": "openConfigSubjectConfiguration",
+          "position": "middle-center",
+          "fallback_text": "Open Configuration → Subject Configuration and click the Psychological Profile subtab."
+        },
+        {
+          "text": "Save after each subtab. Changes take effect immediately — the next AI response will use the updated configuration.",
+          "position": "middle-center"
+        }
+      ]
+    },
+    {
+      "key": "CustomVoicePersonas",
+      "title": "Custom AI voice personas",
+      "description": "Create named AI personas with unique instructions and creativity settings.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Open Configuration from the left sidebar, then switch to the Custom Voices tab.",
+          "glow": "#settings-data-import-sidebar-btn",
+          "navigate_action": "openConfigCustomVoices",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Click New Voice to create a new persona. Each custom voice has a name, description, and a detailed instruction block that tells the AI how to behave.",
+          "glow": "#custom-voices-create-btn",
+          "navigate_action": "openConfigCustomVoices",
+          "position": "top-center",
+          "fallback_text": "Open Configuration → Custom Voices and click New Voice."
+        },
+        {
+          "text": "Give the voice a name (shown in the provider dropdown, e.g. \"Grumpy Professor\") and a short description so you know what it is for.",
+          "glow": "#custom-voice-edit-name",
+          "position": "middle-center",
+          "fallback_text": "In the New Voice form, fill in the Name and Description fields."
+        },
+        {
+          "text": "Write the instruction in the Instructions box. Be specific: describe the persona's name, background, speech patterns, and any rules it should follow.",
+          "glow": "#custom-voice-edit-instructions",
+          "position": "middle-center",
+          "fallback_text": "In the New Voice form, write the AI persona instructions in the large text area."
+        },
+        {
+          "text": "Set the Creativity slider — lower values give more factual, consistent responses; higher values are more expressive and varied.",
+          "glow": "#custom-voice-edit-creativity",
+          "position": "middle-center",
+          "fallback_text": "In the New Voice form, adjust the Creativity slider."
+        },
+        {
+          "text": "Save the voice. It now appears in the provider dropdown in the voice settings panel — select it to switch the AI into that persona.",
+          "glow": "#custom-voices-tbody",
+          "navigate_action": "openConfigCustomVoices",
+          "position": "middle-center",
+          "fallback_text": "After saving, the new voice appears in the Custom Voices table."
+        }
+      ]
+    },
+    {
+      "key": "ReferenceDocuments",
+      "title": "Reference documents",
+      "description": "Upload documents that the AI can consult when answering questions.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Reference documents are files you upload that the AI can read when answering questions. They are especially useful for providing context that is not in your archive — medical history, a biography, a family tree, or a personal statement.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Click the Ref Docs segment in the context bar above the chat input to open the Reference Documents manager.",
+          "glow": "#chat-context-status-refs-seg",
+          "navigate_action": "openReferenceDocuments",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Click Upload Document to add a new file. Supported formats include plain text, PDF, and Markdown. Add a title and description so the AI knows what the document contains.",
+          "glow": "#reference-documents-upload-btn",
+          "navigate_action": "openReferenceDocuments",
+          "position": "middle-center",
+          "fallback_text": "Open the Reference Documents manager and click Upload Document."
+        },
+        {
+          "text": "Documents flagged Include in System Prompt are injected into every AI request — use this for a core context document. Documents flagged Available for Task are included only when the AI's tools call for them.",
+          "navigate_action": "openReferenceDocuments",
+          "position": "middle-center",
+          "fallback_text": "When uploading, check the Include in System Prompt or Available for Task boxes as appropriate."
+        },
+        {
+          "text": "Use the Category and Content Type filters in the manager to organise a large document library.",
+          "glow": "#reference-documents-category-filter",
+          "navigate_action": "openReferenceDocuments",
+          "position": "middle-center",
+          "fallback_text": "Open the Reference Documents manager and use the filter dropdowns."
+        },
+        {
+          "text": "The Ref Docs count in the context bar updates to show how many documents are active. A warning icon means a document is flagged but unavailable — check the manager for details.",
+          "glow": "#chat-context-status-refs-seg",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "ImportPathsOverview",
+      "title": "Import paths overview",
+      "description": "Know which import flow to use for each source.",
+      "category": "Setup & Import",
+      "steps": [
+        { "text": "Use ZIP upload imports for Facebook, Instagram, WhatsApp, and iMessage exports.", "glow": "#data-import-sidebar-btn", "navigate_action": "openDataImport" },
+        { "text": "Use email import for mailbox data and follow-up embedding jobs." },
+        { "text": "Use filesystem/photo imports when source data already exists on local disk." }
+      ]
+    },
+    {
+      "key": "ImportFacebookArchive",
+      "title": "Import Facebook archive",
+      "description": "Step-by-step Facebook ZIP import flow.",
+      "category": "Setup & Import",
+      "steps": [
+        { "text": "Request a Facebook data download in JSON format from Facebook Settings → Your Facebook Information → Download your information. Select JSON format, then wait for the download email." },
+        { "text": "Unzip the downloaded file to a folder on your computer." },
+        { "text": "Open Import & Manage Data from the left sidebar.", "glow": "#data-import-sidebar-btn", "position": "bottom-center", "navigate_action": "openDataImportImport" },
+        {
+          "text": "Click Upload on the Facebook row and select the exported folder.",
+          "position": "top-right",
+          "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"facebook\"]",
+          "fallback_text": "Open Import & Manage Data first, then use Upload on Facebook row.",
+          "navigate_action": "openDataImportImport"
+        }
+      ]
+    },
+    {
+      "key": "ImportInstagramArchive",
+      "title": "Import Instagram archive",
+      "description": "Step-by-step Instagram ZIP import flow.",
+      "category": "Setup & Import",
+      "steps": [
+        { "text": "Request an Instagram data download from Settings → Your activity → Download or transfer information. Select JSON format and request the download." },
+        { "text": "Unzip the downloaded file to a folder on your computer." },
+        { "text": "Open Import & Manage Data from the left sidebar.", "glow": "#data-import-sidebar-btn", "position": "bottom-center", "navigate_action": "openDataImportImport" },
+        {
+          "text": "Click Upload on the Instagram row and select the exported folder.",
+          "position": "top-right",
+          "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"instagram\"]",
+          "fallback_text": "Open Import & Manage Data first, then use Upload on Instagram row.",
+          "navigate_action": "openDataImportImport"
+        }
+      ]
+    },
+    {
+      "key": "ImportWhatsApp",
+      "title": "Import WhatsApp archive",
+      "description": "Step-by-step WhatsApp export and ZIP import flow.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Export your WhatsApp chats from the app: in WhatsApp, open each chat → More options (three dots) → Export chat. Choose to include media. Do this for each conversation you want to import.",
+          "position": "middle-center"
+        },
+        {
+          "text": "WhatsApp exports individual .zip files per chat. Collect them all into a single folder on your computer.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Open Import & Manage Data from the left sidebar.",
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "openDataImportImport",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Find the WhatsApp row in the import list, click Upload, and select the folder containing your exported WhatsApp ZIP files. The import processes each ZIP in turn.",
+          "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"whatsapp\"]",
+          "navigate_action": "openDataImportImport",
+          "position": "top-right",
+          "fallback_text": "Open Import & Manage Data and click Upload on the WhatsApp row."
+        }
+      ]
+    },
+    {
+      "key": "ImportiMessage",
+      "title": "Import iMessage archive",
+      "description": "Import an iMessage export into your archive.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Export your iMessage data from your Mac using a third-party export tool (such as iExporter or a direct copy of the chat.db file). The app expects the standard iMessage export format.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Open Import & Manage Data from the left sidebar.",
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "openDataImportImport",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Find the iMessage row in the import list and click Upload. Select the folder or ZIP containing your iMessage export. The import extracts messages and attachments.",
+          "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"imessage\"]",
+          "navigate_action": "openDataImportImport",
+          "position": "top-right",
+          "fallback_text": "Open Import & Manage Data and click Upload on the iMessage row."
+        }
+      ]
+    },
+    {
+      "key": "ImportGmail",
+      "title": "Import Gmail via IMAP",
+      "description": "Connect your Gmail account and import emails directly via IMAP.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Gmail import uses the IMAP protocol to pull emails directly from your inbox. No export file is needed — the app connects to Gmail and downloads messages.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Open Import & Manage Data from the left sidebar and switch to the Import tab.",
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "openDataImportImport",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Find the Email / IMAP row and click its import button. Enter your Gmail address and, for the password, use an App Password (not your normal Google password). Generate one at myaccount.google.com → Security → 2-Step Verification → App passwords.",
+          "navigate_action": "openDataImportImport",
+          "position": "top-right",
+          "fallback_text": "Open Import & Manage Data → Import tab, then find the Email/IMAP row."
+        },
+        {
+          "text": "Choose which mail folders to import and set a date range if you want to limit the import to recent mail. Click Start Import to begin.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Large mailboxes can take a long time to import. You can monitor progress in the Import & Manage Data panel. The app continues importing in the background.",
+          "position": "middle-center"
+        },
+        {
+          "text": "After email import, run the email embedding background job from Import & Manage Data → Background Jobs so that similarity search works on your emails.",
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "openDataImportBackgroundJobs",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "ImportPhotosLocal",
+      "title": "Import photos from local disk",
+      "description": "Import photos and images stored on your computer into the archive.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Open Import & Manage Data from the left sidebar and switch to the Import tab.",
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "openDataImportImport",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Find the Filesystem / Photo Import row. Click the folder picker button to choose the root directory containing your photos.",
+          "navigate_action": "openDataImportImport",
+          "position": "top-right",
+          "fallback_text": "Open Import & Manage Data → Import tab, then find the Filesystem/Photo row."
+        },
+        {
+          "text": "Configure import options: choose whether to create thumbnails, set a maximum number of images, and set file exclusion patterns to skip certain folders.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Click Start Import. The app scans the folder recursively and imports supported image formats (JPEG, PNG, HEIC, etc.) including any EXIF metadata such as GPS coordinates and timestamps.",
+          "position": "middle-center"
+        },
+        {
+          "text": "After a photo import, run the AI image classification background job from Import & Manage Data → Background Jobs to generate descriptive tags for each photo — this greatly improves AI search and questions about images.",
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "openDataImportBackgroundJobs",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "BackgroundJobsAndMaintenance",
+      "title": "Background jobs and maintenance",
+      "description": "Run scheduled and on-demand maintenance tasks: thumbnails, embeddings, and more.",
+      "category": "Setup & Import",
+      "steps": [
+        {
+          "text": "Open Import & Manage Data from the left sidebar.",
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "openDataImport",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Switch to the Maintenance tab to find one-off tasks such as rebuilding contact lookups, recalculating relationship strengths, and re-processing import data.",
+          "navigate_action": "openDataImportMaintenance",
+          "position": "top-right",
+          "fallback_text": "Open Import & Manage Data and click the Maintenance tab."
+        },
+        {
+          "text": "Switch to the Background Jobs tab to view and trigger scheduled jobs: thumbnail generation, message embeddings, email embeddings, and image AI classification.",
+          "navigate_action": "openDataImportBackgroundJobs",
+          "position": "top-right",
+          "fallback_text": "Open Import & Manage Data and click the Background Jobs tab."
+        },
+        {
+          "text": "Run the thumbnail job after a large photo import so images display quickly in the gallery. Run the embedding jobs after importing messages or emails to enable semantic similarity search.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Jobs run in the background — you can keep using the app while they execute. Check the job status panel to see progress and completion.",
+          "position": "middle-center"
+        }
+      ]
+    },
+    {
+      "key": "CreateAndSwitchArchives",
+      "title": "Create and switch archives",
+      "description": "Manage archive profiles safely across users.",
+      "category": "Setup & Import",
+      "steps": [
+        { "text": "Use login profile controls or admin archives to create and manage archive entries." },
+        { "text": "Switching archive changes the active SQLite database used for sign-in and chat." },
+        { "text": "Disabling an archive hides it from login selection without deleting data." }
+      ]
+    },
+    {
+      "key": "MasterKeySetup",
+      "title": "Master key and sensitive data",
+      "description": "Understand the master key, what it unlocks, and how to use sensitive data records.",
+      "category": "Privacy & Security",
+      "steps": [
+        {
+          "text": "The master key is a passphrase you set once that encrypts sensitive data records and unlocks advanced AI tool access. It is different from your login password and never leaves your device.",
+          "position": "middle-center"
+        },
+        {
+          "text": "On sign-in, a prompt appears asking you to unlock with your master key. You can skip this, but sensitive data and some AI tools will be unavailable until you unlock.",
+          "glow": "#master-key-unlock-input",
+          "position": "middle-center"
+        },
+        {
+          "text": "Open Sensitive Data from the right sidebar to create and manage encrypted records — passwords, PINs, private notes, and any data you want kept locked.",
+          "glow": "#sensitive-data-sidebar-btn",
+          "navigate_action": "openSensitiveData",
+          "position": "middle-right"
+        },
+        {
+          "text": "Click Unlock to enter your master key and decrypt the sensitive data view. Once unlocked for this session, sensitive records are readable and the AI can use them if authorised.",
+          "glow": "#sensitive-data-unlock-btn",
+          "navigate_action": "openSensitiveData",
+          "position": "middle-right",
+          "fallback_text": "Open Sensitive Data from the right sidebar, then click Unlock and enter your master key."
+        },
+        {
+          "text": "Click + New Record to add a new sensitive data entry. Give it a name, category, and the secret value. All records are encrypted at rest with your master key.",
+          "glow": "#sensitive-data-new-btn",
+          "navigate_action": "openSensitiveData",
+          "position": "middle-right",
+          "fallback_text": "Open Sensitive Data, unlock it, then click + New Record."
+        },
+        {
+          "text": "The master key is set and changed via Configuration. If you forget your master key, encrypted records cannot be recovered — it is not stored anywhere.",
+          "glow": "#settings-data-import-sidebar-btn",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "VisitorAccessSharing",
+      "title": "Sharing your archive with visitors",
+      "description": "Create visitor keys so others can access your archive with limited permissions.",
+      "category": "Privacy & Security",
+      "steps": [
+        {
+          "text": "Visitor access lets you share your archive with another person — a family member, carer, or friend — who can browse and chat with the AI without seeing sensitive data or admin features.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Open Configuration and switch to the Manage Visitor Keys tab to create and manage visitor access.",
+          "glow": ".config-tab-button[data-tab=\"manage-keys\"]",
+          "navigate_action": "openConfigManageVisitorKeys",
+          "position": "middle-right",
+          "fallback_text": "Open Configuration from the left sidebar, then click Manage Visitor Keys."
+        },
+        {
+          "text": "Create a new visitor key and set a password hint. Share the archive URL and the visitor key password with the person you want to give access to. They log in using the share link.",
+          "navigate_action": "openConfigManageVisitorKeys",
+          "position": "middle-right",
+          "fallback_text": "Open Configuration → Manage Visitor Keys and click New Key to create one."
+        },
+        {
+          "text": "Visitors see the same archive data but cannot access sensitive records, owner-only AI tools, or admin settings. They use the \"Who's Asking?\" switch set to visitor mode.",
+          "position": "middle-center"
+        },
+        {
+          "text": "You can disable or delete a visitor key at any time to revoke access immediately.",
+          "navigate_action": "openConfigManageVisitorKeys",
+          "position": "middle-right",
+          "fallback_text": "Open Configuration → Manage Visitor Keys and disable or delete the key."
+        }
+      ]
+    },
+    {
+      "key": "ToolsAccessControl",
+      "title": "AI tools access control",
+      "description": "Configure which AI tools are available and what permissions they require.",
+      "category": "Privacy & Security",
+      "steps": [
+        {
+          "text": "AI tools are the capabilities the AI uses to look up data in your archive — search messages, retrieve emails, find photos, and more. Each tool can be restricted by access tier.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Open Configuration and switch to the Tools Access tab.",
+          "glow": "#settings-data-import-sidebar-btn",
+          "navigate_action": "openConfigToolsAccess",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Two tiers are available: Visitor (basic, lower-sensitivity tools available to all sessions) and Master (higher-sensitivity tools requiring master key unlock).",
+          "navigate_action": "openConfigToolsAccess",
+          "position": "middle-center",
+          "fallback_text": "Open Configuration → Tools Access to see the two-tier tool list."
+        },
+        {
+          "text": "Move tools between tiers by editing their access level. Sensitive tools — such as those that read private messages or decrypt sensitive data — should be set to Master tier.",
+          "navigate_action": "openConfigToolsAccess",
+          "position": "middle-center",
+          "fallback_text": "On the Tools Access tab, adjust which tier each tool requires."
+        },
+        {
+          "text": "The Tools count in the context bar reflects how many tools are active for the current session tier. Unlock with the master key to activate Master-tier tools.",
+          "glow": "#chat-context-status-tools-seg",
+          "position": "bottom-center"
+        }
+      ]
+    },
+    {
+      "key": "SharePrivacyVisitorAccess",
+      "title": "Share and privacy basics",
+      "description": "Understand visitor scope and sensitive access.",
+      "category": "Troubleshooting",
+      "steps": [
+        {
+          "text": "To manage visitor access, open Configuration and switch to the \"Manage Visitor Keys\" tab.",
+          "glow": ".config-tab-button[data-tab=\"manage-keys\"]",
+          "position": "middle-right",
+          "fallback_text": "Click Configuration in the left sidebar, then choose Manage Visitor Keys.",
+          "navigate_action": "openSettingsManageKeys"
+        },
+        { "text": "Sensitive/private data and some tools may require owner master unlock." },
+        { "text": "If a feature is missing, verify current role and access tier first." }
+      ]
+    },
+    {
+      "key": "LocalAITroubleshooting",
+      "title": "Local AI troubleshooting",
+      "description": "Recover quickly from common Local AI issues.",
+      "category": "Troubleshooting",
+      "steps": [
+        { "text": "If Local AI is unavailable, verify Ollama is running and both models are installed." },
+        { "text": "Re-open AI & Setup and refresh statuses after model downloads complete." },
+        { "text": "If issues persist, use a cloud provider temporarily and retry Local AI later from AI & Setup." }
+      ]
+    },
+    {
+      "key": "ContextWindowTips",
+      "title": "Context window and long conversations",
+      "description": "Keep AI answers accurate across long chat sessions.",
+      "category": "Troubleshooting",
+      "steps": [
+        {
+          "text": "Every AI provider has a context window — a limit on how much text can be in a single conversation. When a chat session grows very long, early messages may be dropped and the AI can lose context.",
+          "position": "middle-center"
+        },
+        {
+          "text": "If you notice the AI forgetting earlier details, start a new chat session. Short, focused conversations generally produce better answers than very long, wide-ranging ones.",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        },
+        {
+          "text": "For factual or reference questions, upload a reference document instead of repeating context in chat. Documents in the system prompt are always present regardless of conversation length.",
+          "glow": "#chat-context-status-refs-seg",
+          "navigate_action": "openReferenceDocuments",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Local AI (Ollama/Gemma4) has a smaller default context window than cloud providers. If Local AI starts giving incoherent answers in long chats, switch to Claude or Gemini for that session.",
+          "glow": "#voice-settings-trigger",
+          "position": "top-center"
+        }
+      ]
+    },
+    {
+      "key": "LLMUsageTracking",
+      "title": "AI usage tracking",
+      "description": "Monitor token usage and costs across AI providers.",
+      "category": "Troubleshooting",
+      "steps": [
+        {
+          "text": "Every AI chat request uses tokens — a measure of text volume. Cloud providers (Claude, Gemini, DeepSeek) charge per token. Local AI (Ollama) is free but uses your CPU/GPU.",
+          "position": "middle-center"
+        },
+        {
+          "text": "Open the Dashboard from the right sidebar to see a summary of your AI usage, including token counts and estimated costs over time.",
+          "glow": "#statistics-sidebar-btn",
+          "navigate_action": "openDashboard",
+          "position": "middle-right"
+        },
+        {
+          "text": "If costs are a concern, switch to DeepSeek (a lower-cost Anthropic-compatible API) or use Local AI for everyday questions and reserve Claude or Gemini for complex tasks.",
+          "glow": "#voice-settings-trigger",
+          "position": "top-center"
+        },
+        {
+          "text": "Very long system prompts (from reference documents included in the system prompt) increase token usage on every request. Only include documents in the system prompt if they are needed for most questions.",
+          "glow": "#chat-context-status-refs-seg",
+          "position": "bottom-center"
+        }
+      ]
+    }
+  ]
+}

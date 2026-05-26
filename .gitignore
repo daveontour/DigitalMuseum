@@ -29,7 +29,10 @@ launch.bat
 .cursor/rules/digital-museum-core.mdc
 .cursor/rules/digital-museum-core.mdc.md
 .vscode/
-data/
+static/data/email_classifications.json
+static/data/email_matches.json
+static/data/exclusions.json
+static/data/identity_and_health.txt
 node_modules/
 electron/node_modules/
 electron/dist/

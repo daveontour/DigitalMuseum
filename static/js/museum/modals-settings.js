@@ -193,7 +193,7 @@ Modals.ReferenceDocuments = (() => {
             if (!DOM.referenceDocumentsList) return;
 
             if (filteredDocuments.length === 0) {
-                DOM.referenceDocumentsList.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666;">No documents found</div>';
+                DOM.referenceDocumentsList.innerHTML = '<div class="reference-documents-empty-state">No documents found</div>';
                 return;
             }
 

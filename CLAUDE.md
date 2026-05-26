@@ -450,7 +450,7 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `key` | string | Unique identifier (e.g. `"GettingStarted"`) |
 | `title` | string | Display name in the guide modal |
 | `description` | string | Subtitle shown under title |
-| `category` | string | Groups topics: `Getting Started`, `Daily Use`, `Setup & Import`, `Troubleshooting` |
+| `category` | string | Groups topics. Built-in order: `Getting Started`, `Daily Use`, `Setup & Import`, `Troubleshooting`. Custom category names are supported and appear alphabetically after the built-in four. |
 | `recommended` | bool | Shown with "Recommended first" badge and sorted to top |
 | `steps` | array | Ordered list of step objects (see below) |
 
@@ -470,8 +470,41 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | Key | What it does |
 |-----|-------------|
 | `showGettingStartedDialog` | Opens the Getting Started overlay dialog |
+| `openSmsMessages` | Clicks the Messages sidebar button |
+| `openEmailGallery` | Clicks the Emails sidebar button |
+| `openImageGallery` | Clicks the Images sidebar button |
+| `openFacebookAlbums` | Clicks the Facebook Albums sidebar button |
+| `openFacebookPosts` | Clicks the Facebook Posts sidebar button |
+| `openMultiSourceSearch` | Clicks the Multi-Source Search (similarity) sidebar button |
+| `openLocations` | Clicks the Locations sidebar button |
+| `openArtefacts` | Clicks the Artefacts sidebar button |
+| `openIdentityProfile` | Clicks the Identity Profile Wizard sidebar button |
 | `openDataImport` | Clicks the Import & Manage Data sidebar button |
-| `openSettingsManageKeys` | Opens Configuration, then switches to the Manage Visitor Keys tab |
+| `openDataImportImport` | Opens Import & Manage Data on the Import tab |
+| `openDataImportMaintenance` | Opens Import & Manage Data on the Maintenance tab |
+| `openDataImportBackgroundJobs` | Opens Import & Manage Data on the Background Jobs tab |
+| `openConfiguration` | Clicks the Configuration sidebar button |
+| `openPreviousResponses` | Clicks the Previous Responses sidebar button |
+| `openSuggestions` | Clicks the Suggestions sidebar button |
+| `openContacts` | Clicks the Contacts and Relationships sidebar button |
+| `openProfiles` | Clicks the Profiles sidebar button |
+| `openSensitiveData` | Clicks the Sensitive Data sidebar button |
+| `openDashboard` | Clicks the Dashboard/Statistics sidebar button |
+| `openHaveAChat` | Clicks the Have-a-Chat sidebar button |
+| `openRandomQuestion` | Clicks the Random Question sidebar button |
+| `openTodaysThing` | Clicks the Today's Thing sidebar button |
+| `openInterviewer` | Clicks the Interviewer sidebar button |
+| `openConfigAppearance` | Opens Configuration on the Appearance/Settings tab |
+| `openConfigApiKeys` | Opens Configuration on the API Keys tab |
+| `openConfigSubjectConfiguration` | Opens Configuration on the Subject Configuration tab |
+| `openConfigRegions` | Opens Configuration on the Regions tab |
+| `openConfigSuggestions` | Opens Configuration on the Suggestions tab |
+| `openConfigGuideTopics` | Opens Configuration on the Guide Topics tab |
+| `openConfigCustomVoices` | Opens Configuration on the Custom Voices tab |
+| `openConfigManageVisitorKeys` | Opens Configuration on the Manage Visitor Keys tab |
+| `openConfigToolsAccess` | Opens Configuration on the Tools Access tab |
+| `openSettingsManageKeys` | Alias for `openConfigManageVisitorKeys` |
+| `openReferenceDocuments` | Clicks the Ref Docs segment in the chat context bar, opening the Reference Documents manager |
 
 To add a new navigation action: (1) add an entry to `Guide.NavActions` in `guide.js`; (2) add the key to the `NAV_ACTIONS` array in `modals-guide-topics-config.js` so it appears in the admin UI dropdown.
 

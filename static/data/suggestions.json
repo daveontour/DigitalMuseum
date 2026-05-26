@@ -1,0 +1,117 @@
+{
+    "_documentation": "Jinja (server): owner, owners, full_name, his, he, him, himself, owner_gender, deployment_nature_local (True/False). Per item optional: action_label, description, requires (array: local_only, facebook), sensitivity (mature), function (must exist on AppActions in app.js). Runtime source is the suggestions SQLite table (Configuration → Suggestions); this file seeds missing rows on startup only.",
+    "categories": [
+        {
+            "category": "Getting started",
+            "suggestions": [
+                {
+                    "title": "Early life overview",
+                    "description": "Uses biography, email, and chat context where available.",
+                    "prompt": "Summarise what the archive suggests about {{owner}}'s early life. Use biography, email, and chat context where relevant.",
+                    "action_label": "Ask in chat"
+                },
+                {
+                    "title": "Life timeline",
+                    "description": "High-level milestones inferred from the archive.",
+                    "prompt": "Outline a concise life timeline for {{owner}} based on dates and events found across email, messages, photos, and other imported material.",
+                    "action_label": "Ask in chat"
+                }
+            ]
+        },
+        {
+            "category": "Relationships & social life",
+            "suggestions": [
+                {
+                    "title": "Important people",
+                    "description": "Neutral summary of relationships and social circle.",
+                    "prompt": "Who appear to be the most important people in {{owner}}'s life in this archive, and in one sentence each why they matter? Ground answers in messages, email, and biography where possible.",
+                    "action_label": "Ask in chat"
+                },
+                {
+                    "title": "Places and chapters",
+                    "description": "Links people to places or periods if the data supports it.",
+                    "prompt": "Describe periods or places where {{owner}}'s social life seems especially active, and name a few recurring contacts. Stay close to evidence in the archive.",
+                    "action_label": "Ask in chat"
+                }
+            ]
+        },
+        {
+            "category": "Stories & creative angles",
+            "suggestions": [
+                {
+                    "title": "Sporting life (creative)",
+                    "description": "Fictionalised but grounded on archive facts.",
+                    "prompt": "Write a short creative sketch (a few paragraphs) about {{owner}} and sport or fitness, grounded in what the archive actually suggests. Label clearly as imaginative where you extrapolate.",
+                    "action_label": "Ask in chat"
+                },
+                {
+                    "title": "Career chapter (creative)",
+                    "description": "Fictionalised but grounded on archive facts.",
+                    "prompt": "Write a short creative sketch (a few paragraphs) about {{owner}}'s career or work life, grounded in emails and chats. Label clearly as imaginative where you extrapolate.",
+                    "action_label": "Ask in chat"
+                },
+                {
+                    "title": "Biography chapter titles",
+                    "description": "Structured outline only.",
+                    "prompt": "Propose ten chapter titles for a biography of {{owner}}, each with one line explaining why that chapter fits the archive.",
+                    "action_label": "Ask in chat"
+                }
+            ]
+        },
+        {
+            "category": "Facebook",
+            "suggestions": [
+                {
+                    "title": "Travel-related post",
+                    "description": "Picks one concrete post if data exists.",
+                    "prompt": "Show details for one travel-related Facebook post by {{owner}}, with date and a short summary of why it matters in context.",
+                    "action_label": "Ask in chat"
+                },
+                {
+                    "title": "Theatre or events post",
+                    "description": "Picks one concrete post if data exists.",
+                    "prompt": "Show details for one theatre- or events-related Facebook post by {{owner}}, with date and summary.",
+                    "action_label": "Ask in chat"
+                },
+                {
+                    "title": "What {{owner}} posts about",
+                    "description": "Thematic summary with examples.",
+                    "prompt": "Summarise the kinds of things {{owner}} posts about on Facebook, with three specific examples drawn from the archive.",
+                    "action_label": "Ask in chat"
+                },
+                {
+                    "title": "Random Messenger thread",
+                    "description": "Summarises one one-to-one chat at random.",
+                    "prompt": "List one-to-one Facebook Messenger chats, pick one at random, and summarise the tone and topics. Quote or paraphrase one representative message.",
+                    "action_label": "Ask in chat"
+                }
+            ]
+        },
+        {
+            "category": "Examples & long-form (optional)",
+            "suggestions": [
+                {
+                    "title": "Imagined conversation",
+                    "description": "Clearly fictional dialogue inspired by archive tone.",
+                    "prompt": "Write a short imagined conversation between {{owner}} and someone important in the archive. Base mannerisms and topics on real messages or email where possible, and state that the dialogue is fictional.",
+                    "action_label": "Ask in chat",
+                    "sensitivity": "mature"
+                },
+                {
+                    "title": "Alternate-history relationship beat",
+                    "description": "Creative 'what if' — still tied to archive facts.",
+                    "prompt": "Write a brief alternate-history vignette about one relationship in {{owner}}'s life that could have gone differently. Ground personality in evidence; label speculation clearly.",
+                    "action_label": "Ask in chat",
+                    "sensitivity": "mature"
+                },
+                {
+                    "title": "Long-form story (tools-heavy)",
+                    "description": "Very long prompt; uses many tools. For advanced use.",
+                    "prompt": "Write a 2000 word third-person story set in a place {{owner}} lived, grounded in {{his}} nature and relationships as shown in the archive. Use tools such as get_all_chat_messages_by_contact(), search_emails_by_content(), and search_emails_by_contact() for context. Include dialogue between several people {{owner}} knows; keep tone consistent with the archive rather than an external author pastiche. Note where you invent linkage between facts.",
+                    "action_label": "Ask in chat",
+                    "sensitivity": "mature"
+                }
+            ]
+        }
+    ]
+}
