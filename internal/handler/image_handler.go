@@ -23,6 +23,7 @@ import (
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/daveontour/aimuseum/internal/appctx"
+	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/importer"
 	"github.com/daveontour/aimuseum/internal/keystore"
 	"github.com/daveontour/aimuseum/internal/model"
@@ -362,6 +363,7 @@ func (h *ImageHandler) GetGPSRegions(w http.ResponseWriter, r *http.Request) {
 	if regions == nil {
 		regions = []model.GPSRegionCount{}
 	}
+	attachRegionLabelsGPS(regions)
 	writeJSON(w, map[string]any{"regions": regions})
 }
 
@@ -376,7 +378,20 @@ func (h *ImageHandler) GetImageRegions(w http.ResponseWriter, r *http.Request) {
 	if regions == nil {
 		regions = []model.ImageRegionCount{}
 	}
+	attachRegionLabelsImages(regions)
 	writeJSON(w, map[string]any{"regions": regions})
+}
+
+func attachRegionLabelsGPS(rows []model.GPSRegionCount) {
+	for i := range rows {
+		rows[i].Label = georegion.Label(rows[i].Region)
+	}
+}
+
+func attachRegionLabelsImages(rows []model.ImageRegionCount) {
+	for i := range rows {
+		rows[i].Label = georegion.Label(rows[i].Region)
+	}
 }
 
 // ── /facebook/places ──────────────────────────────────────────────────────────

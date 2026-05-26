@@ -1241,32 +1241,8 @@ const App = (() => {
             chartEl.innerHTML = html;
         }
 
-        const REGION_NAME_MAP = {
-            aus: 'Australia',
-            dxb: 'Dubai',
-            ireland: 'Ireland',
-            uk: 'United Kingdom',
-            scandinavia: 'Scandinavia',
-            eur: 'Europe',
-            canada: 'Canada',
-            usa: 'USA',
-            af: 'Africa',
-            me: 'Middle East',
-            malaysia: 'Malaysia',
-            indonesia: 'Indonesia',
-            india: 'India',
-            thailand: 'Thailand',
-            asia: 'Asia',
-            central_america: 'Central America',
-            carribean: 'Caribbean',
-            nz: 'New Zealand',
-            south_america: 'South America',
-            oth: 'Other',
-        };
         function regionDisplayName(key) {
-            if (key == null || key === '') return 'Unknown';
-            const k = String(key).toLowerCase().trim();
-            return REGION_NAME_MAP[k] ?? key;
+            return Regions.label(key);
         }
 
         function renderDashboardImagesByRegionChart(data, prefix) {
@@ -5219,6 +5195,10 @@ const App = (() => {
 
         installVisitorFeatureGateCapture();
         Config.init(); // Loads and applies settings, sets up its listeners
+        await Regions.ensureLoaded();
+        if (DOM.imageGalleryLocationFilter) {
+            Regions.populateSelect(DOM.imageGalleryLocationFilter, { allLabel: 'All regions' });
+        }
         initChatStarfield();
         Chat.renderExistingMessages();
         VoiceSelector.init(); // Sets initial voice state, creativity lock, listeners

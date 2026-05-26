@@ -531,33 +531,8 @@ Modals.NewImageGallery = (() => {
         let _isPickMode = false;
         let _pickModeCallback = null;
 
-        const REGION_LABELS = {
-            aus: 'Australia',
-            dxb: 'Dubai',
-            ireland: 'Ireland',
-            uk: 'United Kingdom',
-            scandinavia: 'Scandinavia',
-            eur: 'Europe',
-            canada: 'Canada',
-            usa: 'USA',
-            af: 'Africa',
-            me: 'Middle East',
-            malaysia: 'Malaysia',
-            indonesia: 'Indonesia',
-            india: 'India',
-            thailand: 'Thailand',
-            asia: 'Asia',
-            central_america: 'Central America',
-            carribean: 'Caribbean',
-            nz: 'New Zealand',
-            south_america: 'South America',
-            oth: 'Other',
-        };
-
         function _regionLabel(code) {
-            if (code == null || code === '') return 'Unknown';
-            const k = String(code).toLowerCase().trim();
-            return REGION_LABELS[k] || code;
+            return Regions.label(code);
         }
 
         function formatDate(year, month) {
@@ -2036,7 +2011,9 @@ Modals.ImageDetailModal = (() => {
             }
             
             DOM.newImageDetailSourceReference.textContent = image.source_reference || 'N/A';
-            DOM.newImageDetailRegion.textContent = image.region || 'N/A';
+            DOM.newImageDetailRegion.textContent = (image.region != null && String(image.region).trim() !== '')
+                ? Regions.label(image.region)
+                : 'N/A';
             DOM.newImageDetailAvailableForTask.textContent = image.available_for_task ? 'Yes' : 'No';
             DOM.newImageDetailProcessed.textContent = image.processed ? 'Yes' : 'No';
             DOM.newImageDetailCreatedAt.textContent = formatDateTime(image.created_at);

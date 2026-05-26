@@ -112,12 +112,14 @@ type GPSCountBySource struct {
 // GPSRegionCount is one row in GET /images/gps-regions.
 type GPSRegionCount struct {
 	Region string `json:"region"`
+	Label  string `json:"label,omitempty"`
 	Count  int64  `json:"count"`
 }
 
 // ImageRegionCount is one row in GET /images/regions.
 type ImageRegionCount struct {
 	Region string `json:"region"`
+	Label  string `json:"label,omitempty"`
 	Count  int64  `json:"count"`
 }
 

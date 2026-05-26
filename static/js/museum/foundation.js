@@ -64,6 +64,7 @@ const CONSTANTS = {
         RANDOM_QUESTION: '/chat/generate-random-question',
         NEW_CHAT: '/new',
         SUGGESTIONS_JSON: '/api/suggestions',
+        REGIONS: '/api/regions',
         FB_CHATTERS: '/facebook-chatters/one_to_one',
         CONTACTS: '/getContacts',
         MESSAGES_BY_CONTACT: '/getMessagesByContact',
@@ -98,6 +99,139 @@ const CONSTANTS = {
     RANDOM_QUESTION_PROMPT: "Generate a random question about {{owner}}'s life. It could be about any aspect of his biography, people he's known, travels, work, hobbies, relationships, psychology, interest, anything. The objective is that by answering the question it would provide insight into him or reveal hidden or understated aspects of him or amusing facts. Do not answer the question, just generate it.",
     TODAYS_THING_PROMPT: "{{todays_thing_prompt}}",
 };
+
+const Regions = (() => {
+    let config = typeof window !== 'undefined' ? (window.DM_REGION_CONFIG || null) : null;
+    let labelMap = null;
+    let loadPromise = null;
+
+    function rebuildLabelMap() {
+        labelMap = {};
+        if (!config || !Array.isArray(config.regions)) {
+            return;
+        }
+        config.regions.forEach((row) => {
+            if (!row || row.code == null) return;
+            const code = String(row.code).trim();
+            if (!code) return;
+            labelMap[code.toLowerCase()] = row.label != null ? String(row.label) : code;
+        });
+        if (config.default_region && config.default_label && !labelMap[String(config.default_region).toLowerCase()]) {
+            labelMap[String(config.default_region).toLowerCase()] = String(config.default_label);
+        }
+    }
+
+    function setConfig(next) {
+        config = next || null;
+        labelMap = null;
+    }
+
+    function label(code) {
+        if (code == null || String(code).trim() === '') {
+            return 'Unknown';
+        }
+        if (!labelMap) {
+            rebuildLabelMap();
+        }
+        const k = String(code).toLowerCase().trim();
+        if (labelMap && labelMap[k]) {
+            return labelMap[k];
+        }
+        if (config && config.default_region && k === String(config.default_region).toLowerCase() && config.default_label) {
+            return String(config.default_label);
+        }
+        return String(code);
+    }
+
+    function codesInOrder() {
+        if (!config || !Array.isArray(config.regions)) {
+            return [];
+        }
+        return config.regions
+            .map((row) => (row && row.code != null ? String(row.code).trim() : ''))
+            .filter(Boolean);
+    }
+
+    async function ensureLoaded() {
+        if (config && Array.isArray(config.regions) && config.regions.length > 0) {
+            return config;
+        }
+        if (loadPromise) {
+            return loadPromise;
+        }
+        loadPromise = fetch(CONSTANTS.API_PATHS.REGIONS, { cache: 'no-store', credentials: 'same-origin' })
+            .then((r) => {
+                if (!r.ok) {
+                    throw new Error(`Failed to fetch regions: ${r.status}`);
+                }
+                return r.json();
+            })
+            .then((data) => {
+                setConfig(data);
+                return config;
+            })
+            .catch((err) => {
+                console.warn('Regions config load failed:', err);
+                return config;
+            })
+            .finally(() => {
+                loadPromise = null;
+            });
+        return loadPromise;
+    }
+
+    /**
+     * Populate a select with region options. Preserves leading non-region options already in the select.
+     * @param {HTMLSelectElement} selectEl
+     * @param {{ rows?: Array<{region:string,count?:number}>, allLabel?: string }} opts
+     */
+    function populateSelect(selectEl, opts = {}) {
+        if (!selectEl) return;
+        const rows = opts.rows || codesInOrder().map((code) => ({ region: code }));
+        const preserve = [];
+        for (const opt of selectEl.options) {
+            const v = opt.value;
+            if (v === 'all' || v === 'loc' || v === 'non' || v === '') {
+                preserve.push({ value: v, text: opt.textContent });
+            } else {
+                break;
+            }
+        }
+        const prev = selectEl.value;
+        selectEl.innerHTML = '';
+        if (preserve.length === 0) {
+            const allOpt = document.createElement('option');
+            allOpt.value = '';
+            allOpt.textContent = opts.allLabel || 'All regions';
+            selectEl.appendChild(allOpt);
+        } else {
+            preserve.forEach(({ value, text }) => {
+                const o = document.createElement('option');
+                o.value = value;
+                o.textContent = text;
+                selectEl.appendChild(o);
+            });
+        }
+        rows.forEach((row) => {
+            const code = row && row.region != null ? String(row.region).trim() : '';
+            if (!code) return;
+            const o = document.createElement('option');
+            o.value = code;
+            const count = row.count != null ? Number(row.count) : 0;
+            o.textContent = count > 0
+                ? `${label(code)} (${count.toLocaleString()})`
+                : label(code);
+            selectEl.appendChild(o);
+        });
+        if (prev && Array.from(selectEl.options).some((o) => o.value === prev)) {
+            selectEl.value = prev;
+        }
+    }
+
+    rebuildLabelMap();
+
+    return { label, codesInOrder, ensureLoaded, populateSelect, getConfig: () => config, setConfig };
+})();
 
 // --- DOM Element Cache ---
 const DOM = {

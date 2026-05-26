@@ -13,6 +13,7 @@ import (
 
 	"github.com/daveontour/aimuseum/internal/appctx"
 	"github.com/daveontour/aimuseum/internal/config"
+	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/repository"
 	"github.com/go-chi/chi/v5"
 )
@@ -20,6 +21,7 @@ import (
 // TemplateHandler serves the templated endpoints:
 //   - GET /                              → index.template.html (or non_user_init)
 //   - GET /api/suggestions               → suggestions.json rendered with subject vars
+//   - GET /api/regions                   → regions.json loaded at startup
 //   - GET /static/js/museum/foundation.js
 //   - GET /static/js/museum/modals-people.js
 type TemplateHandler struct {
@@ -57,6 +59,7 @@ func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, userRepo *rep
 func (h *TemplateHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/", h.GetRoot)
 	r.Get("/api/suggestions", h.GetSuggestions)
+	r.Get("/api/regions", h.GetRegions)
 	r.Get("/static/js/museum/foundation.js", h.GetFoundationJS)
 	r.Get("/static/js/museum/modals-people.js", h.GetModalsPeopleJS)
 	r.Get("/login", h.GetLogin)
@@ -166,6 +169,12 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 	} else {
 		extras["static_modals_comms_js_cache_bust"] = "0"
 	}
+	regionsJSON, err := json.Marshal(georegion.Default().ConfigJSON())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error encoding regions config: %s", err))
+		return
+	}
+	extras["regions_config_json"] = string(regionsJSON)
 	// Non-local deployments hide server filesystem path import tiles; local shows them.
 	if h.deploymentNatureLocal {
 		extras["deployment_nature_body_class"] = ""
@@ -181,6 +190,13 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	_, _ = w.Write([]byte(rendered))
+}
+
+// GetRegions handles GET /api/regions — returns the regions config loaded at startup.
+func (h *TemplateHandler) GetRegions(w http.ResponseWriter, r *http.Request) {
+	cfg := georegion.Default().ConfigJSON()
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, cfg)
 }
 
 // GetSuggestions handles GET /api/suggestions.

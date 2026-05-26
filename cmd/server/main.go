@@ -17,6 +17,7 @@ import (
 	"github.com/daveontour/aimuseum/internal/api/router"
 	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/database"
+	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/repository"
 )
 
@@ -88,6 +89,10 @@ func run() error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
+	}
+
+	if err := georegion.Load(cfg.App.RegionsConfigFile()); err != nil {
+		return fmt.Errorf("load regions config: %w", err)
 	}
 
 	// ── Database ───────────────────────────────────────────────────────────────

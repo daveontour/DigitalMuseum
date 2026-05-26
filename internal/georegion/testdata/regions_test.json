@@ -1,0 +1,25 @@
+{
+  "default_region": "oth",
+  "default_label": "Other",
+  "regions": [
+    { "code": "aus", "label": "Australia", "bbox": [110, -44, 152, -10] },
+    { "code": "dxb", "label": "Dubai", "bbox": [54, 24, 56, 26] },
+    { "code": "ireland", "label": "Ireland", "bbox": [-10.66, 51.38, -5.41, 55.43] },
+    { "code": "uk", "label": "United Kingdom", "bbox": [-8.63, 49.86, 1.76, 60.86] },
+    { "code": "scandinavia", "label": "Scandinavia", "bbox": [4.64, 54.56, 31.06, 71.19] },
+    { "code": "eur", "label": "Europe", "bbox": [-10, 35, 30, 70] },
+    { "code": "canada", "label": "Canada", "bbox": [-141.0, 41.9, -55.63, 71.96] },
+    { "code": "usa", "label": "USA", "bbox": [-128, 20, -65, 50] },
+    { "code": "af", "label": "Africa", "bbox": [-20, -40, 50, 35] },
+    { "code": "me", "label": "Middle East", "bbox": [30, 10, 60, 40] },
+    { "code": "malaysia", "label": "Malaysia", "bbox": [99.64, 0.85, 119.26, 7.36] },
+    { "code": "indonesia", "label": "Indonesia", "bbox": [95.01, -11.0, 141.01, 6.07] },
+    { "code": "india", "label": "India", "bbox": [68.11, 6.74, 97.41, 35.5] },
+    { "code": "thailand", "label": "Thailand", "bbox": [97.34, 5.61, 105.63, 20.46] },
+    { "code": "asia", "label": "Asia", "bbox": [68, -12, 152, 54] },
+    { "code": "central_america", "label": "Central America", "bbox": [-116, 9, -76, 26] },
+    { "code": "carribean", "label": "Caribbean", "bbox": [-85, 12, -58, 25] },
+    { "code": "nz", "label": "New Zealand", "bbox": [163, -47, 179, -34] },
+    { "code": "south_america", "label": "South America", "bbox": [-99, -56, -26, 12] }
+  ]
+}

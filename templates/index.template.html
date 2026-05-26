@@ -1518,7 +1518,7 @@
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="gps_images">—</span>
                                     </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Recompute world region codes for all images that have GPS coordinates, using the current region bounding boxes. Entries shows GPS-tagged images. Safe to run after region definitions change.</p></div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Recompute world region codes for all images that have GPS coordinates, using the bounding boxes in <code>static/data/regions.json</code>. Entries shows GPS-tagged images. After editing region definitions, restart the server and run this job to refresh stored values.</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
@@ -2352,26 +2352,6 @@
                                                 <option value="all" selected>All Locations</option>
                                                 <option value="loc">GPS Data</option>
                                                 <option value="non">No GPS Data</option>
-                                                <option value="aus">Australia</option>
-                                                <option value="dxb">Dubai</option>
-                                                <option value="ireland">Ireland</option>
-                                                <option value="uk">United Kingdom</option>
-                                                <option value="scandinavia">Scandinavia</option>
-                                                <option value="eur">Europe</option>
-                                                <option value="canada">Canada</option>
-                                                <option value="usa">USA</option>
-                                                <option value="af">Africa</option>
-                                                <option value="me">Middle East</option>
-                                                <option value="malaysia">Malaysia</option>
-                                                <option value="indonesia">Indonesia</option>
-                                                <option value="india">India</option>
-                                                <option value="thailand">Thailand</option>
-                                                <option value="asia">Asia</option>
-                                                <option value="central_america">Central America</option>
-                                                <option value="carribean">Caribbean</option>
-                                                <option value="nz">New Zealand</option>
-                                                <option value="south_america">South America</option>
-                                                <option value="oth">Other</option>
                                             </select>
                                             <select id="image-gallery-source-filter" style="border-radius: 4px; border: 1px solid #bfc9da; padding: 0.3em; font-size: var(--text-md);">
                                                 <option value="" selected>All sources</option>
@@ -3847,6 +3827,7 @@
 
     </div>
 
+    <script>window.DM_REGION_CONFIG = {{ regions_config_json }};</script>
     <script src="/static/js/museum/foundation.js" defer></script>
     <script src="/static/js/museum/app-dialogs.js" defer></script>
     <script src="/static/js/museum/chat.js" defer></script>

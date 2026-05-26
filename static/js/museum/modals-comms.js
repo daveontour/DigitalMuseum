@@ -37,36 +37,11 @@ Modals.Locations = (() => {
         const SHUFFLE_MARKER_LIMIT = 500;
         const DEFAULT_MARKER_LIMIT = 1000;
 
-        const REGION_LABELS = {
-            aus: 'Australia',
-            dxb: 'Dubai',
-            ireland: 'Ireland',
-            uk: 'United Kingdom',
-            scandinavia: 'Scandinavia',
-            eur: 'Europe',
-            canada: 'Canada',
-            usa: 'USA',
-            af: 'Africa',
-            me: 'Middle East',
-            malaysia: 'Malaysia',
-            indonesia: 'Indonesia',
-            india: 'India',
-            thailand: 'Thailand',
-            asia: 'Asia',
-            central_america: 'Central America',
-            carribean: 'Caribbean',
-            nz: 'New Zealand',
-            south_america: 'South America',
-            oth: 'Other',
-        };
-
         let selectedRegion = '';
         let regionSelectorBound = false;
 
         function _regionLabel(code) {
-            if (code == null || code === '') return 'Unknown';
-            const k = String(code).toLowerCase().trim();
-            return REGION_LABELS[k] || code;
+            return Regions.label(code);
         }
 
         function _isRegionFilterActive() {
@@ -172,7 +147,7 @@ Modals.Locations = (() => {
                 regions = await _fetchGPSRegions();
             } catch (error) {
                 console.error('Error loading GPS regions for map filter:', error);
-                regions = Object.keys(REGION_LABELS).map(code => ({ region: code, count: 0 }));
+                regions = Regions.codesInOrder().map(code => ({ region: code, count: 0 }));
             }
 
             const sel = _getRegionSelectEl();
