@@ -4857,6 +4857,28 @@
         </div>
     </div>
 
+    <!-- ===== NEW ARTEFACT PROMPT MODAL ===== -->
+    <div id="artefact-new-modal" class="modal" style="display: none; z-index: 4100;">
+        <div class="modal-content confirmation-modal-content artefact-new-modal-content" onclick="event.stopPropagation()">
+            <div class="confirmation-modal-header">
+                <h2><i class="fas fa-box-open"></i> New Artefact</h2>
+                <button type="button" class="modal-close-btn" id="close-artefact-new-modal" aria-label="Close">&times;</button>
+            </div>
+            <form id="artefact-new-form" class="confirmation-modal-body">
+                <p style="color: var(--color-text-muted); margin: 0 0 12px; font-size: var(--text-md);">Enter a name and short description. You can add tags, story, and attachments after the artefact is created.</p>
+                <div id="artefact-new-error" style="display: none; color: var(--color-danger); margin-bottom: 10px; font-size: var(--text-md);"></div>
+                <label for="artefact-new-name" class="artefact-field-label">Name <span style="color: var(--color-danger);">*</span></label>
+                <input type="text" id="artefact-new-name" class="form-control" placeholder="Artefact name" autocomplete="off" required>
+                <label for="artefact-new-description" class="artefact-field-label" style="margin-top: 12px;">Description</label>
+                <textarea id="artefact-new-description" class="form-control artefact-description-textarea" rows="3" placeholder="Short description"></textarea>
+            </form>
+            <div class="confirmation-modal-buttons">
+                <button type="button" id="artefact-new-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
+                <button type="submit" form="artefact-new-form" id="artefact-new-create-btn" class="modal-btn modal-btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== ARTEFACTS GALLERY MODAL ===== -->
     <div id="artefacts-modal" class="modal">
         <div class="modal-content artefacts-modal-content">
@@ -4868,7 +4890,7 @@
 
             </div>
             <div class="artefacts-body-actions" style="margin-bottom: 20px;">
-                <span style="font-size: var(--text-base); color: #555; margin-right: auto; text-align: left;">Artefacts can be a single digital file or a collection of digital files that you can attach a story, recollection  or description to.</span>
+                <span style="font-size: var(--text-base); color: var(--color-text-muted); margin-right: auto; text-align: left;">Artefacts can be a single digital file or a collection of digital files that you can attach a story, recollection  or description to.</span>
                 <button id="artefacts-export-btn" class="modal-btn modal-btn-secondary" title="Download all artefacts as JSON">
                     <i class="fas fa-upload"></i> Export
                 </button>
@@ -4900,31 +4922,33 @@
                     <div class="artefact-photos-panel">
                         <h3 class="artefact-attachments-heading">Attachments</h3>
                         <div id="artefact-photos-strip" class="artefact-photos-strip"></div>
-                        <div class="artefact-photo-actions">
-                            <button id="artefact-add-photo-file-btn" class="modal-btn modal-btn-secondary" style="width:100%;">
-                                <i class="fas fa-file-import"></i> Import File
-                            </button>
-                            <input id="artefact-photo-file-input" type="file" accept="image/*,.pdf,.txt,.md,.markdown,application/pdf,text/plain,text/markdown" style="display:none"/>
-                            <button id="artefact-add-photo-gallery-btn" class="modal-btn modal-btn-secondary" style="width:100%;">
-                                <i class="fas fa-images"></i> Choose from Gallery
-                            </button>
-                        </div>
                     </div>
                     <!-- RIGHT: Details panel -->
                     <div class="artefact-detail-fields">
                         <label class="artefact-field-label">Name</label>
-                        <input id="artefact-detail-name" class="new-image-gallery-input" placeholder="Artefact name"/>
+                        <input id="artefact-detail-name" class="form-control" placeholder="Artefact name"/>
                         <label class="artefact-field-label">Description</label>
-                        <textarea id="artefact-detail-description" class="artefact-description-textarea" placeholder="Short description"></textarea>
+                        <textarea id="artefact-detail-description" class="form-control artefact-description-textarea" placeholder="Short description"></textarea>
                         <label class="artefact-field-label">Tags <span style="font-weight:normal; color:var(--color-text-muted);">(comma-separated)</span></label>
-                        <input id="artefact-detail-tags" class="new-image-gallery-input" placeholder="e.g. childhood, family, 1970s" list="artefact-tags-list"/>
+                        <input id="artefact-detail-tags" class="form-control" placeholder="e.g. childhood, family, 1970s" list="artefact-tags-list"/>
                         <datalist id="artefact-tags-list"></datalist>
                         <label class="artefact-field-label">Story</label>
-                        <textarea id="artefact-detail-story" class="artefact-story-textarea" placeholder="Tell the story behind this artefact..."></textarea>
-                        <div class="artefact-detail-actions">
-                            <button id="artefact-save-btn" class="modal-btn modal-btn-primary">Save</button>
-                            <button id="artefact-delete-btn" class="modal-btn modal-btn-danger" style="display:none;">Delete</button>
-                        </div>
+                        <textarea id="artefact-detail-story" class="form-control artefact-story-textarea" placeholder="Tell the story behind this artefact..."></textarea>
+                    </div>
+                </div>
+                <div class="artefact-detail-footer">
+                    <div class="artefact-photo-actions">
+                        <button id="artefact-add-photo-file-btn" class="modal-btn modal-btn-secondary">
+                            <i class="fas fa-file-import"></i> Import File
+                        </button>
+                        <input id="artefact-photo-file-input" type="file" accept="image/*,.pdf,.txt,.md,.markdown,application/pdf,text/plain,text/markdown" style="display:none"/>
+                        <button id="artefact-add-photo-gallery-btn" class="modal-btn modal-btn-secondary">
+                            <i class="fas fa-images"></i> Choose from Gallery
+                        </button>
+                    </div>
+                    <div class="artefact-detail-actions">
+                        <button id="artefact-save-btn" class="modal-btn modal-btn-primary">Save</button>
+                        <button id="artefact-delete-btn" class="modal-btn modal-btn-danger" style="display:none;">Delete</button>
                     </div>
                 </div>
             </div>

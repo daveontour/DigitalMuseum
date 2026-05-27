@@ -829,12 +829,18 @@ Modals.NewImageGallery = (() => {
                 if (!banner) {
                     banner = document.createElement('div');
                     banner.className = 'pick-mode-banner';
-                    banner.textContent = '📌 Select an image to add it to the artefact';
-                    const content = modal.querySelector('.new-image-gallery-modal-body') || modal.querySelector('.modal-content');
-                    if (content) content.insertBefore(banner, content.firstChild);
+                    banner.setAttribute('role', 'status');
+                    banner.innerHTML = '<span><i class="fas fa-info-circle" aria-hidden="true"></i> Select an image to add it to the artefact</span>';
+                    const body = modal.querySelector('.new-image-gallery-modal-body');
+                    const content = modal.querySelector('.new-image-gallery-modal-content');
+                    if (body && content) {
+                        content.insertBefore(banner, body);
+                    } else if (content) {
+                        content.appendChild(banner);
+                    }
                 }
-            } else {
-                if (banner) banner.remove();
+            } else if (banner) {
+                banner.remove();
             }
         }
 

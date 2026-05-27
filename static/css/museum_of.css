@@ -8108,6 +8108,35 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     outline-offset: 2px;
 }
 
+/* Pick mode — horizontal banner below gallery header (artefact "Choose from Gallery") */
+.pick-mode-banner {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: rgba(251, 191, 36, 0.12);
+    border-bottom: 1px solid rgba(251, 191, 36, 0.35);
+    color: var(--color-warning);
+    font-size: 0.95rem;
+    font-weight: 500;
+    box-sizing: border-box;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+.pick-mode-banner span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pick-mode-banner span i {
+    font-size: 1.1em;
+    opacity: 0.9;
+}
+
 /* Sidebar — search + bulk actions, fixed 25% width */
 .new-image-gallery-sidebar {
     width: 25%;
@@ -11291,9 +11320,33 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
    ARTEFACTS GALLERY
    ======================================================================== */
 
+.artefact-new-modal-content {
+    max-width: 480px;
+    width: min(480px, 92vw);
+}
+
+.artefact-new-modal-content .confirmation-modal-body {
+    text-align: left;
+}
+
+.artefact-new-modal-content .artefact-field-label {
+    display: block;
+    text-align: left;
+}
+
+.artefact-new-modal-content .form-control {
+    width: 100%;
+}
+
+.artefact-new-modal-content textarea.form-control {
+    resize: vertical;
+    min-height: 70px;
+    line-height: var(--line-height-body);
+}
+
 .artefacts-modal-content {
-    max-width: 95vw;
-    width: 90%;
+    max-width: 80vw;
+    width: 80%;
     max-height: 85vh;
     height: 85vh;
     display: flex;
@@ -11615,12 +11668,34 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 .artefact-photo-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(9.5rem, 1fr));
+    gap: 8px;
     flex-shrink: 0;
-    margin-top: auto;
-    padding-top: 4px;
+}
+
+.artefact-photo-actions .modal-btn {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.artefact-detail-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.artefact-detail-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+    justify-content: flex-end;
+    margin-left: auto;
 }
 
 .artefact-doc-thumb-view {
@@ -11745,17 +11820,13 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     margin-bottom: 2px;
 }
 
-.artefact-detail-fields textarea {
+.artefact-detail-fields .form-control {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--color-border-input);
-    background: var(--color-bg-surface);
-    color: var(--color-text);
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-family: inherit;
+}
+
+.artefact-detail-fields textarea.form-control {
     resize: vertical;
-    box-sizing: border-box;
+    line-height: var(--line-height-body);
 }
 
 .artefact-description-textarea {
@@ -11765,13 +11836,6 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 .artefact-story-textarea {
     min-height: 140px;
     resize: vertical;
-}
-
-.artefact-detail-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 8px;
-    flex-shrink: 0;
 }
 
 /* Empty state */
@@ -11787,18 +11851,6 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     display: block;
     margin-bottom: 12px;
     color: var(--color-text-light);
-}
-
-/* Pick-mode banner shown at top of image gallery */
-.pick-mode-banner {
-    background: #4a90e2;
-    color: #fff;
-    text-align: center;
-    padding: 10px 16px;
-    font-weight: 600;
-    border-radius: 6px;
-    margin-bottom: 10px;
-    flex-shrink: 0;
 }
 
 @media (max-width: 640px) {

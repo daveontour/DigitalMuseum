@@ -466,7 +466,7 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `glow` | string | CSS selector of element to highlight with a pulsing outline |
 | `position` | string | Dialog position: `middle-center` (default), `top-left/center/right`, `middle-left/right`, `bottom-left/center/right` |
 | `navigate_action` | string | One or more named action keys, separated by `;` — see Navigation actions below. Actions run in order; pause keys block until elapsed. |
-| `image` | string | Optional image URL displayed below the step text |
+| `image_url` | string | Optional image URL displayed below the step instruction text |
 
 **Navigation actions** — defined in the `NavActions` dictionary in [`static/js/museum/guide.js`](static/js/museum/guide.js). Steps call `Guide._runNavActions()`, which splits `navigate_action` on `;`, trims each part, and runs matching handlers **sequentially** (awaiting promises from pause actions). After the chain completes, the step dialog appears following a short DOM settle delay.
 

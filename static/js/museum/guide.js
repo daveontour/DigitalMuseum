@@ -371,8 +371,9 @@ const Guide = {
             if (progressEl) progressEl.textContent = topicConfig.title 
 
             if (imgEl) {
-                if (step.image) {
-                    imgEl.src = step.image;
+                const imageUrl = step.image_url || step.imageUrl || step.image || '';
+                if (imageUrl) {
+                    imgEl.src = imageUrl;
                     imgEl.style.display = 'block';
                 } else {
                     imgEl.src = '';

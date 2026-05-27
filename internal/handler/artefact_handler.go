@@ -152,24 +152,9 @@ func (h *ArtefactHandler) Import(w http.ResponseWriter, r *http.Request) {
 	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
 		return
 	}
-	raw, err := io.ReadAll(r.Body)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "could not read request body")
+	raw, ok := readArtefactImportPayload(w, r)
+	if !ok {
 		return
-	}
-	// Support multipart/form-data (file upload) or raw JSON body
-	if ct := r.Header.Get("Content-Type"); strings.HasPrefix(ct, "multipart/form-data") {
-		if err2 := r.ParseMultipartForm(32 << 20); err2 == nil {
-			f, _, ferr := r.FormFile("file")
-			if ferr == nil {
-				raw, err = io.ReadAll(f)
-				f.Close()
-				if err != nil {
-					writeError(w, http.StatusBadRequest, "could not read uploaded file")
-					return
-				}
-			}
-		}
 	}
 
 	var data map[string]any
@@ -527,4 +512,33 @@ func parseMediaItemID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func readArtefactImportPayload(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	const maxUpload = 32 << 20
+	ct := r.Header.Get("Content-Type")
+	if strings.HasPrefix(ct, "multipart/form-data") {
+		if err := r.ParseMultipartForm(maxUpload); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid multipart form")
+			return nil, false
+		}
+		f, _, err := r.FormFile("file")
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "file is required")
+			return nil, false
+		}
+		defer f.Close()
+		raw, err := io.ReadAll(io.LimitReader(f, maxUpload))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "could not read uploaded file")
+			return nil, false
+		}
+		return raw, true
+	}
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxUpload))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "could not read request body")
+		return nil, false
+	}
+	return raw, true
 }

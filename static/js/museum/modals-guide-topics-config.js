@@ -205,7 +205,7 @@ Modals.GuideTopicsConfig = (() => {
                 </div>
                 <div class="setting-group" style="margin-bottom:0;">
                     <label class="artefact-field-label">Image URL (optional)</label>
-                    <input type="text" class="form-control guide-step-image" data-index="${index}" value="${escapeHtml(step.image || '')}" placeholder="/static/images/…">
+                    <input type="text" class="form-control guide-step-image-url" data-index="${index}" value="${escapeHtml(step.image_url || step.imageUrl || step.image || '')}" placeholder="/static/images/…">
                 </div>
             </div>
         `;
@@ -237,12 +237,12 @@ Modals.GuideTopicsConfig = (() => {
             const glow = container.querySelector(`.guide-step-glow[data-index="${index}"]`);
             const position = container.querySelector(`.guide-step-position[data-index="${index}"]`);
             const nav = container.querySelector(`.guide-step-nav[data-index="${index}"]`);
-            const image = container.querySelector(`.guide-step-image[data-index="${index}"]`);
+            const imageUrl = container.querySelector(`.guide-step-image-url[data-index="${index}"]`);
             if (text) step.text = text.value;
             if (glow) step.glow = glow.value;
             if (position) step.position = position.value;
             if (nav) step.navigate_action = nav.value;
-            if (image) step.image = image.value;
+            if (imageUrl) step.image_url = imageUrl.value;
         });
     }
 
@@ -254,7 +254,7 @@ Modals.GuideTopicsConfig = (() => {
             if ((step.glow || '').trim()) s.glow = step.glow.trim();
             if (step.position && step.position !== 'middle-center') s.position = step.position;
             if ((step.navigate_action || '').trim()) s.navigate_action = step.navigate_action.trim();
-            if ((step.image || '').trim()) s.image = step.image.trim();
+            if ((step.image_url || '').trim()) s.image_url = step.image_url.trim();
             return s;
         });
     }
@@ -527,7 +527,7 @@ Modals.GuideTopicsConfig = (() => {
         if (addStepBtn) {
             addStepBtn.addEventListener('click', () => {
                 syncStepsFromDOM();
-                editingSteps.push({ text: '', glow: '', position: 'middle-center', navigate_action: '', image: '' });
+                editingSteps.push({ text: '', glow: '', position: 'middle-center', navigate_action: '', image_url: '' });
                 renderStepsList();
             });
         }

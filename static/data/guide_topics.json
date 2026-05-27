@@ -31,9 +31,12 @@
       "title": "Archive selection at sign-in",
       "description": "Choose the right user archive before entering password.",
       "category": "Getting Started",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
-          "text": "On the login screen, the selected user determines which archive database is active."
+          "text": "On the login screen, the selected user determines which archive database is active.",
+          "image_url": "/static/images/test.png"
         },
         {
           "text": "If multiple users exist, confirm the selected name before signing in."

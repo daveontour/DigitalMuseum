@@ -133,25 +133,93 @@ Modals.Artefacts = (() => {
         _showDetailModal();
     }
 
-    function _openCreate() {
-        currentArtefact = null;
-        isCreating = true;
-        // Clear fields
-        _setField('artefact-detail-name', '');
-        _setField('artefact-detail-description', '');
-        _setField('artefact-detail-tags', '');
-        _setField('artefact-detail-story', '');
-        const titleBar = document.getElementById('artefact-detail-title-text');
-        if (titleBar) titleBar.textContent = 'New Artefact';
-        const strip = document.getElementById('artefact-photos-strip');
-        if (strip) strip.innerHTML = '';
-        const saveBtn = document.getElementById('artefact-save-btn');
-        if (saveBtn) saveBtn.textContent = 'Create';
-        const deleteBtn = document.getElementById('artefact-delete-btn');
-        if (deleteBtn) deleteBtn.style.display = 'none';
-        // Disable photo buttons until artefact is saved
-        _setPhotoButtonsEnabled(false);
-        _showDetailModal();
+    function _openNewArtefactDialog() {
+        const modal = document.getElementById('artefact-new-modal');
+        const nameInput = document.getElementById('artefact-new-name');
+        const descInput = document.getElementById('artefact-new-description');
+        const errEl = document.getElementById('artefact-new-error');
+        if (nameInput) nameInput.value = '';
+        if (descInput) descInput.value = '';
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
+        if (modal) modal.style.display = 'flex';
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.select();
+        }
+    }
+
+    function _closeNewArtefactDialog() {
+        const modal = document.getElementById('artefact-new-modal');
+        if (modal) modal.style.display = 'none';
+        const errEl = document.getElementById('artefact-new-error');
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
+    }
+
+    function _showNewArtefactError(message) {
+        const errEl = document.getElementById('artefact-new-error');
+        if (!errEl) return;
+        errEl.textContent = message;
+        errEl.style.display = 'block';
+    }
+
+    async function _createAndOpenArtefact(name, description) {
+        const payload = {
+            name,
+            description: description || null,
+            tags: null,
+            story: null,
+        };
+        try {
+            const resp = await fetch('/artefacts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || 'Create failed');
+            }
+            const saved = await resp.json();
+            _closeNewArtefactDialog();
+            currentArtefact = saved;
+            isCreating = false;
+            _populateDetailModal(saved);
+            _showDetailModal();
+            _loadArtefacts();
+        } catch (err) {
+            console.error('Error creating artefact:', err);
+            _showNewArtefactError(err.message || 'Could not create artefact.');
+        }
+    }
+
+    async function _handleNewArtefactSubmit(e) {
+        if (e) e.preventDefault();
+        const name = (document.getElementById('artefact-new-name')?.value || '').trim();
+        const description = (document.getElementById('artefact-new-description')?.value || '').trim();
+        const createBtn = document.getElementById('artefact-new-create-btn');
+        if (!name) {
+            _showNewArtefactError('Please enter an artefact name.');
+            document.getElementById('artefact-new-name')?.focus();
+            return;
+        }
+        if (createBtn) {
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creating…';
+        }
+        try {
+            await _createAndOpenArtefact(name, description);
+        } finally {
+            if (createBtn) {
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create';
+            }
+        }
     }
 
     function _populateDetailModal(artefact) {
@@ -669,7 +737,23 @@ Modals.Artefacts = (() => {
 
         // New artefact button
         const newBtn = document.getElementById('artefacts-new-btn');
-        if (newBtn) newBtn.addEventListener('click', _openCreate);
+        if (newBtn) newBtn.addEventListener('click', _openNewArtefactDialog);
+
+        const newForm = document.getElementById('artefact-new-form');
+        if (newForm) newForm.addEventListener('submit', _handleNewArtefactSubmit);
+
+        const newCancelBtn = document.getElementById('artefact-new-cancel-btn');
+        if (newCancelBtn) newCancelBtn.addEventListener('click', _closeNewArtefactDialog);
+
+        const closeNewBtn = document.getElementById('close-artefact-new-modal');
+        if (closeNewBtn) closeNewBtn.addEventListener('click', _closeNewArtefactDialog);
+
+        const newModal = document.getElementById('artefact-new-modal');
+        if (newModal) {
+            newModal.addEventListener('click', e => {
+                if (e.target === newModal) _closeNewArtefactDialog();
+            });
+        }
 
         // Detail modal close
         const closeDetailBtn = document.getElementById('close-artefact-detail');
