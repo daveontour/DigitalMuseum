@@ -129,6 +129,8 @@ const Guide = {
         openRandomQuestion: () => Guide._clickSidebarButton('random-question-sidebar-btn'),
         openTodaysThing: () => Guide._clickSidebarButton('todays-thing-sidebar-btn'),
         openInterviewer: () => Guide._clickSidebarButton('interviewer-sidebar-btn'),
+        // Top bar — personality / voice
+        openPersonalitySettings: () => Guide._clickSidebarButton('voice-settings-trigger'),
         // Configuration — tabs
         openConfigAppearance: () => Guide._openConfigurationTab('settings'),
         openConfigApiKeys: () => Guide._openConfigurationTab('api-keys'),
@@ -143,6 +145,7 @@ const Guide = {
         openSettingsManageKeys: () => Guide._openConfigurationTab('manage-keys'),
         // Chat area
         openReferenceDocuments: () => document.getElementById('chat-context-status-refs-seg')?.click(),
+        openToolCallsDialog: () => document.getElementById('chat-context-last-toolcalls-seg')?.click(),
     },
 
     topicAliases: {
@@ -277,7 +280,29 @@ const Guide = {
         if (closeBtn) closeBtn.onclick = close;
     },
 
-    _closeExplanation() {
+    _getTopicDismissNavAction(topicKey) {
+        if (!topicKey) return '';
+        const topics = this._topics || {};
+        const topicConfig = topics[topicKey];
+        if (!topicConfig) return '';
+        return topicConfig.dismiss_navigate_action || topicConfig.dismissNavigateAction || '';
+    },
+
+    _getTopicQAStatus(topic) {
+        if (!topic) return '';
+        const raw = topic.QA !== undefined ? topic.QA : topic.qa;
+        if (raw === true) return 'OK';
+        const value = String(raw).trim().toUpperCase();
+        if (value === 'OK') return 'OK';
+        if (value === 'TEST') return 'TEST';
+        return '';
+    },
+
+    _closeExplanation(options) {
+        const opts = options || {};
+        const topicKey = this._currentTopic;
+        const dismissAction = opts.skipDismissAction ? '' : this._getTopicDismissNavAction(topicKey);
+
         const gsOverlay  = document.getElementById('getting-started-overlay');
         const gsDialog   = document.getElementById('getting-started-dialog');
         if (gsOverlay)  { gsOverlay.style.display = 'none'; gsOverlay.onclick = null; }
@@ -304,6 +329,10 @@ const Guide = {
         this._currentStep  = 0;
         this._unbindEscape();
         this._restoreFocus();
+
+        if (dismissAction) {
+            void this._runNavActions(dismissAction);
+        }
     },
 
     _showStep(stepIndex) {
@@ -328,22 +357,18 @@ const Guide = {
         this._currentStep = stepIndex;
 
         // Support both camelCase (JS) and snake_case (DB-stored JSON) step fields.
-        const glowSel     = step.glow || '';
-        const fallbackTxt = step.fallback_text || step.fallbackText || '';
-        const navAction   = step.navigate_action || step.navigateAction || '';
-        const position    = step.position || 'middle-center';
+        const glowSel   = step.glow || '';
+        const navAction = step.navigate_action || step.navigateAction || '';
+        const position  = step.position || 'middle-center';
 
         const applyGlowAndShow = () => {
             this._clearGlows();
-            const glowOk = this._applyGlow(glowSel);
+            this._applyGlow(glowSel);
 
             textEl.textContent = step.text || '';
-            if (glowSel && !glowOk && fallbackTxt) {
-                textEl.textContent += '\n\n' + fallbackTxt;
-            } else if (glowSel && !glowOk) {
-                textEl.textContent += '\n\nOpen the related section first, then continue this guide step.';
-            }
-            if (progressEl) progressEl.textContent = topicConfig.title + ' — Step ' + (stepIndex + 1) + ' of ' + steps.length;
+             
+            //if (progressEl) progressEl.textContent = topicConfig.title + ' — Step ' + (stepIndex + 1) + ' of ' + steps.length;
+            if (progressEl) progressEl.textContent = topicConfig.title 
 
             if (imgEl) {
                 if (step.image) {
@@ -443,7 +468,8 @@ const Guide = {
                 key: key,
                 title: t.title || key,
                 description: t.description || '',
-                recommended: !!t.recommended
+                recommended: !!t.recommended,
+                qaStatus: this._getTopicQAStatus(t),
             });
         });
         Object.keys(byCategory).forEach((categoryKey) => {
@@ -466,8 +492,11 @@ const Guide = {
                 '<h3 class="guide-topic-group-title">' + category + '</h3>' +
                 '<ul class="guide-topic-group-list">';
             items.forEach((t) => {
+                let qaClass = '';
+                if (t.qaStatus === 'OK') qaClass = ' guide-topic-btn--qa-ok';
+                else if (t.qaStatus === 'TEST') qaClass = ' guide-topic-btn--qa-test';
                 html += '<li class="guide-topic-item">' +
-                    '<button type="button" class="guide-topic-btn" data-topic="' + t.key.replace(/"/g, '&quot;') + '">' +
+                    '<button type="button" class="guide-topic-btn' + qaClass + '" data-topic="' + t.key.replace(/"/g, '&quot;') + '">' +
                     '<span class="guide-topic-btn-title" style="display:block;">' + t.title + (t.recommended ? ' <span class="guide-topic-badge">Recommended first</span>' : '') + '</span>' +
                     '<span class="guide-topic-btn-desc" style="display:block;margin-top:4px;">' + t.description + '</span>' +
                     '</button></li>';

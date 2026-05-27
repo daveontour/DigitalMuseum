@@ -86,8 +86,9 @@ type AppConfig struct {
 	AssetStaticDir       string // path to Python static directory (JS/data files for templating)
 	RegionsConfigPath    string // optional override; default is AssetStaticDir/data/regions.json
 	SuggestionsConfigPath  string // optional override; default is AssetStaticDir/data/suggestions.json
-	GuideTopicsConfigPath  string // optional override; default is AssetStaticDir/data/guide_topics.json
-	DeploymentNature      string // "local" = show filesystem path import tiles; unset/other = hide them
+	GuideTopicsConfigPath            string // optional override; default is AssetStaticDir/data/guide_topics.json
+	GuideTopicsReloadFromFileOnStartup bool // GUIDE_TOPICS_RELOAD_FROM_FILE_ON_STARTUP=true replaces DB rows from seed file on startup
+	DeploymentNature                 string // "local" = show filesystem path import tiles; unset/other = hide them
 }
 
 // RegionsConfigFile returns the path to regions.json (REGIONS_CONFIG_PATH or AssetStaticDir/data/regions.json).
@@ -252,9 +253,10 @@ func Load() (*Config, error) {
 			TemplatesDir:      getenv("TEMPLATES_DIR", "../src/api/templates"),
 			AssetStaticDir:    getenv("ASSET_STATIC_DIR", "../src/api/static"),
 			RegionsConfigPath:     os.Getenv("REGIONS_CONFIG_PATH"),
-			SuggestionsConfigPath: os.Getenv("SUGGESTIONS_CONFIG_PATH"),
-			GuideTopicsConfigPath: os.Getenv("GUIDE_TOPICS_CONFIG_PATH"),
-			DeploymentNature:  getenv("DEPLOYMENT_NATURE", "web"),
+			SuggestionsConfigPath:              os.Getenv("SUGGESTIONS_CONFIG_PATH"),
+			GuideTopicsConfigPath:              os.Getenv("GUIDE_TOPICS_CONFIG_PATH"),
+			GuideTopicsReloadFromFileOnStartup: parseBool(os.Getenv("GUIDE_TOPICS_RELOAD_FROM_FILE_ON_STARTUP")),
+			DeploymentNature:                   getenv("DEPLOYMENT_NATURE", "web"),
 		},
 		Crypto:      cryptoCfg,
 		Defaults:    loadDefaultsConfig(),

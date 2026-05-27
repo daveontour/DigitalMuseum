@@ -34,6 +34,7 @@ Modals.GuideTopicsConfig = (() => {
         'openRandomQuestion',
         'openTodaysThing',
         'openInterviewer',
+        'openPersonalitySettings',
         'openConfigAppearance',
         'openConfigApiKeys',
         'openConfigAiSetup',
@@ -46,6 +47,7 @@ Modals.GuideTopicsConfig = (() => {
         'openConfigToolsAccess',
         'openSettingsManageKeys',
         'openReferenceDocuments',
+        'openToolCallsDialog',
         'closeOpenDialog',
         'pause0_5s',
         'pause1s',
@@ -197,15 +199,9 @@ Modals.GuideTopicsConfig = (() => {
                         <select class="form-control guide-step-position" data-index="${index}">${positionOptions(step.position)}</select>
                     </div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.4rem;">
-                    <div class="setting-group" style="margin-bottom:0;">
-                        <label class="artefact-field-label">Navigate action (optional)</label>
-                        <select class="form-control guide-step-nav" data-index="${index}">${navActionOptions(step.navigate_action || step.navigateAction || '')}</select>
-                    </div>
-                    <div class="setting-group" style="margin-bottom:0;">
-                        <label class="artefact-field-label">Fallback text (optional)</label>
-                        <input type="text" class="form-control guide-step-fallback" data-index="${index}" value="${escapeHtml(step.fallback_text || step.fallbackText || '')}" placeholder="Shown if glow target missing">
-                    </div>
+                <div class="setting-group" style="margin-bottom:0.4rem;">
+                    <label class="artefact-field-label">Navigate action (optional)</label>
+                    <select class="form-control guide-step-nav" data-index="${index}">${navActionOptions(step.navigate_action || step.navigateAction || '')}</select>
                 </div>
                 <div class="setting-group" style="margin-bottom:0;">
                     <label class="artefact-field-label">Image URL (optional)</label>
@@ -241,13 +237,11 @@ Modals.GuideTopicsConfig = (() => {
             const glow = container.querySelector(`.guide-step-glow[data-index="${index}"]`);
             const position = container.querySelector(`.guide-step-position[data-index="${index}"]`);
             const nav = container.querySelector(`.guide-step-nav[data-index="${index}"]`);
-            const fallback = container.querySelector(`.guide-step-fallback[data-index="${index}"]`);
             const image = container.querySelector(`.guide-step-image[data-index="${index}"]`);
             if (text) step.text = text.value;
             if (glow) step.glow = glow.value;
             if (position) step.position = position.value;
             if (nav) step.navigate_action = nav.value;
-            if (fallback) step.fallback_text = fallback.value;
             if (image) step.image = image.value;
         });
     }
@@ -260,7 +254,6 @@ Modals.GuideTopicsConfig = (() => {
             if ((step.glow || '').trim()) s.glow = step.glow.trim();
             if (step.position && step.position !== 'middle-center') s.position = step.position;
             if ((step.navigate_action || '').trim()) s.navigate_action = step.navigate_action.trim();
-            if ((step.fallback_text || '').trim()) s.fallback_text = step.fallback_text.trim();
             if ((step.image || '').trim()) s.image = step.image.trim();
             return s;
         });
@@ -270,7 +263,8 @@ Modals.GuideTopicsConfig = (() => {
 
     function clearEditForm() {
         ['guide-topics-config-edit-key', 'guide-topics-config-edit-title-input',
-         'guide-topics-config-edit-description', 'guide-topics-config-edit-category'].forEach((id) => {
+         'guide-topics-config-edit-description', 'guide-topics-config-edit-category',
+         'guide-topics-config-edit-dismiss-nav'].forEach((id) => {
             const el = getEl(id);
             if (el) el.value = '';
         });
@@ -313,6 +307,8 @@ Modals.GuideTopicsConfig = (() => {
         if (catInput) catInput.value = row.category || '';
         const recEl = getEl('guide-topics-config-edit-recommended');
         if (recEl) recEl.checked = !!row.recommended;
+        const dismissNavInput = getEl('guide-topics-config-edit-dismiss-nav');
+        if (dismissNavInput) dismissNavInput.value = row.dismiss_navigate_action || row.dismissNavigateAction || '';
         editingSteps = Array.isArray(row.steps) ? row.steps.map((s) => Object.assign({}, s)) : [];
         renderStepsList();
         if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
@@ -333,6 +329,7 @@ Modals.GuideTopicsConfig = (() => {
         const description = (getEl('guide-topics-config-edit-description') && getEl('guide-topics-config-edit-description').value || '').trim();
         const category = (getEl('guide-topics-config-edit-category') && getEl('guide-topics-config-edit-category').value || '').trim();
         const recommended = !!(getEl('guide-topics-config-edit-recommended') && getEl('guide-topics-config-edit-recommended').checked);
+        const dismissNavigateAction = (getEl('guide-topics-config-edit-dismiss-nav') && getEl('guide-topics-config-edit-dismiss-nav').value || '').trim();
         const steps = readStepsFromDOM();
 
         if (!key) {
@@ -349,6 +346,7 @@ Modals.GuideTopicsConfig = (() => {
         }
 
         const body = { key, title, description, category, recommended, steps };
+        if (dismissNavigateAction) body.dismiss_navigate_action = dismissNavigateAction;
         try {
             const url = editingId ? `/api/guide-topics/${editingId}` : '/api/guide-topics';
             const method = editingId ? 'PATCH' : 'POST';
@@ -529,7 +527,7 @@ Modals.GuideTopicsConfig = (() => {
         if (addStepBtn) {
             addStepBtn.addEventListener('click', () => {
                 syncStepsFromDOM();
-                editingSteps.push({ text: '', glow: '', position: 'middle-center', navigate_action: '', fallback_text: '', image: '' });
+                editingSteps.push({ text: '', glow: '', position: 'middle-center', navigate_action: '', image: '' });
                 renderStepsList();
             });
         }

@@ -36,6 +36,7 @@ type TemplateHandler struct {
 	defaultLocalAIOK      bool
 	pageTitle             string
 	deploymentNatureLocal bool
+	guideTopicsReloadFromFileOnStartup bool
 }
 
 // NewTemplateHandler creates a TemplateHandler.
@@ -50,8 +51,9 @@ func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, userRepo *rep
 		defaultClaudeOK:       cfg.AI.AnthropicAPIKey != "",
 		defaultDeepSeekOK:     strings.TrimSpace(cfg.AI.DeepSeekAPIKey) != "",
 		defaultLocalAIOK:      strings.TrimSpace(cfg.AI.LocalAIBaseURL) != "",
-		pageTitle:             cfg.App.PageTitle,
-		deploymentNatureLocal: strings.EqualFold(strings.TrimSpace(cfg.App.DeploymentNature), "local"),
+		pageTitle:                          cfg.App.PageTitle,
+		deploymentNatureLocal:              strings.EqualFold(strings.TrimSpace(cfg.App.DeploymentNature), "local"),
+		guideTopicsReloadFromFileOnStartup: cfg.App.GuideTopicsReloadFromFileOnStartup,
 	}
 }
 
@@ -374,6 +376,10 @@ func (h *TemplateHandler) buildContext(r *http.Request) map[string]string {
 	if h.deploymentNatureLocal {
 		depLocal = "True"
 	}
+	guideReload := "False"
+	if h.guideTopicsReloadFromFileOnStartup {
+		guideReload = "True"
+	}
 
 	return map[string]string{
 		"owner":               subjectName,
@@ -391,6 +397,7 @@ func (h *TemplateHandler) buildContext(r *http.Request) map[string]string {
 		"owner_gender":            gender,
 		"todays_thing_prompt":     "",
 		"deployment_nature_local": depLocal,
+		"guide_topics_reload_from_file_on_startup": guideReload,
 	}
 }
 

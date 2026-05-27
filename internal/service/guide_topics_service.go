@@ -6,18 +6,20 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/daveontour/aimuseum/internal/database"
 	"github.com/daveontour/aimuseum/internal/model"
 	"github.com/daveontour/aimuseum/internal/repository"
 )
 
 // GuideTopicInput holds the editable fields for one guide topic.
 type GuideTopicInput struct {
-	Key         string           `json:"key"`
-	Title       string           `json:"title"`
-	Description string           `json:"description,omitempty"`
-	Category    string           `json:"category"`
-	Recommended bool             `json:"recommended,omitempty"`
-	Steps       []map[string]any `json:"steps"`
+	Key                   string           `json:"key"`
+	Title                 string           `json:"title"`
+	Description           string           `json:"description,omitempty"`
+	Category              string           `json:"category"`
+	Recommended           bool             `json:"recommended,omitempty"`
+	DismissNavigateAction string           `json:"dismiss_navigate_action,omitempty"`
+	Steps                 []map[string]any `json:"steps"`
 }
 
 // GuideTopicsService manages deployment-wide guide topic configuration rows.
@@ -114,6 +116,11 @@ func (s *GuideTopicsService) Delete(ctx context.Context, id int64) error {
 // DeleteAll removes every guide topic row.
 func (s *GuideTopicsService) DeleteAll(ctx context.Context) (int64, error) {
 	return s.repo.DeleteAll(ctx)
+}
+
+// ReloadFromFile deletes all guide topic rows and reloads from the seed JSON file.
+func (s *GuideTopicsService) ReloadFromFile(ctx context.Context, path string) error {
+	return database.ReloadGuideTopicsFromFile(ctx, s.repo.DB(), path)
 }
 
 // ExportDocument returns the guide_topics.json interchange shape.
@@ -254,6 +261,9 @@ func buildGuideTopicRow(in GuideTopicInput) (string, string, error) {
 	}
 	if in.Recommended {
 		item["recommended"] = true
+	}
+	if d := strings.TrimSpace(in.DismissNavigateAction); d != "" {
+		item["dismiss_navigate_action"] = d
 	}
 	if len(in.Steps) > 0 {
 		item["steps"] = in.Steps

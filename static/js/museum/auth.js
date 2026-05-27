@@ -86,6 +86,21 @@ const AuthModule = (() => {
             });
         }
 
+        const guideReloadSec = document.getElementById('account-guide-reload-section');
+        const guideReloadEnabled = typeof CONSTANTS !== 'undefined'
+            && CONSTANTS.GUIDE_TOPICS_RELOAD_FROM_FILE_ON_STARTUP === 'True';
+        if (guideReloadSec) {
+            guideReloadSec.style.display = (guideReloadEnabled && currentUser && !currentUser.is_visitor) ? 'block' : 'none';
+        }
+        const guideReloadBtn = document.getElementById('account-reload-guide-topics-btn');
+        if (guideReloadBtn && !guideReloadBtn.dataset.wired) {
+            guideReloadBtn.dataset.wired = '1';
+            guideReloadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                void reloadGuideTopicsFromFile();
+            });
+        }
+
         // Wire logout button
         const logoutBtn = document.getElementById('account-logout-btn');
         if (logoutBtn) {
@@ -100,6 +115,51 @@ const AuthModule = (() => {
             // Ignore errors — redirect regardless
         }
         window.location.href = '/login';
+    }
+
+    async function reloadGuideTopicsFromFile() {
+        const message = 'Delete all guide topics in the database and reload from guide_topics.json?\n\nAny topics edited in Configuration will be replaced with the seed file contents.';
+        let confirmed = false;
+        if (typeof AppDialogs !== 'undefined' && AppDialogs.showAppConfirm) {
+            confirmed = await AppDialogs.showAppConfirm(
+                'Reload guide topics?',
+                message,
+                { danger: true, confirmLabel: 'Reload' }
+            );
+        } else {
+            confirmed = window.confirm(`Reload guide topics?\n\n${message}`);
+        }
+        if (!confirmed) return;
+
+        const menu = document.getElementById('account-dropdown-menu');
+        if (menu) menu.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/guide-topics/reload-from-file', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || data.detail || `HTTP ${response.status}`);
+            }
+            if (typeof Guide !== 'undefined' && Guide.invalidateCache) {
+                Guide.invalidateCache();
+            }
+            if (typeof Modals !== 'undefined' && Modals.GuideTopicsConfig && Modals.GuideTopicsConfig.load) {
+                void Modals.GuideTopicsConfig.load();
+            }
+            if (typeof AppDialogs !== 'undefined' && AppDialogs.showAppAlert) {
+                await AppDialogs.showAppAlert('Guide topics reloaded from guide_topics.json.');
+            }
+        } catch (err) {
+            if (typeof AppDialogs !== 'undefined' && AppDialogs.showAppAlert) {
+                await AppDialogs.showAppAlert('Failed to reload guide topics: ' + err.message);
+            } else {
+                window.alert('Failed to reload guide topics: ' + err.message);
+            }
+        }
     }
 
     function getUser() {

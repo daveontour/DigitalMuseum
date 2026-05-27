@@ -8,18 +8,25 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 
 // GuideTopicsHandler handles /api/guide-topics/* endpoints.
 type GuideTopicsHandler struct {
-	svc *service.GuideTopicsService
+	svc                      *service.GuideTopicsService
+	reloadFromFileEnabled    bool
+	guideTopicsSeedPath      string
 }
 
 // NewGuideTopicsHandler creates a GuideTopicsHandler.
-func NewGuideTopicsHandler(svc *service.GuideTopicsService) *GuideTopicsHandler {
-	return &GuideTopicsHandler{svc: svc}
+func NewGuideTopicsHandler(svc *service.GuideTopicsService, appCfg config.AppConfig) *GuideTopicsHandler {
+	return &GuideTopicsHandler{
+		svc:                   svc,
+		reloadFromFileEnabled: appCfg.GuideTopicsReloadFromFileOnStartup,
+		guideTopicsSeedPath:   appCfg.GuideTopicsConfigFile(),
+	}
 }
 
 // RegisterRoutes mounts guide topic routes.
@@ -29,6 +36,7 @@ func (h *GuideTopicsHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/guide-topics/export", h.Export)
 	r.Post("/api/guide-topics/import/preview", h.ImportPreview)
 	r.Post("/api/guide-topics/import", h.ImportApply)
+	r.Post("/api/guide-topics/reload-from-file", h.ReloadFromFile)
 	r.Post("/api/guide-topics", h.Create)
 	r.Delete("/api/guide-topics/all", h.DeleteAll)
 	r.Patch("/api/guide-topics/{id}", h.Update)
@@ -137,6 +145,19 @@ func (h *GuideTopicsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, item)
+}
+
+// ReloadFromFile handles POST /api/guide-topics/reload-from-file.
+func (h *GuideTopicsHandler) ReloadFromFile(w http.ResponseWriter, r *http.Request) {
+	if !h.reloadFromFileEnabled {
+		writeError(w, http.StatusForbidden, "guide topics reload from file is not enabled")
+		return
+	}
+	if err := h.svc.ReloadFromFile(r.Context(), h.guideTopicsSeedPath); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error reloading guide topics from file: %s", err))
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
 }
 
 // DeleteAll handles DELETE /api/guide-topics/all.

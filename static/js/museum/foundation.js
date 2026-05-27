@@ -94,6 +94,8 @@ const CONSTANTS = {
     },
     /** True when DEPLOYMENT_NATURE=local — path-based import tiles are shown; otherwise they are hidden. */
     DEPLOYMENT_NATURE_LOCAL: "{{deployment_nature_local}}",
+    /** True when GUIDE_TOPICS_RELOAD_FROM_FILE_ON_STARTUP=true — account menu can reload guide topics from seed JSON. */
+    GUIDE_TOPICS_RELOAD_FROM_FILE_ON_STARTUP: "{{guide_topics_reload_from_file_on_startup}}",
     OWNER_NAME: "{{owner}}",
     OWNER_GENDER: "{{owner_gender}}",
     RANDOM_QUESTION_PROMPT: "Generate a random question about {{owner}}'s life. It could be about any aspect of his biography, people he's known, travels, work, hobbies, relationships, psychology, interest, anything. The objective is that by answering the question it would provide insight into him or reveal hidden or understated aspects of him or amusing facts. Do not answer the question, just generate it.",

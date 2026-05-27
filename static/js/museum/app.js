@@ -4289,55 +4289,36 @@ const App = (() => {
 
                 items.forEach((item) => {
                     const row = document.createElement('div');
-                    row.style.display = 'flex';
-                    row.style.gap = '10px';
-                    row.style.alignItems = 'flex-start';
-                    row.style.justifyContent = 'space-between';
-                    row.style.padding = '8px';
-                    row.style.marginBottom = '8px';
-                    row.style.borderRadius = '8px';
-                    row.style.background = '#ffffff';
-                    row.style.border = '1px solid #b8c4d8';
+                    row.className = 'message-similarity-result-row';
 
                     const left = document.createElement('div');
-                    left.style.flex = '1 1 auto';
+                    left.className = 'message-similarity-result-main';
                     if (item.previewImageUrl) {
                         const thumb = document.createElement('img');
                         thumb.src = item.previewImageUrl;
                         thumb.alt = item.title || 'Image preview';
-                        thumb.style.width = '56px';
-                        thumb.style.height = '56px';
-                        thumb.style.objectFit = 'cover';
-                        thumb.style.borderRadius = '6px';
-                        thumb.style.float = 'left';
-                        thumb.style.marginRight = '8px';
-                        thumb.style.border = '1px solid var(--color-border)';
+                        thumb.className = 'message-similarity-result-thumb';
                         left.appendChild(thumb);
                     }
                     const title = document.createElement('div');
-                    title.style.fontWeight = '600';
+                    title.className = 'message-similarity-result-title';
                     title.textContent = item.title || `${label} item`;
                     left.appendChild(title);
 
                     const preview = document.createElement('div');
-                    preview.style.fontSize = '0.9em';
-                    preview.style.marginTop = '4px';
-                    preview.style.whiteSpace = 'pre-wrap';
-                    preview.style.wordBreak = 'break-word';
+                    preview.className = 'message-similarity-result-preview';
                     preview.textContent = item.primaryText || '';
                     left.appendChild(preview);
 
                     if (item.secondaryText) {
                         const sub = document.createElement('div');
-                        sub.style.fontSize = '0.82em';
-                        sub.style.marginTop = '4px';
-                        sub.style.color = 'var(--color-text-muted)';
+                        sub.className = 'message-similarity-result-meta';
                         sub.textContent = item.secondaryText;
                         left.appendChild(sub);
                     }
 
                     const right = document.createElement('div');
-                    right.style.flex = '0 0 auto';
+                    right.className = 'message-similarity-result-actions';
                     const openBtn = document.createElement('button');
                     openBtn.type = 'button';
                     openBtn.className = 'modal-btn modal-btn-secondary';

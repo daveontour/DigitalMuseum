@@ -165,7 +165,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	// ── Guide topics (deployment-wide interactive help) ────────────────────────
 	guideTopicsRepo := repository.NewGuideTopicsRepo(pool)
 	guideTopicsSvc := service.NewGuideTopicsService(guideTopicsRepo)
-	guideTopicsHandler := handler.NewGuideTopicsHandler(guideTopicsSvc)
+	guideTopicsHandler := handler.NewGuideTopicsHandler(guideTopicsSvc, cfg.App)
 	guideTopicsHandler.RegisterRoutes(r)
 
 	// ── Templated endpoints (GET /, suggestions, JS files) ───────────────────

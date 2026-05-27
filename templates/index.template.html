@@ -146,6 +146,11 @@
                                 <i class="fas fa-user-shield" style="margin-right:6px;"></i>Admin
                             </button>
                         </div>
+                        <div id="account-guide-reload-section" style="display:none; border-bottom:1px solid var(--color-border); padding-bottom:4px; margin-bottom:4px;">
+                            <button type="button" id="account-reload-guide-topics-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
+                                <i class="fas fa-sync-alt" style="margin-right:6px;"></i>Reload Guide Topics
+                            </button>
+                        </div>
                         <button id="account-logout-btn" class="account-dropdown-item" type="button" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
                             <i class="fas fa-sign-out-alt" style="margin-right:6px;"></i>Sign Out
                         </button>
@@ -3800,6 +3805,11 @@
                     <div class="setting-group">
                         <label for="guide-topics-config-edit-description" class="artefact-field-label">Description (optional)</label>
                         <input type="text" id="guide-topics-config-edit-description" class="form-control" placeholder="Brief description shown in the guide modal">
+                    </div>
+                    <div class="setting-group">
+                        <label for="guide-topics-config-edit-dismiss-nav" class="artefact-field-label">Dismiss navigate action (optional)</label>
+                        <input type="text" id="guide-topics-config-edit-dismiss-nav" class="form-control" placeholder="closeOpenDialog or closeOpenDialog;pause0_5s;openImageGallery">
+                        <p style="margin:0.35rem 0 0;color:var(--color-text-muted);font-size:var(--text-sm);">Semicolon-separated NavActions run when the topic is completed or dismissed (Done, Close, Escape, overlay click).</p>
                     </div>
                     <div style="margin-top:1rem;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">

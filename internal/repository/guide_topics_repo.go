@@ -13,6 +13,11 @@ type GuideTopicsRepo struct {
 	pool *sql.DB
 }
 
+// DB returns the underlying database handle.
+func (r *GuideTopicsRepo) DB() *sql.DB {
+	return r.pool
+}
+
 // NewGuideTopicsRepo creates a GuideTopicsRepo.
 func NewGuideTopicsRepo(pool *sql.DB) *GuideTopicsRepo {
 	return &GuideTopicsRepo{pool: pool}

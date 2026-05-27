@@ -155,7 +155,11 @@ func run() error {
 		if err := database.SeedSuggestionsFromFileIfMissing(migrateCtx, db.Std, cfg.App.SuggestionsConfigFile()); err != nil {
 			return fmt.Errorf("seed suggestions: %w", err)
 		}
-		if err := database.SeedGuideTopicsFromFileIfMissing(migrateCtx, db.Std, cfg.App.GuideTopicsConfigFile()); err != nil {
+		if cfg.App.GuideTopicsReloadFromFileOnStartup {
+			if err := database.ReloadGuideTopicsFromFile(migrateCtx, db.Std, cfg.App.GuideTopicsConfigFile()); err != nil {
+				return fmt.Errorf("reload guide topics from file: %w", err)
+			}
+		} else if err := database.SeedGuideTopicsFromFileIfMissing(migrateCtx, db.Std, cfg.App.GuideTopicsConfigFile()); err != nil {
 			return fmt.Errorf("seed guide topics: %w", err)
 		}
 	}
