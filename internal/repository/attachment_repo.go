@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/daveontour/aimuseum/internal/model"
+	"github.com/daveontour/aimuseum/internal/sqlutil"
 )
 
 // AttachmentRepo accesses IMAP and Gmail email attachment rows in media_items.
@@ -97,9 +98,9 @@ func (r *AttachmentRepo) GetByIDOrder(ctx context.Context, offset int) (*model.A
 // GetBySize returns one attachment ordered by blob size, with an offset.
 func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset int) (*model.AttachmentInfo, error) {
 	uid := uidFromCtx(ctx)
-	dir := "ASC NULLS LAST"
+	orderExpr := sqlutil.OrderByAscNullsLast("LENGTH(mb.image_data)")
 	if orderDesc {
-		dir = "DESC NULLS LAST"
+		orderExpr = sqlutil.OrderByDescNullsLast("LENGTH(mb.image_data)")
 	}
 	q := `
 		SELECT ` + attachmentInfoCols + `, LENGTH(mb.image_data) AS sz
@@ -112,9 +113,9 @@ func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset i
 	q, args = addUIDFilterQualified(q, args, uid, "mm")
 	args = append(args, offset)
 	q += fmt.Sprintf(`
-		ORDER BY LENGTH(mb.image_data) %s
+		ORDER BY %s
 		OFFSET ?%d
-		LIMIT 1`, dir, len(args))
+		LIMIT 1`, orderExpr, len(args))
 	var a model.AttachmentInfo
 	var sz *int64
 	err := r.pool.QueryRowContext(ctx, q, args...).Scan(
@@ -236,15 +237,15 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 	switch order {
 	case "size":
 		if direction == "desc" {
-			orderExpr = "LENGTH(mb.image_data) DESC NULLS LAST"
+			orderExpr = sqlutil.OrderByDescNullsLast("LENGTH(mb.image_data)")
 		} else {
-			orderExpr = "LENGTH(mb.image_data) ASC NULLS LAST"
+			orderExpr = sqlutil.OrderByAscNullsLast("LENGTH(mb.image_data)")
 		}
 	case "date":
 		if direction == "desc" {
-			orderExpr = "e.date DESC NULLS LAST"
+			orderExpr = sqlutil.OrderByDescNullsLast("e.date")
 		} else {
-			orderExpr = "e.date ASC NULLS LAST"
+			orderExpr = sqlutil.OrderByAscNullsLast("e.date")
 		}
 	default: // "id"
 		if direction == "desc" {

@@ -46,6 +46,34 @@ const Guide = {
         return new Promise((resolve) => setTimeout(resolve, ms));
     },
 
+    _clickSelector(selector, options) {
+        if (!selector || typeof selector !== 'string') return Promise.resolve(false);
+        const opts = options || {};
+        const delayMs = Number.isFinite(opts.delayMs) ? opts.delayMs : 120;
+        const retries = Number.isFinite(opts.retries) ? opts.retries : 8;
+        const retryDelayMs = Number.isFinite(opts.retryDelayMs) ? opts.retryDelayMs : 100;
+        const trimmed = selector.trim();
+        if (!trimmed) return Promise.resolve(false);
+
+        return new Promise((resolve) => {
+            const attempt = (remaining) => {
+                const el = document.querySelector(trimmed);
+                if (el) {
+                    el.click();
+                    resolve(true);
+                    return;
+                }
+                if (remaining <= 0) {
+                    console.warn('Guide: click_selector not found:', trimmed);
+                    resolve(false);
+                    return;
+                }
+                setTimeout(() => attempt(remaining - 1), retryDelayMs);
+            };
+            setTimeout(() => attempt(retries), delayMs);
+        });
+    },
+
     _closeOpenDialog() {
         const excludeIds = new Set([
             'guide-modal',
@@ -121,6 +149,16 @@ const Guide = {
         openPreviousResponses: () => Guide._clickSidebarButton('previous-responses-sidebar-btn'),
         openSuggestions: () => Guide._clickSidebarButton('suggestions-sidebar-btn'),
         openContacts: () => Guide._clickSidebarButton('contacts-sidebar-btn'),
+        openContactsRelationships: () => {
+            if (typeof Modals !== 'undefined' && Modals.Contacts?.open) {
+                Modals.Contacts.open('relationships');
+                return;
+            }
+            Guide._clickSidebarButton('contacts-sidebar-btn');
+            setTimeout(() => {
+                document.querySelector('#contacts-modal .manage-contacts-tab-btn[data-manage-contacts-tab="relationships"]')?.click();
+            }, 120);
+        },
         openProfiles: () => Guide._clickSidebarButton('profiles-sidebar-btn'),
         openSensitiveData: () => Guide._clickSidebarButton('sensitive-data-sidebar-btn'),
         openDashboard: () => Guide._clickSidebarButton('statistics-sidebar-btn'),
@@ -142,6 +180,7 @@ const Guide = {
         openConfigCustomVoices: () => Guide._openConfigurationTab('custom-voices'),
         openConfigManageVisitorKeys: () => Guide._openConfigurationTab('manage-keys'),
         openConfigToolsAccess: () => Guide._openConfigurationTab('tools-access'),
+        openConfigToolTest: () => Guide._openConfigurationTab('tool-test'),
         openSettingsManageKeys: () => Guide._openConfigurationTab('manage-keys'),
         // Chat area
         openReferenceDocuments: () => document.getElementById('chat-context-status-refs-seg')?.click(),
@@ -359,6 +398,7 @@ const Guide = {
         // Support both camelCase (JS) and snake_case (DB-stored JSON) step fields.
         const glowSel   = step.glow || '';
         const navAction = step.navigate_action || step.navigateAction || '';
+        const clickSelector = step.click_selector || step.clickSelector || step.click || '';
         const position  = step.position || 'middle-center';
 
         const applyGlowAndShow = () => {
@@ -403,10 +443,19 @@ const Guide = {
             overlay.onclick = () => this._closeExplanation();
         };
 
-        if (navAction) {
+        const runPreShowActions = async () => {
+            if (navAction) {
+                await this._runNavActions(navAction);
+            }
+            if (clickSelector) {
+                await this._clickSelector(clickSelector);
+            }
+        };
+
+        if (navAction || clickSelector) {
             overlay.style.display = 'none';
             dialog.style.display  = 'none';
-            void this._runNavActions(navAction).then(() => {
+            void runPreShowActions().then(() => {
                 if (step.text) {
                     setTimeout(applyGlowAndShow, 120);
                 }

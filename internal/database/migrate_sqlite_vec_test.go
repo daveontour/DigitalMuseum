@@ -35,6 +35,7 @@ func TestEnsureSQLiteVecEmbeddingTables_CreatesAndIsIdempotent(t *testing.T) {
 		"media_tag_embeddings",
 		"facebook_post_text_embeddings",
 		"facebook_album_description_embeddings",
+		"artefact_embeddings",
 	} {
 		var n int
 		if err := db.QueryRowContext(ctx,

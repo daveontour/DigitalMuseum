@@ -396,7 +396,15 @@
                     <button class="modal-close-btn" id="close-message-similarity-modal">&times;</button>
                 </div>
                 <div class="modal-body email-gallery-search-section message-similarity-modal-body" style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column;">
-                    <textarea id="message-similarity-text" rows="3" class="email-gallery-input" placeholder="Search messages, images, Facebook posts, and Facebook albums..."></textarea>
+                    <textarea id="message-similarity-text" rows="3" class="email-gallery-input" placeholder="Search messages, emails, images, artefacts, Facebook posts, and Facebook albums..."></textarea>
+                    <div class="message-similarity-sensitivity-row">
+                        <label for="message-similarity-sensitivity" class="email-gallery-sort-label">Match sensitivity</label>
+                        <div class="message-similarity-sensitivity-slider">
+                            <input type="range" id="message-similarity-sensitivity" min="0" max="100" value="50" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+                            <span id="message-similarity-sensitivity-label" class="message-similarity-sensitivity-value">Balanced</span>
+                        </div>
+                        <div class="message-similarity-sensitivity-hint">Higher values require closer matches (lower distance).</div>
+                    </div>
                     <div style="display:flex; align-items:center; gap:0.45rem; margin-top:0.45rem;">
                         <label for="message-similarity-n" class="email-gallery-sort-label">Number of matches</label>
                         <input id="message-similarity-n" type="number" min="1" max="100" value="25" class="email-gallery-input" style="width:5rem; flex-shrink:0;">
@@ -740,6 +748,9 @@
                         </button>
                         <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tools-access">
                             <i class="fas fa-wrench"></i> Tools Access
+                        </button>
+                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tool-test">
+                            <i class="fas fa-vial"></i> Tool Test
                         </button>
                     </div>
                     <div class="config-content">
@@ -1427,6 +1438,31 @@
                         </div>
                     </section>
                 </div>
+                <div class="config-tab-content" id="tool-test-tab">
+                    <section class="section-config">
+                        <h1>Tool Test</h1>
+                    </section>
+                    <section class="config-section tool-test-panel">
+                        <div class="tool-test-toolbar">
+                            <div class="tool-test-toolbar-actions">
+                                <button type="button" id="tool-test-select-all" class="modal-btn modal-btn-secondary">Select All</button>
+                                <button type="button" id="tool-test-deselect-all" class="modal-btn modal-btn-secondary">Deselect All</button>
+                                <button type="button" id="tool-test-run-btn" class="modal-btn modal-btn-primary"><i class="fas fa-play"></i> Run selected</button>
+                            </div>
+                            <div id="tool-test-status" class="tool-test-status" aria-live="polite"></div>
+                        </div>
+                        <div class="tool-test-sections">
+                            <div class="tool-test-block tool-test-block--tools">
+                                <h3 class="tool-test-section-heading">Available Tools</h3>
+                                <div id="tool-test-tool-list" class="tool-test-tool-list"></div>
+                            </div>
+                            <div class="tool-test-block tool-test-block--results">
+                                <h3 class="tool-test-section-heading">Results</h3>
+                                <div id="tool-test-results" class="tool-test-results"></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
                     </div>
                 </div>
             </div>
@@ -1814,6 +1850,24 @@
                                         </div>
                                     </div>
                                 </article>
+                                <article class="data-import-card data-import-row" data-import="artefact_embeddings">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-gem"></i> Optimise Artefacts for Searching</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed artefact name, description, tags, and story for similarity search. You can reprocess all embeddings or fill only missing vectors when prompted.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="artefact_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="artefact_embeddings" title="Deletes all artefact embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
                                 </div>
                             </div>
                             <div id="data-import-panel-background-jobs" role="tabpanel" class="data-import-category-panel" data-import-category-panel="background-jobs" aria-labelledby="data-import-tab-background-jobs">
@@ -1934,10 +1988,10 @@
                 </div>
                 <div class="modal-body">
                     <div id="import-input-modal-body"></div>
-                    <div style="margin-top: 1.5rem; display: flex; gap: 10px; justify-content: flex-end;">
-                        <button type="button" id="import-input-modal-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
-                        <button type="button" id="import-input-modal-submit" class="modal-btn modal-btn-primary"><i class="fas fa-play"></i> Execute</button>
-                    </div>
+                </div>
+                <div class="import-input-modal-footer">
+                    <button type="button" id="import-input-modal-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
+                    <button type="button" id="import-input-modal-submit" class="modal-btn modal-btn-primary"><i class="fas fa-play"></i> Execute</button>
                 </div>
             </div>
         </div>
@@ -4250,13 +4304,14 @@
     <script src="/static/js/museum/modals-email.js" defer></script>
     <script src="/static/js/museum/modals-comms.js?v={{ static_modals_comms_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-people.js" defer></script>
-    <script src="/static/js/museum/modals-artefacts.js" defer></script>
+    <script src="/static/js/museum/modals-artefacts.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-sensitive.js" defer></script>
     <script src="/static/js/museum/modals-settings.js?v={{ static_modals_settings_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/local-ai-setup.js" defer></script>
     <script src="/static/js/museum/modals-regions.js" defer></script>
     <script src="/static/js/museum/modals-suggestions-config.js" defer></script>
     <script src="/static/js/museum/modals-guide-topics-config.js" defer></script>
+    <script src="/static/js/museum/modals-tool-test.js" defer></script>
     <script src="/static/js/museum/identity-profile-wizard.js" defer></script>
     <script src="/static/js/museum/guide.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/interviewer.js" defer></script>

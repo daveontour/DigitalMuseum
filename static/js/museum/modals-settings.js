@@ -3622,6 +3622,7 @@ Modals.initAll = () => {
         Modals.SensitiveData.init();
         Modals.ManageKeys.init();
         if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.init) Modals.LLMToolsAccess.init();
+        if (Modals.ToolTest && Modals.ToolTest.init) Modals.ToolTest.init();
         if (Modals.BackgroundJobs && Modals.BackgroundJobs.init) Modals.BackgroundJobs.init();
         Modals.Profiles.init();
         if (Modals.EmailMatches && Modals.EmailMatches.init) Modals.EmailMatches.init();

@@ -466,9 +466,10 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `glow` | string | CSS selector of element to highlight with a pulsing outline |
 | `position` | string | Dialog position: `middle-center` (default), `top-left/center/right`, `middle-left/right`, `bottom-left/center/right` |
 | `navigate_action` | string | One or more named action keys, separated by `;` — see Navigation actions below. Actions run in order; pause keys block until elapsed. |
+| `click_selector` | string | Optional CSS selector of a control to click before the step dialog appears. Runs after `navigate_action` (if any). Retries briefly until the element exists. |
 | `image_url` | string | Optional image URL displayed below the step instruction text |
 
-**Navigation actions** — defined in the `NavActions` dictionary in [`static/js/museum/guide.js`](static/js/museum/guide.js). Steps call `Guide._runNavActions()`, which splits `navigate_action` on `;`, trims each part, and runs matching handlers **sequentially** (awaiting promises from pause actions). After the chain completes, the step dialog appears following a short DOM settle delay.
+**Navigation actions** — defined in the `NavActions` dictionary in [`static/js/museum/guide.js`](static/js/museum/guide.js). Steps call `Guide._runNavActions()`, which splits `navigate_action` on `;`, trims each part, and runs matching handlers **sequentially** (awaiting promises from pause actions). If `click_selector` is set, `Guide._clickSelector()` runs next (with short retries for DOM settle). After both complete, the step dialog appears following a short DOM settle delay.
 
 **Multiple actions:** combine keys with semicolons, e.g. `"closeOpenDialog;pause0_5s;openImageGallery"`. Use pause actions between UI opens/closes when modals or tabs need time to render. The admin step editor dropdown selects one key at a time; for chains, edit the JSON directly, use the topic **Dismiss navigate action** text field, or type a semicolon-separated value into exported topic data before import.
 
@@ -497,6 +498,7 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `openPreviousResponses` | Clicks the Previous Responses sidebar button |
 | `openSuggestions` | Clicks the Suggestions sidebar button |
 | `openContacts` | Clicks the Contacts and Relationships sidebar button |
+| `openContactsRelationships` | Opens Contacts and Relationships on the Relationships tab |
 | `openProfiles` | Clicks the Profiles sidebar button |
 | `openSensitiveData` | Clicks the Sensitive Data sidebar button |
 | `openDashboard` | Clicks the Dashboard/Statistics sidebar button |

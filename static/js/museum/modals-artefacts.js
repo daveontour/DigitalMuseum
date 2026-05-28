@@ -120,12 +120,20 @@ Modals.Artefacts = (() => {
     // -------------------------------------------------------------------------
 
     async function _openDetail(artefactId) {
+        const id = typeof artefactId === 'string' ? parseInt(artefactId, 10) : Number(artefactId);
+        if (!Number.isFinite(id) || id <= 0) return;
         try {
-            const resp = await fetch(`/artefacts/${artefactId}`);
-            if (!resp.ok) throw new Error('Failed to load artefact');
+            const resp = await fetch(`/artefacts/${id}`);
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || err.error || 'Failed to load artefact');
+            }
             currentArtefact = await resp.json();
         } catch (err) {
             console.error('Error loading artefact:', err);
+            if (window.AppDialogs && typeof window.AppDialogs.showAppAlert === 'function') {
+                await window.AppDialogs.showAppAlert('Error', err.message || 'Could not open artefact.');
+            }
             return;
         }
         isCreating = false;
@@ -848,5 +856,9 @@ Modals.Artefacts = (() => {
         _loadTagSuggestions();
     }
 
-    return { open, close, init };
+    async function openAndSelectArtefact(artefactId) {
+        await _openDetail(artefactId);
+    }
+
+    return { open, close, init, openAndSelectArtefact };
 })();

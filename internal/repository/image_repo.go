@@ -1144,7 +1144,7 @@ func (r *ImageRepo) GetFacebookPosts(ctx context.Context, p GetFacebookPostsPara
 	}
 
 	baseQuery += " GROUP BY fp.id, fp.timestamp, fp.title, fp.post_text, fp.external_url, fp.post_type"
-	baseQuery += " ORDER BY fp.timestamp DESC NULLS LAST"
+	baseQuery += " ORDER BY " + sqlutil.OrderByDescNullsLast("fp.timestamp")
 
 	// Count total
 	countQuery := `SELECT COUNT(*) FROM (` + baseQuery + `) AS sub`

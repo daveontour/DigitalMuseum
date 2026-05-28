@@ -13,6 +13,223 @@
       ]
     },
     {
+      "key": "GrandTour",
+      "title": "Grand tour",
+      "description": "A guided walkthrough of every major area — chat, galleries, creative tools, contacts, import, and configuration.",
+      "category": "Getting Started",
+      "recommended": true,
+      "QA": "TEST",
+      "dismiss_navigate_action": "closeOpenDialog",
+      "steps": [
+        {
+          "text": "Welcome to the grand tour. Use the Guide button any time to reopen this list or pick a focused topic for deeper help.",
+          "glow": "#guide-sidebar-btn",
+          "position": "top-right"
+        },
+        {
+          "text": "The chat box is home base. Ask natural-language questions about your archive — emails, messages, photos, contacts, and more.",
+          "glow": "#user-input",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Open Personality Settings from the portrait in the top bar. Choose your AI provider, voice persona, creativity, and who is asking (owner or visitor).",
+          "glow": "#voice-settings-trigger",
+          "click_selector": "#voice-settings-trigger",
+          "position": "top-center"
+        },
+        {
+          "text": "The context bar above the chat shows how many AI tools and reference documents are active, plus token use from your last request.",
+          "glow": "#chat-context-status-bar",
+          "navigate_action": "closeOpenDialog",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Click Tools in the context bar to review which archive tools the AI may call (Configuration → Tools Access).",
+          "glow": "#chat-context-status-tools-seg",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Click Ref Docs to open the Reference Documents manager — upload PDFs, Markdown, or text the AI can use in answers.",
+          "glow": "#chat-context-status-refs-seg",
+          "click_selector": "#chat-context-status-refs-seg",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Click the tool-call count to inspect which archive searches ran on your last chat request.",
+          "glow": "#chat-context-last-toolcalls-seg",
+          "navigate_action": "closeOpenDialog",
+          "position": "bottom-center"
+        },
+        {
+          "text": "Messages — browse SMS, WhatsApp, iMessage, and other imported conversations by contact.",
+          "glow": "#sms-messages-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openSmsMessages",
+          "position": "middle-left"
+        },
+        {
+          "text": "Emails — search and read your imported Gmail and IMAP mail in a gallery with filters and sort.",
+          "glow": "#email-gallery-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openEmailGallery",
+          "position": "middle-left"
+        },
+        {
+          "text": "Images — search photos by metadata, tags, date, region, or semantic content similarity.",
+          "glow": "#new-image-gallery-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openImageGallery",
+          "position": "middle-left"
+        },
+        {
+          "text": "Facebook Albums — browse imported Facebook photo albums.",
+          "glow": "#fb-albums-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openFacebookAlbums",
+          "position": "middle-left"
+        },
+        {
+          "text": "Facebook Posts — read imported Facebook posts and their text.",
+          "glow": "#fb-posts-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openFacebookPosts",
+          "position": "middle-left"
+        },
+        {
+          "text": "Multi-Source Search — find related content across emails, messages, and posts by concept, not just keywords.",
+          "glow": "#message-similarity-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openMultiSourceSearch",
+          "position": "middle-left"
+        },
+        {
+          "text": "Locations — explore places mentioned or geotagged in your archive.",
+          "glow": "#locations-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openLocations",
+          "position": "middle-left"
+        },
+        {
+          "text": "Artefacts — curate named collections with descriptions, stories, and attached files or gallery images.",
+          "glow": "#artefacts-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openArtefacts",
+          "position": "middle-left"
+        },
+        {
+          "text": "Previous Responses — revisit and resume saved chat turns.",
+          "glow": "#previous-responses-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openPreviousResponses",
+          "position": "middle-right"
+        },
+        {
+          "text": "Suggestions — ready-made prompts to explore your archive; click one to fill the chat input.",
+          "glow": "#suggestions-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openSuggestions",
+          "position": "middle-right"
+        },
+        {
+          "text": "Contacts and Relationships — directory of people, email matching, classifications, and the relationship graph.",
+          "glow": "#contacts-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openContacts",
+          "position": "middle-right"
+        },
+        {
+          "text": "Open the Relationships tab to visualise who connects to whom and how strongly, based on message traffic.",
+          "navigate_action": "closeOpenDialog;pause0_5s;openContactsRelationships",
+          "position": "middle-center"
+        },
+        {
+          "text": "Profiles — AI-generated biographical profiles for contacts, editable and regeneratable.",
+          "glow": "#profiles-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openProfiles",
+          "position": "middle-right"
+        },
+        {
+          "text": "Sensitive Data — encrypted notes unlocked with your master key; separate from the main archive tables.",
+          "glow": "#sensitive-data-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openSensitiveData",
+          "position": "middle-right"
+        },
+        {
+          "text": "Dashboard — record counts and a snapshot of what is in your archive.",
+          "glow": "#statistics-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openDashboard",
+          "position": "middle-right"
+        },
+        {
+          "text": "Have-a-Chat — watch two AI personas discuss a topic using your archive as context.",
+          "glow": "#have-a-chat-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openHaveAChat",
+          "position": "middle-right"
+        },
+        {
+          "text": "Random Question — generate a surprising question about the archive to spark exploration.",
+          "glow": "#random-question-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openRandomQuestion",
+          "position": "middle-right"
+        },
+        {
+          "text": "Today's Thing — a daily prompt drawn from the subject's interests in Configuration.",
+          "glow": "#todays-thing-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openTodaysThing",
+          "position": "middle-right"
+        },
+        {
+          "text": "Interviewer — structured AI-led interviews using archive data, with saved sessions.",
+          "glow": "#interviewer-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openInterviewer",
+          "position": "middle-right"
+        },
+        {
+          "text": "Identity Profile — a guided wizard to capture life story, health, family, career, and interests for the subject.",
+          "glow": "#identity-profile-wizard-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openIdentityProfile",
+          "position": "bottom-left"
+        },
+        {
+          "text": "Import & Manage Data — upload Facebook, Instagram, WhatsApp, iMessage, Gmail, photos, and run maintenance jobs.",
+          "glow": "#data-import-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openDataImportImport",
+          "position": "bottom-left"
+        },
+        {
+          "text": "The Maintenance and Background Jobs tabs schedule thumbnails, embeddings, and other housekeeping tasks.",
+          "navigate_action": "closeOpenDialog;pause0_5s;openDataImportMaintenance",
+          "position": "middle-center"
+        },
+        {
+          "text": "Configuration — appearance, API keys, subject details, regions, suggestions, guide topics, custom voices, visitor keys, and tool access.",
+          "glow": "#settings-data-import-sidebar-btn",
+          "navigate_action": "closeOpenDialog;pause0_5s;openConfiguration",
+          "position": "bottom-left"
+        },
+        {
+          "text": "API Keys — connect Claude, Gemini, and DeepSeek. Local AI (Ollama) needs no cloud key.",
+          "navigate_action": "closeOpenDialog;pause0_5s;openConfigApiKeys",
+          "position": "middle-center"
+        },
+        {
+          "text": "Subject Configuration — name, pronouns, interests, writing style, and psychological profile for the archive owner.",
+          "navigate_action": "closeOpenDialog;pause0_5s;openConfigSubjectConfiguration",
+          "position": "middle-center"
+        },
+        {
+          "text": "Custom Voices — create persona instructions the AI can adopt in chat and creative tools.",
+          "navigate_action": "closeOpenDialog;pause0_5s;openConfigCustomVoices",
+          "position": "middle-center"
+        },
+        {
+          "text": "Manage Visitor Keys — issue keys so guests can unlock shared views without the owner's master password.",
+          "navigate_action": "closeOpenDialog;pause0_5s;openConfigManageVisitorKeys",
+          "position": "middle-center"
+        },
+        {
+          "text": "Tools Access — choose which AI archive tools require owner vs visitor tier for each session.",
+          "navigate_action": "closeOpenDialog;pause0_5s;openConfigToolsAccess",
+          "position": "middle-center"
+        },
+        {
+          "text": "That completes the grand tour. Reopen Guide anytime and pick a focused topic — Browsing emails, Import paths, Master key setup, and others — for step-by-step detail on any area.",
+          "glow": "#guide-sidebar-btn",
+          "navigate_action": "closeOpenDialog",
+          "position": "top-right"
+        }
+      ]
+    },
+    {
       "key": "FirstRunQuickSetup",
       "title": "Quick setup checklist",
       "description": "A short first-run flow: import, configure, ask a question, unlock.",
@@ -55,7 +272,7 @@
       "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
-          "text": "Type your question in chat and press Send. Try: \"Show me photos from last summer\" or \"Who have I emailed most?\"",
+          "text": "Type your question in chat and press Send. Try: \"Tell me about Dave's friends\" or \"Show me photos from last summer\" or \"Who have I emailed most?\"",
           "glow": "#user-input"
         },
         {
@@ -65,7 +282,7 @@
         },
         {
           "text": "When the Personality Settings dialog is open you can set characteristice of the conversation or clear the the conversation history and start a new conversation.",
-          "navigate_action": "openPersonalitySettings",
+          "click_selector": "#voice-settings-trigger",
           "position": "top-center"
         },
         {
@@ -209,7 +426,9 @@
         },
         {
           "text": "Locations are grouped by category and region. Browse by area to revisit places you have been.",
-          "navigate_action": "openLocations"
+          "navigate_action": "openLocations",
+          "position": "top-center",
+          "image_url": "/static/images/guide/locations1.png"
         },
         {
           "text": "Click a location to see related photos or archive items from that place."
@@ -227,7 +446,8 @@
        {
           "text": "To filter the photos by region, select a region from the Region dropdown menu.",
           "position": "top-center",
-          "glow": "#geo-metadata-region-select"
+          "glow": "#geo-metadata-region-select",
+          "image_url": "/static/images/guide/locations2.png"
         },
         {
           "text": "Ask the AI for location-based summaries: \"Where have I travelled most?\" or \"Show me photos from Paris\".",
@@ -242,47 +462,52 @@
       "title": "Artefacts — notes and custom items",
       "description": "Create, search, import, and export personal artefact records in your archive.",
       "category": "Daily Use",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
-          "text": "Open Artefacts from the left sidebar. Artefacts are personal notes, items, and custom records you attach to your archive — think of them as a private annotation layer.",
+          "text": "Open Artefacts from the left sidebar. Artefacts are personal notes, items, and custom records you attach to your archive — think of them as a display case of meaningful items.",
           "glow": "#artefacts-sidebar-btn",
-          "navigate_action": "openArtefacts"
+          "position":"middle-center"
         },
         {
           "text": "Click \"+ New Artefact\" to create a new record. Each artefact can have a name, description, tags, images, and a story section.",
           "glow": "#artefacts-new-btn",
           "navigate_action": "openArtefacts",
-          "position": "top-left"
+          "position": "middle-center"
         },
         {
           "text": "Use the Search box to find artefacts by name, description, tags, or story text.",
           "glow": "#artefacts-search",
-          "navigate_action": "openArtefacts",
-          "position": "top-left"
+          "position": "middle-center"
         },
         {
           "text": "Use Export to download all artefacts as a JSON file, or Import to load artefacts from a previously exported file.",
           "glow": "#artefacts-export-btn",
-          "navigate_action": "openArtefacts",
-          "position": "top-left"
+          "position": "middle-center"
         },
         {
           "text": "Artefacts are searchable by the AI: ask \"Tell me about my artefact about the vintage watch\" or \"List artefacts tagged family\".",
           "glow": "#user-input",
-          "position": "bottom-center"
+          "position": "middle-center",
+          "navigate_action": "closeOpenDialog"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "ManagingContacts",
-      "title": "Managing contacts",
+      "title": "Managing Contacts",
       "description": "Use Contacts and Relationships, Profiles, and contact tools effectively.",
       "category": "Daily Use",
       "steps": [
         {
           "text": "Open Contacts and Relationships in the right sidebar to browse people or open the Relationships tab for the connection map.",
           "glow": "#contacts-sidebar-btn",
+          "position": "middle-center"
+        },
+        {
+          "text": "The Contacts and Relationships dialog is used to manage the contacts and relationships in your archive. It is used to create, edit, and delete contacts and relationships.",
+          "position": "middle-center",
           "navigate_action": "openContacts"
         },
         {
@@ -308,32 +533,34 @@
       "title": "Relationship map",
       "description": "Visualise your social network and connection strengths.",
       "category": "Daily Use",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
           "text": "Open Contacts and Relationships in the right sidebar to access the relationship tools.",
           "glow": "#contacts-sidebar-btn",
-          "navigate_action": "openContacts",
-          "position": "middle-right"
+          "position": "middle-center"
         },
         {
-          "text": "Switch to the Relationships tab inside the Contacts dialog. This shows a visual network map of people connected to you.",
-          "navigate_action": "openContacts"
+          "text": "The relationship map is shown on the Relationships tab inside the Contacts dialog. This shows a visual network map of people connected to you.",
+          "navigate_action": "openContactsRelationships",
+          "position": "top-center"
         },
         {
           "text": "Node size and link thickness reflect connection strength — people you communicate with most appear more prominently.",
-          "position": "middle-center"
+          "position": "bottom-center"
         },
         {
           "text": "Click any node in the network to highlight that person and their direct connections.",
-          "position": "middle-center"
+          "position": "bottom-center"
         },
         {
           "text": "Ask the AI about your relationships: \"Who am I closest to based on my messages?\" or \"Who connects me to the Smith family?\"",
           "glow": "#user-input",
-          "position": "bottom-center"
+          "position": "middle-center",
+          "navigate_action": "closeOpenDialog"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "CreateContactProfile",
@@ -982,45 +1209,46 @@
     },
     {
       "key": "CustomVoicePersonas",
-      "title": "Custom AI voice personas",
+      "title": "Custom AI Voice Personas",
       "description": "Create named AI personas with unique instructions and creativity settings.",
       "category": "Setup & Import",
+      "dismiss_navigate_action": "closeOpenDialog",
+      "QA":"TEST",
       "steps": [
         {
-          "text": "Open Configuration from the left sidebar, then switch to the Custom Voices tab.",
+          "text": "As well as the pre defined AI personae (voices) you can create your own custom AI voice personas. Open Configuration from the left sidebar, then switch to the Custom Voices tab.",
           "glow": "#settings-data-import-sidebar-btn",
-          "navigate_action": "openConfigCustomVoices",
+          "image_url": "/static/images/guide/voices.png",
           "position": "bottom-center"
         },
         {
-          "text": "Click New Voice to create a new persona. Each custom voice has a name, description, and a detailed instruction block that tells the AI how to behave.",
+          "text": "Click New Voice to create a new persona. ",
           "glow": "#custom-voices-create-btn",
           "navigate_action": "openConfigCustomVoices",
           "position": "top-center"
         },
         {
-          "text": "Give the voice a name (shown in the provider dropdown, e.g. \"Grumpy Professor\") and a short description so you know what it is for.",
+          "text": "Each custom voice has a name, description, and a detailed instruction block that tells the AI how to behave. Give the voice a name (shown in the provider dropdown, e.g. \"Grumpy Professor\") and a short description so you know what it is for.",
           "glow": "#custom-voice-edit-name",
-          "position": "middle-center"
+          "click_selector": "#custom-voices-create-btn",
+          "position": "top-left"
         },
         {
           "text": "Write the instruction in the Instructions box. Be specific: describe the persona's name, background, speech patterns, and any rules it should follow.",
           "glow": "#custom-voice-edit-instructions",
-          "position": "middle-center"
+          "position": "top-center"
         },
         {
           "text": "Set the Creativity slider — lower values give more factual, consistent responses; higher values are more expressive and varied.",
           "glow": "#custom-voice-edit-creativity",
-          "position": "middle-center"
+          "position": "top-center"
         },
         {
           "text": "Save the voice. It now appears in the provider dropdown in the voice settings panel — select it to switch the AI into that persona.",
           "glow": "#custom-voices-tbody",
-          "navigate_action": "openConfigCustomVoices",
-          "position": "middle-center"
+          "position": "top-center"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "ReferenceDocuments",
@@ -1192,19 +1420,20 @@
       "dismiss_navigate_action": "closeOpenDialog"
     },
     {
-      "key": "ImportGmail",
-      "title": "Import Gmail via IMAP",
-      "description": "Connect your Gmail account and import emails directly via IMAP.",
+      "key": "ImportMail",
+      "title": "Import Mail via IMAP",
+      "description": "Connect your email account and import emails directly via IMAP.",
       "category": "Setup & Import",
+      "QA":"TEST",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
-          "text": "Gmail import uses the IMAP protocol to pull emails directly from your inbox. No export file is needed — the app connects to Gmail and downloads messages.",
+          "text": "Email import uses the IMAP protocol to pull emails directly from your inbox and folders. No export file is needed — the app connects to email account and downloads messages.",
           "position": "middle-center"
         },
         {
           "text": "Open Import & Manage Data from the left sidebar and switch to the Import tab.",
           "glow": "#data-import-sidebar-btn",
-          "navigate_action": "openDataImportImport",
           "position": "bottom-center"
         },
         {
@@ -1226,8 +1455,7 @@
           "navigate_action": "openDataImportBackgroundJobs",
           "position": "bottom-center"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "ImportPhotosLocal",

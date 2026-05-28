@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"database/sql"
+
 	"github.com/daveontour/aimuseum/internal/keystore"
 	"github.com/daveontour/aimuseum/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -21,11 +23,13 @@ type ArtefactHandler struct {
 	sensitiveSvc *service.SensitiveService
 	authSvc      *service.AuthService
 	sessionStore *keystore.SessionMasterStore
+	pool         *sql.DB
+	embeddingSvc *service.EmbeddingService
 }
 
 // NewArtefactHandler creates an ArtefactHandler.
-func NewArtefactHandler(svc *service.ArtefactService, sensitiveSvc *service.SensitiveService, authSvc *service.AuthService, sessionStore *keystore.SessionMasterStore) *ArtefactHandler {
-	return &ArtefactHandler{svc: svc, sensitiveSvc: sensitiveSvc, authSvc: authSvc, sessionStore: sessionStore}
+func NewArtefactHandler(svc *service.ArtefactService, sensitiveSvc *service.SensitiveService, authSvc *service.AuthService, sessionStore *keystore.SessionMasterStore, pool *sql.DB, embeddingSvc *service.EmbeddingService) *ArtefactHandler {
+	return &ArtefactHandler{svc: svc, sensitiveSvc: sensitiveSvc, authSvc: authSvc, sessionStore: sessionStore, pool: pool, embeddingSvc: embeddingSvc}
 }
 
 // RegisterRoutes mounts all artefact routes onto r.
@@ -35,6 +39,11 @@ func (h *ArtefactHandler) RegisterRoutes(r chi.Router) {
 	r.Post("/artefacts/import", h.Import)
 	r.Get("/artefacts", h.List)
 	r.Post("/artefacts", h.Create)
+	r.Post("/artefacts/embeddings/backfill", h.ArtefactEmbeddingsBackfillStart)
+	r.Get("/artefacts/embeddings/backfill/stream", h.ArtefactEmbeddingsBackfillStream)
+	r.Post("/artefacts/embeddings/backfill/cancel", h.ArtefactEmbeddingsBackfillCancel)
+	r.Get("/artefacts/embeddings/backfill/status", h.ArtefactEmbeddingsBackfillStatus)
+	r.Post("/artefacts/similar-by-text", h.SimilarArtefactsByText)
 
 	r.Get("/artefacts/{artefact_id}", h.GetByID)
 	r.Put("/artefacts/{artefact_id}", h.Update)

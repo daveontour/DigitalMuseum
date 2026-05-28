@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,11 +20,13 @@ import (
 type EmailHandler struct {
 	svc          *service.EmailService
 	sessionStore *keystore.SessionMasterStore
+	pool         *sql.DB
+	embeddingSvc *service.EmbeddingService
 }
 
 // NewEmailHandler creates an EmailHandler.
-func NewEmailHandler(svc *service.EmailService, sessionStore *keystore.SessionMasterStore) *EmailHandler {
-	return &EmailHandler{svc: svc, sessionStore: sessionStore}
+func NewEmailHandler(svc *service.EmailService, sessionStore *keystore.SessionMasterStore, pool *sql.DB, embeddingSvc *service.EmbeddingService) *EmailHandler {
+	return &EmailHandler{svc: svc, sessionStore: sessionStore, pool: pool, embeddingSvc: embeddingSvc}
 }
 
 // RegisterRoutes mounts all email routes onto r.
@@ -32,6 +35,7 @@ func (h *EmailHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/emails/folders", h.GetFolders)
 	r.Get("/emails/label", h.GetByLabel)
 	r.Get("/emails/search", h.Search)
+	r.Post("/emails/similar-by-text", h.SimilarEmailsByText)
 	r.Delete("/emails/bulk-delete", h.BulkDelete)
 
 	r.Get("/emails/{email_id}/html", h.GetHTML)

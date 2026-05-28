@@ -197,6 +197,15 @@ func (h *ImportDataPurgeHandler) Purge(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			deleted = sqlutil.RowsAffected(tag)
 		}
+	case "artefact_embeddings":
+		tag, e := h.pool.ExecContext(ctx, `
+			DELETE FROM artefact_embeddings
+			WHERE rowid IN (SELECT id FROM artefacts WHERE COALESCE(user_id, 0) = ?1)
+		`, uid)
+		err = e
+		if err == nil {
+			deleted = sqlutil.RowsAffected(tag)
+		}
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown purge kind: %s", kind))
 		return

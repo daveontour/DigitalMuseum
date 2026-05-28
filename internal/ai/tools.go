@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -156,22 +157,28 @@ func NewToolExecutor(pool *sql.DB, subjectName, tavilyKey, pepper string, getRAM
 	}
 }
 
+// toolsSQLWhereRe detects an existing WHERE clause in the query prefix (before ORDER BY etc.).
+var toolsSQLWhereRe = regexp.MustCompile(`(?i)\bwhere\b`)
+
+// toolsTrailingClauseRe matches ORDER BY / LIMIT etc. with any leading whitespace (incl. newlines).
+var toolsTrailingClauseRe = regexp.MustCompile(`(?is)\s+(?:order\s+by|group\s+by|having|limit|offset|fetch)\b`)
+
+func toolsQueryHasWhere(prefix string) bool {
+	return toolsSQLWhereRe.MatchString(prefix)
+}
+
 // toolsUIDFilterInsertPoint returns the byte index in q before which a user_id
 // predicate must be inserted. Appending "AND user_id" after ORDER BY/LIMIT
 // produces invalid SQL, so we splice before the first trailing clause.
 func toolsUIDFilterInsertPoint(q string) int {
-	ql := strings.ToLower(q)
-	markers := []string{" order by", " group by", " having ", " limit ", " offset ", " fetch "}
-	best := len(q)
-	for _, m := range markers {
-		if i := strings.Index(ql, m); i >= 0 && i < best {
-			best = i
-		}
+	loc := toolsTrailingClauseRe.FindStringIndex(q)
+	if loc == nil {
+		return len(q)
 	}
-	return best
+	return loc[0]
 }
 
-// toolsUIDFilter appends user_id = $N to the WHERE clause (or adds WHERE) when
+// toolsUIDFilter appends user_id = ? to the WHERE clause (or adds WHERE) when
 // the context carries a non-zero userID. When userID == 0 (unauthenticated /
 // single-tenant mode) no filter is added, preserving backward-compatible behaviour.
 func toolsUIDFilter(ctx context.Context, q string, args []any) (string, []any) {
@@ -183,8 +190,7 @@ func toolsUIDFilter(ctx context.Context, q string, args []any) (string, []any) {
 	insertAt := toolsUIDFilterInsertPoint(q)
 	prefix := strings.TrimRight(q[:insertAt], " \t\n\r")
 	suffix := q[insertAt:]
-	qlPrefix := strings.ToLower(prefix)
-	hasWhere := strings.Contains(qlPrefix, " where ")
+	hasWhere := toolsQueryHasWhere(prefix)
 	joiner := " AND user_id = "
 	if !hasWhere {
 		joiner = " WHERE user_id = "
@@ -460,7 +466,7 @@ func searchEmailsBySimilarity(ctx context.Context, pool *sql.DB, text string) (m
 		SELECT id, date, from_address, to_addresses, subject, plain_text, snippet, has_attachments
 		FROM emails
 		WHERE id IN (%s)
-		  AND user_deleted = FALSE
+		  AND user_deleted = 0
 		  AND COALESCE(user_id, 0) = ?
 	`, strings.Join(placeholders, ","))
 	emailRows, err := pool.QueryContext(ctx, q, args...)
@@ -732,7 +738,7 @@ func getMessagesAroundInChat(ctx context.Context, pool *sql.DB, chatSession stri
 
 	q := fmt.Sprintf(`WITH session_msgs AS (
 		SELECT id, message_date, sender_name, sender_id, type, text, service, subject,
-			ROW_NUMBER() OVER (ORDER BY message_date ASC NULLS LAST, id ASC) AS rn
+			ROW_NUMBER() OVER (ORDER BY %s) AS rn
 		FROM messages
 		%s
 	),
@@ -742,9 +748,9 @@ func getMessagesAroundInChat(ctx context.Context, pool *sql.DB, chatSession stri
 	SELECT sm.id, sm.message_date, sm.sender_name, sm.sender_id, sm.type, sm.text, sm.service, sm.subject, sm.rn, a.rn AS anchor_rn
 	FROM session_msgs sm
 	CROSS JOIN anchor a
-	WHERE sm.rn BETWEEN GREATEST(1, a.rn - %d) AND a.rn + %d
+	WHERE sm.rn BETWEEN MAX(1, a.rn - %d) AND a.rn + %d
 	ORDER BY sm.rn`,
-		innerWhere, chatMessageNeighborCount, chatMessageNeighborCount)
+		sqlutil.OrderByAscNullsLast("message_date", "id ASC"), innerWhere, chatMessageNeighborCount, chatMessageNeighborCount)
 
 	rows, err := pool.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -825,7 +831,7 @@ func getEmailsByContact(ctx context.Context, pool *sql.DB, name string) (map[str
 	q, args := toolsUIDFilter(ctx,
 		`SELECT id, date, from_address, to_addresses, subject, plain_text, snippet, has_attachments
 		 FROM emails WHERE (from_address LIKE ? OR to_addresses LIKE ?) ORDER BY date ASC LIMIT 500`,
-		[]any{pattern})
+		[]any{pattern, pattern})
 	rows, err := pool.QueryContext(ctx, q, args...)
 	if err != nil {
 		return map[string]any{"error": err.Error(), "contact_name": name, "email_count": 0, "emails": []any{}}, nil
@@ -985,7 +991,7 @@ func searchFacebookAlbums(ctx context.Context, pool *sql.DB, keyword string) (ma
 	q, args := toolsUIDFilter(ctx,
 		`SELECT id, name, description, cover_photo_uri, last_modified_timestamp
 		 FROM facebook_albums WHERE name LIKE ? OR description LIKE ? ORDER BY name ASC`,
-		[]any{pattern})
+		[]any{pattern, pattern})
 	rows, err := pool.QueryContext(ctx, q, args...)
 	if err != nil {
 		return map[string]any{"error": err.Error(), "albums": []any{}, "count": 0}, nil
@@ -995,7 +1001,7 @@ func searchFacebookAlbums(ctx context.Context, pool *sql.DB, keyword string) (ma
 	for rows.Next() {
 		var id int64
 		var name, desc, coverURI *string
-		var lastMod *time.Time
+		var lastMod sqlutil.NullDBTime
 		if err := rows.Scan(&id, &name, &desc, &coverURI, &lastMod); err != nil {
 			continue
 		}
@@ -1006,8 +1012,8 @@ func searchFacebookAlbums(ctx context.Context, pool *sql.DB, keyword string) (ma
 			"cover_photo_uri": strVal(coverURI, ""),
 			"last_modified":   nil,
 		}
-		if lastMod != nil {
-			a["last_modified"] = lastMod.Format(time.RFC3339)
+		if lastMod.Valid {
+			a["last_modified"] = lastMod.Time.Format(time.RFC3339)
 		}
 		albums = append(albums, a)
 	}
@@ -1102,7 +1108,7 @@ func getAllFacebookPosts(ctx context.Context, pool *sql.DB) (map[string]any, err
 	var posts []map[string]any
 	for rows.Next() {
 		var id int64
-		var ts *time.Time
+		var ts sqlutil.NullDBTime
 		var title, postText, extURL, postType *string
 		if err := rows.Scan(&id, &ts, &title, &postText, &extURL, &postType); err != nil {
 			continue
@@ -1115,8 +1121,8 @@ func getAllFacebookPosts(ctx context.Context, pool *sql.DB) (map[string]any, err
 			"external_url": strVal(extURL, ""),
 			"post_type":    strVal(postType, ""),
 		}
-		if ts != nil {
-			p["timestamp"] = ts.Format(time.RFC3339)
+		if ts.Valid {
+			p["timestamp"] = ts.Time.Format(time.RFC3339)
 		}
 		posts = append(posts, p)
 	}
@@ -1195,8 +1201,8 @@ func searchChatMessagesGlobally(ctx context.Context, pool *sql.DB, keyword strin
 		FROM messages
 		WHERE chat_session IS NOT NULL AND TRIM(chat_session) <> ''
 		  AND (COALESCE(text, '') LIKE ? OR COALESCE(subject, '') LIKE ?)
-		ORDER BY message_date ASC NULLS LAST, id ASC
-		LIMIT %d`, chatMessageKeywordSearchLimit), []any{pat})
+		ORDER BY `+sqlutil.OrderByAscNullsLast("message_date", "id ASC")+`
+		LIMIT %d`, chatMessageKeywordSearchLimit), []any{pat, pat})
 	return execChatMessageKeywordSearch(ctx, pool, q, args, keyword, "", true)
 }
 
@@ -1212,8 +1218,8 @@ func searchChatMessagesInSession(ctx context.Context, pool *sql.DB, chatSession,
 		FROM messages
 		WHERE chat_session LIKE ?
 		  AND (COALESCE(text, '') LIKE ? OR COALESCE(subject, '') LIKE ?)
-		ORDER BY message_date ASC NULLS LAST, id ASC
-		LIMIT %d`, chatMessageKeywordSearchLimit), []any{sessPat, kwPat})
+		ORDER BY `+sqlutil.OrderByAscNullsLast("message_date", "id ASC")+`
+		LIMIT %d`, chatMessageKeywordSearchLimit), []any{sessPat, kwPat, kwPat})
 	return execChatMessageKeywordSearch(ctx, pool, q, args, keyword, chatSession, false)
 }
 
@@ -1507,7 +1513,7 @@ func listInterviewsTool(ctx context.Context, pool *sql.DB, stateFilter string) (
 		var purposeDetail *string
 		var hasWriteup bool
 		var turnCount int
-		var createdAt, lastActivity time.Time
+		var createdAt, lastActivity sqlutil.DBTime
 		if err := rows.Scan(&id, &title, &style, &purpose, &purposeDetail, &state,
 			&hasWriteup, &turnCount, &createdAt, &lastActivity); err != nil {
 			return map[string]any{"error": err.Error()}, nil
@@ -1549,7 +1555,7 @@ func getInterviewTool(ctx context.Context, pool *sql.DB, interviewID int64) (map
 	var id int64
 	var title, style, purpose, state string
 	var purposeDetail, writeup *string
-	var createdAt, updatedAt time.Time
+	var createdAt, updatedAt sqlutil.DBTime
 	err := pool.QueryRowContext(ctx, q, args...).Scan(
 		&id, &title, &style, &purpose, &purposeDetail, &state,
 		&writeup, &createdAt, &updatedAt,

@@ -1005,6 +1005,9 @@ const App = (() => {
                 if (targetTab === 'tools-access') {
                     if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.load) void Modals.LLMToolsAccess.load();
                 }
+                if (targetTab === 'tool-test') {
+                    if (Modals.ToolTest && Modals.ToolTest.load) void Modals.ToolTest.load();
+                }
                 if (targetTab === 'regions-config') {
                     if (Modals.RegionsConfig && Modals.RegionsConfig.load) void Modals.RegionsConfig.load();
                 }
@@ -2212,6 +2215,7 @@ const App = (() => {
                 contacts: 'ProcessContacts',
                 image_ai_gemma_unclassified: 'Image AI Classification',
                 image_tag_embeddings: 'Image Tag Embeddings',
+                artefact_embeddings: 'Artefact Embeddings',
                 facebook_post_text_embeddings: 'Facebook Post Text Embeddings',
                 facebook_album_description_embeddings: 'Facebook Album Description Embeddings'
             };
@@ -2454,92 +2458,96 @@ const App = (() => {
 
         function gmailImportFormHTML(ids) {
             return `
-                <div id="${ids.authWrap}" style="margin-bottom: 15px; padding: 10px; border-radius: 6px; background: #f0f4ff; border: 1px solid #c7d4f0; display: flex; align-items: center; gap: 10px;">
-                    <span id="${ids.authText}" style="font-size: 0.95em; flex: 1; min-width: 0;">Checking Gmail authentication…</span>
-                    <div id="${ids.authActions}" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto;">
-                        <button type="button" id="${ids.authDisconnect}" style="display: none; padding: 5px 12px; background: #fff; color: #5c6b7a; border: 1px solid #bfc9da; border-radius: 4px; font-size: 0.9em; font-weight: 500; cursor: pointer;">Disconnect</button>
-                        <button type="button" id="${ids.authLink}" style="display: none; padding: 5px 12px; background: #4285f4; color: #fff; border: none; border-radius: 4px; font-size: 0.9em; font-weight: 500; cursor: pointer;">Connect Gmail</button>
+                <div class="import-input-form">
+                <div id="${ids.authWrap}" class="import-input-gmail-auth">
+                    <span id="${ids.authText}" class="import-input-gmail-auth-text">Checking Gmail authentication…</span>
+                    <div id="${ids.authActions}" class="import-input-gmail-auth-actions">
+                        <button type="button" id="${ids.authDisconnect}" class="modal-btn modal-btn-secondary" style="display: none;">Disconnect</button>
+                        <button type="button" id="${ids.authLink}" class="modal-btn modal-btn-primary" style="display: none;">Connect Gmail</button>
                     </div>
                 </div>
                 <div id="${ids.importControls}" style="display: none;">
-                    <div class="setting-group" style="margin-bottom: 15px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="checkbox" id="${ids.allLabels}" style="cursor: pointer;">
+                    <div class="setting-group">
+                        <label class="import-input-check-row">
+                            <input type="checkbox" id="${ids.allLabels}">
                             <span>Process All Labels</span>
                         </label>
                     </div>
-                    <div id="${ids.excludeLabelsWrap}" class="setting-group" style="margin-bottom: 15px; display: none;">
-                        <label for="${ids.excludeLabels}" style="display: block; margin-bottom: 5px; font-weight: 500;">Exclude Labels (one regex per line)</label>
-                        <textarea id="${ids.excludeLabels}" rows="4" placeholder="e.g.&#10;^Spam$&#10;^Trash.*&#10;.*Promotions.*" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-family: monospace; font-size: 0.9em; resize: vertical; box-sizing: border-box;"></textarea>
-                        <small style="color: #666; margin-top: 4px; display: block;">Labels matching any pattern will be skipped.</small>
+                    <div id="${ids.excludeLabelsWrap}" class="setting-group" style="display: none;">
+                        <label class="artefact-field-label" for="${ids.excludeLabels}">Exclude Labels (one regex per line)</label>
+                        <textarea id="${ids.excludeLabels}" class="form-control import-input-regex-textarea" rows="4" placeholder="e.g.&#10;^Spam$&#10;^Trash.*&#10;.*Promotions.*"></textarea>
+                        <small class="import-input-hint">Labels matching any pattern will be skipped.</small>
                     </div>
-                    <div id="${ids.labelsWrap}" class="setting-group import-dialog-labels-folders-section" style="margin-bottom: 15px;">
-                        <label for="${ids.labelsSelect}" style="display: block; margin-bottom: 5px; font-weight: 500;">Select Labels</label>
-                        <select id="${ids.labelsSelect}" class="import-dialog-folders-pane" multiple style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da;">
+                    <div id="${ids.labelsWrap}" class="setting-group import-dialog-labels-folders-section">
+                        <label class="artefact-field-label" for="${ids.labelsSelect}">Select Labels</label>
+                        <select id="${ids.labelsSelect}" class="form-control import-dialog-folders-pane" multiple>
                             <option value="">Loading labels…</option>
                         </select>
-                        <small style="color: #666; margin-top: 4px; display: block;">Hold Ctrl/Cmd to select multiple</small>
+                        <small class="import-input-hint">Hold Ctrl/Cmd to select multiple</small>
                     </div>
-                    <div class="setting-group" style="margin-bottom: 15px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="checkbox" id="${ids.newOnly}" style="cursor: pointer;">
+                    <div class="setting-group">
+                        <label class="import-input-check-row">
+                            <input type="checkbox" id="${ids.newOnly}">
                             <span>New Only (skip already imported emails)</span>
                         </label>
                     </div>
+                </div>
                 </div>`;
         }
 
         function imapImportFormHTML(ids) {
             return `
-                <div class="setting-group" style="margin-bottom: 15px;">
-                    <label for="${ids.host}" style="display: block; margin-bottom: 5px; font-weight: 500;">IMAP Host</label>
-                    <input type="text" id="${ids.host}" placeholder="e.g., imap.outlook.com" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da;">
+                <div class="import-input-form">
+                <div class="setting-group">
+                    <label class="artefact-field-label" for="${ids.host}">IMAP Host</label>
+                    <input type="text" class="form-control" id="${ids.host}" placeholder="e.g., imap.outlook.com">
                 </div>
-                <div class="setting-group" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: flex-end;">
-                    <div style="flex: 1;">
-                        <label for="${ids.port}" style="display: block; margin-bottom: 5px; font-weight: 500;">Port</label>
-                        <input type="number" id="${ids.port}" placeholder="993" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da;">
+                <div class="import-input-port-row">
+                    <div class="setting-group import-input-port-field">
+                        <label class="artefact-field-label" for="${ids.port}">Port</label>
+                        <input type="number" class="form-control" id="${ids.port}" placeholder="993">
                     </div>
-                    <div style="margin-bottom: 9px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="checkbox" id="${ids.useSsl}" style="cursor: pointer;">
+                    <div class="import-input-ssl-field">
+                        <label class="import-input-check-row">
+                            <input type="checkbox" id="${ids.useSsl}">
                             <span>SSL/TLS</span>
                         </label>
                     </div>
                 </div>
-                <div class="setting-group" style="margin-bottom: 15px;">
-                    <label for="${ids.username}" style="display: block; margin-bottom: 5px; font-weight: 500;">Username</label>
-                    <input type="text" id="${ids.username}" placeholder="your@email.com" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da;">
+                <div class="setting-group">
+                    <label class="artefact-field-label" for="${ids.username}">Username</label>
+                    <input type="text" class="form-control" id="${ids.username}" placeholder="your@email.com">
                 </div>
-                <div class="setting-group" style="margin-bottom: 15px;">
-                    <label for="${ids.password}" style="display: block; margin-bottom: 5px; font-weight: 500;">Password</label>
-                    <input type="password" id="${ids.password}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da;">
+                <div class="setting-group">
+                    <label class="artefact-field-label" for="${ids.password}">Password</label>
+                    <input type="password" class="form-control" id="${ids.password}">
                 </div>
-                <div class="setting-group" style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                    <button type="button" id="${ids.fetchBtn}" style="padding: 6px 14px; border-radius: 4px; border: 1px solid #bfc9da; cursor: pointer; background: #e8f0fe; font-weight: 500;">Fetch Folders</button>
-                    <span id="${ids.fetchStatus}" style="font-size: 0.9em; color: #666;"></span>
+                <div class="setting-group import-input-fetch-row">
+                    <button type="button" id="${ids.fetchBtn}" class="modal-btn modal-btn-secondary">Fetch Folders</button>
+                    <span id="${ids.fetchStatus}" class="import-input-status" aria-live="polite"></span>
                 </div>
-                <div class="setting-group" style="margin-bottom: 15px;">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="${ids.allFolders}" style="cursor: pointer;">
+                <div class="setting-group">
+                    <label class="import-input-check-row">
+                        <input type="checkbox" id="${ids.allFolders}">
                         <span>Process All Folders</span>
                     </label>
                 </div>
-                <div id="${ids.excludeFoldersWrap}" class="setting-group" style="margin-bottom: 15px; display: none;">
-                    <label for="${ids.excludeFolders}" style="display: block; margin-bottom: 5px; font-weight: 500;">Exclude Folders (one regex per line)</label>
-                    <textarea id="${ids.excludeFolders}" rows="4" placeholder="e.g.&#10;^Spam$&#10;^Trash&#10;.*Junk.*" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-family: monospace; font-size: 0.9em; resize: vertical; box-sizing: border-box;"></textarea>
-                    <small style="color: #666; margin-top: 4px; display: block;">Folders matching any pattern will be skipped.</small>
+                <div id="${ids.excludeFoldersWrap}" class="setting-group" style="display: none;">
+                    <label class="artefact-field-label" for="${ids.excludeFolders}">Exclude Folders (one regex per line)</label>
+                    <textarea id="${ids.excludeFolders}" class="form-control import-input-regex-textarea" rows="4" placeholder="e.g.&#10;^Spam$&#10;^Trash&#10;.*Junk.*"></textarea>
+                    <small class="import-input-hint">Folders matching any pattern will be skipped.</small>
                 </div>
-                <div id="${ids.foldersWrap}" class="setting-group import-dialog-labels-folders-section" style="margin-bottom: 15px; display: none;">
-                    <label for="${ids.foldersSelect}" style="display: block; margin-bottom: 5px; font-weight: 500;">Select Folders</label>
-                    <select id="${ids.foldersSelect}" class="import-dialog-folders-pane" multiple style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da;"></select>
-                    <small style="color: #666; margin-top: 4px; display: block;">Hold Ctrl/Cmd to select multiple</small>
+                <div id="${ids.foldersWrap}" class="setting-group import-dialog-labels-folders-section" style="display: none;">
+                    <label class="artefact-field-label" for="${ids.foldersSelect}">Select Folders</label>
+                    <select id="${ids.foldersSelect}" class="form-control import-dialog-folders-pane" multiple></select>
+                    <small class="import-input-hint">Hold Ctrl/Cmd to select multiple</small>
                 </div>
-                <div class="setting-group" style="margin-bottom: 15px;">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="${ids.newOnly}" style="cursor: pointer;">
+                <div class="setting-group">
+                    <label class="import-input-check-row">
+                        <input type="checkbox" id="${ids.newOnly}">
                         <span>New Only (skip already imported emails)</span>
                     </label>
+                </div>
                 </div>`;
         }
 
@@ -2576,6 +2584,7 @@ const App = (() => {
             contacts: '/contacts/extract/cancel',
             image_ai_gemma_unclassified: '/image/ai-classification/cancel',
             image_tag_embeddings: '/images/tag-embeddings/backfill/cancel',
+            artefact_embeddings: '/artefacts/embeddings/backfill/cancel',
             facebook_post_text_embeddings: '/facebook/posts/embeddings/backfill/cancel',
             facebook_album_description_embeddings: '/facebook/albums/embeddings/backfill/cancel'
         };
@@ -2780,6 +2789,9 @@ const App = (() => {
                 case 'image_tag_embeddings':
                     if (data.status_line) return data.status_line;
                     return `Image tag embeddings: ${data.processed || 0}/${data.total || 0} | ${data.embedded || 0} embedded, ${data.skipped_unchanged || 0} skipped (unchanged), ${data.skipped || 0} skipped (empty), ${data.errors || 0} errors`;
+                case 'artefact_embeddings':
+                    if (data.status_line) return data.status_line;
+                    return `Artefact embeddings: ${data.processed || 0}/${data.total || 0} | ${data.embedded || 0} embedded, ${data.skipped || 0} skipped (empty), ${data.errors || 0} errors`;
                 case 'facebook_post_text_embeddings':
                     if (data.status_line) return data.status_line;
                     return `Facebook post embeddings: ${data.processed || 0}/${data.total || 0} | ${data.embedded || 0} embedded, ${data.skipped || 0} skipped | ${data.errors || 0} errors`;
@@ -2880,6 +2892,7 @@ const App = (() => {
             contacts: { needsInput: false, title: 'Contacts Merge', run: async () => { const r = await fetch('/contacts/extract', { method: 'POST' }); return r; }, stream: '/contacts/extract/stream' },
             image_ai_gemma_unclassified: { needsInput: false, title: 'AI classify images missing GemmaClassified tag', run: async () => { const r = await fetch('/image/ai-classification/missing-gemma-classified', { method: 'POST' }); return r; }, stream: '/image/ai-classification/stream' },
             image_tag_embeddings: { needsInput: false, title: 'Build image tag similarity embeddings', run: async (vals) => { const body = { reprocess_all: !!(vals && vals.reprocess_all) }; const r = await fetch('/images/tag-embeddings/backfill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/images/tag-embeddings/backfill/stream' },
+            artefact_embeddings: { needsInput: false, title: 'Build artefact similarity embeddings', run: async (vals) => { const body = { reprocess_all: !!(vals && vals.reprocess_all) }; const r = await fetch('/artefacts/embeddings/backfill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/artefacts/embeddings/backfill/stream' },
             facebook_post_text_embeddings: { needsInput: false, title: 'Build Facebook post text embeddings', run: async (vals) => { const body = { reprocess_all: !!(vals && vals.reprocess_all) }; const r = await fetch('/facebook/posts/embeddings/backfill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/facebook/posts/embeddings/backfill/stream' },
             facebook_album_description_embeddings: { needsInput: false, title: 'Build Facebook album description embeddings', run: async (vals) => { const body = { reprocess_all: !!(vals && vals.reprocess_all) }; const r = await fetch('/facebook/albums/embeddings/backfill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/facebook/albums/embeddings/backfill/stream' },
             imap_processing: { needsInput: true, title: 'IMAP Import', run: async (vals) => { const body = { host: vals.host, port: vals.port, username: vals.username, password: vals.password, use_ssl: vals.use_ssl !== false, all_folders: vals.all_folders || false, folders: vals.folders && vals.folders.length ? vals.folders : (vals.all_folders ? [] : ['INBOX']), new_only: vals.new_only || false, exclude_folders: vals.exclude_folders || [] }; return await fetch('/imap/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }, stream: '/imap/process/stream' }
@@ -3284,12 +3297,13 @@ const App = (() => {
                 const use_ssl = useSslEl.checked;
                 if (!host || !username || !password) {
                     fetchStatus.textContent = 'Fill in host, username, and password first.';
-                    fetchStatus.style.color = '#c0392b';
+                    fetchStatus.classList.add('import-input-status--error');
+                    fetchStatus.classList.remove('import-input-status--success');
                     return;
                 }
                 fetchBtn.disabled = true;
                 fetchStatus.textContent = 'Connecting...';
-                fetchStatus.style.color = '#666';
+                fetchStatus.classList.remove('import-input-status--error', 'import-input-status--success');
                 try {
                     const resp = await fetch('/imap/folders', {
                         method: 'POST',
@@ -3299,7 +3313,8 @@ const App = (() => {
                     if (!resp.ok) {
                         const err = await resp.json();
                         fetchStatus.textContent = err.detail || 'Failed to fetch folders';
-                        fetchStatus.style.color = '#c0392b';
+                        fetchStatus.classList.add('import-input-status--error');
+                        fetchStatus.classList.remove('import-input-status--success');
                         return;
                     }
                     const data = await resp.json();
@@ -3314,13 +3329,15 @@ const App = (() => {
                     const inboxOpt = Array.from(foldersSelect.options).find(o => o.value.toUpperCase() === 'INBOX');
                     if (inboxOpt) inboxOpt.selected = true;
                     fetchStatus.textContent = `${folders.length} folder(s) loaded`;
-                    fetchStatus.style.color = '#27ae60';
+                    fetchStatus.classList.add('import-input-status--success');
+                    fetchStatus.classList.remove('import-input-status--error');
                     if (!allFoldersCb.checked) foldersWrap.style.display = 'block';
                     if (excludeFoldersWrap) excludeFoldersWrap.style.display = allFoldersCb.checked ? 'block' : 'none';
                     void imapSaveToPrivateStore();
                 } catch (e) {
                     fetchStatus.textContent = 'Connection error: ' + e.message;
-                    fetchStatus.style.color = '#c0392b';
+                    fetchStatus.classList.add('import-input-status--error');
+                    fetchStatus.classList.remove('import-input-status--success');
                 } finally {
                     fetchBtn.disabled = false;
                 }
@@ -3420,15 +3437,15 @@ const App = (() => {
             const cfg = importConfigs[importType];
             if (!cfg || !cfg.needsInput) { onSubmit({}); return; }
             importInputModalTitle.textContent = cfg.title;
-            importInputModalBody.innerHTML = cfg.fields.map(f => {
+            importInputModalBody.innerHTML = '<div class="import-input-form">' + cfg.fields.map(f => {
                 if (f.type === 'checkbox') {
-                    return `<div class="setting-group" style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="import-modal-${f.id}" style="width: 16px; height: 16px;"><label for="import-modal-${f.id}" style="font-weight: 500; cursor: pointer;">${f.label}</label></div>`;
+                    return `<div class="setting-group"><label class="import-input-check-row"><input type="checkbox" id="import-modal-${f.id}"><span>${f.label}</span></label></div>`;
                 }
                 if (f.type === 'folder') {
-                    return `<div class="setting-group" style="margin-bottom: 15px;"><label for="import-modal-${f.id}" style="display: block; margin-bottom: 5px; font-weight: 500;">${f.label}</label><div style="display: flex; gap: 8px; align-items: stretch;"><input type="text" id="import-modal-${f.id}" placeholder="${f.placeholder || ''}" style="flex: 1; min-width: 0; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da;"><button type="button" class="modal-btn modal-btn-secondary" id="import-modal-${f.id}-browse" style="white-space: nowrap;">Choose folder…</button></div><p style="margin: 8px 0 0; font-size: 12px; color: #666;">Paths only are stored in the archive; image files remain on disk (reference import).</p></div>`;
+                    return `<div class="setting-group"><label class="artefact-field-label" for="import-modal-${f.id}">${f.label}</label><div style="display: flex; gap: 8px; align-items: stretch;"><input type="text" class="form-control" id="import-modal-${f.id}" placeholder="${f.placeholder || ''}" style="flex: 1; min-width: 0;"><button type="button" class="modal-btn modal-btn-secondary" id="import-modal-${f.id}-browse" style="white-space: nowrap;">Choose folder…</button></div><p class="import-input-hint" style="margin-top: 0.5rem;">Paths only are stored in the archive; image files remain on disk (reference import).</p></div>`;
                 }
-                return `<div class="setting-group" style="margin-bottom: 15px;"><label for="import-modal-${f.id}" style="display: block; margin-bottom: 5px; font-weight: 500;">${f.label}</label><input type="${f.type || 'text'}" id="import-modal-${f.id}" placeholder="${f.placeholder || ''}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da;"></div>`;
-            }).join('');
+                return `<div class="setting-group"><label class="artefact-field-label" for="import-modal-${f.id}">${f.label}</label><input type="${f.type || 'text'}" class="form-control" id="import-modal-${f.id}" placeholder="${f.placeholder || ''}"></div>`;
+            }).join('') + '</div>';
             cfg.fields.forEach(f => {
                 const el = document.getElementById(`import-modal-${f.id}`);
                 if (el && typeof getControlValue === 'function') {
@@ -3609,6 +3626,18 @@ const App = (() => {
                             'Reprocess all: refresh every embedding via local AI (slower).\n' +
                             'Skip unchanged: only embed images where tags changed or no embedding exists yet.',
                         { confirmLabel: 'Reprocess all', cancelLabel: 'Skip unchanged' }
+                    );
+                }
+                await runImport(importType, { reprocess_all: !!reprocessAll });
+            } else if (importType === 'artefact_embeddings') {
+                let reprocessAll = false;
+                if (window.AppDialogs && typeof window.AppDialogs.showAppConfirm === 'function') {
+                    reprocessAll = await window.AppDialogs.showAppConfirm(
+                        'Artefact embeddings',
+                        'Do you want to reprocess all artefacts?\n\n' +
+                            'Reprocess all: refresh every embedding via local AI (slower).\n' +
+                            'Fill missing only: only embed artefacts that do not already have vectors.',
+                        { confirmLabel: 'Reprocess all', cancelLabel: 'Fill missing only' }
                     );
                 }
                 await runImport(importType, { reprocess_all: !!reprocessAll });
@@ -3849,7 +3878,7 @@ const App = (() => {
         })();
 
         async function checkInitialImportStatus() {
-            const types = ['upload_zip','email_processing','imap_processing','filesystem','reference_import','image_regions_recalc','email_embeddings','message_embeddings','message_context_embeddings','image_tag_embeddings','facebook_post_text_embeddings','facebook_album_description_embeddings','image_export','thumbnails','contacts','image_ai_gemma_unclassified'];
+            const types = ['upload_zip','email_processing','imap_processing','filesystem','reference_import','image_regions_recalc','email_embeddings','message_embeddings','message_context_embeddings','image_tag_embeddings','artefact_embeddings','facebook_post_text_embeddings','facebook_album_description_embeddings','image_export','thumbnails','contacts','image_ai_gemma_unclassified'];
             const statusEndpoints = {
                 upload_zip: '/import/upload/status',
                 email_processing: '/gmail/process/status',
@@ -3865,6 +3894,7 @@ const App = (() => {
                 contacts: '/contacts/extract/status',
                 image_ai_gemma_unclassified: '/image/ai-classification/status',
                 image_tag_embeddings: '/images/tag-embeddings/backfill/status',
+                artefact_embeddings: '/artefacts/embeddings/backfill/status',
                 facebook_post_text_embeddings: '/facebook/posts/embeddings/backfill/status',
                 facebook_album_description_embeddings: '/facebook/albums/embeddings/backfill/status'
             };
@@ -4096,6 +4126,62 @@ const App = (() => {
         const messageSimilarityTabs = document.getElementById('message-similarity-tabs');
         const messageSimilarityResults = document.getElementById('message-similarity-results');
         const messageSimilarityClearBtn = document.getElementById('message-similarity-clear-btn');
+        const messageSimilaritySensitivity = document.getElementById('message-similarity-sensitivity');
+        const messageSimilaritySensitivityLabel = document.getElementById('message-similarity-sensitivity-label');
+        const MESSAGE_SIMILARITY_SENSITIVITY_DEFAULT = 50;
+
+        const sensitivityToMaxDistance = (sensitivity) => {
+            const s = Math.max(0, Math.min(100, Number(sensitivity)));
+            if (!Number.isFinite(s)) return 1.1;
+            const minDist = 0.35;
+            const maxDist = 1.85;
+            return maxDist - (s / 100) * (maxDist - minDist);
+        };
+
+        const sensitivityDisplayLabel = (sensitivity) => {
+            const s = Math.max(0, Math.min(100, Number(sensitivity)));
+            if (s >= 85) return 'Very strict';
+            if (s >= 65) return 'Strict';
+            if (s >= 35) return 'Balanced';
+            if (s >= 15) return 'Relaxed';
+            return 'Broad';
+        };
+
+        const itemPassesSimilaritySensitivity = (item, maxDistance) => {
+            const raw = item?.distance;
+            if (raw == null || raw === '') {
+                return maxDistance >= 1.05;
+            }
+            const d = Number(raw);
+            return Number.isFinite(d) && d <= maxDistance;
+        };
+
+        const filterGroupedBySensitivity = (grouped, maxDistance) => {
+            const out = {};
+            Object.keys(grouped).forEach((key) => {
+                const items = Array.isArray(grouped[key]) ? grouped[key] : [];
+                out[key] = items.filter((item) => itemPassesSimilaritySensitivity(item, maxDistance));
+            });
+            return out;
+        };
+
+        const formatSimilarityDistance = (distance) => {
+            const d = Number(distance);
+            if (Number.isFinite(d)) return d.toFixed(3);
+            return '—';
+        };
+
+        const updateMessageSimilaritySensitivityLabel = () => {
+            if (!messageSimilaritySensitivity || !messageSimilaritySensitivityLabel) return;
+            const val = parseInt(messageSimilaritySensitivity.value, 10);
+            messageSimilaritySensitivityLabel.textContent = sensitivityDisplayLabel(val);
+            messageSimilaritySensitivity.setAttribute('aria-valuenow', String(val));
+        };
+
+        const closeMessageSimilarityModal = () => {
+            if (!messageSimilarityModal) return;
+            messageSimilarityModal.style.display = 'none';
+        };
 
         const setMessageSimilarityStatus = (msg, isError = false) => {
             if (!messageSimilarityStatus) return;
@@ -4111,7 +4197,9 @@ const App = (() => {
 
         const messageSimilarityMediaMeta = {
             messages: { label: 'Messages' },
+            emails: { label: 'Emails' },
             images: { label: 'Images' },
+            artefacts: { label: 'Artefacts' },
             facebook_posts: { label: 'Facebook Posts' },
             facebook_albums: { label: 'Facebook Albums' }
         };
@@ -4187,12 +4275,46 @@ const App = (() => {
             }));
         };
 
+        const normalizeEmailSimilarityResults = (data) => {
+            const rows = Array.isArray(data?.results) ? data.results : [];
+            return rows.map((r) => ({
+                mediaType: 'emails',
+                id: r?.id,
+                title: r?.subject || `Email ${r?.id ?? ''}`.trim(),
+                primaryText: r?.snippet || r?.plain_text || '(no preview)',
+                secondaryText: r?.from_address || '',
+                distance: r?.distance,
+                raw: r
+            }));
+        };
+
+        const normalizeArtefactSimilarityResults = (data) => {
+            const rows = Array.isArray(data?.results) ? data.results : [];
+            return rows.map((r) => ({
+                mediaType: 'artefacts',
+                id: r?.id,
+                title: r?.name || `Artefact ${r?.id ?? ''}`.trim(),
+                primaryText: r?.description || r?.story || r?.tags || 'No description',
+                secondaryText: r?.tags || '',
+                distance: r?.distance,
+                previewImageUrl: r?.id ? `/artefacts/${r.id}/thumbnail` : '',
+                raw: r
+            }));
+        };
+
         const openMessageSimilarityResult = (item) => {
             if (!item) return;
             switch (item.mediaType) {
                 case 'messages':
                     if (item.id && Modals.SMSMessages && typeof Modals.SMSMessages.openAndSelectConversation === 'function') {
                         Modals.SMSMessages.openAndSelectConversation(item.id);
+                    }
+                    return;
+                case 'emails':
+                    if (item.id != null && item.id !== '') {
+                        if (Modals.EmailGallery && typeof Modals.EmailGallery.openAndSelectEmail === 'function') {
+                            void Modals.EmailGallery.openAndSelectEmail(item.id);
+                        }
                     }
                     return;
                 case 'images':
@@ -4214,6 +4336,13 @@ const App = (() => {
                         void Modals.FBAlbums.openAndSelectAlbum(item.id);
                     }
                     return;
+                case 'artefacts':
+                    if (item.id != null && item.id !== '') {
+                        if (Modals.Artefacts && typeof Modals.Artefacts.openAndSelectArtefact === 'function') {
+                            void Modals.Artefacts.openAndSelectArtefact(item.id);
+                        }
+                    }
+                    return;
                 default:
                     return;
             }
@@ -4226,7 +4355,7 @@ const App = (() => {
             if (messageSimilarityTabs) { messageSimilarityTabs.innerHTML = ''; messageSimilarityTabs.style.display = 'flex'; }
             const grouped = payload?.grouped || {};
             const errors = Array.isArray(payload?.errors) ? payload.errors : [];
-            const mediaOrder = ['messages', 'images', 'facebook_posts', 'facebook_albums'];
+            const mediaOrder = ['messages', 'emails', 'images', 'artefacts', 'facebook_posts', 'facebook_albums'];
             const totalCount = mediaOrder.reduce((acc, key) => acc + ((grouped[key] || []).length), 0);
             if (totalCount === 0) {
                 const empty = document.createElement('div');
@@ -4310,12 +4439,12 @@ const App = (() => {
                     preview.textContent = item.primaryText || '';
                     left.appendChild(preview);
 
-                    if (item.secondaryText) {
-                        const sub = document.createElement('div');
-                        sub.className = 'message-similarity-result-meta';
-                        sub.textContent = item.secondaryText;
-                        left.appendChild(sub);
-                    }
+                    const meta = document.createElement('div');
+                    meta.className = 'message-similarity-result-meta';
+                    const metaParts = [`Distance: ${formatSimilarityDistance(item.distance)}`];
+                    if (item.secondaryText) metaParts.push(item.secondaryText);
+                    meta.textContent = metaParts.join(' · ');
+                    left.appendChild(meta);
 
                     const right = document.createElement('div');
                     right.className = 'message-similarity-result-actions';
@@ -4367,11 +4496,6 @@ const App = (() => {
             }
         };
 
-        const closeMessageSimilarityModal = () => {
-            if (!messageSimilarityModal) return;
-            messageSimilarityModal.style.display = 'none';
-        };
-
         if (messageSimilaritySidebarBtn && messageSimilarityModal) {
             messageSimilaritySidebarBtn.addEventListener('click', () => {
                 messageSimilarityModal.style.display = 'flex';
@@ -4380,10 +4504,18 @@ const App = (() => {
         }
         if (closeMessageSimilarityModalBtn) closeMessageSimilarityModalBtn.addEventListener('click', closeMessageSimilarityModal);
         if (messageSimilarityCancelBtn) messageSimilarityCancelBtn.addEventListener('click', closeMessageSimilarityModal);
+        if (messageSimilaritySensitivity) {
+            messageSimilaritySensitivity.addEventListener('input', updateMessageSimilaritySensitivityLabel);
+            updateMessageSimilaritySensitivityLabel();
+        }
         if (messageSimilarityClearBtn) {
             messageSimilarityClearBtn.addEventListener('click', () => {
                 if (messageSimilarityText) messageSimilarityText.value = '';
                 if (messageSimilarityN) messageSimilarityN.value = '25';
+                if (messageSimilaritySensitivity) {
+                    messageSimilaritySensitivity.value = String(MESSAGE_SIMILARITY_SENSITIVITY_DEFAULT);
+                    updateMessageSimilaritySensitivityLabel();
+                }
                 setMessageSimilarityStatus('');
                 if (messageSimilarityTabs) { messageSimilarityTabs.innerHTML = ''; messageSimilarityTabs.style.display = 'none'; }
                 if (messageSimilarityResults) { messageSimilarityResults.innerHTML = ''; messageSimilarityResults.style.display = 'none'; }
@@ -4418,10 +4550,22 @@ const App = (() => {
                             normalize: normalizeMessageSimilarityResults
                         },
                         {
+                            id: 'emails',
+                            label: 'Emails',
+                            endpoint: '/emails/similar-by-text',
+                            normalize: normalizeEmailSimilarityResults
+                        },
+                        {
                             id: 'images',
                             label: 'Images',
                             endpoint: '/images/similar-by-tags',
                             normalize: normalizeImageSimilarityResults
+                        },
+                        {
+                            id: 'artefacts',
+                            label: 'Artefacts',
+                            endpoint: '/artefacts/similar-by-text',
+                            normalize: normalizeArtefactSimilarityResults
                         },
                         {
                             id: 'facebook_posts',
@@ -4454,7 +4598,9 @@ const App = (() => {
 
                     const grouped = {
                         messages: [],
+                        emails: [],
                         images: [],
+                        artefacts: [],
                         facebook_posts: [],
                         facebook_albums: []
                     };
@@ -4480,14 +4626,24 @@ const App = (() => {
                         }
                     });
 
-                    const total = Object.values(grouped).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
+                    const rawTotal = Object.values(grouped).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
+                    const sensitivityVal = parseInt(
+                        messageSimilaritySensitivity?.value || String(MESSAGE_SIMILARITY_SENSITIVITY_DEFAULT),
+                        10
+                    );
+                    const maxDistance = sensitivityToMaxDistance(sensitivityVal);
+                    const groupedFiltered = filterGroupedBySensitivity(grouped, maxDistance);
+                    const total = Object.values(groupedFiltered).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
                     const okSourceCount = sources.length - errors.length;
+                    const sensitivityNote = total < rawTotal
+                        ? ` (${total} after ${sensitivityDisplayLabel(sensitivityVal).toLowerCase()} sensitivity filter)`
+                        : '';
                     if (errors.length > 0) {
-                        setMessageSimilarityStatus(`Found ${total} match(es) across ${okSourceCount}/${sources.length} sources.`, false);
+                        setMessageSimilarityStatus(`Found ${rawTotal} match(es) across ${okSourceCount}/${sources.length} sources${sensitivityNote}.`, false);
                     } else {
-                        setMessageSimilarityStatus(`Found ${total} match(es) across ${sources.length} sources.`, false);
+                        setMessageSimilarityStatus(`Found ${rawTotal} match(es) across ${sources.length} sources${sensitivityNote}.`, false);
                     }
-                    renderMessageSimilarityResults({ grouped, errors });
+                    renderMessageSimilarityResults({ grouped: groupedFiltered, errors });
                 } catch (err) {
                     setMessageSimilarityStatus(`Search failed: ${err.message || err}`, true);
                 } finally {

@@ -103,7 +103,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	emailRepo := repository.NewEmailRepo(pool)
 	emailSvc := service.NewEmailService(emailRepo)
 	emailSvc.WithBilling(billingRepo, userRepo)
-	emailHandler := handler.NewEmailHandler(emailSvc, sessionMasterStore)
+	emailHandler := handler.NewEmailHandler(emailSvc, sessionMasterStore, pool, embeddingSvc)
 	emailHandler.RegisterRoutes(r)
 
 	// ── Shared: documents / sensitive / private store / RAM master key ───────
@@ -192,8 +192,9 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 
 	// ── Artefacts ─────────────────────────────────────────────────────────────
 	artefactRepo := repository.NewArtefactRepo(pool)
-	artefactSvc := service.NewArtefactService(artefactRepo)
-	artefactHandler := handler.NewArtefactHandler(artefactSvc, sensitiveSvc, authSvc, sessionMasterStore)
+	artefactEmbedHelper := service.NewArtefactEmbeddingHelper(pool, artefactRepo, embeddingSvc)
+	artefactSvc := service.NewArtefactService(artefactRepo, artefactEmbedHelper)
+	artefactHandler := handler.NewArtefactHandler(artefactSvc, sensitiveSvc, authSvc, sessionMasterStore, pool, embeddingSvc)
 	artefactHandler.RegisterRoutes(r)
 
 	// ── Voices ────────────────────────────────────────────────────────────────
@@ -340,6 +341,9 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 
 	llmToolsAccessHandler := handler.NewLLMToolsAccessHandler(privateStoreSvc, sessionMasterStore, authSvc)
 	llmToolsAccessHandler.RegisterRoutes(r)
+
+	llmToolsTestHandler := handler.NewLLMToolsTestHandler(pool, sessionMasterStore, subjectConfigRepo, cfg.AI.TavilyAPIKey, cfg.Crypto.KeyringPepper, authSvc)
+	llmToolsTestHandler.RegisterRoutes(r)
 
 	// ── Background jobs scheduler (per-user maintenance jobs) ─────────────────
 	backgroundJobsRepo := repository.NewBackgroundJobRepo(pool)

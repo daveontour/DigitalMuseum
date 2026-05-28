@@ -26,12 +26,29 @@ var ErrArtefactUnsupportedMedia = errors.New("unsupported artefact file type")
 
 // ArtefactService orchestrates artefact CRUD and media operations.
 type ArtefactService struct {
-	repo *repository.ArtefactRepo
+	repo  *repository.ArtefactRepo
+	embed *ArtefactEmbeddingHelper
 }
 
-// NewArtefactService creates an ArtefactService.
-func NewArtefactService(repo *repository.ArtefactRepo) *ArtefactService {
-	return &ArtefactService{repo: repo}
+// NewArtefactService creates an ArtefactService. embed may be nil (no incremental vec sync).
+func NewArtefactService(repo *repository.ArtefactRepo, embed *ArtefactEmbeddingHelper) *ArtefactService {
+	return &ArtefactService{repo: repo, embed: embed}
+}
+
+func (s *ArtefactService) syncEmbedding(ctx context.Context, artefactID int64) {
+	if s.embed != nil {
+		s.embed.Sync(ctx, artefactID)
+	}
+}
+
+// SyncArtefactEmbedding recomputes the sqlite-vec embedding for one artefact (best-effort).
+func (s *ArtefactService) SyncArtefactEmbedding(ctx context.Context, artefactID int64) {
+	s.syncEmbedding(ctx, artefactID)
+}
+
+// ListForEmbeddingBackfill lists artefacts for the embedding maintenance job.
+func (s *ArtefactService) ListForEmbeddingBackfill(ctx context.Context, onlyMissing bool) ([]*repository.ArtefactEmbeddingRow, error) {
+	return s.repo.ListForEmbeddingBackfill(ctx, onlyMissing)
 }
 
 // ── Artefact CRUD ──────────────────────────────────────────────────────────────
@@ -60,6 +77,7 @@ func (s *ArtefactService) Create(ctx context.Context, name string, description, 
 	if err != nil {
 		return nil, err
 	}
+	s.syncEmbedding(ctx, a.ID)
 	return buildArtefactResponse(a, nil), nil
 }
 
@@ -75,10 +93,14 @@ func (s *ArtefactService) Update(ctx context.Context, id int64, name *string, de
 	if err != nil {
 		return nil, err
 	}
+	s.syncEmbedding(ctx, id)
 	return buildArtefactResponse(a, items), nil
 }
 
 func (s *ArtefactService) Delete(ctx context.Context, id int64) error {
+	if s.embed != nil {
+		s.embed.Delete(ctx, id)
+	}
 	// Collect artefact-owned media that has no other links
 	orphanIDs, err := s.repo.GetOrphanArtefactMediaIDs(ctx, id)
 	if err != nil {
@@ -316,6 +338,7 @@ func (s *ArtefactService) ImportArtefacts(ctx context.Context, artefacts []map[s
 			return created, linked, skipped, err2
 		}
 		created++
+		s.syncEmbedding(ctx, a.ID)
 
 		refs, _ := item["media_refs"].([]any)
 		for _, r := range refs {

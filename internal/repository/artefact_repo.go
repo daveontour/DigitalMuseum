@@ -105,6 +105,45 @@ func (r *ArtefactRepo) GetByID(ctx context.Context, id int64) (*model.Artefact, 
 	return &a, nil
 }
 
+// ArtefactEmbeddingRow is one artefact eligible for embedding backfill.
+type ArtefactEmbeddingRow struct {
+	ID          int64
+	Name        string
+	Description *string
+	Tags        *string
+	Story       *string
+}
+
+// ListForEmbeddingBackfill returns artefacts for the current user, optionally only those without vec rows.
+func (r *ArtefactRepo) ListForEmbeddingBackfill(ctx context.Context, onlyMissing bool) ([]*ArtefactEmbeddingRow, error) {
+	uid := uidFromCtx(ctx)
+	q := `
+		SELECT a.id, a.name, a.description, a.tags, a.story
+		FROM artefacts a
+		WHERE COALESCE(a.user_id, 0) = ?1`
+	args := []any{uidVal(uid)}
+	if onlyMissing {
+		q += ` AND NOT EXISTS (SELECT 1 FROM artefact_embeddings e WHERE e.rowid = a.id)`
+	}
+	q += ` ORDER BY a.id ASC`
+
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("ListForEmbeddingBackfill: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*ArtefactEmbeddingRow
+	for rows.Next() {
+		var row ArtefactEmbeddingRow
+		if err := rows.Scan(&row.ID, &row.Name, &row.Description, &row.Tags, &row.Story); err != nil {
+			return nil, err
+		}
+		out = append(out, &row)
+	}
+	return out, rows.Err()
+}
+
 // GetMediaItems returns all linked media items for an artefact, ordered by sort_order.
 func (r *ArtefactRepo) GetMediaItems(ctx context.Context, artefactID int64) ([]*model.ArtefactMediaItem, error) {
 	rows, err := r.pool.QueryContext(ctx,

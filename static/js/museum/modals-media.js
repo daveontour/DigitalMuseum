@@ -375,13 +375,9 @@ Modals.FBPosts = (() => {
             const preview = (p.post_text || p.title || '(no text)').substring(0, 80) + ((p.post_text || '').length > 80 ? '…' : '');
             const icon = postTypeIcon(p);
             const isSelected = p.id === selectedPostId;
-            return `<div class="fb-post-list-item" data-post-id="${p.id}" style="
-                padding: 0.6rem 0.8rem; cursor: pointer; border-radius: 4px;
-                background: ${isSelected ? '#233366' : 'transparent'};
-                color: ${isSelected ? '#fff' : '#333'};
-                border-bottom: 1px solid #dee2e6; margin-bottom: 2px;">
-                <div style="font-size:0.75em;color:${isSelected ? '#ccc' : '#888'};">${formatDate(p.timestamp)}${icon}</div>
-                <div style="font-size:0.85em;margin-top:2px;">${preview}</div>
+            return `<div class="fb-post-list-item${isSelected ? ' selected' : ''}" data-post-id="${p.id}">
+                <div class="fb-post-list-item-date">${formatDate(p.timestamp)}${icon}</div>
+                <div class="fb-post-list-item-preview">${preview}</div>
             </div>`;
         }).join('');
 

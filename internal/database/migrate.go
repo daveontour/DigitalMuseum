@@ -1409,6 +1409,7 @@ func ensureSQLiteVecEmbeddingTables(ctx context.Context, db *sql.DB) error {
 		"media_tag_embeddings",
 		"facebook_post_text_embeddings",
 		"facebook_album_description_embeddings",
+		"artefact_embeddings",
 	}
 	for _, table := range tables {
 		var exists int
