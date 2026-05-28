@@ -30,6 +30,8 @@ const HaveAChat = (() => {
     let _freeRunActive = false;
     /** Snapshot for post-stop save prompt (null when not showing save dialog). */
     let _pendingSavePayload = null;
+    /** Current in-chat thinking bubble element (while waiting on active turn). */
+    let _thinkingBubbleEl = null;
 
     // ── DOM helpers ──────────────────────────────────────────────────────────
     const _el = (id) => document.getElementById(id);
@@ -372,6 +374,58 @@ const HaveAChat = (() => {
         }
     }
 
+    function _removeThinkingBubble() {
+        if (_thinkingBubbleEl) {
+            _thinkingBubbleEl.remove();
+            _thinkingBubbleEl = null;
+        }
+    }
+
+    function _showThinkingBubble(slot, provider, voiceKey) {
+        _removeThinkingBubble();
+        if (!DOM || !DOM.chatBox) return;
+
+        const msgEl = document.createElement('div');
+        const slotClass = slot === 'a' ? 'have-a-chat-claude' : 'have-a-chat-gemini';
+        msgEl.classList.add('have-a-chat-message', slotClass, 'have-a-chat-thinking-message');
+
+        const header = document.createElement('div');
+        header.className = 'have-a-chat-header';
+
+        const img = document.createElement('img');
+        img.className = 'have-a-chat-voice-image';
+        img.src = `/static/images/${typeof VoiceSelector !== 'undefined' ? VoiceSelector.getVoiceImage(voiceKey, true) : voiceKey + '_sm.png'}`;
+        img.alt = voiceKey;
+        img.onerror = () => { img.style.display = 'none'; };
+
+        const nameLabel = document.createElement('span');
+        nameLabel.className = 'have-a-chat-label';
+        nameLabel.textContent = _voiceNames[voiceKey] || voiceKey;
+
+        const llmBadge = document.createElement('span');
+        llmBadge.className = 'have-a-chat-llm-badge have-a-chat-llm-' + provider;
+        llmBadge.textContent = _llmDisplayName(provider);
+
+        header.appendChild(img);
+        header.appendChild(nameLabel);
+        header.appendChild(llmBadge);
+        msgEl.appendChild(header);
+
+        const contentEl = document.createElement('div');
+        contentEl.className = 'have-a-chat-thinking-content';
+        contentEl.innerHTML = `
+            <span class="have-a-chat-thinking-text">Thinking</span>
+            <span class="have-a-chat-thinking-dots" aria-hidden="true">
+                <span></span><span></span><span></span>
+            </span>
+        `;
+        msgEl.appendChild(contentEl);
+
+        DOM.chatBox.appendChild(msgEl);
+        _thinkingBubbleEl = msgEl;
+        if (typeof UI !== 'undefined' && UI.scrollToBottom) UI.scrollToBottom();
+    }
+
     // ── Control bar helpers ──────────────────────────────────────────────────
     function _syncContextStatusBar() {
         if (typeof UI !== 'undefined' && UI.syncChatContextStatusBarVisibility) {
@@ -490,9 +544,11 @@ const HaveAChat = (() => {
             const voiceName = _voiceNames[voiceKey] || voiceKey;
             const llmLabel  = _llmDisplayName(provider);
             _setStatus(`${voiceName} (${llmLabel}) is thinking…`);
+            _showThinkingBubble(_currentSlot, provider, voiceKey);
 
             try {
                 const result = await _callTurnEndpoint();
+                _removeThinkingBubble();
                 if (_stopRequested) break;
 
                 // Use provider from response (handles fallback cases)
@@ -537,6 +593,7 @@ const HaveAChat = (() => {
                 }
 
             } catch (err) {
+                _removeThinkingBubble();
                 _setStatus(`Error: ${err.message} — conversation paused.`);
                 _isPaused = true;
                 _setPauseButtonLabel(true);
@@ -687,6 +744,7 @@ const HaveAChat = (() => {
         _isRunning     = false;
         _isPaused      = false;
         _stopRequested = true;
+        _removeThinkingBubble();
         _cancelFreeRun('stop');
         const hadHistory = _chatHistory.length > 0;
         _hideControlBar();

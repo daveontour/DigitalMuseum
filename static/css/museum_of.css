@@ -12714,6 +12714,58 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 .have-a-chat-content p:first-child { margin-top: 0; }
 .have-a-chat-content p:last-child  { margin-bottom: 0; }
 
+.have-a-chat-thinking-message {
+    opacity: 0.95;
+}
+
+.have-a-chat-thinking-message.have-a-chat-claude {
+    background-color: rgba(20, 90, 200, 0.62);
+}
+
+.have-a-chat-thinking-message.have-a-chat-gemini {
+    background-color: rgba(90, 40, 180, 0.62);
+}
+
+.have-a-chat-thinking-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text);
+    font-size: var(--message-font-size, 16px);
+    line-height: 1.5;
+}
+
+.have-a-chat-thinking-text {
+    font-weight: 600;
+}
+
+.have-a-chat-thinking-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.have-a-chat-thinking-dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    animation: haveAChatThinkingPulse 1.2s infinite ease-in-out;
+}
+
+.have-a-chat-thinking-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.have-a-chat-thinking-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes haveAChatThinkingPulse {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+    40% { transform: scale(1); opacity: 1; }
+}
+
 /* Control bar — sits below the chat form when a conversation is active */
 .have-a-chat-controls {
     display: flex;
