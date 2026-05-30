@@ -1000,7 +1000,7 @@ func classifyImageAIOne(ctx context.Context, svc *service.ImageService, id int64
 		return imageAIClassifyOutcome{id: id, errMsg: fmt.Sprintf("classify image %d: model returned no keywords", id)}
 	}
 
-	tagsForUpdate := keywordTags + ", GemmaClassified"
+	tagsForUpdate := keywordTags
 	ok, mergeErr := svc.UpdateTagsMerge(ctx, id, tagsForUpdate)
 	if mergeErr != nil {
 		return imageAIClassifyOutcome{id: id, errMsg: fmt.Sprintf("tag update image %d: %v", id, mergeErr)}
@@ -1168,7 +1168,7 @@ func classifyImageAIOneRunPod(ctx context.Context, svc *service.ImageService, id
 		return imageAIClassifyOutcome{id: id, errMsg: fmt.Sprintf("classify image %d: model returned no keywords", id)}
 	}
 
-	tagsForUpdate := keywordTags + ", GemmaClassified"
+	tagsForUpdate := keywordTags
 	ok, mergeErr := svc.UpdateTagsMerge(ctx, id, tagsForUpdate)
 	if mergeErr != nil {
 		return imageAIClassifyOutcome{id: id, errMsg: fmt.Sprintf("tag update image %d: %v", id, mergeErr)}

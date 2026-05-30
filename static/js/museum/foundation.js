@@ -402,6 +402,7 @@ const DOM = {
     closeGeoMetadataModalBtn: document.getElementById('close-geo-metadata-modal'),
     geoMetadataRegionSelect: document.getElementById('geo-metadata-region-select'),
     shufflePhotosBtn: document.getElementById('shuffle-photos-btn'),
+    findNearbyMapBtn: document.getElementById('find-nearby-map-btn'),
     nearbyLocationsModal: document.getElementById('nearby-locations-modal'),
     nearbyMapView: document.getElementById('nearby-map-view'),
     nearbyLocationsCount: document.getElementById('nearby-locations-count'),

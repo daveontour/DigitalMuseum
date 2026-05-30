@@ -25,32 +25,32 @@ import (
 //   - GET /static/js/museum/foundation.js
 //   - GET /static/js/museum/modals-people.js
 type TemplateHandler struct {
-	subjectRepo           *repository.SubjectConfigRepo
-	userRepo              *repository.UserRepo
-	suggestionsSvc        *service.SuggestionsService
-	templatesDir          string
-	pythonStaticDir       string
-	defaultGeminiOK       bool
-	defaultClaudeOK       bool
-	defaultDeepSeekOK     bool
-	defaultLocalAIOK      bool
-	pageTitle             string
-	deploymentNatureLocal bool
+	subjectRepo                        *repository.SubjectConfigRepo
+	userRepo                           *repository.UserRepo
+	suggestionsSvc                     *service.SuggestionsService
+	templatesDir                       string
+	pythonStaticDir                    string
+	defaultGeminiOK                    bool
+	defaultClaudeOK                    bool
+	defaultDeepSeekOK                  bool
+	defaultLocalAIOK                   bool
+	pageTitle                          string
+	deploymentNatureLocal              bool
 	guideTopicsReloadFromFileOnStartup bool
 }
 
 // NewTemplateHandler creates a TemplateHandler.
 func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, userRepo *repository.UserRepo, suggestionsSvc *service.SuggestionsService, cfg *config.Config) *TemplateHandler {
 	return &TemplateHandler{
-		subjectRepo:           subjectRepo,
-		userRepo:              userRepo,
-		suggestionsSvc:        suggestionsSvc,
-		templatesDir:          cfg.App.TemplatesDir,
-		pythonStaticDir:       cfg.App.AssetStaticDir,
-		defaultGeminiOK:       cfg.AI.GeminiAPIKey != "",
-		defaultClaudeOK:       cfg.AI.AnthropicAPIKey != "",
-		defaultDeepSeekOK:     strings.TrimSpace(cfg.AI.DeepSeekAPIKey) != "",
-		defaultLocalAIOK:      strings.TrimSpace(cfg.AI.LocalAIBaseURL) != "",
+		subjectRepo:                        subjectRepo,
+		userRepo:                           userRepo,
+		suggestionsSvc:                     suggestionsSvc,
+		templatesDir:                       cfg.App.TemplatesDir,
+		pythonStaticDir:                    cfg.App.AssetStaticDir,
+		defaultGeminiOK:                    cfg.AI.GeminiAPIKey != "",
+		defaultClaudeOK:                    cfg.AI.AnthropicAPIKey != "",
+		defaultDeepSeekOK:                  strings.TrimSpace(cfg.AI.DeepSeekAPIKey) != "",
+		defaultLocalAIOK:                   strings.TrimSpace(cfg.AI.LocalAIBaseURL) != "",
 		pageTitle:                          cfg.App.PageTitle,
 		deploymentNatureLocal:              strings.EqualFold(strings.TrimSpace(cfg.App.DeploymentNature), "local"),
 		guideTopicsReloadFromFileOnStartup: cfg.App.GuideTopicsReloadFromFileOnStartup,
@@ -182,7 +182,7 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 	// Non-local deployments hide server filesystem path import tiles; local shows them.
 	if h.deploymentNatureLocal {
 		extras["deployment_nature_body_class"] = ""
-		extras["index_filesystem_import_tile"] = indexFilesystemImportTileHTML
+		//extras["index_filesystem_import_tile"] = indexFilesystemImportTileHTML
 		//		extras["index_filesystem_reference_import_tile"] = indexFilesystemReferenceImportTileHTML
 	} else {
 		extras["deployment_nature_body_class"] = "deployment-hide-path-import-tiles"
@@ -394,9 +394,9 @@ func (h *TemplateHandler) buildContext(r *http.Request) map[string]string {
 		"admirer_image":       admirerImage,
 		"admirer_image_small": admirerImageSm,
 		// Undefined in Python context too — render as empty string.
-		"owner_gender":            gender,
-		"todays_thing_prompt":     "",
-		"deployment_nature_local": depLocal,
+		"owner_gender":                             gender,
+		"todays_thing_prompt":                      "",
+		"deployment_nature_local":                  depLocal,
 		"guide_topics_reload_from_file_on_startup": guideReload,
 	}
 }
@@ -412,25 +412,25 @@ func (h *TemplateHandler) readFile(baseDir, relPath string) (string, error) {
 
 // indexFilesystemImportTileHTML is the Data Import “Picture and Images” tile (server path scan).
 // Omitted from the rendered page when DEPLOYMENT_NATURE is not local (see GetRoot extras).
-const indexFilesystemImportTileHTML = `
-                                <article class="data-import-card data-import-row data-import-path-row" data-import="filesystem">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-link"></i> Link to Images on Disk</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count" data-import-count-key="filesystem">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Scan folders on this machine and register image paths as referenced media (local Electron deployments only).<br/><br/>Thumbnails are generated and stored in the database for quick access.  <br/><br/> Optonally, you can select to import the images into the database as part of the process or run the import process at a later stage. <br/><br/> <strong>Clear Data</strong> removes filesystem-linked rows.</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                                <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="filesystem"><i class="fas fa-link"></i> Link</button>
-                                                <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="filesystem_media" title="Remove filesystem-sourced images from the library"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
-                                        </div>
-                                    </div>
-                                </article>`
+// const indexFilesystemImportTileHTML = `
+//                                 <article class="data-import-card data-import-row data-import-path-row" data-import="filesystem">
+//                                     <div class="data-import-card-header">
+//                                         <h3 class="data-import-card-title"><i class="fas fa-link"></i> Link to Images on Disk</h3>
+//                                     </div>
+//                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+//                                         <span class="data-import-count" data-import-count-key="filesystem">—</span>
+//                                     </div>
+//                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Scan folders on this machine and register image paths as referenced media (local Electron deployments only).<br/><br/>Thumbnails are generated and stored in the database for quick access.  <br/><br/> Optonally, you can select to import the images into the database as part of the process or run the import process at a later stage. <br/><br/> <strong>Clear Data</strong> removes filesystem-linked rows.</p></div>
+//                                     <div class="data-import-actions-td">
+//                                         <div class="data-import-card-actions-row">
+//                                             <div class="data-import-action-group">
+//                                                 <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="filesystem"><i class="fas fa-link"></i> Link</button>
+//                                                 <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+//                                             </div>
+//                                             <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="filesystem_media" title="Remove filesystem-sourced images from the library"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+//                                         </div>
+//                                     </div>
+//                                 </article>`
 
 // indexFilesystemReferenceImportTileHTML registers paths only (is_referenced); same purge as folder scan.
 // const indexFilesystemReferenceImportTileHTML = `                                <tr class="data-import-row data-import-path-row" data-import="filesystem_reference">

@@ -36,9 +36,19 @@ Modals.Locations = (() => {
 
         const SHUFFLE_MARKER_LIMIT = 500;
         const DEFAULT_MARKER_LIMIT = 1000;
+        const NEARBY_MARKER_LIMIT = 1000;
 
         let selectedRegion = '';
         let regionSelectorBound = false;
+
+        let nearbyModeActive = false;
+        let nearbyGeoData = [];
+        let nearbyCenterLat = null;
+        let nearbyCenterLng = null;
+        let nearbyRadiusKm = null;
+        let nearbyCenterLayer = null;
+        let nearbyCenterMarkerIcon = null;
+        let nearbyLoadToken = 0;
 
         function _regionLabel(code) {
             return Regions.label(code);
@@ -162,6 +172,7 @@ Modals.Locations = (() => {
         }
 
         async function _reloadLocationDataForCurrentFilters(options = {}) {
+            _exitNearbyMode();
             if (!mapView || !layerControl) {
                 await _loadLocationData(['all'], null, options);
                 return;
@@ -174,9 +185,186 @@ Modals.Locations = (() => {
             );
         }
 
+        function _parseNearbyRadius(raw) {
+            const radiusKm = parseFloat(String(raw).trim());
+            if (!Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 500) {
+                return null;
+            }
+            return radiusKm;
+        }
+
+        function _exitNearbyMode() {
+            nearbyModeActive = false;
+            nearbyGeoData = [];
+            nearbyCenterLat = null;
+            nearbyCenterLng = null;
+            nearbyRadiusKm = null;
+            if (mapView && nearbyCenterLayer) {
+                mapView.removeLayer(nearbyCenterLayer);
+                nearbyCenterLayer = null;
+            }
+        }
+
+        function _ensureNearbyCenterMarkerIcon() {
+            if (!nearbyCenterMarkerIcon) {
+                nearbyCenterMarkerIcon = L.divIcon({
+                    className: 'nearby-center-marker',
+                    html: '<div style="background:#c0392b;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,0.45);"></div>',
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9],
+                });
+            }
+            return nearbyCenterMarkerIcon;
+        }
+
+        function _showNearbyCenterMarker() {
+            if (!mapView || nearbyCenterLat == null || nearbyCenterLng == null) return;
+            if (nearbyCenterLayer) {
+                mapView.removeLayer(nearbyCenterLayer);
+            }
+            nearbyCenterLayer = L.marker(
+                [nearbyCenterLat, nearbyCenterLng],
+                { icon: _ensureNearbyCenterMarkerIcon() }
+            );
+            nearbyCenterLayer.addTo(mapView);
+        }
+
+        function _updateNearbyShownCount(total, shown) {
+            const shownCount = document.getElementById('geo-metadata-shown-count');
+            if (!shownCount) return;
+            let text = `${total} image${total === 1 ? '' : 's'} within ${nearbyRadiusKm} km of map center`;
+            if (shown !== total) {
+                text = `${shown} of ${total} nearby image${total === 1 ? '' : 's'} shown for selected layers`;
+            }
+            if (total === NEARBY_MARKER_LIMIT) {
+                text += ' (Showing Nearest 1000 Locations)';
+            }
+            shownCount.textContent = text;
+        }
+
+        function _applyNearbyLocationsToMap(activeMap) {
+            const buckets = {
+                filesystem: [],
+                whatsapp: [],
+                email: [],
+                message: [],
+                biography: [],
+                other: [],
+            };
+            const latlngs = [];
+
+            if (nearbyCenterLat != null && nearbyCenterLng != null) {
+                latlngs.push([nearbyCenterLat, nearbyCenterLng]);
+            }
+
+            nearbyGeoData.forEach(item => {
+                if (!item.latitude || !item.longitude) return;
+                const category = _sourceToActiveCategory(item.source);
+                if (!buckets[category]) return;
+                buckets[category].push(_buildMarker(item, category === 'email'));
+                if (activeMap[category]) {
+                    latlngs.push([item.latitude, item.longitude]);
+                }
+            });
+
+            _setLayerMarkers(photoMarkersLayer, activeMap.filesystem ? buckets.filesystem : []);
+            _setLayerMarkers(whatsappMarkersLayer, activeMap.whatsapp ? buckets.whatsapp : []);
+            _setLayerMarkers(emailMarkersLayer, activeMap.email ? buckets.email : []);
+            _setLayerMarkers(messageMarkersLayer, activeMap.message ? buckets.message : []);
+            _setLayerMarkers(biographyMarkersLayer, activeMap.biography ? buckets.biography : []);
+            _setLayerMarkers(otherMarkersLayer, activeMap.other ? buckets.other : []);
+            _setLayerMarkers(fbMarkersLayer, []);
+
+            _showNearbyCenterMarker();
+
+            let shown = 0;
+            if (activeMap.filesystem) shown += buckets.filesystem.length;
+            if (activeMap.whatsapp) shown += buckets.whatsapp.length;
+            if (activeMap.email) shown += buckets.email.length;
+            if (activeMap.message) shown += buckets.message.length;
+            if (activeMap.biography) shown += buckets.biography.length;
+            if (activeMap.other) shown += buckets.other.length;
+
+            const total = nearbyGeoData.length;
+            _updateNearbyShownCount(total, shown);
+
+            if (latlngs.length > 0) {
+                mapView.fitBounds(latlngs, { padding: [20, 20] });
+            }
+            mapView.invalidateSize();
+        }
+
+        async function _loadNearbyForMapCenter() {
+            if (nearbyCenterLat == null || nearbyCenterLng == null) return;
+            const token = ++nearbyLoadToken;
+            const shownCount = document.getElementById('geo-metadata-shown-count');
+            if (shownCount) {
+                shownCount.textContent = 'Loading nearby locations…';
+            }
+
+            try {
+                const response = await fetch('/images/locations/nearby', {
+                    method: 'POST',
+                    cache: 'no-store',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: nearbyCenterLat,
+                        longitude: nearbyCenterLng,
+                        radius_km: nearbyRadiusKm,
+                        limit: NEARBY_MARKER_LIMIT,
+                    }),
+                });
+                if (token !== nearbyLoadToken) return;
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch nearby locations: ${response.status}`);
+                }
+                const data = await response.json();
+                if (token !== nearbyLoadToken) return;
+                nearbyGeoData = data.locations || [];
+                _ensureMapView();
+                const { activeMap } = getActiveLayerMap();
+                _applyNearbyLocationsToMap(activeMap);
+            } catch (error) {
+                if (token !== nearbyLoadToken) return;
+                console.error('Error loading nearby locations for map:', error);
+                if (shownCount) {
+                    shownCount.textContent = 'Failed to load nearby locations';
+                }
+            }
+        }
+
+        async function findNearbyFromMapCenter() {
+            _ensureMapView();
+            if (!mapView) return;
+
+            const center = mapView.getCenter();
+            const radiusStr = await AppDialogs.showAppPrompt(
+                'Find Nearby',
+                'Enter search radius in kilometers:',
+                '25',
+                { promptLabel: 'Radius (km)' }
+            );
+            if (radiusStr == null) return;
+
+            const radiusKm = _parseNearbyRadius(radiusStr);
+            if (radiusKm == null) {
+                await AppDialogs.showAppAlert('Invalid radius', 'Enter a value between 0 and 500 km.');
+                return;
+            }
+
+            nearbyCenterLat = center.lat;
+            nearbyCenterLng = center.lng;
+            nearbyRadiusKm = radiusKm;
+            nearbyModeActive = true;
+            await _loadNearbyForMapCenter();
+        }
+
         function init() {
             if (DOM.closeGeoMetadataModalBtn) DOM.closeGeoMetadataModalBtn.addEventListener('click', close);
             if (DOM.shufflePhotosBtn) DOM.shufflePhotosBtn.addEventListener('click', shufflePhotoMarkers);
+            if (DOM.findNearbyMapBtn) {
+                DOM.findNearbyMapBtn.addEventListener('click', () => { void findNearbyFromMapCenter(); });
+            }
         }
 
         async function open() {
@@ -203,6 +391,7 @@ Modals.Locations = (() => {
         }
 
         async function shufflePhotoMarkers() {
+            _exitNearbyMode();
             if (!mapView || !layerControl) return;
             const { activeMap, categories } = getActiveLayerMap();
             if (categories.length === 0) return;
@@ -362,6 +551,7 @@ Modals.Locations = (() => {
         }
 
         async function _loadLocationData(categories, activeMapOverride, options = {}) {
+            _exitNearbyMode();
             const limit = options.limit || DEFAULT_MARKER_LIMIT;
             const region = options.region != null ? options.region : selectedRegion;
             const regionActive = region != null && String(region).trim() !== '';
@@ -506,6 +696,10 @@ Modals.Locations = (() => {
                 _syncFacebookLayerForRegionFilter();
             }
             const { activeMap, categories } = getActiveLayerMap();
+            if (nearbyModeActive) {
+                _applyNearbyLocationsToMap(activeMap);
+                return;
+            }
             if (categories.length === 0) {
                 _clearMediaMarkers(activeMap);
                 return;

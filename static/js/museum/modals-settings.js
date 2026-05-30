@@ -2552,10 +2552,10 @@ Modals.ManageKeys = (() => {
     let _visitorKeyRefDocsGen = 0;
 
     async function _loadVisitorKeyHintsTable() {
-        const loading = document.getElementById('visitor-key-hints-loading');
-        const errEl = document.getElementById('visitor-key-hints-error');
+        const loading = document.getElementById('manage-visitor-key-hints-loading');
+        const errEl = document.getElementById('manage-visitor-key-hints-error');
         const tbody = document.getElementById('visitor-key-hints-tbody');
-        const empty = document.getElementById('visitor-key-hints-empty');
+        const empty = document.getElementById('manage-visitor-key-hints-empty');
         const createBtn = document.getElementById('create-visitor-key-hint-btn');
         if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
         if (loading) loading.style.display = 'block';

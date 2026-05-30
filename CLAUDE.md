@@ -609,6 +609,7 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 - Prefer **`font-size: var(--text-…)`** (and existing colour tokens) in HTML `style` attributes or CSS when `museum_of.css` is on the page.
 - Use **`em`** only for sizes that must track a parent's font size (e.g. a hint span under a micro label).
 - Pages that **do not** load `museum_of.css` should not reference these variables; use plain **`rem`** (or page-local CSS) instead.
+- Every HTML control must have a unique and descriptive id attribute
 
 ## Key Files Quick Reference
 

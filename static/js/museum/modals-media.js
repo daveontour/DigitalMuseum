@@ -2064,11 +2064,17 @@ Modals.ImageDetailModal = (() => {
                         Modals.NearbyLocations.open(image.latitude, image.longitude, radiusKm, image.id);
                     };
                     
-                    // Clear existing content and add coordinates and button
+                    // Clear existing content and add coordinates and buttons
                     DOM.newImageDetailGps.innerHTML = '';
-                    DOM.newImageDetailGps.appendChild(document.createTextNode(gpsText));
-                    DOM.newImageDetailGps.appendChild(openMapsButton);
-                    DOM.newImageDetailGps.appendChild(findNearbyButton);
+                    const coordsSpan = document.createElement('span');
+                    coordsSpan.className = 'image-detail-gps-coords';
+                    coordsSpan.textContent = gpsText;
+                    const actionsWrap = document.createElement('div');
+                    actionsWrap.className = 'image-detail-gps-actions';
+                    actionsWrap.appendChild(openMapsButton);
+                    actionsWrap.appendChild(findNearbyButton);
+                    DOM.newImageDetailGps.appendChild(coordsSpan);
+                    DOM.newImageDetailGps.appendChild(actionsWrap);
                 } else {
                     DOM.newImageDetailGps.textContent = 'GPS data available';
                 }

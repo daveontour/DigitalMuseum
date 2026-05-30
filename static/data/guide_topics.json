@@ -1086,39 +1086,20 @@
       "title": "Local AI setup and health",
       "description": "Understand Ollama readiness and required models.",
       "category": "Setup & Import",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
-          "text": "Local AI depends on the Ollama server plus two models: gemma4 and embeddinggemma."
+          "text": "Local AI depends on the Ollama server plus two models: gemma4 and embeddinggemma. The gemma4 model is used for the main chat and the embeddinggemma model is used for the embedding search functionality and for image content classification."
         },
         {
-          "text": "On login, open AI & Setup to confirm server status and model availability."
+          "text": "On login screen, check the status of the local AI by selecting the \"Local AI\" tab to confirm the AI server status and model availability."
         },
         {
           "text": "If a model is missing, use Download required models. Initial download can take several minutes."
         },
         {
           "text": "Some AI features may be unavailable when Local AI is not ready."
-        }
-      ]
-    },
-    {
-      "key": "SettingsAndDataImport",
-      "title": "Settings and data import",
-      "description": "Configure app behavior and import source archives.",
-      "category": "Setup & Import",
-      "steps": [
-        {
-          "text": "Open Configuration from the left sidebar.",
-          "glow": "#settings-data-import-sidebar-btn",
-          "position": "bottom-center"
-        },
-        {
-          "text": "Use chat settings, subject configuration, custom voices, and key management in this dialog."
-        },
-        {
-          "text": "Open Import & Manage Data for file imports and maintenance jobs.",
-          "glow": "#data-import-sidebar-btn",
-          "position": "bottom-center"
         }
       ]
     },
@@ -1213,13 +1194,13 @@
       "description": "Create named AI personas with unique instructions and creativity settings.",
       "category": "Setup & Import",
       "dismiss_navigate_action": "closeOpenDialog",
-      "QA":"TEST",
+      "QA":"OK",
       "steps": [
         {
           "text": "As well as the pre defined AI personae (voices) you can create your own custom AI voice personas. Open Configuration from the left sidebar, then switch to the Custom Voices tab.",
           "glow": "#settings-data-import-sidebar-btn",
           "image_url": "/static/images/guide/voices.png",
-          "position": "bottom-center"
+          "position": "middle-center"
         },
         {
           "text": "Click New Voice to create a new persona. ",
@@ -1236,17 +1217,17 @@
         {
           "text": "Write the instruction in the Instructions box. Be specific: describe the persona's name, background, speech patterns, and any rules it should follow.",
           "glow": "#custom-voice-edit-instructions",
-          "position": "top-center"
+          "position": "top-left"
         },
         {
           "text": "Set the Creativity slider — lower values give more factual, consistent responses; higher values are more expressive and varied.",
           "glow": "#custom-voice-edit-creativity",
-          "position": "top-center"
+          "position": "top-left"
         },
         {
           "text": "Save the voice. It now appears in the provider dropdown in the voice settings panel — select it to switch the AI into that persona.",
           "glow": "#custom-voices-tbody",
-          "position": "top-center"
+          "position": "top-left"
         }
       ]
     },
@@ -1255,115 +1236,103 @@
       "title": "Reference documents",
       "description": "Upload documents that the AI can consult when answering questions.",
       "category": "Setup & Import",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
           "text": "Reference documents are files you upload that the AI can read when answering questions. They are especially useful for providing context that is not in your archive — medical history, a biography, a family tree, or a personal statement.",
           "position": "middle-center"
         },
         {
-          "text": "Click the Ref Docs segment in the context bar above the chat input to open the Reference Documents manager.",
+          "text": "Click the Ref Docs segment in the context bar below the chat input box or  \"Import and Manage Reference Documents\" in the DataImport tab to open the Reference Documents manager.",
           "glow": "#chat-context-status-refs-seg",
-          "navigate_action": "openReferenceDocuments",
           "position": "bottom-center"
         },
         {
-          "text": "Click Upload Document to add a new file. Supported formats include plain text, PDF, and Markdown. Add a title and description so the AI knows what the document contains.",
+          "text": "Click Upload Document to add a new file.",
           "glow": "#reference-documents-upload-btn",
           "navigate_action": "openReferenceDocuments",
           "position": "middle-center"
         },
         {
+          "text": "Supported formats include plain text, PDF, and Markdown. Add a title and description so the AI knows what the document contains.",
+          "glow": "#reference-documents-upload-btn",
+          "click_selector": "#reference-documents-upload-btn",
+          "position": "top-left"
+        },
+        {
           "text": "Documents flagged Include in System Prompt are injected into every AI request — use this for a core context document. Documents flagged Available for Task are included only when the AI's tools call for them.",
-          "navigate_action": "openReferenceDocuments",
-          "position": "middle-center"
+          "position": "top-left"
         },
         {
-          "text": "Use the Category and Content Type filters in the manager to organise a large document library.",
-          "glow": "#reference-documents-category-filter",
-          "navigate_action": "openReferenceDocuments",
-          "position": "middle-center"
-        },
-        {
-          "text": "The Ref Docs count in the context bar updates to show how many documents are active. A warning icon means a document is flagged but unavailable — check the manager for details.",
+          "text": "The Ref Docs count in the context bar updates to show how many documents are active. A warning icon means a document is flagged but unavailable or that no documents are available — check the manager for details.",
           "glow": "#chat-context-status-refs-seg",
+          "navigate_action": "closeOpenDialog",
           "position": "bottom-center"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
-    },
-    {
-      "key": "ImportPathsOverview",
-      "title": "Import paths overview",
-      "description": "Know which import flow to use for each source.",
-      "category": "Setup & Import",
-      "steps": [
-        {
-          "text": "Use ZIP upload imports for Facebook, Instagram, WhatsApp, and iMessage exports.",
-          "glow": "#data-import-sidebar-btn",
-          "navigate_action": "openDataImport"
-        },
-        {
-          "text": "Use email import for mailbox data and follow-up embedding jobs."
-        },
-        {
-          "text": "Use filesystem/photo imports when source data already exists on local disk."
-        }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "ImportFacebookArchive",
       "title": "Import Facebook archive",
       "description": "Step-by-step Facebook ZIP import flow.",
       "category": "Setup & Import",
+      "QA":"TEST",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
-          "text": "Request a Facebook data download in JSON format from Facebook Settings → Your Facebook Information → Download your information. Select JSON format, then wait for the download email."
+          "text": "Request a Facebook data download in JSON format from Facebook. Select JSON format, then wait for the download email.",
+          "image_url": "/static/images/guide/fb-download.png",
+          "position": "middle-top"
         },
         {
-          "text": "Unzip the downloaded file to a folder on your computer."
+          "text": "Unzip the downloaded file to a folder on your computer.",
+          "position": "middle-top"
         },
         {
           "text": "Open Import & Manage Data from the left sidebar.",
           "glow": "#data-import-sidebar-btn",
-          "position": "bottom-center",
-          "navigate_action": "openDataImportImport"
+          "position": "bottom-center"
         },
         {
           "text": "Click Upload on the Facebook row and select the exported folder.",
           "position": "top-right",
           "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"facebook\"]",
-          "navigate_action": "openDataImportImport"
+          "navigate_action": "openDataImportImport",
+          "image_url": "/static/images/guide/import-archive.png"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "ImportInstagramArchive",
       "title": "Import Instagram archive",
       "description": "Step-by-step Instagram ZIP import flow.",
       "category": "Setup & Import",
+      "QA":"TEST",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
-          "text": "Request an Instagram data download from Settings → Your activity → Download or transfer information. Select JSON format and request the download."
+          "text": "Request a Instagram data download in JSON format from Facebook. Select JSON format, then wait for the download email.",
+          "image_url": "/static/images/guide/fb-download.png",
+          "position": "middle-top"
         },
         {
-          "text": "Unzip the downloaded file to a folder on your computer."
+          "text": "Unzip the downloaded file to a folder on your computer.",
+          "position": "middle-top"
         },
         {
           "text": "Open Import & Manage Data from the left sidebar.",
           "glow": "#data-import-sidebar-btn",
-          "position": "bottom-center",
-          "navigate_action": "openDataImportImport"
+          "position": "bottom-center"
         },
         {
           "text": "Click Upload on the Instagram row and select the exported folder.",
-          "position": "top-right",
+          "position": "bottom-right",
           "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"instagram\"]",
-          "navigate_action": "openDataImportImport"
+          "navigate_action": "openDataImportImport",
+          "image_url": "/static/images/guide/import-archive.png"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "ImportWhatsApp",
@@ -1424,7 +1393,7 @@
       "title": "Import Mail via IMAP",
       "description": "Connect your email account and import emails directly via IMAP.",
       "category": "Setup & Import",
-      "QA":"TEST",
+      "QA":"OK",
       "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
@@ -1437,23 +1406,31 @@
           "position": "bottom-center"
         },
         {
-          "text": "Find the Email / IMAP row and click its import button. Enter your Gmail address and, for the password, use an App Password (not your normal Google password). Generate one at myaccount.google.com → Security → 2-Step Verification → App passwords.",
+          "text": "Find the Email / IMAP row and click its import button. ",
           "navigate_action": "openDataImportImport",
-          "position": "top-right"
+          "position": "middle-right",
+          "glow": "#data-import-start-imap-processing-btn"
         },
         {
-          "text": "Choose which mail folders to import and set a date range if you want to limit the import to recent mail. Click Start Import to begin.",
-          "position": "middle-center"
+          "text": "Enter your Email address and, for the password, use an app password.(refer to your email provider for instructions on how to generate an app password).",
+          "image_url": "/static/images/guide/imap-config.png",
+          "position": "middle-right",
+          "click_selector": "#data-import-start-imap-processing-btn"
+
+        },
+        {
+          "text": "Choose which mail folders to import and set a if you want to limit the import to new mail only. Click Start Import to begin.",
+          "position": "middle-center",
+          "glow":"#imap-modal-fetch-folders"
         },
         {
           "text": "Large mailboxes can take a long time to import. You can monitor progress in the Import & Manage Data panel. The app continues importing in the background.",
           "position": "middle-center"
         },
         {
-          "text": "After email import, run the email embedding background job from Import & Manage Data → Background Jobs so that similarity search works on your emails.",
-          "glow": "#data-import-sidebar-btn",
-          "navigate_action": "openDataImportBackgroundJobs",
-          "position": "bottom-center"
+          "text": "After email import, the email embedding background job is run automatically so that similarity search works on your emails.",
+          "navigate_action": "closeOpenDialog",
+          "position": "middle-center"
         }
       ]
     },
@@ -1462,34 +1439,35 @@
       "title": "Import photos from local disk",
       "description": "Import photos and images stored on your computer into the archive.",
       "category": "Setup & Import",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
           "text": "Open Import & Manage Data from the left sidebar and switch to the Import tab.",
           "glow": "#data-import-sidebar-btn",
-          "navigate_action": "openDataImportImport",
           "position": "bottom-center"
         },
         {
-          "text": "Find the Filesystem / Photo Import row. Click the folder picker button to choose the root directory containing your photos.",
+          "text": "Find the \"Link to Images on Disk\" row. Click the link button to choose the root directory containing your photos.",
           "navigate_action": "openDataImportImport",
-          "position": "top-right"
+          "position": "top-left",
+          "glow":"#data-import-link-images-modal-btn"
         },
         {
-          "text": "Configure import options: choose whether to create thumbnails, set a maximum number of images, and set file exclusion patterns to skip certain folders.",
+          "text": "Configure import options: set a maximum number of images to import and set whether the images get imported into the database or just linked to the archive as referenced media.",
+          "click_selector": "#data-import-link-images-modal-btn",
+          "position": "top-left"
+        },
+        {
+          "text": "Click Execute. The app scans the folder recursively and imports supported image formats (JPEG, PNG, HEIC, etc.) including any EXIF metadata such as GPS coordinates and timestamps.",
+          "position": "top-left"
+        },
+        {
+          "text": "After a photo import, you can run the AI image classification background job from Import & Manage Data → Background Jobs to generate descriptive tags of the content for each photo — this greatly improves AI search and questions about images.",
+          "navigate_action": "closeOpenDialog",
           "position": "middle-center"
-        },
-        {
-          "text": "Click Start Import. The app scans the folder recursively and imports supported image formats (JPEG, PNG, HEIC, etc.) including any EXIF metadata such as GPS coordinates and timestamps.",
-          "position": "middle-center"
-        },
-        {
-          "text": "After a photo import, run the AI image classification background job from Import & Manage Data → Background Jobs to generate descriptive tags for each photo — this greatly improves AI search and questions about images.",
-          "glow": "#data-import-sidebar-btn",
-          "navigate_action": "openDataImportBackgroundJobs",
-          "position": "bottom-center"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "BackgroundJobsAndMaintenance",
@@ -1620,6 +1598,8 @@
       "title": "AI tools access control",
       "description": "Configure which AI tools are available and what permissions they require.",
       "category": "Privacy & Security",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
           "text": "AI tools are the capabilities the AI uses to look up data in your archive — search messages, retrieve emails, find photos, and more. Each tool can be restricted by access tier.",
@@ -1628,53 +1608,32 @@
         {
           "text": "Open Configuration and switch to the Tools Access tab.",
           "glow": "#settings-data-import-sidebar-btn",
-          "navigate_action": "openConfigToolsAccess",
           "position": "bottom-center"
         },
         {
-          "text": "Two tiers are available: Visitor (basic, lower-sensitivity tools available to all sessions) and Master (higher-sensitivity tools requiring master key unlock).",
+          "text": "Two tiers are available: Visitor (basic, lower-sensitivity tools available to all sessions) and Master (higher-sensitivity tools requiring archive owner access to use).",
           "navigate_action": "openConfigToolsAccess",
-          "position": "middle-center"
+          "position": "bottom-right"
         },
         {
-          "text": "Move tools between tiers by editing their access level. Sensitive tools — such as those that read private messages or decrypt sensitive data — should be set to Master tier.",
-          "navigate_action": "openConfigToolsAccess",
-          "position": "middle-center"
+          "text": "Select which tools are available for each tier. Sensitive tools — such as those that read private messages or decrypt sensitive data — should only be set to Master tier.",
+          "position": "bottom-right"
         },
         {
-          "text": "The Tools count in the context bar reflects how many tools are active for the current session tier. Unlock with the master key to activate Master-tier tools.",
+          "text": "The Tools count in the context bar reflects how many tools are active for the current session tier.",
           "glow": "#chat-context-status-tools-seg",
+          "navigate_action": "closeOpenDialog",
           "position": "bottom-center"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
-    },
-    {
-      "key": "SharePrivacyVisitorAccess",
-      "title": "Share and privacy basics",
-      "description": "Understand visitor scope and sensitive access.",
-      "category": "Troubleshooting",
-      "steps": [
-        {
-          "text": "To manage visitor access, open Configuration and switch to the \"Manage Visitor Keys\" tab.",
-          "glow": ".config-tab-button[data-tab=\"manage-keys\"]",
-          "position": "middle-right",
-          "navigate_action": "openSettingsManageKeys"
-        },
-        {
-          "text": "Sensitive/private data and some tools may require owner master unlock."
-        },
-        {
-          "text": "If a feature is missing, verify current role and access tier first."
-        }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "LocalAITroubleshooting",
       "title": "Local AI troubleshooting",
       "description": "Recover quickly from common Local AI issues.",
       "category": "Troubleshooting",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
           "text": "If Local AI is unavailable, verify Ollama is running and both models are installed."
@@ -1692,6 +1651,8 @@
       "title": "Context window and long conversations",
       "description": "Keep AI answers accurate across long chat sessions.",
       "category": "Troubleshooting",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
           "text": "Every AI provider has a context window — a limit on how much text can be in a single conversation. When a chat session grows very long, early messages may be dropped and the AI can lose context.",
@@ -1700,50 +1661,48 @@
         {
           "text": "If you notice the AI forgetting earlier details, start a new chat session. Short, focused conversations generally produce better answers than very long, wide-ranging ones.",
           "glow": "#user-input",
-          "position": "bottom-center"
-        },
-        {
-          "text": "For factual or reference questions, upload a reference document instead of repeating context in chat. Documents in the system prompt are always present regardless of conversation length.",
-          "glow": "#chat-context-status-refs-seg",
-          "navigate_action": "openReferenceDocuments",
-          "position": "bottom-center"
+          "position": "middle-center"
         },
         {
           "text": "Local AI (Ollama/Gemma4) has a smaller default context window than cloud providers. If Local AI starts giving incoherent answers in long chats, switch to Claude or Gemini for that session.",
           "glow": "#voice-settings-trigger",
-          "position": "top-center"
+          "position": "middle-center"
+        }, {
+          "text": "You can clear the conversation history by clicking the voice image in the top right corner and selecting \"Clear conversation history\".",
+          "position": "middle-center",
+          "glow":"#selected-voice-image",
+          "image_url": "/static/images/guide/clear-conversation.png"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     },
     {
       "key": "LLMUsageTracking",
       "title": "AI usage tracking",
       "description": "Monitor token usage and costs across AI providers.",
       "category": "Troubleshooting",
+      "QA":"OK",
+      "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
           "text": "Every AI chat request uses tokens — a measure of text volume. Cloud providers (Claude, Gemini, DeepSeek) charge per token. Local AI (Ollama) is free but uses your CPU/GPU.",
-          "position": "middle-center"
+          "position": "top-center"
         },
         {
-          "text": "Open the Dashboard from the right sidebar to see a summary of your AI usage, including token counts and estimated costs over time.",
+          "text": "Click on the User button in the top right corner to download a PDF summary of your AI usage",
           "glow": "#statistics-sidebar-btn",
-          "navigate_action": "openDashboard",
+          "image_url": "/static/images/guide/token-usage.png",
           "position": "middle-right"
         },
         {
           "text": "If costs are a concern, switch to DeepSeek (a lower-cost Anthropic-compatible API) or use Local AI for everyday questions and reserve Claude or Gemini for complex tasks.",
-          "glow": "#voice-settings-trigger",
           "position": "top-center"
         },
         {
           "text": "Very long system prompts (from reference documents included in the system prompt) increase token usage on every request. Only include documents in the system prompt if they are needed for most questions.",
           "glow": "#chat-context-status-refs-seg",
-          "position": "bottom-center"
+          "position": "top-center"
         }
-      ],
-      "dismiss_navigate_action": "closeOpenDialog"
+      ]
     }
   ]
 }

@@ -107,8 +107,8 @@
                 </div>
             </div>
             <!-- <div class="top-bar-llm">
-                <label for="llm-provider-select" class="top-bar-label">LLM Provider</label>
-                <select id="llm-provider-select">
+                <label for="llm-provider-select-legacy" class="top-bar-label">LLM Provider</label>
+                <select id="llm-provider-select-legacy">
                     <option value="gemini" selected>Gemini</option>
                     <option value="claude">Claude</option>
                 </select>
@@ -194,7 +194,7 @@
                     <!-- <button type="button" class="more-options-btn" id="pam-bot-trigger-btn" style="background:linear-gradient(135deg,#2c5282,#4a7fcb);color:#fff;margin-top:6px;">
                         <i class="fas fa-heart"></i> Memory Companion
                     </button> -->
-                    <!-- <button type="button" class="more-options-btn" id="identity-profile-wizard-btn" title="Create or edit your identity profile" style="margin-top:4px;">
+                    <!-- <button type="button" class="more-options-btn" id="identity-profile-wizard-btn-legacy" title="Create or edit your identity profile" style="margin-top:4px;">
                         <i class="fas fa-id-card"></i> Identity Profile
                     </button> -->
                 </div>
@@ -232,7 +232,7 @@
                     <!-- CHANGE: Add a toolbar div for assistant messages -->
                     {% if role == 'assistant' %}
                     <div class="message-toolbar">
-                        <button class="copy-md-btn" title="Copy Markdown">
+                        <button id="copy-md-btn-{{ loop.index0 }}" class="copy-md-btn" title="Copy Markdown">
                             <i class="fa-regular fa-clipboard"></i> Copy
                         </button>
                     </div>
@@ -241,7 +241,7 @@
                     <div class="message-content" data-role="{{ role }}">
                         <!-- Raw text initially, JS will render Markdown -->
                         <!-- CHANGE: Store raw markdown in data attribute for JS access -->
-                        <textarea class="raw-markdown" style="display:none;">{{ message.parts[0] }}</textarea>
+                        <textarea id="message-raw-markdown-{{ loop.index0 }}" class="raw-markdown" style="display:none;">{{ message.parts[0] }}</textarea>
                         <!-- Container for rendered HTML -->
                         <div class="rendered-content">
                             {{ message.parts[0] | safe }} <!-- Keep initial display if JS is slow/fails -->
@@ -473,8 +473,8 @@
                         <span style="color:var(--color-text-muted); font-size:var(--text-sm);"></span>
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:4px;">Temperature: <span id="have-a-chat-temperature-display">0.7</span></label>
-                        <input type="range" id="have-a-chat-temperature" min="0" max="2" step="0.1" value="0.7" style="width:100%;">
+                        <label style="display:block; font-weight:bold; margin-bottom:4px;">Creativity: <span id="have-a-chat-temperature-display">0.4</span></label>
+                        <input type="range" id="have-a-chat-temperature" min="0" max="2" step="0.1" value="0.4" style="width:100%;">
                     </div>
                     <div>
                         <label for="have-a-chat-free-run-rounds" style="display:block; font-weight:bold; margin-bottom:4px;">Free run (full rounds)</label>
@@ -581,7 +581,7 @@
                         <label class="interview-section-label"><i class="fas fa-user-tie"></i> Interviewer Style</label>
                         <div class="interview-card-grid" id="interview-style-grid">
                             <label class="interview-card">
-                                <input type="radio" name="interview-style" value="formal_journalist" checked>
+                                <input id="interview-style-formal-journalist-radio" type="radio" name="interview-style" value="formal_journalist" checked>
                                 <div class="interview-card-inner">
                                     <i class="fas fa-newspaper"></i>
                                     <strong>Formal Journalist</strong>
@@ -589,7 +589,7 @@
                                 </div>
                             </label>
                             <label class="interview-card">
-                                <input type="radio" name="interview-style" value="casual_conversational">
+                                <input id="interview-style-casual-conversational-radio" type="radio" name="interview-style" value="casual_conversational">
                                 <div class="interview-card-inner">
                                     <i class="fas fa-coffee"></i>
                                     <strong>Casual Conversational</strong>
@@ -597,7 +597,7 @@
                                 </div>
                             </label>
                             <label class="interview-card">
-                                <input type="radio" name="interview-style" value="academic_researcher">
+                                <input id="interview-style-academic-researcher-radio" type="radio" name="interview-style" value="academic_researcher">
                                 <div class="interview-card-inner">
                                     <i class="fas fa-graduation-cap"></i>
                                     <strong>Academic Researcher</strong>
@@ -605,7 +605,7 @@
                                 </div>
                             </label>
                             <label class="interview-card">
-                                <input type="radio" name="interview-style" value="podcast_host">
+                                <input id="interview-style-podcast-host-radio" type="radio" name="interview-style" value="podcast_host">
                                 <div class="interview-card-inner">
                                     <i class="fas fa-podcast"></i>
                                     <strong>Podcast Host</strong>
@@ -613,7 +613,7 @@
                                 </div>
                             </label>
                             <label class="interview-card">
-                                <input type="radio" name="interview-style" value="therapeutic">
+                                <input id="interview-style-therapeutic-radio" type="radio" name="interview-style" value="therapeutic">
                                 <div class="interview-card-inner">
                                     <i class="fas fa-heart"></i>
                                     <strong>Therapeutic</strong>
@@ -627,7 +627,7 @@
                         <label class="interview-section-label"><i class="fas fa-bullseye"></i> Interview Purpose</label>
                         <div class="interview-card-grid" id="interview-purpose-grid">
                             <label class="interview-card">
-                                <input type="radio" name="interview-purpose" value="biography" checked>
+                                <input id="interview-purpose-biography-radio" type="radio" name="interview-purpose" value="biography" checked>
                                 <div class="interview-card-inner">
                                     <i class="fas fa-book"></i>
                                     <strong>Biography</strong>
@@ -635,7 +635,7 @@
                                 </div>
                             </label>
                             <label class="interview-card">
-                                <input type="radio" name="interview-purpose" value="specific_topic">
+                                <input id="interview-purpose-specific-topic-radio" type="radio" name="interview-purpose" value="specific_topic">
                                 <div class="interview-card-inner">
                                     <i class="fas fa-search"></i>
                                     <strong>Specific Topic</strong>
@@ -643,7 +643,7 @@
                                 </div>
                             </label>
                             <label class="interview-card">
-                                <input type="radio" name="interview-purpose" value="oral_history">
+                                <input id="interview-purpose-oral-history-radio" type="radio" name="interview-purpose" value="oral_history">
                                 <div class="interview-card-inner">
                                     <i class="fas fa-landmark"></i>
                                     <strong>Oral History</strong>
@@ -651,7 +651,7 @@
                                 </div>
                             </label>
                             <label class="interview-card">
-                                <input type="radio" name="interview-purpose" value="memoir">
+                                <input id="interview-purpose-memoir-radio" type="radio" name="interview-purpose" value="memoir">
                                 <div class="interview-card-inner">
                                     <i class="fas fa-pen-fancy"></i>
                                     <strong>Memoir</strong>
@@ -659,7 +659,7 @@
                                 </div>
                             </label>
                             <label class="interview-card">
-                                <input type="radio" name="interview-purpose" value="legacy">
+                                <input id="interview-purpose-legacy-radio" type="radio" name="interview-purpose" value="legacy">
                                 <div class="interview-card-inner">
                                     <i class="fas fa-seedling"></i>
                                     <strong>Legacy Project</strong>
@@ -719,37 +719,37 @@
                 </div>
                 <div class="config-modal-body">
                     <div class="config-tabs-sidebar">
-                        <button type="button" class="config-tab-button active" data-tab="settings">
+                        <button id="config-tab-btn-settings" type="button" class="config-tab-button active" data-tab="settings">
                             <i class="fas fa-sliders-h"></i> Appearance
                         </button>
-                        <button type="button" class="config-tab-button" data-tab="api-keys">
+                        <button id="config-tab-btn-api-keys" type="button" class="config-tab-button" data-tab="api-keys">
                             <i class="fas fa-plug"></i> API Keys
                         </button>
-                        <button type="button" class="config-tab-button" data-tab="ai-setup-config">
+                        <button id="config-tab-btn-ai-setup-config" type="button" class="config-tab-button" data-tab="ai-setup-config">
                             <i class="fas fa-microchip"></i> AI &amp; Setup
                         </button>
-                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="subject-configuration">
+                        <button id="config-tab-btn-subject-configuration" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="subject-configuration">
                             <i class="fas fa-user"></i> Subject Configuration
                         </button>
-                        <button type="button" class="config-tab-button" data-tab="regions-config">
+                        <button id="config-tab-btn-regions-config" type="button" class="config-tab-button" data-tab="regions-config">
                             <i class="fas fa-globe-americas"></i> Regions
                         </button>
-                        <button type="button" class="config-tab-button" data-tab="suggestions-config">
+                        <button id="config-tab-btn-suggestions-config" type="button" class="config-tab-button" data-tab="suggestions-config">
                             <i class="fas fa-lightbulb"></i> Suggestions
                         </button>
-                        <button type="button" class="config-tab-button" data-tab="guide-topics-config">
+                        <button id="config-tab-btn-guide-topics-config" type="button" class="config-tab-button" data-tab="guide-topics-config">
                             <i class="fas fa-map-signs"></i> Guide Topics
                         </button>
-                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="custom-voices">
+                        <button id="config-tab-btn-custom-voices" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="custom-voices">
                             <i class="fas fa-microphone-alt"></i> Custom Voices
                         </button>
-                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-keys">
+                        <button id="config-tab-btn-manage-keys" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-keys">
                             <i class="fas fa-key"></i> Manage Visitor Keys
                         </button>
-                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tools-access">
+                        <button id="config-tab-btn-tools-access" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tools-access">
                             <i class="fas fa-wrench"></i> Tools Access
                         </button>
-                        <button type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tool-test">
+                        <button id="config-tab-btn-tool-test" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tool-test">
                             <i class="fas fa-vial"></i> Tool Test
                         </button>
                     </div>
@@ -962,7 +962,7 @@
                                     <span class="local-ai-setup-status-value" data-local-ai-embed-value>—</span>
                                 </div>
                             </div>
-                            <button type="button" class="modal-btn modal-btn-primary local-ai-setup-download-btn" data-local-ai-download style="display:none;">
+                            <button id="local-ai-setup-download-btn" type="button" class="modal-btn modal-btn-primary local-ai-setup-download-btn" data-local-ai-download style="display:none;">
                                 <i class="fas fa-download" aria-hidden="true"></i> Download required models
                             </button>
                             <div class="local-ai-setup-msg" data-local-ai-msg style="display:none;"></div>
@@ -1379,8 +1379,8 @@
                                     <i class="fas fa-plus"></i> Add hint (orphan seat)
                                 </button>
                             </div> -->
-                            <!-- <div id="visitor-key-hints-loading" style="display: none; color: var(--color-text-muted); margin-bottom: 8px;"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
-                            <div id="visitor-key-hints-error" style="display: none; color: #dc3545; margin-bottom: 8px;"></div> -->
+                            <div id="manage-visitor-key-hints-loading" style="display: none; color: var(--color-text-muted); margin-bottom: 8px;"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+                            <div id="manage-visitor-key-hints-error" style="display: none; color: #dc3545; margin-bottom: 8px;"></div>
                             <div style="overflow-x: auto;">
                                 <table class="sensitive-data-table" id="visitor-key-hints-table" style="width: 100%;">
                                     <thead>
@@ -1400,7 +1400,7 @@
                                     <tbody id="visitor-key-hints-tbody"></tbody>
                                 </table>
                             </div>
-                            <p id="visitor-key-hints-empty" style="display: none; color: var(--color-text-muted); font-size: var(--text-md);">No visitor hints yet.</p>
+                            <p id="manage-visitor-key-hints-empty" style="display: none; color: var(--color-text-muted); font-size: var(--text-md);">No visitor hints yet.</p>
                         </div>
                     </section>
                 </div>
@@ -1505,10 +1505,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="email_processing"><i class="fas fa-play"></i> Import</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-email-processing-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="email_processing"><i class="fas fa-play"></i> Import</button>
+                                            <button id="data-import-cancel-btn" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="emails_gmail" title="Deletes only emails imported via Gmail API for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-emails-gmail-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="emails_gmail" title="Deletes only emails imported via Gmail API for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1523,10 +1523,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="imap_processing"><i class="fas fa-play"></i> Import</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-imap-processing-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="imap_processing"><i class="fas fa-play"></i> Import</button>
+                                            <button id="data-import-cancel-btn-2" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="emails_imap" title="Deletes IMAP and legacy emails (everything not tagged Gmail) for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-emails-imap-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="emails_imap" title="Deletes IMAP and legacy emails (everything not tagged Gmail) for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1541,10 +1541,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-zip-start-btn" data-zip-archive-type="whatsapp"><i class="fas fa-play"></i> Import</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-zip-start-whatsapp-btn" type="button" class="modal-btn modal-btn-primary data-import-zip-start-btn" data-zip-archive-type="whatsapp"><i class="fas fa-play"></i> Import</button>
+                                            <button id="data-import-cancel-btn-3" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="whatsapp"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-whatsapp-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="whatsapp"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1559,10 +1559,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-zip-start-btn" data-zip-archive-type="instagram"><i class="fas fa-play"></i> Import</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-zip-start-instagram-btn" type="button" class="modal-btn modal-btn-primary data-import-zip-start-btn" data-zip-archive-type="instagram"><i class="fas fa-play"></i> Import</button>
+                                            <button id="data-import-cancel-btn-4" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="instagram"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-instagram-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="instagram"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1577,10 +1577,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-zip-start-btn" data-zip-archive-type="imessage"><i class="fas fa-play"></i> Import</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-zip-start-imessage-btn" type="button" class="modal-btn modal-btn-primary data-import-zip-start-btn" data-zip-archive-type="imessage"><i class="fas fa-play"></i> Import</button>
+                                            <button id="data-import-cancel-btn-5" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="imessage"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-imessage-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="imessage"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1595,14 +1595,31 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-zip-start-btn" data-zip-archive-type="facebook"><i class="fas fa-play"></i> Import</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-zip-start-facebook-btn" type="button" class="modal-btn modal-btn-primary data-import-zip-start-btn" data-zip-archive-type="facebook"><i class="fas fa-play"></i> Import</button>
+                                            <button id="data-import-cancel-btn-6" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_all" title="Removes Messenger, albums, posts, and Facebook places for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-facebook-all-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_all" title="Removes Messenger, albums, posts, and Facebook places for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
-                                {{ index_filesystem_import_tile }}
+                                <article class="data-import-card data-import-row data-import-path-row" data-import="filesystem">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-link"></i> Link to Images on Disk</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count" data-import-count-key="filesystem">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Scan folders on this machine and register image paths as referenced media (local Electron deployments only).<br/><br/>Thumbnails are generated and stored in the database for quick access.  <br/><br/> Optonally, you can select to import the images into the database as part of the process or run the import process at a later stage. <br/><br/> <strong>Clear Data</strong> removes filesystem-linked rows.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                                <button id="data-import-link-images-modal-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="filesystem"><i class="fas fa-link"></i> Link</button>
+                                                <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="filesystem_media" title="Remove filesystem-sourced images from the library"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
                                 <article class="data-import-card data-import-row" data-import="reference_modal">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-book"></i> Import and Manage Reference Documents</h3>
@@ -1614,10 +1631,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-open-modal-btn" data-open-modal="reference-documents-manage-modal"><i class="fas fa-folder-open"></i> Manage</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-open-reference-documents-manage-modal-btn" type="button" class="modal-btn modal-btn-primary data-import-open-modal-btn" data-open-modal="reference-documents-manage-modal"><i class="fas fa-folder-open"></i> Manage</button>
+                                            <button id="data-import-cancel-btn-7" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="reference_documents"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-reference-documents-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="reference_documents"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1632,10 +1649,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <!-- <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-open-modal-btn" data-open-modal="reference-documents-manage-modal"><i class="fas fa-folder-open"></i> Manage</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-open-reference-documents-manage-modal-btn-2" type="button" class="modal-btn modal-btn-primary data-import-open-modal-btn" data-open-modal="reference-documents-manage-modal"><i class="fas fa-folder-open"></i> Manage</button>
+                                            <button id="data-import-cancel-btn-8" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this import"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="reference_documents"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button> -->
+                                            <button id="data-import-clear-reference-documents-btn-2" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="reference_documents"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button> -->
                                         </div>
                                     </div>
                                 </article>
@@ -1654,8 +1671,8 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="reference_import"><i class="fas fa-play"></i> Import</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-reference-import-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="reference_import"><i class="fas fa-play"></i> Import</button>
+                                            <button id="data-import-cancel-btn-9" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1671,8 +1688,8 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_export"><i class="fas fa-play"></i> Export</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-image-export-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_export"><i class="fas fa-play"></i> Export</button>
+                                            <button id="data-import-cancel-btn-10" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1687,7 +1704,7 @@
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Remove images that have been imported into the database. This function only offers <strong>Clear Data</strong> to remove filesystem-sourced library images; counts reflect embedded images for this archive.</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row data-import-card-actions-row--clear-only">
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="filesystem_media" title="Removes all filesystem-sourced images (includes folder uploads and scans)"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-filesystem-media-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="filesystem_media" title="Removes all filesystem-sourced images (includes folder uploads and scans)"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1702,8 +1719,8 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="contacts"><i class="fas fa-play"></i> Reprocess</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-contacts-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="contacts"><i class="fas fa-play"></i> Reprocess</button>
+                                            <button id="data-import-cancel-btn-11" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1719,10 +1736,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="thumbnails_prompt"><i class="fas fa-play"></i> Process</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-thumbnails-prompt-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="thumbnails_prompt"><i class="fas fa-play"></i> Process</button>
+                                            <button id="data-import-cancel-btn-12" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="thumbnails" title="Clears thumbnail bytes from stored blobs (images remain)"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-thumbnails-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="thumbnails" title="Clears thumbnail bytes from stored blobs (images remain)"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1737,8 +1754,8 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_regions_recalc"><i class="fas fa-play"></i> Recalculate</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-image-regions-recalc-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_regions_recalc"><i class="fas fa-play"></i> Recalculate</button>
+                                            <button id="data-import-cancel-btn-13" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1754,10 +1771,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="message_context_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-message-context-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="message_context_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-14" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="message_embeddings" title="Deletes all message embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-message-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="message_embeddings" title="Deletes all message embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1772,10 +1789,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="email_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-email-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="email_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-15" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="email_embeddings" title="Deletes all email embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-email-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="email_embeddings" title="Deletes all email embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1790,10 +1807,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="facebook_post_text_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-facebook-post-text-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="facebook_post_text_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-16" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_post_text_embeddings" title="Deletes all Facebook post text embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-facebook-post-text-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_post_text_embeddings" title="Deletes all Facebook post text embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1808,10 +1825,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="facebook_album_description_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-facebook-album-description-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="facebook_album_description_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-17" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_album_description_embeddings" title="Deletes all Facebook album description embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-facebook-album-description-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_album_description_embeddings" title="Deletes all Facebook album description embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1826,8 +1843,8 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_ai_gemma_unclassified"><i class="fas fa-play"></i> Classify</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-image-ai-gemma-unclassified-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_ai_gemma_unclassified"><i class="fas fa-play"></i> Classify</button>
+                                            <button id="data-import-cancel-btn-18" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1843,10 +1860,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_tag_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-image-tag-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_tag_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-19" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="media_tag_embeddings" title="Deletes all image tag embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-media-tag-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="media_tag_embeddings" title="Deletes all image tag embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -1861,10 +1878,10 @@
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
                                             <div class="data-import-action-group">
-                                            <button type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="artefact_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            <button id="data-import-start-artefact-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="artefact_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-20" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
-                                            <button type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="artefact_embeddings" title="Deletes all artefact embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                            <button id="data-import-clear-artefact-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="artefact_embeddings" title="Deletes all artefact embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
                                         </div>
                                     </div>
                                 </article>
@@ -2348,11 +2365,11 @@
                 <div class="modal-body">
                     <div style="margin-bottom: 0.75rem;">
                         <label style="display: flex; align-items: center; padding: 4px 6px; margin-bottom: 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'">
-                            <input type="radio" name="sms-ask-ai-option" value="summarise" checked style="margin-right: 10px; cursor: pointer;">
+                            <input id="sms-ask-ai-option-summarise-radio" type="radio" name="sms-ask-ai-option" value="summarise" checked style="margin-right: 10px; cursor: pointer;">
                             <span style="color: var(--color-text); font-size: var(--text-base);">Summarise the Conversation</span>
                         </label>
                         <label style="display: flex; align-items: center; padding: 4px 6px; margin-bottom: 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'">
-                            <input type="radio" name="sms-ask-ai-option" value="other" style="margin-right: 10px; cursor: pointer;">
+                            <input id="sms-ask-ai-option-other-radio" type="radio" name="sms-ask-ai-option" value="other" style="margin-right: 10px; cursor: pointer;">
                             <span style="color: var(--color-text); font-size: var(--text-base);">Other</span>
                         </label>
                     </div>
@@ -2431,11 +2448,11 @@
                 <div class="modal-body">
                     <div style="margin-bottom: 0.75rem;">
                         <label style="display: flex; align-items: center; padding: 4px 6px; margin-bottom: 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'">
-                            <input type="radio" name="email-ask-ai-option" value="summarise" checked style="margin-right: 10px; cursor: pointer;">
+                            <input id="email-ask-ai-option-summarise-radio" type="radio" name="email-ask-ai-option" value="summarise" checked style="margin-right: 10px; cursor: pointer;">
                             <span style="color: var(--color-text); font-size: var(--text-base);">Summarise Emails with the same sender</span>
                         </label>
                         <label style="display: flex; align-items: center; padding: 4px 6px; margin-bottom: 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'">
-                            <input type="radio" name="email-ask-ai-option" value="other" style="margin-right: 10px; cursor: pointer;">
+                            <input id="email-ask-ai-option-other-radio" type="radio" name="email-ask-ai-option" value="other" style="margin-right: 10px; cursor: pointer;">
                             <span style="color: var(--color-text); font-size: var(--text-base);">Other</span>
                         </label>
                     </div>
@@ -2458,6 +2475,9 @@
                     <div style="display: flex; align-items: center; gap: 0.75em; flex-shrink: 0;">
                         <button id="shuffle-photos-btn" class="modal-btn" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.9em; font-size: var(--text-md); flex-shrink: 0;">
                             <i class="fas fa-random" style="margin-right: 0.4em;"></i>Shuffle
+                        </button>
+                        <button id="find-nearby-map-btn" type="button" class="modal-btn" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.9em; font-size: var(--text-md); flex-shrink: 0;">
+                            <i class="fas fa-search-location" style="margin-right: 0.4em;"></i>Find Nearby
                         </button>
                         <div id="geo-metadata-region-control" style="display: flex; align-items: center; gap: 0.4em; flex-shrink: 0;">
                             <label for="geo-metadata-region-select" style="font-size: var(--text-md); white-space: nowrap;">Region</label>
@@ -3074,11 +3094,11 @@
                 </div> -->
                 <div class="contacts-modal-body">
                     <div class="manage-contacts-tabs" style="display: flex; flex-direction: row; border-bottom: 2px solid #bfc9da; margin-bottom: 0.5em; flex-shrink: 0;">
-                        <button type="button" class="manage-contacts-tab-btn active" data-manage-contacts-tab="contacts-directory">Contacts</button>
-                        <button type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="relationships">Relationships</button>
-                        <button type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="email-classifications">Contact Classifications</button>
-                        <button type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="email-matches">Email Matches</button>
-                        <button type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="email-exclusions">Email Exclusions</button>
+                        <button id="manage-contacts-tab-btn-contacts-directory" type="button" class="manage-contacts-tab-btn active" data-manage-contacts-tab="contacts-directory">Contacts</button>
+                        <button id="manage-contacts-tab-btn-relationships" type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="relationships">Relationships</button>
+                        <button id="manage-contacts-tab-btn-email-classifications" type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="email-classifications">Contact Classifications</button>
+                        <button id="manage-contacts-tab-btn-email-matches" type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="email-matches">Email Matches</button>
+                        <button id="manage-contacts-tab-btn-email-exclusions" type="button" class="manage-contacts-tab-btn" data-manage-contacts-tab="email-exclusions">Email Exclusions</button>
 
                     </div>
                     <div id="contacts-directory-tab-content" class="manage-contacts-tab-content active" style="flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
@@ -3399,8 +3419,8 @@
                 </div>
                 <div class="modal-body complete-profile-modal-body">
                     <div class="sd-detail-tab-bar complete-profile-tab-bar" role="tablist">
-                        <button type="button" class="sd-tab-btn complete-profile-tab active" data-tab="view" role="tab" aria-selected="true">View</button>
-                        <button type="button" class="sd-tab-btn complete-profile-tab" data-tab="edit" role="tab" aria-selected="false">Edit</button>
+                        <button id="complete-profile-tab-btn-view" type="button" class="sd-tab-btn complete-profile-tab active" data-tab="view" role="tab" aria-selected="true">View</button>
+                        <button id="complete-profile-tab-btn-edit" type="button" class="sd-tab-btn complete-profile-tab" data-tab="edit" role="tab" aria-selected="false">Edit</button>
                     </div>
                     <div id="complete-profile-view-pane" class="complete-profile-pane complete-profile-view-pane">
                         <div id="complete-profile-content" class="rendered-content complete-profile-markdown"></div>
@@ -3473,19 +3493,19 @@
                         <legend class="upload-import-label" style="margin-bottom: 10px;">Archive source</legend>
                         <div class="upload-import-radio-list">
                             <label class="upload-import-radio-row">
-                                <input type="radio" name="upload-zip-archive-type" value="facebook" checked>
+                                <input id="upload-zip-archive-type-facebook-radio" type="radio" name="upload-zip-archive-type" value="facebook" checked>
                                 <span>Facebook (full export)</span>
                             </label>
                             <label class="upload-import-radio-row">
-                                <input type="radio" name="upload-zip-archive-type" value="instagram">
+                                <input id="upload-zip-archive-type-instagram-radio" type="radio" name="upload-zip-archive-type" value="instagram">
                                 <span>Instagram</span>
                             </label>
                             <label class="upload-import-radio-row">
-                                <input type="radio" name="upload-zip-archive-type" value="whatsapp">
+                                <input id="upload-zip-archive-type-whatsapp-radio" type="radio" name="upload-zip-archive-type" value="whatsapp">
                                 <span>WhatsApp</span>
                             </label>
                             <label class="upload-import-radio-row">
-                                <input type="radio" name="upload-zip-archive-type" value="imessage">
+                                <input id="upload-zip-archive-type-imessage-radio" type="radio" name="upload-zip-archive-type" value="imessage">
                                 <span>iMessage / SMS (iMazing export)</span>
                             </label>
                         </div>
@@ -3639,7 +3659,7 @@
                         <div class="reference-documents-field-hint" style="margin-top:0.35rem;font-size:var(--text-md);color:var(--color-text-muted);">When enabled, the document text is sent with every chat-style request and is hidden from the “list available reference documents” tools.</div>
                     </div>
                     <div class="reference-documents-form-actions">
-                        <button type="submit" class="modal-btn modal-btn-primary">Save Changes</button>
+                        <button id="reference-documents-edit-save-btn" type="submit" class="modal-btn modal-btn-primary">Save Changes</button>
                         <button type="button" id="reference-documents-edit-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
                     </div>
                 </form>
@@ -4056,9 +4076,15 @@
             <p id="guide-explanation-text"></p>
             <img id="guide-explanation-image" class="guide-explanation-image" src="" alt="" style="display: none;">
             <div class="guide-explanation-actions">
-                <button type="button" id="guide-explanation-back-btn" class="guide-explanation-back-btn" style="display: none;"><i class="fas fa-chevron-left"></i> Back</button>
-                <button type="button" id="guide-explanation-next-btn" class="guide-explanation-next-btn" style="display: none;">Next <i class="fas fa-chevron-right"></i></button>
-                <button type="button" id="guide-explanation-done-btn" class="guide-explanation-done-btn" style="display: none;">Done</button>
+                <button type="button" id="guide-explanation-back-btn" class="guide-explanation-back-btn guide-explanation-nav-btn" style="display: none;" aria-label="Previous step">
+                    <span class="guide-explanation-nav-icon" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                    <span class="guide-explanation-nav-label">Back</span>
+                </button>
+                <button type="button" id="guide-explanation-next-btn" class="guide-explanation-next-btn guide-explanation-nav-btn" style="display: none;" aria-label="Next step">
+                    <span class="guide-explanation-nav-label">Next</span>
+                    <span class="guide-explanation-nav-icon" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+                </button>
+                <button type="button" id="guide-explanation-done-btn" class="guide-explanation-done-btn guide-explanation-nav-btn" style="display: none;">Done</button>
             </div>
             <button type="button" id="guide-explanation-close-btn" class="guide-explanation-close-btn" style="display: none;">&times;</button>
         </div>
@@ -4888,8 +4914,8 @@
                 <input id="sd-detail-description" class="new-image-gallery-input" placeholder="Short description"/>
                 <label class="artefact-field-label">Details</label>
                 <div class="sd-detail-tab-bar">
-                    <button class="sd-tab-btn active" data-tab="edit">Edit</button>
-                    <button class="sd-tab-btn" data-tab="preview">Preview</button>
+                    <button id="sensitive-data-tab-btn-edit" class="sd-tab-btn active" data-tab="edit">Edit</button>
+                    <button id="sensitive-data-tab-btn-preview" class="sd-tab-btn" data-tab="preview">Preview</button>
                 </div>
                 <textarea id="sd-detail-details" class="artefact-story-textarea" placeholder="Sensitive data..."></textarea>
                 <div id="sd-detail-preview" class="sd-detail-markdown-preview rendered-content" style="display:none;"></div>
@@ -5293,14 +5319,14 @@
           <div class="wizard-chip-group">
             <span class="wizard-chip-group-label">Known Conditions (click to select)</span>
             <div class="wizard-chip-container" id="wf-conditions-chips">
-              <button type="button" class="wizard-chip" data-value="High blood pressure">High blood pressure</button>
-              <button type="button" class="wizard-chip" data-value="Gout">Gout</button>
-              <button type="button" class="wizard-chip" data-value="Diabetes">Diabetes</button>
-              <button type="button" class="wizard-chip" data-value="Asthma">Asthma</button>
-              <button type="button" class="wizard-chip" data-value="Heart disease">Heart disease</button>
-              <button type="button" class="wizard-chip" data-value="Arthritis">Arthritis</button>
-              <button type="button" class="wizard-chip" data-value="Depression">Depression</button>
-              <button type="button" class="wizard-chip" data-value="Anxiety">Anxiety</button>
+              <button id="wizard-chip-high-blood-pressure" type="button" class="wizard-chip" data-value="High blood pressure">High blood pressure</button>
+              <button id="wizard-chip-gout" type="button" class="wizard-chip" data-value="Gout">Gout</button>
+              <button id="wizard-chip-diabetes" type="button" class="wizard-chip" data-value="Diabetes">Diabetes</button>
+              <button id="wizard-chip-asthma" type="button" class="wizard-chip" data-value="Asthma">Asthma</button>
+              <button id="wizard-chip-heart-disease" type="button" class="wizard-chip" data-value="Heart disease">Heart disease</button>
+              <button id="wizard-chip-arthritis" type="button" class="wizard-chip" data-value="Arthritis">Arthritis</button>
+              <button id="wizard-chip-depression" type="button" class="wizard-chip" data-value="Depression">Depression</button>
+              <button id="wizard-chip-anxiety" type="button" class="wizard-chip" data-value="Anxiety">Anxiety</button>
             </div>
             <label style="font-size:var(--text-sm);color:var(--color-text-muted);">Other conditions (comma-separated)
               <input type="text" id="wf-conditions-custom" class="form-control" placeholder="Any other conditions…">
@@ -5398,44 +5424,44 @@
           <div class="wizard-chip-group">
             <span class="wizard-chip-group-label">Sports &amp; Fitness</span>
             <div class="wizard-chip-container" id="wf-sports-chips">
-              <button type="button" class="wizard-chip" data-value="Running">Running</button>
-              <button type="button" class="wizard-chip" data-value="Cycling">Cycling</button>
-              <button type="button" class="wizard-chip" data-value="Triathlon">Triathlon</button>
-              <button type="button" class="wizard-chip" data-value="Swimming">Swimming</button>
-              <button type="button" class="wizard-chip" data-value="Martial arts">Martial arts</button>
-              <button type="button" class="wizard-chip" data-value="Tennis">Tennis</button>
-              <button type="button" class="wizard-chip" data-value="Golf">Golf</button>
-              <button type="button" class="wizard-chip" data-value="Football">Football</button>
-              <button type="button" class="wizard-chip" data-value="Gym">Gym</button>
-              <button type="button" class="wizard-chip" data-value="Hiking">Hiking</button>
+              <button id="wizard-chip-running" type="button" class="wizard-chip" data-value="Running">Running</button>
+              <button id="wizard-chip-cycling" type="button" class="wizard-chip" data-value="Cycling">Cycling</button>
+              <button id="wizard-chip-triathlon" type="button" class="wizard-chip" data-value="Triathlon">Triathlon</button>
+              <button id="wizard-chip-swimming" type="button" class="wizard-chip" data-value="Swimming">Swimming</button>
+              <button id="wizard-chip-martial-arts" type="button" class="wizard-chip" data-value="Martial arts">Martial arts</button>
+              <button id="wizard-chip-tennis" type="button" class="wizard-chip" data-value="Tennis">Tennis</button>
+              <button id="wizard-chip-golf" type="button" class="wizard-chip" data-value="Golf">Golf</button>
+              <button id="wizard-chip-football" type="button" class="wizard-chip" data-value="Football">Football</button>
+              <button id="wizard-chip-gym" type="button" class="wizard-chip" data-value="Gym">Gym</button>
+              <button id="wizard-chip-hiking" type="button" class="wizard-chip" data-value="Hiking">Hiking</button>
             </div>
           </div>
           <div class="wizard-chip-group">
             <span class="wizard-chip-group-label">Arts &amp; Culture</span>
             <div class="wizard-chip-container" id="wf-arts-chips">
-              <button type="button" class="wizard-chip" data-value="Theatre">Theatre</button>
-              <button type="button" class="wizard-chip" data-value="Music">Music</button>
-              <button type="button" class="wizard-chip" data-value="Film">Film</button>
-              <button type="button" class="wizard-chip" data-value="Dance">Dance</button>
-              <button type="button" class="wizard-chip" data-value="Writing">Writing</button>
-              <button type="button" class="wizard-chip" data-value="Photography">Photography</button>
-              <button type="button" class="wizard-chip" data-value="Reading">Reading</button>
-              <button type="button" class="wizard-chip" data-value="Social Causes">Social Causes</button>
-              <button type="button" class="wizard-chip" data-value="Community Volunteering">Community Volunteering</button>
+              <button id="wizard-chip-theatre" type="button" class="wizard-chip" data-value="Theatre">Theatre</button>
+              <button id="wizard-chip-music" type="button" class="wizard-chip" data-value="Music">Music</button>
+              <button id="wizard-chip-film" type="button" class="wizard-chip" data-value="Film">Film</button>
+              <button id="wizard-chip-dance" type="button" class="wizard-chip" data-value="Dance">Dance</button>
+              <button id="wizard-chip-writing" type="button" class="wizard-chip" data-value="Writing">Writing</button>
+              <button id="wizard-chip-photography" type="button" class="wizard-chip" data-value="Photography">Photography</button>
+              <button id="wizard-chip-reading" type="button" class="wizard-chip" data-value="Reading">Reading</button>
+              <button id="wizard-chip-social-causes" type="button" class="wizard-chip" data-value="Social Causes">Social Causes</button>
+              <button id="wizard-chip-community-volunteering" type="button" class="wizard-chip" data-value="Community Volunteering">Community Volunteering</button>
             </div>
           </div>
           <div class="wizard-chip-group">
             <span class="wizard-chip-group-label">Intellectual Interests</span>
             <div class="wizard-chip-container" id="wf-intellectual-chips">
-              <button type="button" class="wizard-chip" data-value="Science">Science</button>
-              <button type="button" class="wizard-chip" data-value="Philosophy">Philosophy</button>
-              <button type="button" class="wizard-chip" data-value="Technology">Technology</button>
-              <button type="button" class="wizard-chip" data-value="Politics">Politics</button>
-              <button type="button" class="wizard-chip" data-value="Psychology">Psychology</button>
-              <button type="button" class="wizard-chip" data-value="History">History</button>
-              <button type="button" class="wizard-chip" data-value="Economics">Economics</button>
-              <button type="button" class="wizard-chip" data-value="Atheism / Secularism">Atheism / Secularism</button>
-              <button type="button" class="wizard-chip" data-value="Aviation">Aviation</button>
+              <button id="wizard-chip-science" type="button" class="wizard-chip" data-value="Science">Science</button>
+              <button id="wizard-chip-philosophy" type="button" class="wizard-chip" data-value="Philosophy">Philosophy</button>
+              <button id="wizard-chip-technology" type="button" class="wizard-chip" data-value="Technology">Technology</button>
+              <button id="wizard-chip-politics" type="button" class="wizard-chip" data-value="Politics">Politics</button>
+              <button id="wizard-chip-psychology" type="button" class="wizard-chip" data-value="Psychology">Psychology</button>
+              <button id="wizard-chip-history" type="button" class="wizard-chip" data-value="History">History</button>
+              <button id="wizard-chip-economics" type="button" class="wizard-chip" data-value="Economics">Economics</button>
+              <button id="wizard-chip-atheism-secularism" type="button" class="wizard-chip" data-value="Atheism / Secularism">Atheism / Secularism</button>
+              <button id="wizard-chip-aviation" type="button" class="wizard-chip" data-value="Aviation">Aviation</button>
             </div>
           </div>
           <label>Music — Favourite artists, concerts, genres
@@ -5511,7 +5537,7 @@
     <div class="user-llm-info-popover-card" role="dialog" aria-modal="true" aria-labelledby="user-llm-info-popover-title" aria-describedby="user-llm-info-popover-body">
         <div class="user-llm-info-popover-header">
             <span id="user-llm-info-popover-title" class="user-llm-info-popover-title"></span>
-            <button type="button" class="user-llm-info-popover-close" aria-label="Close information"><i class="fas fa-times" aria-hidden="true"></i></button>
+            <button id="user-llm-info-popover-close-btn" type="button" class="user-llm-info-popover-close" aria-label="Close information"><i class="fas fa-times" aria-hidden="true"></i></button>
         </div>
         <p id="user-llm-info-popover-body" class="user-llm-info-popover-body"></p>
     </div>
