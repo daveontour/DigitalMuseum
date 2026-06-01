@@ -1708,23 +1708,6 @@
                                         </div>
                                     </div>
                                 </article>
-                                <article class="data-import-card data-import-row" data-import="contacts">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-address-book"></i> Reprocess Contacts Data</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count" data-import-count-key="contacts">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Rebuild the contacts store from existing messages and related sources. Useful after large imports or if you have updated your contacts classification, emails matches or email exclusions</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                            <button id="data-import-start-contacts-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="contacts"><i class="fas fa-play"></i> Reprocess</button>
-                                            <button id="data-import-cancel-btn-11" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </article>
                                 <article class="data-import-card data-import-row" data-import="thumbnails">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-image"></i> Thumbnails Creation &amp; Location Extraction</h3>
@@ -1750,6 +1733,7 @@
                                     <div class="data-import-card-metrics-source" hidden aria-hidden="true">
                                         <span class="data-import-count" data-import-count-key="gps_images">—</span>
                                     </div>
+
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Recompute world region codes for all images that have GPS coordinates, using the bounding boxes in <strong>Configuration → Regions</strong>. Entries shows GPS-tagged images. After editing region definitions, run this job to refresh stored values (no server restart required).</p></div>
                                     <div class="data-import-actions-td">
                                         <div class="data-import-card-actions-row">
@@ -1760,6 +1744,41 @@
                                         </div>
                                     </div>
                                 </article>
+                                <article class="data-import-card data-import-row" data-import="image_ai_gemma_unclassified">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-tags"></i> Use AI to Classify Image Contents and Add tags</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count" data-import-count-key="imported_images">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Use local AI (e.g. Gemma via Ollama) and optionally cloud hosted services to tag images with the contents of the image for ones that are not yet classified</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-image-ai-gemma-unclassified-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_ai_gemma_unclassified"><i class="fas fa-play"></i> Classify</button>
+                                            <button id="data-import-cancel-btn-18" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+                                <article class="data-import-card data-import-row" data-import="contacts">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-address-book"></i> Reprocess Contacts Data</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count" data-import-count-key="contacts">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Rebuild the contacts store from existing messages and related sources. Useful after large imports or if you have updated your contacts classification, emails matches or email exclusions</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-contacts-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="contacts"><i class="fas fa-play"></i> Reprocess</button>
+                                            <button id="data-import-cancel-btn-11" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+
                                 <article class="data-import-card data-import-row" data-import="message_context_embeddings">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-vector-square"></i> Optimise Message and Conversation for Searching</h3>
@@ -1829,23 +1848,6 @@
                                             <button id="data-import-cancel-btn-17" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
                                             <button id="data-import-clear-facebook-album-description-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_album_description_embeddings" title="Deletes all Facebook album description embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
-                                        </div>
-                                    </div>
-                                </article>
-                                <article class="data-import-card data-import-row" data-import="image_ai_gemma_unclassified">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-tags"></i> Use AI to Classify Image Contents and Add tags</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count" data-import-count-key="imported_images">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Use local AI (e.g. Gemma via Ollama) and optionally cloud hosted services to tag images with the contents of the image for ones that are not yet classified</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                            <button id="data-import-start-image-ai-gemma-unclassified-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_ai_gemma_unclassified"><i class="fas fa-play"></i> Classify</button>
-                                            <button id="data-import-cancel-btn-18" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
                                         </div>
                                     </div>
                                 </article>
@@ -2669,52 +2671,78 @@
                     <!-- Master Pane -->
                     <div class="email-gallery-master-pane">
                         <div class="email-gallery-search-section">
-                            <div class="email-metadata-filters">
-                                <div class="email-gallery-title">
-                                </div>
-                                <div class="email-gallery-search-row">
-                                    <input type="text" id="email-gallery-search" placeholder="Search emails..." class="email-gallery-input">
-                                </div>
-                                <div class="email-gallery-filter-row">
-                                    <input type="text" id="email-gallery-sender" placeholder="From..." class="email-gallery-input">
-                                    <input type="text" id="email-gallery-recipient" placeholder="To..." class="email-gallery-input">
-                                </div>
-                                <div class="email-gallery-filter-row-full">
-                                    <input type="text" id="email-gallery-to-from" placeholder="To or From..." class="email-gallery-input">
-                                </div> 
-                                <div class="email-gallery-filter-row email-gallery-filter-year-month-row">
-                                    <select id="email-gallery-year-filter" class="email-gallery-select"></select>                                         
-                                    <select id="email-gallery-month-filter" class="email-gallery-select"></select>
-                                    <label class="email-gallery-checkbox-label">
-                                        <input type="checkbox" id="email-gallery-attachments-filter">
-                                        Attachments
-                                    </label>
-                                </div>
-                                <div class="email-gallery-filter-row">
-                                    <!-- <label for="email-gallery-source-filter" class="email-gallery-sort-label" style="margin-right:8px;">Source</label> -->
-                                    <select id="email-gallery-source-filter" class="email-gallery-select" style="flex:1; min-width:160px;" aria-label="Email import source">
-                                        <option value="all" selected>All sources</option>
-                                        <option value="gmail">Gmail</option>
-                                        <option value="imap">IMAP (not Gmail)</option>
-                                    </select>
-                                </div>
-                                <div class="email-gallery-button-row">
-                                    <div class="email-gallery-actions-start">
-                                        <button id="email-gallery-search-btn" class="modal-btn modal-btn-primary">
-                                            <i class="fas fa-search"></i>Search
-                                        </button>
-                                        <button id="email-gallery-clear-btn" class="modal-btn modal-btn-secondary">
-                                            <i class="fas fa-times"></i>Clear
-                                        </button>
+                            <div class="email-gallery-search-accordion" role="region" aria-label="Email search filters">
+                                <div class="new-image-gallery-accordion-item" data-accordion-panel="metadata">
+                                    <button type="button" class="new-image-gallery-accordion-head" id="email-gallery-accordion-metadata" aria-expanded="true" aria-controls="email-gallery-accordion-metadata-body">
+                                        <span class="new-image-gallery-accordion-title">Metadata Search</span>
+                                        <i class="fas fa-chevron-down new-image-gallery-accordion-chevron" aria-hidden="true"></i>
+                                    </button>
+                                    <div class="new-image-gallery-accordion-body" id="email-gallery-accordion-metadata-body" role="region" aria-labelledby="email-gallery-accordion-metadata">
+                                        <div class="email-metadata-filters">
+                                            <div class="email-gallery-search-row">
+                                                <input type="text" id="email-gallery-search" placeholder="Search emails..." class="email-gallery-input">
+                                            </div>
+                                            <div class="email-gallery-filter-row">
+                                                <input type="text" id="email-gallery-sender" placeholder="From..." class="email-gallery-input">
+                                                <input type="text" id="email-gallery-recipient" placeholder="To..." class="email-gallery-input">
+                                            </div>
+                                            <div class="email-gallery-filter-row-full">
+                                                <input type="text" id="email-gallery-to-from" placeholder="To or From..." class="email-gallery-input">
+                                            </div>
+                                            <div class="email-gallery-filter-row email-gallery-filter-year-month-row">
+                                                <select id="email-gallery-year-filter" class="email-gallery-select"></select>
+                                                <select id="email-gallery-month-filter" class="email-gallery-select"></select>
+                                                <label class="email-gallery-checkbox-label">
+                                                    <input type="checkbox" id="email-gallery-attachments-filter">
+                                                    Attachments
+                                                </label>
+                                            </div>
+                                            <div class="email-gallery-filter-row">
+                                                <select id="email-gallery-source-filter" class="email-gallery-select" style="flex:1; min-width:160px;" aria-label="Email import source">
+                                                    <option value="all" selected>All sources</option>
+                                                    <option value="gmail">Gmail</option>
+                                                    <option value="imap">IMAP (not Gmail)</option>
+                                                </select>
+                                            </div>
+                                            <div class="email-gallery-button-row">
+                                                <div class="email-gallery-actions-start">
+                                                    <button id="email-gallery-search-btn" class="modal-btn modal-btn-primary" type="button">
+                                                        <i class="fas fa-search"></i>Metadata Search
+                                                    </button>
+                                                    <button id="email-gallery-clear-btn" class="modal-btn modal-btn-secondary" type="button">
+                                                        <i class="fas fa-times"></i>Clear
+                                                    </button>
+                                                </div>
+                                                <div class="email-gallery-sort-inline">
+                                                    <label class="email-gallery-sort-label" for="email-gallery-sort">Sort</label>
+                                                    <select id="email-gallery-sort" class="email-gallery-select email-gallery-sort-select" aria-label="Sort emails">
+                                                        <option value="date-desc">Newest first</option>
+                                                        <option value="date-asc">Oldest first</option>
+                                                        <option value="sender-asc">Sender A–Z</option>
+                                                        <option value="subject-asc">Subject A–Z</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="email-gallery-sort-inline">
-                                        <label class="email-gallery-sort-label" for="email-gallery-sort">Sort</label>
-                                        <select id="email-gallery-sort" class="email-gallery-select email-gallery-sort-select" aria-label="Sort emails">
-                                            <option value="date-desc">Newest first</option>
-                                            <option value="date-asc">Oldest first</option>
-                                            <option value="sender-asc">Sender A–Z</option>
-                                            <option value="subject-asc">Subject A–Z</option>
-                                        </select>
+                                </div>
+                                <div class="new-image-gallery-accordion-item is-collapsed" data-accordion-panel="content">
+                                    <button type="button" class="new-image-gallery-accordion-head" id="email-gallery-accordion-content" aria-expanded="false" aria-controls="email-gallery-accordion-content-body">
+                                        <span class="new-image-gallery-accordion-title">Email Content Search</span>
+                                        <i class="fas fa-chevron-down new-image-gallery-accordion-chevron" aria-hidden="true"></i>
+                                    </button>
+                                    <div class="new-image-gallery-accordion-body" id="email-gallery-accordion-content-body" role="region" aria-labelledby="email-gallery-accordion-content" hidden>
+                                        <textarea id="email-gallery-content-search" rows="1" class="email-gallery-input" placeholder="Enter text to find similar emails by content…" disabled aria-describedby="email-gallery-content-search-hint" style="width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                                         <div style="display: flex; align-items: center; gap: 0.45rem; margin-top: 0.45rem;">
+                                            <label for="email-gallery-content-search-n" class="email-gallery-sort-label" style="margin-right:8px;">Number of matches</label>
+                                            <input type="number" id="email-gallery-content-search-n" class="email-gallery-input" value="25" min="1" max="50" step="1" style="width: 4.5rem; flex-shrink: 0;">
+                                            <button type="button" id="email-gallery-content-search-btn" class="modal-btn modal-btn-primary" disabled>
+                                                <i class="fas fa-search"></i>Content Search
+                                            </button>
+                                            <button type="button" id="email-gallery-content-search-clear-btn" class="modal-btn modal-btn-secondary">
+                                                <i class="fas fa-times"></i>Clear
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2788,11 +2816,15 @@
                     <button id="close-new-image-gallery-modal" class="modal-close-btn">&times;</button>
                 </div>
                 <div class="new-image-gallery-modal-body">
-                    <div class="new-image-gallery-sidebar email-gallery-search-section">
-
+                    <div class="new-image-gallery-sidebar">
+                        <div class="new-image-gallery-sidebar-accordion" role="region" aria-label="Image search filters">
                         <!-- Section 1: Metadata Search -->
-                        <div class="new-image-gallery-sidebar-section">
-                            <div class="new-image-gallery-sidebar-section-label">Metadata Search</div>
+                        <div class="new-image-gallery-accordion-item" data-accordion-panel="metadata">
+                            <button type="button" class="new-image-gallery-accordion-head" id="new-image-gallery-accordion-metadata" aria-expanded="true" aria-controls="new-image-gallery-accordion-metadata-body">
+                                <span class="new-image-gallery-accordion-title">Metadata Search</span>
+                                <i class="fas fa-chevron-down new-image-gallery-accordion-chevron" aria-hidden="true"></i>
+                            </button>
+                            <div class="new-image-gallery-accordion-body" id="new-image-gallery-accordion-metadata-body" role="region" aria-labelledby="new-image-gallery-accordion-metadata">
                             <div class="new-image-metadata-filters email-metadata-filters">
                                 <div class="new-image-gallery-search-row email-gallery-search-row">
                                     <input type="text" id="new-image-gallery-title" placeholder="Title..." class="new-image-gallery-input email-gallery-input">
@@ -2829,6 +2861,12 @@
                                     <select id="new-image-gallery-month-filter" class="new-image-gallery-select email-gallery-select"></select>
                                 </div>
                                 <div class="new-image-gallery-filter-row email-gallery-filter-row">
+                                    <label class="new-image-gallery-date-label email-gallery-date-label" for="new-image-gallery-created-from">From</label>
+                                    <input type="date" id="new-image-gallery-created-from" class="new-image-gallery-input email-gallery-input" aria-label="From date">
+                                    <label class="new-image-gallery-date-label email-gallery-date-label" for="new-image-gallery-created-to">To</label>
+                                    <input type="date" id="new-image-gallery-created-to" class="new-image-gallery-input email-gallery-input" aria-label="To date">
+                                </div>
+                                <div class="new-image-gallery-filter-row new-image-gallery-filter-row-checkboxes email-gallery-filter-row">
                                     <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
                                         <input type="checkbox" id="new-image-gallery-has-gps">
                                         Has GPS
@@ -2836,6 +2874,10 @@
                                     <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
                                         <input type="checkbox" id="new-image-gallery-has-thumbnail">
                                         Has Thumbnail
+                                    </label>
+                                    <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
+                                        <input type="checkbox" id="new-image-gallery-ai-classified">
+                                        AI Classified
                                     </label>
                                 </div>
                                 <div class="new-image-gallery-button-row email-gallery-button-row">
@@ -2847,12 +2889,16 @@
                                     </button>
                                 </div>
                             </div>
+                            </div>
                         </div>
-                        
-                        <div class="new-image-gallery-sidebar-section-divider"></div>
+
                         <!-- Section 2: Image Content Search -->
-                        <div class="new-image-gallery-sidebar-section">
-                                <div class="new-image-gallery-sidebar-section-label">Image Content Search</div>
+                        <div class="new-image-gallery-accordion-item is-collapsed" data-accordion-panel="content">
+                            <button type="button" class="new-image-gallery-accordion-head" id="new-image-gallery-accordion-content" aria-expanded="false" aria-controls="new-image-gallery-accordion-content-body">
+                                <span class="new-image-gallery-accordion-title">Image Content Search</span>
+                                <i class="fas fa-chevron-down new-image-gallery-accordion-chevron" aria-hidden="true"></i>
+                            </button>
+                            <div class="new-image-gallery-accordion-body" id="new-image-gallery-accordion-content-body" role="region" aria-labelledby="new-image-gallery-accordion-content" hidden>
                                 <input type="text" id="new-image-gallery-similar-tags" placeholder="Enter any text to search for matching images" class="new-image-gallery-input email-gallery-input" disabled aria-describedby="new-image-gallery-similar-hint" style="width: 100%; box-sizing: border-box;">
                                 <div style="display: flex; align-items: center; gap: 0.45rem; margin-top: 0.45rem;">
                                     <label for="new-image-gallery-similar-n" class="email-gallery-sort-label" style="margin-right:8px;">Number of matches</label>
@@ -2866,11 +2912,12 @@
                                         <i class="fas fa-times"></i>Clear
                                     </button>
                                 </div>
+                            </div>
+                        </div>
                         </div>
 
-                        <div class="new-image-gallery-sidebar-section-divider"></div>
-                        <!-- Section 3: Bulk Actions -->
-                        <div class="new-image-gallery-sidebar-section">
+                        <!-- Bulk Actions — pinned to bottom of sidebar -->
+                        <div class="new-image-gallery-sidebar-bulk">
                             <div class="new-image-gallery-sidebar-section-label">Bulk Actions <span class="new-image-gallery-sidebar-section-hint">Ctrl+click &bull; Shift+click for range</span></div>
                             <div id="new-image-gallery-bulk-edit-section">
                                 <div class="new-image-gallery-selected-count-row">
@@ -2922,6 +2969,9 @@
                         <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1em; gap: 0.4em; flex-wrap: nowrap;">
                                 <button type="button" id="new-image-detail-find-similar-btn" class="modal-btn modal-btn-secondary" style="padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" title="Search the gallery for images with similar tags (local AI)">
                                     <i class="fas fa-search"></i> Find Similar
+                                </button>
+                                <button type="button" id="new-image-detail-find-same-time-btn" class="modal-btn modal-btn-secondary" style="padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" title="Search the gallery for images created within +/- 1 week of this image's created date">
+                                    <i class="fas fa-clock"></i> Find Same Time
                                 </button>
                                 <button id="new-image-gallery-save-btn" class="modal-btn modal-btn-primary" style="display:none; padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" disabled>
                                     <i class="fas fa-save"></i> Save Changes

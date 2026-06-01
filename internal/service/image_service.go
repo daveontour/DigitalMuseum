@@ -125,7 +125,8 @@ func (s *ImageService) BulkUpdateTags(ctx context.Context, imageIDs []int64, tag
 }
 
 // UpdateTagsMerge appends comma-separated tags into existing media_items.tags (see repository.UpdateTags).
-// Unlike BulkUpdateTags, this does not refresh sqlite-vec tag embeddings — call SyncTagEmbedding when metadata is final.
+// Tags already on the image (case-insensitive) are not appended again.
+// Does not refresh sqlite-vec tag embeddings; run the tag-embedding backfill job when needed.
 func (s *ImageService) UpdateTagsMerge(ctx context.Context, id int64, newTags string) (bool, error) {
 	return s.repo.UpdateTags(ctx, id, newTags)
 }
@@ -254,6 +255,7 @@ func locationItemsFromMediaItems(items []*model.MediaItem) []model.LocationItem 
 			Description:     item.Description,
 			Year:            item.Year,
 			Month:           item.Month,
+			Day:             item.Day,
 			Tags:            item.Tags,
 			GoogleMapsURL:   item.GoogleMapsURL,
 			Region:          item.Region,
@@ -525,6 +527,7 @@ func toMediaMetadataResponse(m *model.MediaItem) model.MediaMetadataResponse {
 		UpdatedAt:        m.UpdatedAt,
 		Year:             m.Year,
 		Month:            m.Month,
+		Day:              m.Day,
 		Latitude:         m.Latitude,
 		Longitude:        m.Longitude,
 		Altitude:         m.Altitude,
@@ -604,9 +607,9 @@ func convertHeicToJpeg(data []byte) ([]byte, error) {
 	// elsewhere ImageMagick 7's unified "magick" CLI is typical.
 	var cmd *exec.Cmd
 	if runtime.GOOS == "linux" {
-		cmd = exec.Command("convert", tmpInPath, "-quality", "95", tmpOutPath)
+		cmd = exec.Command("convert", tmpInPath, "-auto-orient", "-quality", "95", tmpOutPath)
 	} else {
-		cmd = exec.Command("magick", tmpInPath, "-quality", "95", tmpOutPath)
+		cmd = exec.Command("magick", tmpInPath, "-auto-orient", "-quality", "95", tmpOutPath)
 	}
 	hideConsole(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {

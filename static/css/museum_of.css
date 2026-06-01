@@ -7187,6 +7187,34 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     border-bottom: 1px solid var(--color-border);
 }
 
+/* Emails master pane only — must not match Images sidebar (shared legacy class name) */
+.email-gallery-master-pane > .email-gallery-search-section {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 55%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+
+.email-gallery-search-accordion {
+    overflow-y: auto;
+    padding: 0.65rem 0.75rem 0.75rem;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+.email-gallery-search-accordion .new-image-gallery-accordion-item + .new-image-gallery-accordion-item {
+    margin-top: 0.5rem;
+}
+
+.email-gallery-content-search-hint {
+    margin: 0.35rem 0 0;
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+}
+
 .email-metadata-filters {
     display: flex;
     flex-direction: column;
@@ -7210,12 +7238,14 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Year + month + attachments on one row (Emails dialog search panel) */
-.email-gallery-search-section .email-gallery-filter-row.email-gallery-filter-year-month-row {
+.email-gallery-search-section .email-gallery-filter-row.email-gallery-filter-year-month-row,
+.new-image-gallery-sidebar .email-gallery-filter-row.email-gallery-filter-year-month-row {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     align-items: center;
 }
 
-.email-gallery-search-section .email-gallery-filter-year-month-row .email-gallery-checkbox-label {
+.email-gallery-search-section .email-gallery-filter-year-month-row .email-gallery-checkbox-label,
+.new-image-gallery-sidebar .email-gallery-filter-year-month-row .email-gallery-checkbox-label {
     white-space: nowrap;
     margin: 0;
 }
@@ -7231,9 +7261,13 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     box-sizing: border-box;
 }
 
-/* Emails dialog — search panel only */
+/* Emails / Images dialog — search panel controls (not layout) */
 .email-gallery-search-section .email-gallery-input,
-.email-gallery-search-section .email-gallery-select {
+.email-gallery-search-section .email-gallery-select,
+.new-image-gallery-sidebar .email-gallery-input,
+.new-image-gallery-sidebar .email-gallery-select,
+.new-image-gallery-sidebar .new-image-gallery-input,
+.new-image-gallery-sidebar .new-image-gallery-select {
     border-radius: 6px;
     border: 1px solid var(--color-border-input);
     padding: 0.4rem 0.55rem;
@@ -7243,17 +7277,27 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.email-gallery-search-section .email-gallery-input::placeholder {
+.email-gallery-search-section .email-gallery-input::placeholder,
+.new-image-gallery-sidebar .email-gallery-input::placeholder,
+.new-image-gallery-sidebar .new-image-gallery-input::placeholder {
     color: var(--color-text-light);
 }
 
 .email-gallery-search-section .email-gallery-input:hover,
-.email-gallery-search-section .email-gallery-select:hover {
+.email-gallery-search-section .email-gallery-select:hover,
+.new-image-gallery-sidebar .email-gallery-input:hover,
+.new-image-gallery-sidebar .email-gallery-select:hover,
+.new-image-gallery-sidebar .new-image-gallery-input:hover,
+.new-image-gallery-sidebar .new-image-gallery-select:hover {
     border-color: var(--color-border-input);
 }
 
 .email-gallery-search-section .email-gallery-input:focus,
-.email-gallery-search-section .email-gallery-select:focus {
+.email-gallery-search-section .email-gallery-select:focus,
+.new-image-gallery-sidebar .email-gallery-input:focus,
+.new-image-gallery-sidebar .email-gallery-select:focus,
+.new-image-gallery-sidebar .new-image-gallery-input:focus,
+.new-image-gallery-sidebar .new-image-gallery-select:focus {
     outline: none;
     border-color: var(--color-blue);
     box-shadow: var(--focus-ring);
@@ -7267,7 +7311,9 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     font-size: 0.9em;
 }
 
-.email-gallery-search-section .email-gallery-checkbox-label {
+.email-gallery-search-section .email-gallery-checkbox-label,
+.new-image-gallery-sidebar .email-gallery-checkbox-label,
+.new-image-gallery-sidebar .new-image-gallery-checkbox-label {
     gap: 0.4rem;
     color: var(--color-text-muted);
     font-size: 0.85rem;
@@ -7307,32 +7353,37 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Search actions: match list toolbar / reader neutrals */
-.email-gallery-search-section .modal-btn {
+.email-gallery-search-section .modal-btn,
+.new-image-gallery-sidebar .modal-btn {
     font-size: 0.8rem;
     font-weight: 600;
     padding: 0.4rem 0.75rem;
     border-radius: 6px;
 }
 
-.email-gallery-search-section .modal-btn-primary {
+.email-gallery-search-section .modal-btn-primary,
+.new-image-gallery-sidebar .modal-btn-primary {
     background: #1a73e8;
     color: #fff;
     border: none;
 }
 
-.email-gallery-search-section .modal-btn-primary:hover {
+.email-gallery-search-section .modal-btn-primary:hover,
+.new-image-gallery-sidebar .modal-btn-primary:hover {
     background: #1557b0;
     filter: none;
 }
 
-.email-gallery-search-section .modal-btn-secondary {
+.email-gallery-search-section .modal-btn-secondary,
+.new-image-gallery-sidebar .modal-btn-secondary {
     background: var(--color-bg-surface);
     color: var(--color-text);
     border: 1px solid var(--color-border);
     margin-left: 0;
 }
 
-.email-gallery-search-section .modal-btn-secondary:hover {
+.email-gallery-search-section .modal-btn-secondary:hover,
+.new-image-gallery-sidebar .modal-btn-secondary:hover {
     background: var(--color-bg-hover);
     color: var(--color-text);
 }
@@ -8303,21 +8354,109 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     opacity: 0.9;
 }
 
-/* Sidebar — search + bulk actions, fixed 25% width */
+/* Sidebar — accordion search (scrollable) + bulk actions pinned at bottom */
 .new-image-gallery-sidebar {
     width: 25%;
     min-width: 220px;
+    max-width: 25%;
+    flex: 0 0 25%;
     flex-shrink: 0;
+    align-self: stretch;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow: hidden;
     border-right: 1px solid var(--color-border);
     background: var(--color-bg-base);
-    padding: 0.75rem;
+    padding: 0;
     box-sizing: border-box;
     gap: 0;
-    /* override email-gallery-search-section border-bottom */
-    border-bottom: none !important;
+}
+
+.new-image-gallery-sidebar-accordion {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.75rem;
+    box-sizing: border-box;
+}
+
+.new-image-gallery-sidebar-bulk {
+    flex-shrink: 0;
+    padding: 0.75rem;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-base);
+    box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.18);
+    box-sizing: border-box;
+}
+
+.new-image-gallery-accordion-item {
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--color-bg-elevated);
+}
+
+.new-image-gallery-accordion-item + .new-image-gallery-accordion-item {
+    margin-top: 0.5rem;
+}
+
+.new-image-gallery-accordion-item.is-collapsed .new-image-gallery-accordion-body {
+    display: none;
+}
+
+.new-image-gallery-accordion-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    margin: 0;
+    border: none;
+    background: linear-gradient(180deg, var(--color-bg-surface) 0%, var(--color-bg-base) 100%);
+    cursor: pointer;
+    font-family: var(--font-sans-ui);
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+.new-image-gallery-accordion-head:hover {
+    background: var(--color-bg-hover);
+}
+
+.new-image-gallery-accordion-head:focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: -2px;
+}
+
+.new-image-gallery-accordion-title {
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-text-muted);
+}
+
+.new-image-gallery-accordion-chevron {
+    color: var(--color-text-muted);
+    width: 1em;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.new-image-gallery-accordion-item.is-collapsed .new-image-gallery-accordion-chevron {
+    transform: rotate(-90deg);
+}
+
+.new-image-gallery-accordion-body {
+    padding: 0 0.65rem 0.65rem;
+}
+
+.new-image-gallery-sidebar-bulk .new-image-gallery-sidebar-section-label {
+    padding-bottom: 0.45rem;
+    margin-bottom: 0;
+    border-bottom: none;
 }
 
 /* Main content area — thumbnail grid */
@@ -8535,19 +8674,13 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     flex: 0 0 auto;
 }
 
-/* Sidebar: suppress email-gallery-search-section chrome (padding/border already on sidebar) */
-.new-image-gallery-sidebar.email-gallery-search-section {
-    border-bottom: none;
-    padding: 0.75rem;
-}
-
 /* Bulk actions: fixed-width buttons were forcing the column past the dialog edge */
 .new-image-gallery-bulk-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     align-items: stretch;
-    margin-top: 1rem;
+    margin-top: 0.5rem;
 }
 
 .new-image-gallery-bulk-actions .modal-btn {
@@ -8611,6 +8744,26 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 
 .new-image-gallery-filter-row:has(input[type="number"]) {
     grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.new-image-gallery-date-label,
+.email-gallery-date-label {
+    display: flex;
+    align-items: center;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.new-image-gallery-filter-row:has(input[type="date"]) {
+    grid-template-columns: auto 1fr auto 1fr;
+    align-items: center;
+}
+
+.new-image-gallery-filter-row-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.75rem;
 }
 
 .new-image-gallery-input,

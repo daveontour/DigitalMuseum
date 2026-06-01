@@ -28,7 +28,7 @@ func NewImageRepo(pool *sql.DB) *ImageRepo {
 const mediaItemColumns = `
 	id, media_blob_id, description, title, author, tags, categories, notes,
 	available_for_task, media_type, processed, created_at, updated_at, embedding,
-	year, month, latitude, longitude, altitude, rating, has_gps, google_maps_url,
+	year, month, day, latitude, longitude, altitude, rating, has_gps, google_maps_url,
 	region, is_personal, is_business, is_social, is_promotional, is_spam,
 	is_important, use_by_ai, is_referenced, source, source_reference`
 
@@ -36,7 +36,7 @@ const mediaItemColumns = `
 const mediaItemColumnsQualified = `
 	mi.id, mi.media_blob_id, mi.description, mi.title, mi.author, mi.tags, mi.categories, mi.notes,
 	mi.available_for_task, mi.media_type, mi.processed, mi.created_at, mi.updated_at, mi.embedding,
-	mi.year, mi.month, mi.latitude, mi.longitude, mi.altitude, mi.rating, mi.has_gps, mi.google_maps_url,
+	mi.year, mi.month, mi.day, mi.latitude, mi.longitude, mi.altitude, mi.rating, mi.has_gps, mi.google_maps_url,
 	mi.region, mi.is_personal, mi.is_business, mi.is_social, mi.is_promotional, mi.is_spam,
 	mi.is_important, mi.use_by_ai, mi.is_referenced, mi.source, mi.source_reference`
 
@@ -163,6 +163,16 @@ func (r *ImageRepo) Search(ctx context.Context, p model.ImageSearchParams) ([]*m
 	if p.Month != nil {
 		addEq("month", *p.Month)
 	}
+	if p.CreatedFrom != nil {
+		conds = append(conds, fmt.Sprintf("date(created_at) >= date(?%d)", n))
+		args = append(args, p.CreatedFrom.Format("2006-01-02"))
+		n++
+	}
+	if p.CreatedTo != nil {
+		conds = append(conds, fmt.Sprintf("date(created_at) <= date(?%d)", n))
+		args = append(args, p.CreatedTo.Format("2006-01-02"))
+		n++
+	}
 	if p.Rating != nil {
 		addEq("rating", *p.Rating)
 	} else {
@@ -187,6 +197,9 @@ func (r *ImageRepo) Search(ctx context.Context, p model.ImageSearchParams) ([]*m
 			  AND mb.thumbnail_data IS NOT NULL
 			  AND LENGTH(mb.thumbnail_data) > 0
 		)`)
+	}
+	if p.AIClassified != nil && *p.AIClassified {
+		conds = append(conds, "require_classification = FALSE")
 	}
 	if p.AvailableForTask != nil {
 		addEq("available_for_task", *p.AvailableForTask)
@@ -675,6 +688,53 @@ func (r *ImageRepo) GetFacebookPlaces(ctx context.Context) ([]model.FacebookPlac
 
 // ── Write / delete ────────────────────────────────────────────────────────────
 
+// commaSplitTags splits comma-separated tags into trimmed, non-empty parts.
+func commaSplitTags(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// tagSetLowercase builds a case-insensitive set from one or more comma-separated tag strings.
+func tagSetLowercase(tagStrings ...string) map[string]struct{} {
+	set := make(map[string]struct{})
+	for _, raw := range tagStrings {
+		for _, t := range commaSplitTags(raw) {
+			set[strings.ToLower(t)] = struct{}{}
+		}
+	}
+	return set
+}
+
+// filterTagsNotAlreadyPresent returns tags from newTags that are not already in existingTags
+// (case-insensitive). Duplicates within newTags are collapsed, preserving first-seen casing.
+func filterTagsNotAlreadyPresent(existingTags *string, newTags string) []string {
+	existing := ""
+	if existingTags != nil {
+		existing = *existingTags
+	}
+	present := tagSetLowercase(existing)
+	var additions []string
+	for _, t := range commaSplitTags(newTags) {
+		key := strings.ToLower(t)
+		if _, ok := present[key]; ok {
+			continue
+		}
+		present[key] = struct{}{}
+		additions = append(additions, t)
+	}
+	return additions
+}
+
 // UpdateTags updates the tags column for a media item (merge: append to existing).
 func (r *ImageRepo) UpdateTags(ctx context.Context, id int64, newTags string) (bool, error) {
 	uid := uidFromCtx(ctx)
@@ -722,9 +782,17 @@ func (r *ImageRepo) UpdateTags(ctx context.Context, id int64, newTags string) (b
 		"existing_preview", existingPreview,
 	)
 
-	merged := newTags
+	additions := filterTagsNotAlreadyPresent(existing, newTags)
+	if len(additions) == 0 {
+		slog.Debug("UpdateTags trace: no new tags to append (all already present)",
+			"media_item_id", id,
+			"user_id", uid,
+		)
+		return true, nil
+	}
+	merged := strings.Join(additions, ", ")
 	if existing != nil && strings.TrimSpace(*existing) != "" {
-		merged = strings.TrimSpace(*existing) + ", " + strings.TrimSpace(newTags)
+		merged = strings.TrimSpace(*existing) + ", " + merged
 	}
 	uq := `UPDATE media_items SET tags = ?2, require_classification = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?1`
 	uargs := []any{id, merged}
@@ -1231,7 +1299,7 @@ func scanMediaItem(row scanner) (*model.MediaItem, error) {
 		&m.ID, &m.MediaBlobID, &m.Description, &m.Title, &m.Author, &m.Tags,
 		&m.Categories, &m.Notes, &m.AvailableForTask, &m.MediaType, &m.Processed,
 		&m.CreatedAt, &m.UpdatedAt, &m.Embedding,
-		&m.Year, &m.Month, &m.Latitude, &m.Longitude, &m.Altitude,
+		&m.Year, &m.Month, &m.Day, &m.Latitude, &m.Longitude, &m.Altitude,
 		&m.Rating, &m.HasGPS, &m.GoogleMapsURL, &m.Region,
 		&m.IsPersonal, &m.IsBusiness, &m.IsSocial, &m.IsPromotional,
 		&m.IsSpam, &m.IsImportant, &m.UseByAI, &m.IsReferenced,
@@ -1258,7 +1326,7 @@ func scanMediaItems(rows interface {
 			&m.ID, &m.MediaBlobID, &m.Description, &m.Title, &m.Author, &m.Tags,
 			&m.Categories, &m.Notes, &m.AvailableForTask, &m.MediaType, &m.Processed,
 			&m.CreatedAt, &m.UpdatedAt, &m.Embedding,
-			&m.Year, &m.Month, &m.Latitude, &m.Longitude, &m.Altitude,
+			&m.Year, &m.Month, &m.Day, &m.Latitude, &m.Longitude, &m.Altitude,
 			&m.Rating, &m.HasGPS, &m.GoogleMapsURL, &m.Region,
 			&m.IsPersonal, &m.IsBusiness, &m.IsSocial, &m.IsPromotional,
 			&m.IsSpam, &m.IsImportant, &m.UseByAI, &m.IsReferenced,

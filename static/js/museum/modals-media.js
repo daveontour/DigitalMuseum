@@ -531,10 +531,13 @@ Modals.NewImageGallery = (() => {
             return Regions.label(code);
         }
 
-        function formatDate(year, month) {
-            if (!year && !month) return 'No Date';
+        function formatDate(year, month, day) {
+            if (!year && !month && !day) return 'No Date';
             const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December'];
+            if (year && month && day) {
+                return `${day} ${monthNames[month - 1]} ${year}`;
+            }
             if (year && month) {
                 return `${monthNames[month - 1]} ${year}`;
             } else if (year) {
@@ -545,7 +548,36 @@ Modals.NewImageGallery = (() => {
             return 'No Date';
         }
 
+        function _setAccordionItemOpen(item, open) {
+            if (!item) return;
+            const head = item.querySelector('.new-image-gallery-accordion-head');
+            const body = item.querySelector('.new-image-gallery-accordion-body');
+            item.classList.toggle('is-collapsed', !open);
+            if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (body) body.hidden = !open;
+        }
+
+        function _initSidebarAccordion() {
+            const accordion = document.querySelector('.new-image-gallery-sidebar-accordion');
+            if (!accordion) return;
+            const items = accordion.querySelectorAll('.new-image-gallery-accordion-item');
+            items.forEach((item) => {
+                const head = item.querySelector('.new-image-gallery-accordion-head');
+                if (!head) return;
+                const open = !item.classList.contains('is-collapsed');
+                _setAccordionItemOpen(item, open);
+                head.addEventListener('click', () => {
+                    const isOpen = !item.classList.contains('is-collapsed');
+                    items.forEach((other) => _setAccordionItemOpen(other, false));
+                    if (!isOpen) {
+                        _setAccordionItemOpen(item, true);
+                    }
+                });
+            });
+        }
+
         function init() {
+            _initSidebarAccordion();
             DOM.closeNewImageGalleryModalBtn.addEventListener('click', close);
             DOM.newImageGallerySearchBtn.addEventListener('click', _handleSearch);
             DOM.newImageGalleryClearBtn.addEventListener('click', _handleClear);
@@ -576,7 +608,8 @@ Modals.NewImageGallery = (() => {
                 DOM.newImageGalleryRatingMin,
                 DOM.newImageGalleryRatingMax,
                 DOM.newImageGalleryHasGps,
-                DOM.newImageGalleryHasThumbnail
+                DOM.newImageGalleryHasThumbnail,
+                DOM.newImageGalleryAIClassified
             ];
 
             filterInputs.forEach(input => {
@@ -745,16 +778,19 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryRegionFilter) DOM.newImageGalleryRegionFilter.value = '';
             if (DOM.newImageGalleryYearFilter) DOM.newImageGalleryYearFilter.value = '0';
             if (DOM.newImageGalleryMonthFilter) DOM.newImageGalleryMonthFilter.value = '0';
+            if (DOM.newImageGalleryCreatedFrom) DOM.newImageGalleryCreatedFrom.value = '';
+            if (DOM.newImageGalleryCreatedTo) DOM.newImageGalleryCreatedTo.value = '';
             if (DOM.newImageGalleryRating) DOM.newImageGalleryRating.value = '';
             if (DOM.newImageGalleryRatingMin) DOM.newImageGalleryRatingMin.value = '';
             if (DOM.newImageGalleryRatingMax) DOM.newImageGalleryRatingMax.value = '';
             if (DOM.newImageGalleryHasGps) DOM.newImageGalleryHasGps.checked = false;
             if (DOM.newImageGalleryHasThumbnail) DOM.newImageGalleryHasThumbnail.checked = false;
+            if (DOM.newImageGalleryAIClassified) DOM.newImageGalleryAIClassified.checked = false;
         }
 
         /**
          * @param {{ resetCriteriaAndSearch?: boolean }} [options]
-         * When resetCriteriaAndSearch is true (sidebar Images button), filters are cleared and GET /images/search runs with no params (all images).
+         * When resetCriteriaAndSearch is true (sidebar Images button), filters are cleared.
          */
         async function open(options) {
             const resetCriteriaAndSearch = !!(options && options.resetCriteriaAndSearch);
@@ -763,7 +799,6 @@ Modals.NewImageGallery = (() => {
             if (resetCriteriaAndSearch) {
                 imageData = [];
                 if (DOM.newImageGalleryThumbnailGrid) DOM.newImageGalleryThumbnailGrid.innerHTML = '';
-                _setGalleryLoading(true);
             }
             await _setupFilters();
             if (resetCriteriaAndSearch) {
@@ -779,13 +814,10 @@ Modals.NewImageGallery = (() => {
             _updatePickModeBanner();
             await _updateThumbnailProcessingBanner();
             await _refreshSimilarEmbedAvailability();
-            if (resetCriteriaAndSearch) {
-                await _loadImageData();
-            } else {
-                // Don't load images automatically — wait for user to enter search criteria (or pick-mode / openTaggedImages path fills later)
-                imageData = [];
-                _renderThumbnailGrid();
-            }
+            // Don't load images automatically — wait for user to run a search
+            // (or pick-mode / openTaggedImages / openImagesFromDate path triggers loading).
+            imageData = [];
+            _renderThumbnailGrid();
         }
 
         async function _refreshSimilarEmbedAvailability() {
@@ -1054,6 +1086,21 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryMonthFilter && DOM.newImageGalleryMonthFilter.value && DOM.newImageGalleryMonthFilter.value !== '0') {
                 params.append('month', DOM.newImageGalleryMonthFilter.value);
             }
+            const createdFrom = DOM.newImageGalleryCreatedFrom ? DOM.newImageGalleryCreatedFrom.value.trim() : '';
+            const createdTo = DOM.newImageGalleryCreatedTo ? DOM.newImageGalleryCreatedTo.value.trim() : '';
+            if (createdFrom && createdTo && createdFrom > createdTo) {
+                _setGalleryLoading(false);
+                if (window.AppDialogs) {
+                    await AppDialogs.showAppAlert('Invalid date range', 'From date must be on or before To date.');
+                }
+                return;
+            }
+            if (createdFrom) {
+                params.append('created_from', createdFrom);
+            }
+            if (createdTo) {
+                params.append('created_to', createdTo);
+            }
             if (DOM.newImageGalleryRating && DOM.newImageGalleryRating.value) {
                 params.append('rating', DOM.newImageGalleryRating.value);
             }
@@ -1068,6 +1115,9 @@ Modals.NewImageGallery = (() => {
             }
             if (DOM.newImageGalleryHasThumbnail && DOM.newImageGalleryHasThumbnail.checked) {
                 params.append('has_thumbnail', 'true');
+            }
+            if (DOM.newImageGalleryAIClassified && DOM.newImageGalleryAIClassified.checked) {
+                params.append('ai_classified', 'true');
             }
 
             try {
@@ -1125,7 +1175,8 @@ Modals.NewImageGallery = (() => {
                 (DOM.newImageGalleryRatingMin && DOM.newImageGalleryRatingMin.value) ||
                 (DOM.newImageGalleryRatingMax && DOM.newImageGalleryRatingMax.value) ||
                 (DOM.newImageGalleryHasGps && DOM.newImageGalleryHasGps.checked) ||
-                (DOM.newImageGalleryHasThumbnail && DOM.newImageGalleryHasThumbnail.checked)
+                (DOM.newImageGalleryHasThumbnail && DOM.newImageGalleryHasThumbnail.checked) ||
+                (DOM.newImageGalleryAIClassified && DOM.newImageGalleryAIClassified.checked)
             );
         }
 
@@ -1632,10 +1683,13 @@ Modals.ImageDetailModal = (() => {
         let onDeleteCallback = null;
         let allowRedirects = true;
 
-        function formatDate(year, month) {
-            if (!year && !month) return 'No Date';
+        function formatDate(year, month, day) {
+            if (!year && !month && !day) return 'No Date';
             const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December'];
+            if (year && month && day) {
+                return `${day} ${monthNames[month - 1]} ${year}`;
+            }
             if (year && month) {
                 return `${monthNames[month - 1]} ${year}`;
             } else if (year) {
@@ -1938,7 +1992,7 @@ Modals.ImageDetailModal = (() => {
             DOM.newImageDetailAuthor.textContent = image.author || 'N/A';
             DOM.newImageDetailCategories.textContent = image.categories || 'N/A';
             DOM.newImageDetailNotes.textContent = image.notes || 'N/A';
-            DOM.newImageDetailDate.textContent = formatDate(image.year, image.month);
+            DOM.newImageDetailDate.textContent = formatDate(image.year, image.month, image.day);
             DOM.newImageDetailImageType.textContent = image.media_type || image.image_type || 'N/A';
             
             // Source: Show button if not "Filesystem", otherwise show text
@@ -2153,6 +2207,56 @@ Modals.ImageDetailModal = (() => {
                     const tags = fromField || fromImage;
                     if (Modals.NewImageGallery && typeof Modals.NewImageGallery.showSimilarByTagsFromDetail === 'function') {
                         await Modals.NewImageGallery.showSimilarByTagsFromDetail(tags);
+                    }
+                });
+            }
+            
+            if (DOM.newImageDetailFindSameTimeBtn) {
+                DOM.newImageDetailFindSameTimeBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const img = currentImageInModal;
+                    const createdAtRaw = img && img.created_at ? img.created_at : null;
+                    if (!createdAtRaw) {
+                        if (window.AppDialogs) {
+                            await AppDialogs.showAppAlert('Find Same Time', 'This image has no created_at timestamp.');
+                        }
+                        return;
+                    }
+                    const createdAt = new Date(createdAtRaw);
+                    if (isNaN(createdAt.getTime())) {
+                        if (window.AppDialogs) {
+                            await AppDialogs.showAppAlert('Find Same Time', 'Unable to parse created_at date for this image.');
+                        }
+                        return;
+                    }
+
+                    const dateToYMD = (d) => {
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        return `${yyyy}-${mm}-${dd}`;
+                    };
+
+                    const fromDate = new Date(createdAt.getTime());
+                    fromDate.setDate(fromDate.getDate() - 7);
+                    const toDate = new Date(createdAt.getTime());
+                    toDate.setDate(toDate.getDate() + 7);
+
+                    // Close image details first; then open gallery and run metadata search.
+                    close();
+                    if (Modals.NewImageGallery && typeof Modals.NewImageGallery.open === 'function') {
+                        await Modals.NewImageGallery.open({ resetCriteriaAndSearch: true });
+                    }
+
+                    if (DOM.newImageGalleryCreatedFrom) {
+                        DOM.newImageGalleryCreatedFrom.value = dateToYMD(fromDate);
+                    }
+                    if (DOM.newImageGalleryCreatedTo) {
+                        DOM.newImageGalleryCreatedTo.value = dateToYMD(toDate);
+                    }
+
+                    if (DOM.newImageGallerySearchBtn) {
+                        DOM.newImageGallerySearchBtn.click();
                     }
                 });
             }

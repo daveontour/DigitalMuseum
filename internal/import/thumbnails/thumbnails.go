@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/daveontour/aimuseum/internal/georegion"
 )
@@ -264,15 +265,18 @@ func processMediaItem(ctx context.Context, pool *sql.DB, processor *Processor, w
 			description = COALESCE(NULLIF(?1, ''), description),
 			year = COALESCE(?2, year),
 			month = COALESCE(?3, month),
-			latitude = COALESCE(?4, latitude),
-			longitude = COALESCE(?5, longitude),
-			has_gps = COALESCE(?6, has_gps),
-			region = COALESCE(?7, region),
+			day = COALESCE(?4, day),
+			created_at = COALESCE(?5, created_at),
+			latitude = COALESCE(?6, latitude),
+			longitude = COALESCE(?7, longitude),
+			has_gps = COALESCE(?8, has_gps),
+			region = COALESCE(?9, region),
 			updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?8`
+		WHERE id = ?10`
 
 	var description *string
-	var year, month *int
+	var year, month, day *int
+	var createdAt *time.Time
 	var latitude, longitude *float64
 	var hasGPS *bool
 	var region *string
@@ -282,19 +286,11 @@ func processMediaItem(ctx context.Context, pool *sql.DB, processor *Processor, w
 			description = &exifData.Description
 		}
 		if exifData.DateTaken != "" {
-			parts := strings.Fields(exifData.DateTaken)
-			if len(parts) > 0 {
-				dateParts := strings.Split(parts[0], ":")
-				if len(dateParts) >= 2 {
-					var y, m int
-					if _, err := fmt.Sscanf(dateParts[0], "%d", &y); err == nil {
-						year = &y
-					}
-					if _, err := fmt.Sscanf(dateParts[1], "%d", &m); err == nil {
-						month = &m
-					}
-				}
-			}
+			parsedYear, parsedMonth, parsedDay, parsedAt := ParseExifDateTaken(exifData.DateTaken)
+			year = parsedYear
+			month = parsedMonth
+			day = parsedDay
+			createdAt = parsedAt
 		}
 		if exifData.LatitudeDecimal != nil && exifData.LongitudeDecimal != nil {
 			latitude = exifData.LatitudeDecimal
@@ -306,7 +302,7 @@ func processMediaItem(ctx context.Context, pool *sql.DB, processor *Processor, w
 		}
 	}
 
-	_, err = tx.ExecContext(ctx, updateItemQuery, description, year, month, latitude, longitude, hasGPS, region, work.MediaItemID)
+	_, err = tx.ExecContext(ctx, updateItemQuery, description, year, month, day, createdAt, latitude, longitude, hasGPS, region, work.MediaItemID)
 	if err != nil {
 		return processResult{Success: false, Error: fmt.Errorf("failed to update media item: %w", err)}
 	}

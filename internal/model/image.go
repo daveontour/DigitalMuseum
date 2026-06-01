@@ -1,6 +1,10 @@
 package model
 
-import "github.com/daveontour/aimuseum/internal/sqlutil"
+import (
+	"time"
+
+	"github.com/daveontour/aimuseum/internal/sqlutil"
+)
 
 // MediaItem is the domain type for a row in media_items.
 type MediaItem struct {
@@ -20,6 +24,7 @@ type MediaItem struct {
 	Embedding        *string
 	Year             *int
 	Month            *int
+	Day              *int
 	Latitude         *float64
 	Longitude        *float64
 	Altitude         *float64
@@ -63,6 +68,7 @@ type MediaMetadataResponse struct {
 	UpdatedAt        sqlutil.NullDBTime `json:"updated_at"`
 	Year             *int               `json:"year"`
 	Month            *int               `json:"month"`
+	Day              *int               `json:"day"`
 	Latitude         *float64           `json:"latitude"`
 	Longitude        *float64           `json:"longitude"`
 	Altitude         *float64           `json:"altitude"`
@@ -93,14 +99,18 @@ type ImageSearchParams struct {
 	MediaType        *string
 	Year             *int
 	Month            *int
+	Day              *int
 	HasGPS           *bool
 	HasThumbnail     *bool
+	AIClassified     *bool // when true, only rows with require_classification=false
 	Rating           *int
 	RatingMin        *int
 	RatingMax        *int
 	AvailableForTask *bool
 	Processed        *bool
 	Region           *string
+	CreatedFrom      *time.Time // inclusive start date (created_at)
+	CreatedTo        *time.Time // inclusive end date (created_at)
 }
 
 // GPSCountBySource is one row in GET /images/gps-count-by-source.
@@ -154,6 +164,7 @@ type LocationItem struct {
 	Description     *string            `json:"description"`
 	Year            *int               `json:"year"`
 	Month           *int               `json:"month"`
+	Day             *int               `json:"day"`
 	Tags            *string            `json:"tags"`
 	GoogleMapsURL   *string            `json:"google_maps_url"`
 	Region          *string            `json:"region"`

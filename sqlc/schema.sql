@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS media_items (
     embedding          TEXT,
     year               INTEGER,
     month              INTEGER,
+    day                INTEGER,
     latitude           DOUBLE PRECISION,
     longitude          DOUBLE PRECISION,
     altitude           DOUBLE PRECISION,

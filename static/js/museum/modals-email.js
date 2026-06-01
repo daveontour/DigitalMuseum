@@ -330,10 +330,67 @@ Modals.EmailGallery = (() => {
             }
         }
 
+        function _setEmailAccordionItemOpen(item, open) {
+            if (!item) return;
+            const head = item.querySelector('.new-image-gallery-accordion-head');
+            const body = item.querySelector('.new-image-gallery-accordion-body');
+            item.classList.toggle('is-collapsed', !open);
+            if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (body) body.hidden = !open;
+        }
+
+        function _initEmailGalleryAccordion() {
+            const accordion = document.querySelector('.email-gallery-search-accordion');
+            if (!accordion) return;
+            const items = accordion.querySelectorAll('.new-image-gallery-accordion-item');
+            items.forEach((item) => {
+                const head = item.querySelector('.new-image-gallery-accordion-head');
+                if (!head) return;
+                const open = !item.classList.contains('is-collapsed');
+                _setEmailAccordionItemOpen(item, open);
+                head.addEventListener('click', () => {
+                    const isOpen = !item.classList.contains('is-collapsed');
+                    items.forEach((other) => _setEmailAccordionItemOpen(other, false));
+                    if (!isOpen) {
+                        _setEmailAccordionItemOpen(item, true);
+                    }
+                });
+            });
+        }
+
+        async function _refreshEmailContentEmbedAvailability() {
+            try {
+                const r = await fetch('/api/embed/availability');
+                const d = await r.json().catch(() => ({}));
+                const ok = !!(d && d.available);
+                if (DOM.emailGalleryContentSearch) {
+                    DOM.emailGalleryContentSearch.disabled = !ok;
+                    DOM.emailGalleryContentSearch.title = ok ? '' : 'Configure LOCALAI_BASE_URL and LOCALAI_EMBEDDING_MODEL';
+                }
+                if (DOM.emailGalleryContentSearchBtn) {
+                    DOM.emailGalleryContentSearchBtn.disabled = !ok;
+                }
+                if (DOM.emailGalleryContentSearchHint) {
+                    DOM.emailGalleryContentSearchHint.textContent = ok
+                        ? 'Email body embeddings, local AI model'
+                        : 'Embedding API unavailable — check local AI settings';
+                }
+            } catch (e) {
+                console.warn('email content embed availability check failed', e);
+            }
+        }
+
         function init() {
+            _initEmailGalleryAccordion();
             DOM.closeEmailGalleryModalBtn.addEventListener('click', close);
             DOM.emailGallerySearchBtn.addEventListener('click', _handleSearch);
             DOM.emailGalleryClearBtn.addEventListener('click', _handleClear);
+            if (DOM.emailGalleryContentSearchBtn) {
+                DOM.emailGalleryContentSearchBtn.addEventListener('click', () => { void _handleEmailContentSearch(); });
+            }
+            if (DOM.emailGalleryContentSearchClearBtn) {
+                DOM.emailGalleryContentSearchClearBtn.addEventListener('click', _handleEmailContentSearchClear);
+            }
             
             // Delete button handler
             if (DOM.emailDeleteBtn) {
@@ -623,6 +680,7 @@ Modals.EmailGallery = (() => {
 
         async function open() {
             DOM.emailGalleryModal.style.display = 'flex';
+            void _refreshEmailContentEmbedAvailability();
             _loadEmailData().catch(error => {
                 console.error('Error loading email data in open():', error);
             });
@@ -826,6 +884,80 @@ Modals.EmailGallery = (() => {
             }
         }
 
+        async function _runEmailContentSearchQuery(q) {
+            const defaultN = 25;
+            const parsedN = DOM.emailGalleryContentSearchN && DOM.emailGalleryContentSearchN.value
+                ? parseInt(DOM.emailGalleryContentSearchN.value, 10)
+                : NaN;
+            const n = (!Number.isFinite(parsedN) || parsedN <= 0) ? defaultN : Math.min(parsedN, 50);
+            const r = await fetch('/emails/similar-by-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ text: q, n })
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                throw new Error(data.detail || data.error || r.statusText);
+            }
+            const rows = Array.isArray(data.results) ? data.results : [];
+            emailData = rows.map((row) => mapSearchRowToEmail({
+                id: row.id,
+                subject: row.subject,
+                from_address: row.from_address,
+                to_addresses: row.to_addresses,
+                date: row.date,
+                snippet: row.snippet,
+                attachment_ids: row.attachment_ids || []
+            }));
+            _sortEmailDataInPlace();
+            selectedEmailIndex = -1;
+            _renderEmailList();
+            _showInstructions();
+            _updateEmailDetails();
+            _selectFirstEmail();
+        }
+
+        async function _handleEmailContentSearch() {
+            const q = DOM.emailGalleryContentSearch && DOM.emailGalleryContentSearch.value
+                ? DOM.emailGalleryContentSearch.value.trim()
+                : '';
+            if (!q) {
+                if (window.AppDialogs) await AppDialogs.showAppAlert('Email content search', 'Enter text to match against stored email content.');
+                return;
+            }
+            const btn = DOM.emailGalleryContentSearchBtn;
+            const originalHTML = btn ? btn.innerHTML : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching…';
+            }
+            try {
+                await _runEmailContentSearchQuery(q);
+            } catch (err) {
+                console.error('email content search', err);
+                if (window.AppDialogs) await AppDialogs.showAppAlert('Email content search', err.message || 'Request failed');
+                emailData = [];
+                _renderEmailList();
+                _showInstructions();
+            } finally {
+                if (btn && originalHTML !== null) {
+                    btn.innerHTML = originalHTML;
+                    void _refreshEmailContentEmbedAvailability();
+                }
+            }
+        }
+
+        function _handleEmailContentSearchClear() {
+            if (DOM.emailGalleryContentSearch) DOM.emailGalleryContentSearch.value = '';
+            if (DOM.emailGalleryContentSearchN) DOM.emailGalleryContentSearchN.value = '25';
+            emailData = [];
+            selectedEmailIndex = -1;
+            _renderEmailList();
+            _showInstructions();
+            _updateEmailDetails();
+        }
+
         function _handleClear() {
             DOM.emailGallerySearch.value = '';
             DOM.emailGallerySender.value = '';
@@ -836,6 +968,8 @@ Modals.EmailGallery = (() => {
             DOM.emailGalleryAttachmentsFilter.checked = false;
             const _gsf = document.getElementById('email-gallery-source-filter');
             if (_gsf) _gsf.value = 'all';
+            if (DOM.emailGalleryContentSearch) DOM.emailGalleryContentSearch.value = '';
+            if (DOM.emailGalleryContentSearchN) DOM.emailGalleryContentSearchN.value = '25';
             DOM.emailGalleryList.innerHTML = '';
             DOM.emailGalleryEmailContent.style.display = 'none';
 

@@ -145,6 +145,7 @@ func schemaDDL() []string {
 			embedding          TEXT,
 			year               INTEGER,
 			month              INTEGER,
+			day                INTEGER,
 			latitude           DOUBLE PRECISION,
 			longitude          DOUBLE PRECISION,
 			altitude           DOUBLE PRECISION,
@@ -1172,6 +1173,9 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 	if err := ensureMediaItemsSourceReferenceIndex(ctx, db); err != nil {
 		return err
 	}
+	if err := addMediaItemsDayColumn(ctx, db); err != nil {
+		return err
+	}
 	if err := seedReservedUserSlot(ctx, db); err != nil {
 		return err
 	}
@@ -1291,6 +1295,35 @@ func addMediaItemsRequireClassificationColumn(ctx context.Context, db *sql.DB) e
 		}
 	}
 	slog.Info("sqlite migration: added media_items.require_classification")
+	return nil
+}
+
+func addMediaItemsDayColumn(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_items'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master media_items: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	var has int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('media_items') WHERE name = 'day'`,
+	).Scan(&has); err != nil {
+		return fmt.Errorf("pragma_table_info media_items.day: %w", err)
+	}
+	if has > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE media_items ADD COLUMN day INTEGER`); err != nil {
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "duplicate column") && !strings.Contains(msg, "already exists") {
+			return fmt.Errorf("add media_items.day: %w", err)
+		}
+	}
+	slog.Info("sqlite migration: added media_items.day")
 	return nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/daveontour/aimuseum/internal/appctx"
@@ -281,6 +282,14 @@ func (h *ImageHandler) Search(w http.ResponseWriter, r *http.Request) {
 		}
 		p.HasThumbnail = &b
 	}
+	if v := q.Get("ai_classified"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "ai_classified must be true or false")
+			return
+		}
+		p.AIClassified = &b
+	}
 	if v := q.Get("available_for_task"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
@@ -296,6 +305,26 @@ func (h *ImageHandler) Search(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p.Processed = &b
+	}
+	if v := strings.TrimSpace(q.Get("created_from")); v != "" {
+		t, err := time.Parse("2006-01-02", v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "created_from must be YYYY-MM-DD")
+			return
+		}
+		p.CreatedFrom = &t
+	}
+	if v := strings.TrimSpace(q.Get("created_to")); v != "" {
+		t, err := time.Parse("2006-01-02", v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "created_to must be YYYY-MM-DD")
+			return
+		}
+		p.CreatedTo = &t
+	}
+	if p.CreatedFrom != nil && p.CreatedTo != nil && p.CreatedFrom.After(*p.CreatedTo) {
+		writeError(w, http.StatusBadRequest, "created_from must be on or before created_to")
+		return
 	}
 
 	result, err := h.svc.Search(r.Context(), p)
@@ -1008,7 +1037,6 @@ func classifyImageAIOne(ctx context.Context, svc *service.ImageService, id int64
 	if !ok {
 		return imageAIClassifyOutcome{id: id, errMsg: fmt.Sprintf("tag update image %d failed", id)}
 	}
-	svc.SyncTagEmbedding(ctx, id)
 	if _, err := svc.SetRequireClassification(ctx, id, false); err != nil {
 		return imageAIClassifyOutcome{id: id, errMsg: fmt.Sprintf("clear require_classification image %d: %v", id, err)}
 	}
@@ -1176,7 +1204,6 @@ func classifyImageAIOneRunPod(ctx context.Context, svc *service.ImageService, id
 	if !ok {
 		return imageAIClassifyOutcome{id: id, errMsg: fmt.Sprintf("tag update image %d failed", id)}
 	}
-	svc.SyncTagEmbedding(ctx, id)
 	if _, err := svc.SetRequireClassification(ctx, id, false); err != nil {
 		return imageAIClassifyOutcome{id: id, errMsg: fmt.Sprintf("clear require_classification image %d: %v", id, err)}
 	}
@@ -1516,6 +1543,7 @@ func similarByTagsResultRow(meta *model.MediaMetadataResponse, distance any) map
 		"updated_at":         meta.UpdatedAt,
 		"year":               meta.Year,
 		"month":              meta.Month,
+		"day":                meta.Day,
 		"latitude":           meta.Latitude,
 		"longitude":          meta.Longitude,
 		"altitude":           meta.Altitude,

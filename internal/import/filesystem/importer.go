@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/daveontour/aimuseum/internal/import/utils"
 	"github.com/daveontour/aimuseum/internal/importstorage"
@@ -204,7 +205,7 @@ func ImportImagesFromDirectories(
 				imp, upd, err := storage.SaveImagesBatch(ctx, batch, !overwriteExisting)
 				if err != nil {
 					for _, item := range batch {
-						_, isUpdate, saveErr := storage.SaveImage(ctx, item.SourceRef, item.ImageData, item.MediaType, item.Title, item.Tags, item.IsReferenced)
+						_, isUpdate, saveErr := storage.SaveImage(ctx, item.SourceRef, item.ImageData, item.MediaType, item.Title, item.Tags, item.IsReferenced, item.FileCreatedAt)
 						if saveErr != nil {
 							stats.mu.Lock()
 							stats.Errors++
@@ -267,6 +268,11 @@ func ImportImagesFromDirectories(
 				title := strings.TrimSuffix(work.Name, filepath.Ext(work.Name))
 				tags := generateDirectoryTags(work.Path, work.RootPath)
 
+				fileCreatedAt := time.Time{}
+				if info, statErr := os.Stat(work.Path); statErr == nil {
+					fileCreatedAt = info.ModTime()
+				}
+
 				var imageData []byte
 				if !referenceMode {
 					var err error
@@ -284,12 +290,13 @@ func ImportImagesFromDirectories(
 				}
 
 				batch = append(batch, importstorage.BatchImageItem{
-					SourceRef:    absPath,
-					ImageData:    imageData,
-					MediaType:    mediaType,
-					Title:        title,
-					Tags:         tags,
-					IsReferenced: referenceMode,
+					SourceRef:     absPath,
+					ImageData:     imageData,
+					MediaType:     mediaType,
+					Title:         title,
+					Tags:          tags,
+					IsReferenced:  referenceMode,
+					FileCreatedAt: fileCreatedAt,
 				})
 
 				if len(batch) >= imageBatchSize {

@@ -156,6 +156,7 @@ func (p *Processor) CreateThumbAndGetExif(
 	if processThumbnail && processExif {
 		args := []string{
 			"-",
+			"-auto-orient",
 			"-quiet",
 			"-format", formatString,
 			"-write", "info:fd:2",
@@ -191,6 +192,7 @@ func (p *Processor) CreateThumbAndGetExif(
 	} else if processThumbnail {
 		args := []string{
 			"-",
+			"-auto-orient",
 			"-filter", "Lanczos",
 			"-colorspace", "sRGB",
 			"-resize", fmt.Sprintf("%dx%d>", width, width),
