@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }}</title>
-    <link rel="stylesheet" href="/static/css/museum_of.css?v=20260509a">
+    <link rel="stylesheet" href="/static/css/museum_of.css?v={{ static_museum_css_cache_bust }}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="/static/css/leaflet.css">
-    <link rel="stylesheet" href="/static/css/images_grid.css">
+    <!-- <link rel="stylesheet" href="/static/css/images_grid.css"> -->
     <!-- Include marked.js -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Optional: highlight.js -->
@@ -1761,6 +1761,23 @@
                                         </div>
                                     </div>
                                 </article>
+                                <article class="data-import-card data-import-row" data-import="media_classification_tag_qa">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-clipboard-check"></i> QA Check Image Classification Tags</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count" data-import-count-key="imported_images">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Review images marked as classified (<code>require_classification = false</code>). Items with fewer than five comma-separated tags are re-queued for AI classification.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-media-classification-tag-qa-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="media_classification_tag_qa"><i class="fas fa-play"></i> Run QA</button>
+                                            <button id="data-import-cancel-btn-21" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
                                 <article class="data-import-card data-import-row" data-import="contacts">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-address-book"></i> Reprocess Contacts Data</h3>
@@ -2173,61 +2190,54 @@
                     <div class="images-grid-viewer">
                         <div class="container">
                             <div class="header">
-                                <p>View and manage attachments (50 per page)</p>
+                                <p>View and manage attachments (100 per page)</p>
                             </div>
                             <div class="content">
                                 <div class="controls">
                                     <div class="sort-controls">
                                         <label>
-                                            <input type="checkbox" id="show-all-types-checkbox" onchange="syncTopControls(); changeSortOrder();">
+                                            <input type="checkbox" id="show-all-types-checkbox" onchange="changeSortOrder();">
                                             <span>Show all file types</span>
                                         </label>
                                         <label>Sort by:</label>
-                                        <select id="sort-order-select" onchange="syncTopControls(); changeSortOrder();">
+                                        <select id="sort-order-select" onchange="changeSortOrder();">
                                             <option value="id">ID</option>
                                             <option value="size" selected>Size</option>
                                             <option value="date">Date</option>
                                         </select>
-                                        <select id="sort-direction-select" onchange="syncTopControls(); changeSortOrder();">
+                                        <select id="sort-direction-select" onchange="changeSortOrder();">
                                             <option value="asc" selected>Ascending</option>
                                             <option value="desc">Descending</option>
                                         </select>
                                     </div>
                                     <div class="pagination">
-                                        <button id="prev-page-btn" onclick="previousPage()">Previous</button>
+                                        <button type="button" id="prev-page-btn" class="modal-btn modal-btn-secondary" onclick="previousPage()">Previous</button>
                                         <span id="page-info">Page 1 of 1</span>
-                                        <button id="next-page-btn" onclick="nextPage()">Next</button>
+                                        <button type="button" id="next-page-btn" class="modal-btn modal-btn-secondary" onclick="nextPage()">Next</button>
                                     </div>
-                                    <button class="select-all-btn" id="select-all-btn" onclick="selectAll()">Select All</button>
-                                    <button class="delete-selected-btn" id="delete-selected-btn" onclick="deleteSelected()" disabled>Delete Selected</button>
+                                    <button type="button" class="select-all-btn modal-btn modal-btn-secondary" id="select-all-btn" onclick="selectAll()">Select All</button>
+                                    <button type="button" class="delete-selected-btn modal-btn modal-btn-danger" id="delete-selected-btn" onclick="deleteSelected()" disabled>Delete Selected</button>
                                 </div>
                                 
-                                <div id="images-grid" class="images-grid" style="display: none;"></div>
-                                
-                                <div class="controls" id="bottom-controls">
-                                    <div class="sort-controls">
-                                        <label>
-                                            <input type="checkbox" id="show-all-types-checkbox-bottom" onchange="syncBottomControls(); changeSortOrder();">
-                                            <span>Show all file types</span>
-                                        </label>
-                                        <label>Sort by:</label>
-                                        <select id="sort-order-select-bottom" onchange="syncBottomControls(); changeSortOrder();">
-                                            <option value="id">ID</option>
-                                            <option value="size" selected>Size</option>
-                                            <option value="date">Date</option>
-                                        </select>
-                                        <select id="sort-direction-select-bottom" onchange="syncBottomControls(); changeSortOrder();">
-                                            <option value="asc" selected>Ascending</option>
-                                            <option value="desc">Descending</option>
-                                        </select>
-                                    </div>
-                                    <div class="pagination">
-                                        <button id="prev-page-btn-bottom" onclick="previousPage()">Previous</button>
-                                        <span id="page-info-bottom">Page 1 of 1</span>
-                                        <button id="next-page-btn-bottom" onclick="nextPage()">Next</button>
-                                    </div>
-                                    <button class="select-all-btn" id="select-all-btn-bottom" onclick="selectAll()">Select All</button>
-                                    <button class="delete-selected-btn" id="delete-selected-btn-bottom" onclick="deleteSelected()" disabled>Delete Selected</button>
+                                <div id="attachments-table-wrap" class="attachments-table-wrap" style="display: none;">
+                                    <table class="attachments-data-table" aria-label="Email attachments">
+                                        <thead>
+                                            <tr>
+                                                <th class="attachments-th-select" scope="col"><span class="sr-only">Select</span></th>
+                                                <th class="attachments-th-preview" scope="col">Preview</th>
+                                                <th class="attachments-th-size" scope="col">Size</th>
+                                                <th class="attachments-th-type" scope="col">Type</th>
+                                                <th class="attachments-th-actions" scope="col">Actions</th>
+                                                <th class="attachments-th-gap" scope="col" aria-hidden="true"><span class="sr-only">Spacer</span></th>
+                                                <th class="attachments-th-select" scope="col"><span class="sr-only">Select</span></th>
+                                                <th class="attachments-th-preview" scope="col">Preview</th>
+                                                <th class="attachments-th-size" scope="col">Size</th>
+                                                <th class="attachments-th-type" scope="col">Type</th>
+                                                <th class="attachments-th-actions" scope="col">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="attachments-table-body"></tbody>
+                                    </table>
                                 </div>
                                 
                                 <div id="image-modal" class="image-modal" onclick="closeModal()">
@@ -2238,17 +2248,24 @@
                                 
                                 <div id="metadata-modal" class="metadata-modal" onclick="closeMetadataModal(event)">
                                     <div class="metadata-modal-content" onclick="event.stopPropagation()">
-                                        <span class="close-metadata-modal" onclick="closeMetadataModal(event)">&times;</span>
-                                        <div id="metadata-content"></div>
+                                        <div class="metadata-modal-header">
+                                            <h2 class="metadata-modal-title">Attachment Details</h2>
+                                            <button type="button" class="modal-close-btn close-metadata-modal" aria-label="Close" onclick="closeMetadataModal(event)">&times;</button>
+                                        </div>
+                                        <div id="metadata-content" class="metadata-modal-body"></div>
                                     </div>
                                 </div>
                                 
                                 <div id="email-modal" class="email-modal" onclick="closeEmailModal(event)">
                                     <div class="email-modal-content" onclick="event.stopPropagation()">
-                                        <span class="close-email-modal" onclick="closeEmailModal(event)">&times;</span>
-                                        <h2 style="color: #667eea; margin-bottom: 15px;">Email Content</h2>
-                                        <div id="email-metadata-display" style="margin-bottom: 20px;"></div>
-                                        <div id="email-content" class="email-content"></div>
+                                        <div class="email-modal-header">
+                                            <h2 class="email-modal-title">Email Content</h2>
+                                            <button type="button" class="modal-close-btn close-email-modal" aria-label="Close" onclick="closeEmailModal(event)">&times;</button>
+                                        </div>
+                                        <div class="email-modal-body">
+                                            <div id="email-metadata-display"></div>
+                                            <div id="email-content" class="email-content"></div>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -2878,6 +2895,10 @@
                                     <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
                                         <input type="checkbox" id="new-image-gallery-ai-classified">
                                         AI Classified
+                                    </label>
+                                    <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
+                                        <input type="checkbox" id="new-image-gallery-ai-unclassified">
+                                        AI Unclassified
                                     </label>
                                 </div>
                                 <div class="new-image-gallery-button-row email-gallery-button-row">
@@ -4398,6 +4419,7 @@
     <script src="/static/js/museum/pam-bot.js" defer></script>
     <script src="/static/js/museum/auth.js" defer></script>
     <script src="/static/js/museum/upload-import.js" defer></script>
+    <script src="/static/js/museum/images-grid.js?v={{ static_images_grid_js_cache_bust }}" defer></script>
     <script>
     window.__uploadImportSelectedPath = '';
     window.startUploadImportFromSelected = function(evt) {
@@ -4560,7 +4582,6 @@
     };
     </script>
     <script src="/static/js/leaflet.js"></script>
-    <script src="/static/js/images_grid.js"></script>
     <script>
         // Function to show confirmation modal
 

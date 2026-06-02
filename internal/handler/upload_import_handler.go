@@ -292,7 +292,8 @@ func (h *UploadImportHandler) Jobs(w http.ResponseWriter, r *http.Request) {
 		"thumbnails":       thumbnailsJob.Status(),
 		"contacts_extract": contactsExtractJob.Status(),
 		"reference_import": referenceImportJob.Status(),
-		"image_regions_recalc": imageRegionsRecalcJob.Status(),
+		"image_regions_recalc":        imageRegionsRecalcJob.Status(),
+		"media_classification_tag_qa": mediaClassificationTagQAJob.Status(),
 	}
 	writeJSON(w, jobs)
 }

@@ -173,6 +173,17 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 	} else {
 		extras["static_modals_comms_js_cache_bust"] = "0"
 	}
+	// Bust cache for museum_of.css and images-grid.js (Email Attachments layout lives here).
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "css", "museum_of.css")); err == nil {
+		extras["static_museum_css_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		extras["static_museum_css_cache_bust"] = "0"
+	}
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "images-grid.js")); err == nil {
+		extras["static_images_grid_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		extras["static_images_grid_js_cache_bust"] = "0"
+	}
 	regionsJSON, err := json.Marshal(georegion.Default().ConfigJSON())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error encoding regions config: %s", err))

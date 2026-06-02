@@ -2310,8 +2310,9 @@ Modals.EmailAttachments = (() => {
         function _triggerGridLoad() {
             if (typeof loadImages !== 'function') return;
             setTimeout(() => {
-                const imagesGrid = document.getElementById('images-grid');
-                if (imagesGrid && (imagesGrid.innerHTML === '' || imagesGrid.style.display === 'none')) {
+                const tableBody = document.getElementById('attachments-table-body');
+                const tableWrap = document.getElementById('attachments-table-wrap');
+                if (tableBody && tableWrap && (tableBody.innerHTML === '' || tableWrap.style.display === 'none')) {
                     loadImages(1);
                 }
             }, 100);

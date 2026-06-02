@@ -103,6 +103,7 @@ type ImageSearchParams struct {
 	HasGPS           *bool
 	HasThumbnail     *bool
 	AIClassified     *bool // when true, only rows with require_classification=false
+	AIUnclassified   *bool // when true, only rows with require_classification=true
 	Rating           *int
 	RatingMin        *int
 	RatingMax        *int

@@ -2630,6 +2630,11 @@ body {
     display: block;
 }
 
+/* Email Attachments: match Email Manager flex chain so the table area scrolls (Electron + browser). */
+#email-attachments-modal.modal {
+    overflow: hidden;
+}
+
 #email-attachments-modal .email-attachments-modal-panel {
     padding: 0;
     overflow: hidden;
@@ -2638,6 +2643,15 @@ body {
     flex-direction: column;
     height: 100%;
     min-height: 0;
+}
+
+#email-attachments-modal .images-grid-viewer {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 #images-grid-iframe {
@@ -14658,4 +14672,549 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 .tool-test-result-pre--error {
     color: var(--color-danger);
     border-color: rgba(220, 53, 69, 0.35);
+}
+
+/* Email Attachments viewer (embedded in main SPA + standalone page) */
+
+.images-grid-viewer {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+body.images-grid-viewer {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.images-grid-viewer .container {
+    max-width: 100%;
+    margin: 0;
+    background: var(--color-bg-base, #0f172a);
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.images-grid-viewer .header {
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--color-border, #334155);
+}
+
+.images-grid-viewer .header h1 {
+    font-size: var(--text-lg, 1.125rem);
+    margin: 0 0 0.25rem;
+    color: var(--color-text, #e2e8f0);
+}
+
+.images-grid-viewer .header p {
+    font-size: var(--text-caption, 0.85rem);
+    margin: 0;
+    color: var(--color-text-muted, #94a3b8);
+}
+
+.images-grid-viewer .content {
+    padding: 0.75rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.images-grid-viewer .controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    flex-shrink: 0;
+}
+
+.images-grid-viewer .pagination {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.images-grid-viewer .pagination span {
+    font-weight: 600;
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-muted, #94a3b8);
+}
+
+.images-grid-viewer .sort-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.images-grid-viewer .sort-controls select {
+    padding: 0.35rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-input, #475569);
+    background: var(--color-bg-surface, #1e293b);
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text, #e2e8f0);
+    cursor: pointer;
+}
+
+.images-grid-viewer .sort-controls select:hover {
+    border-color: var(--color-border-input, #64748b);
+}
+
+.images-grid-viewer .sort-controls select:focus {
+    outline: none;
+    border-color: var(--color-blue, #3b82f6);
+    box-shadow: var(--focus-ring, 0 0 0 2px rgba(59, 130, 246, 0.35));
+}
+
+.images-grid-viewer .sort-controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-muted, #94a3b8);
+}
+
+.images-grid-viewer .sort-controls input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--color-blue, #3b82f6);
+}
+
+.images-grid-viewer .attachments-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--color-border, #334155);
+    border-radius: 8px;
+    background: var(--color-bg-surface, #1e293b);
+}
+
+.images-grid-viewer .attachments-data-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: var(--text-sm, 0.875rem);
+    line-height: var(--line-height-snug, 1.35);
+}
+
+.images-grid-viewer .attachments-data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.45rem 0.65rem;
+    font-size: var(--text-2xs, 0.65rem);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--color-text-muted, #94a3b8);
+    background: var(--color-bg-elevated, #334155);
+    border-bottom: 1px solid var(--color-border, #475569);
+    white-space: nowrap;
+}
+
+.images-grid-viewer .attachments-th-select {
+    width: 2.75rem;
+    text-align: center;
+}
+
+.images-grid-viewer .attachments-th-preview {
+    width: 3.75rem;
+}
+
+.images-grid-viewer .attachments-th-size {
+    width: 5rem;
+}
+
+.images-grid-viewer .attachments-th-type {
+    width: 4.5rem;
+}
+
+.images-grid-viewer .attachments-th-actions {
+    width: 6.5rem;
+    text-align: center;
+}
+
+.images-grid-viewer .attachments-th-gap,
+.images-grid-viewer .attachments-td-gap {
+    width: 1.5rem;
+    min-width: 1.5rem;
+    max-width: 1.5rem;
+    padding: 0;
+    background: var(--color-bg-base, #0f172a);
+    border-left: 1px solid var(--color-border, #475569);
+    border-right: 1px solid var(--color-border, #475569);
+    pointer-events: none;
+}
+
+.images-grid-viewer .attachments-th-gap {
+    border-top: none;
+    border-bottom: 1px solid var(--color-border, #475569);
+}
+
+.images-grid-viewer .attachments-data-table tbody td {
+    padding: 0.4rem 0.65rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--color-border-subtle, #334155);
+    color: var(--color-text, #e2e8f0);
+}
+
+.images-grid-viewer .attachments-table-row {
+    transition: background 0.12s ease;
+}
+
+.images-grid-viewer .attachments-entry {
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.images-grid-viewer .attachments-entry:hover {
+    background: var(--color-bg-hover, rgba(148, 163, 184, 0.08));
+}
+
+.images-grid-viewer .attachments-entry.selected {
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.images-grid-viewer .attachments-entry-empty {
+    cursor: default;
+    pointer-events: none;
+}
+
+.images-grid-viewer .attachments-td-select {
+    text-align: center;
+}
+
+.images-grid-viewer .attachments-select-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    cursor: pointer;
+}
+
+.images-grid-viewer .attachments-select-label input {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--color-blue, #3b82f6);
+}
+
+.images-grid-viewer .attachments-td-preview {
+    width: 3.75rem;
+}
+
+.images-grid-viewer .attachments-preview-img {
+    display: block;
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--color-border, #475569);
+    background: var(--color-bg-base, #0f172a);
+}
+
+.images-grid-viewer .attachments-td-type {
+    color: var(--color-text-muted, #94a3b8);
+    font-size: var(--text-caption, 0.85rem);
+    width: 4.5rem;
+    max-width: 4.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.images-grid-viewer .attachments-td-actions {
+    text-align: center;
+}
+
+.images-grid-viewer .attachments-actions-cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+}
+
+.images-grid-viewer .attachments-icon-btn.modal-btn {
+    padding: 0.35rem 0.45rem;
+    min-width: 2rem;
+    line-height: 1;
+    font-size: var(--text-sm, 0.875rem);
+}
+
+.images-grid-viewer .attachments-icon-btn i {
+    font-size: 0.95em;
+    pointer-events: none;
+}
+
+.images-grid-viewer .attachments-table-empty td {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--color-text-muted, #94a3b8);
+    font-style: italic;
+}
+
+.images-grid-viewer .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.images-grid-viewer .loading,
+.images-grid-viewer .error {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--color-text-muted, #94a3b8);
+    flex-shrink: 0;
+}
+
+.images-grid-viewer .error {
+    color: var(--color-danger, #f87171);
+}
+
+/* Legacy grid rules removed — table layout only */
+
+/* Modals — fixed to viewport */
+.images-grid-viewer .image-modal {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    cursor: pointer;
+}
+
+.images-grid-viewer .image-modal-content {
+    margin: auto;
+    display: block;
+    max-width: 90%;
+    max-height: 90%;
+    margin-top: 5%;
+    animation: images-grid-zoom 0.3s;
+}
+
+.images-grid-viewer .pdf-modal-content {
+    margin: auto;
+    display: block;
+    width: 90%;
+    height: 90vh;
+    margin-top: 2%;
+    border: none;
+    animation: images-grid-zoom 0.3s;
+}
+
+@keyframes images-grid-zoom {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+}
+
+.images-grid-viewer .close-modal {
+    position: absolute;
+    top: 15px;
+    right: 35px;
+    color: #f1f1f1;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.images-grid-viewer .close-modal:hover {
+    color: #bbb;
+}
+
+.images-grid-viewer .metadata-modal {
+    display: none;
+    position: fixed;
+    z-index: 10001;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    overflow: auto;
+}
+
+.images-grid-viewer .metadata-modal-content {
+    position: relative;
+    background-color: var(--color-bg-elevated, #fefefe);
+    color: var(--color-text, #e2e8f3);
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 80%;
+    max-width: 800px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: images-grid-zoom 0.3s;
+    overflow: hidden;
+}
+
+.images-grid-viewer .metadata-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--color-bg-surface, #1a2332);
+    border-bottom: 2px solid rgba(79, 156, 249, 0.4);
+    padding: 12px 18px;
+    padding-right: 48px;
+}
+
+.images-grid-viewer .metadata-modal-title {
+    margin: 0;
+    font-size: var(--text-lg, 1.125rem);
+    font-weight: 600;
+    color: var(--color-text, #e2e8f3);
+}
+
+.images-grid-viewer .metadata-modal-body {
+    padding: 24px 30px 30px;
+}
+
+.images-grid-viewer .metadata-section {
+    margin-bottom: 25px;
+}
+
+.images-grid-viewer .metadata-section:last-child {
+    margin-bottom: 0;
+}
+
+.images-grid-viewer .metadata-section h3 {
+    color: var(--color-blue, #4a90e2);
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid rgba(79, 156, 249, 0.4);
+}
+
+.images-grid-viewer .metadata-row {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: var(--text-sm, 0.875rem);
+}
+
+.images-grid-viewer .metadata-label {
+    font-weight: 600;
+    color: var(--color-text-muted, #8fa4c8);
+}
+
+.images-grid-viewer .metadata-value {
+    color: var(--color-text, #e2e8f3);
+    word-break: break-word;
+}
+
+.images-grid-viewer .metadata-modal-content .modal-close-btn.close-metadata-modal {
+    top: 10px;
+    right: 14px;
+}
+
+.images-grid-viewer .email-modal {
+    display: none;
+    position: fixed;
+    z-index: 10001;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    overflow: auto;
+}
+
+.images-grid-viewer .email-modal-content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-bg-surface, #1e2d4f);
+    color: var(--color-text, #e2e8f3);
+    margin: 3% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: images-grid-zoom 0.3s;
+}
+
+.images-grid-viewer .email-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: var(--color-bg-surface, #1a2332);
+    border-bottom: 2px solid rgba(79, 156, 249, 0.4);
+    padding: 12px 18px;
+    padding-right: 48px;
+}
+
+.images-grid-viewer .email-modal-title {
+    margin: 0;
+    font-size: var(--text-lg, 1.125rem);
+    font-weight: 600;
+    color: var(--color-text, #e2e8f3);
+}
+
+.images-grid-viewer .email-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 24px 30px 30px;
+    background: var(--color-bg-surface, #1e2d4f);
+}
+
+.images-grid-viewer #email-metadata-display {
+    margin-bottom: 20px;
+}
+
+.images-grid-viewer .email-content {
+    margin-top: 15px;
+    background: #f0f8ff;
+    border: 1px solid var(--color-border, #475569);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.images-grid-viewer .email-content .email-viewer-iframe {
+    display: block;
+    background: #f0f8ff;
+}
+
+.images-grid-viewer .email-modal-loading {
+    text-align: center;
+    padding: 24px 20px;
+    color: var(--color-text-muted, #8fa4c8);
+}
+
+.images-grid-viewer .email-modal-content .modal-close-btn.close-email-modal {
+    top: 10px;
+    right: 14px;
 }

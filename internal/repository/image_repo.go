@@ -201,6 +201,9 @@ func (r *ImageRepo) Search(ctx context.Context, p model.ImageSearchParams) ([]*m
 	if p.AIClassified != nil && *p.AIClassified {
 		conds = append(conds, "require_classification = FALSE")
 	}
+	if p.AIUnclassified != nil && *p.AIUnclassified {
+		conds = append(conds, "require_classification = TRUE")
+	}
 	if p.AvailableForTask != nil {
 		addEq("available_for_task", *p.AvailableForTask)
 	}
@@ -306,6 +309,42 @@ func (r *ImageRepo) ListMediaItemsForTagEmbeddingBackfill(ctx context.Context, o
 	for rows.Next() {
 		var row MediaTagEmbeddingRow
 		if err := rows.Scan(&row.ID, &row.Tags, &row.RequireClassification); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// MediaClassificationQARow is one image flagged as classification-complete for tag-count QA.
+type MediaClassificationQARow struct {
+	ID   int64
+	Tags *string
+}
+
+// ListMediaItemsForClassificationTagQA returns image items with require_classification=false
+// so under-tagged rows can be re-queued for classification.
+func (r *ImageRepo) ListMediaItemsForClassificationTagQA(ctx context.Context) ([]MediaClassificationQARow, error) {
+	uid := uidFromCtx(ctx)
+	q := `
+		SELECT id, tags
+		FROM media_items
+		WHERE media_type LIKE 'image/%'
+		  AND require_classification = FALSE`
+	args := []any{}
+	q, args = addUIDFilter(q, args, uid)
+	q += ` ORDER BY id ASC`
+
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("ListMediaItemsForClassificationTagQA: %w", err)
+	}
+	defer rows.Close()
+
+	var out []MediaClassificationQARow
+	for rows.Next() {
+		var row MediaClassificationQARow
+		if err := rows.Scan(&row.ID, &row.Tags); err != nil {
 			return nil, err
 		}
 		out = append(out, row)
@@ -687,6 +726,11 @@ func (r *ImageRepo) GetFacebookPlaces(ctx context.Context) ([]model.FacebookPlac
 }
 
 // ── Write / delete ────────────────────────────────────────────────────────────
+
+// CountCommaSeparatedTags returns the number of non-empty comma-separated tag tokens.
+func CountCommaSeparatedTags(raw string) int {
+	return len(commaSplitTags(raw))
+}
 
 // commaSplitTags splits comma-separated tags into trimmed, non-empty parts.
 func commaSplitTags(raw string) []string {

@@ -544,6 +544,7 @@ const DOM = {
     newImageGalleryHasGps: document.getElementById('new-image-gallery-has-gps'),
     newImageGalleryHasThumbnail: document.getElementById('new-image-gallery-has-thumbnail'),
     newImageGalleryAIClassified: document.getElementById('new-image-gallery-ai-classified'),
+    newImageGalleryAIUnclassified: document.getElementById('new-image-gallery-ai-unclassified'),
     newImageGallerySearchBtn: document.getElementById('new-image-gallery-search-btn'),
     newImageGalleryClearBtn: document.getElementById('new-image-gallery-clear-btn'),
     newImageGalleryThumbnailGrid: document.getElementById('new-image-gallery-thumbnail-grid'),

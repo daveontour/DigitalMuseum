@@ -30,7 +30,6 @@ func NewAttachmentHandler(svc *service.AttachmentService, pythonStaticDir string
 // RegisterRoutes mounts all attachment routes.
 func (h *AttachmentHandler) RegisterRoutes(r chi.Router) {
 	// Static page routes (must come before /{id} catch-all)
-	r.Get("/attachments-viewer", h.ViewerPage)
 	r.Get("/attachments-images-grid", h.ImagesGridPage)
 
 	// Info / navigation routes (must come before /{id})
@@ -76,12 +75,10 @@ func writeAttachmentInfo(a *model.AttachmentInfo) map[string]any {
 
 // ── Page handlers ─────────────────────────────────────────────────────────────
 
-func (h *AttachmentHandler) ViewerPage(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, filepath.Join(h.pythonStaticDir, "templates", "attachments_viewer.html"))
-}
-
 func (h *AttachmentHandler) ImagesGridPage(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, filepath.Join(h.pythonStaticDir, "templates", "images_grid.html"))
+	// Attachments grid UI now lives in the main SPA (index.template.html).
+	// Keep this legacy route as a compatibility redirect.
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 // ── Data endpoints ────────────────────────────────────────────────────────────

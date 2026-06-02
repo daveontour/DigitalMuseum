@@ -72,6 +72,7 @@ make run                          # go run ./cmd/server
 
 # Build binaries
 make build-exe                    # bin/digitalmuseum.exe
+# Do not use bare `go build ./...` — CGO needs -I./cgo-compat (see Makefile); plain go build fails on sqlite3.h
 
 # Tests / lint
 make test
@@ -675,8 +676,8 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Login / register page | `templates/login.html` |
 | Share visitor page | `templates/share.html` |
 | Profile selection / first-run page | `templates/non_user_init.template.html` |
-| Attachment viewer (standalone) | `templates/attachments_viewer.html` |
-| Image grid (standalone) | `templates/images_grid.html` |
+| Attachment viewer (standalone, legacy) | `templates/attachments_viewer.html` |
+| Email attachments grid (embedded in SPA modal) | `templates/index.template.html` (`#email-attachments-modal`) |
 | Suggestions (DB + seed JSON) | `static/data/suggestions.json`, `internal/service/suggestions_service.go`, `static/js/museum/modals-suggestions-config.js` |
 | Guide system (DB + seed JSON) | `static/data/guide_topics.json`, `internal/service/guide_topics_service.go`, `static/js/museum/guide.js`, `static/js/museum/modals-guide-topics-config.js` |
 

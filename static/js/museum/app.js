@@ -2208,6 +2208,7 @@ const App = (() => {
                 thumbnails_async: 'Thumbnails',
                 reference_import: 'Reference Images',
                 image_regions_recalc: 'Image Regions',
+                media_classification_tag_qa: 'Classification Tag QA',
                 email_embeddings: 'Optimise Emails',
                 message_embeddings: 'Message Embeddings',
                 message_context_embeddings: 'Message Context Embeddings',
@@ -2576,6 +2577,7 @@ const App = (() => {
             filesystem: '/images/import/cancel',
             reference_import: '/images/import-reference/cancel',
             image_regions_recalc: '/images/recalculate-regions/cancel',
+            media_classification_tag_qa: '/images/classification-tag-qa/cancel',
             email_embeddings: '/emails/embeddings/backfill/cancel',
             message_embeddings: '/messages/embeddings/backfill/cancel',
             message_context_embeddings: '/messages/context-embeddings/backfill/cancel',
@@ -2770,6 +2772,8 @@ const App = (() => {
                     return `Item: ${data.processed || 0}/${data.total || 0} | ${data.imported || 0} imported, ${data.skipped || 0} skipped | ${data.errors || 0} errors`;
                 case 'image_regions_recalc':
                     return `Item: ${data.processed || 0}/${data.total || 0} | ${data.updated || 0} updated`;
+                case 'media_classification_tag_qa':
+                    return `Item: ${data.processed || 0}/${data.total || 0} | ${data.reflagged || 0} re-flagged | ${data.errors || 0} errors`;
                 case 'email_embeddings':
                     return `Email: ${data.processed || 0}/${data.total || 0} | ${data.embedded || 0} embedded, ${data.skipped || 0} skipped | ${data.errors || 0} errors`;
                 case 'message_embeddings':
@@ -2883,6 +2887,7 @@ const App = (() => {
             filesystem_reference: { needsInput: true, title: 'Reference images on filesystem (local)', fields: [{ id: 'root_directory', key: 'filesystem_reference_import_directory', label: 'Folder(s) on this machine — separate with semicolons. Each folder is scanned recursively; only paths are stored in the archive (images stay on disk).', placeholder: 'e.g., C:\\Photos\\Vacation; D:\\Pictures', required: true }, { id: 'max_images', key: 'filesystem_reference_import_max_images', label: 'Max images (optional)', placeholder: 'Leave empty for all', required: false, type: 'number' }], run: async (vals) => { const body = { root_directory: vals.root_directory, create_thumb_and_get_exif: false, reference_mode: true }; if (vals.max_images) body.max_images = parseInt(vals.max_images, 10); const r = await fetch('/images/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r; }, stream: '/images/import/stream' },
             reference_import: { needsInput: false, title: 'Import Reference Images to Database', run: async () => { const r = await fetch('/images/import-reference', { method: 'POST' }); return r; }, stream: '/images/import-reference/stream' },
             image_regions_recalc: { needsInput: false, title: 'Recalculate Image Regions', run: async () => { const r = await fetch('/images/recalculate-regions', { method: 'POST' }); return r; }, stream: '/images/recalculate-regions/stream' },
+            media_classification_tag_qa: { needsInput: false, title: 'QA Check Image Classification Tags', run: async () => { const r = await fetch('/images/classification-tag-qa', { method: 'POST' }); return r; }, stream: '/images/classification-tag-qa/stream' },
             email_embeddings: { needsInput: false, title: 'Optimise Emails for Searching', run: async () => { const r = await fetch('/emails/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/emails/embeddings/backfill/stream' },
             message_embeddings: { needsInput: false, title: 'Generate missing message embedding vectors', run: async () => { const r = await fetch('/messages/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/messages/embeddings/backfill/stream' },
             message_context_embeddings: { needsInput: false, title: 'Build message context embeddings', run: async () => { const r = await fetch('/messages/context-embeddings/backfill', { method: 'POST' }); return r; }, stream: '/messages/context-embeddings/backfill/stream' },
@@ -3878,7 +3883,7 @@ const App = (() => {
         })();
 
         async function checkInitialImportStatus() {
-            const types = ['upload_zip','email_processing','imap_processing','filesystem','reference_import','image_regions_recalc','email_embeddings','message_embeddings','message_context_embeddings','image_tag_embeddings','artefact_embeddings','facebook_post_text_embeddings','facebook_album_description_embeddings','image_export','thumbnails','contacts','image_ai_gemma_unclassified'];
+            const types = ['upload_zip','email_processing','imap_processing','filesystem','reference_import','image_regions_recalc','media_classification_tag_qa','email_embeddings','message_embeddings','message_context_embeddings','image_tag_embeddings','artefact_embeddings','facebook_post_text_embeddings','facebook_album_description_embeddings','image_export','thumbnails','contacts','image_ai_gemma_unclassified'];
             const statusEndpoints = {
                 upload_zip: '/import/upload/status',
                 email_processing: '/gmail/process/status',
@@ -3886,6 +3891,7 @@ const App = (() => {
                 filesystem: '/images/import/status',
                 reference_import: '/images/import-reference/status',
                 image_regions_recalc: '/images/recalculate-regions/status',
+                media_classification_tag_qa: '/images/classification-tag-qa/status',
                 email_embeddings: '/emails/embeddings/backfill/status',
                 message_embeddings: '/messages/embeddings/backfill/status',
                 message_context_embeddings: '/messages/context-embeddings/backfill/status',

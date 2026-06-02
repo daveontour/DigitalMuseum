@@ -609,7 +609,8 @@ Modals.NewImageGallery = (() => {
                 DOM.newImageGalleryRatingMax,
                 DOM.newImageGalleryHasGps,
                 DOM.newImageGalleryHasThumbnail,
-                DOM.newImageGalleryAIClassified
+                DOM.newImageGalleryAIClassified,
+                DOM.newImageGalleryAIUnclassified
             ];
 
             filterInputs.forEach(input => {
@@ -786,6 +787,7 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryHasGps) DOM.newImageGalleryHasGps.checked = false;
             if (DOM.newImageGalleryHasThumbnail) DOM.newImageGalleryHasThumbnail.checked = false;
             if (DOM.newImageGalleryAIClassified) DOM.newImageGalleryAIClassified.checked = false;
+            if (DOM.newImageGalleryAIUnclassified) DOM.newImageGalleryAIUnclassified.checked = false;
         }
 
         /**
@@ -1119,6 +1121,9 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryAIClassified && DOM.newImageGalleryAIClassified.checked) {
                 params.append('ai_classified', 'true');
             }
+            if (DOM.newImageGalleryAIUnclassified && DOM.newImageGalleryAIUnclassified.checked) {
+                params.append('ai_unclassified', 'true');
+            }
 
             try {
                 const response = await fetch('/images/search?' + params.toString());
@@ -1176,7 +1181,8 @@ Modals.NewImageGallery = (() => {
                 (DOM.newImageGalleryRatingMax && DOM.newImageGalleryRatingMax.value) ||
                 (DOM.newImageGalleryHasGps && DOM.newImageGalleryHasGps.checked) ||
                 (DOM.newImageGalleryHasThumbnail && DOM.newImageGalleryHasThumbnail.checked) ||
-                (DOM.newImageGalleryAIClassified && DOM.newImageGalleryAIClassified.checked)
+                (DOM.newImageGalleryAIClassified && DOM.newImageGalleryAIClassified.checked) ||
+                (DOM.newImageGalleryAIUnclassified && DOM.newImageGalleryAIUnclassified.checked)
             );
         }
 
@@ -1186,7 +1192,7 @@ Modals.NewImageGallery = (() => {
                 'email_attachment': 'Email',
                 'gmail_attachment':"GMail",
                 'facebook_messenger': 'Facebook Messenger',
-                'filesystem': 'Imgae Import',
+                'filesystem': 'Image Import',
                 'instagram': 'Insta',
                 'whatsapp': 'WhatsApp',
                 'imessage': 'iMessage',
@@ -2158,7 +2164,7 @@ Modals.ImageDetailModal = (() => {
                 'email_attachment': 'Email',
                 'gmail_attachment':"GMail",
                 'facebook_messenger': 'Facebook Messenger',
-                'filesystem': 'Imgae Import',
+                'filesystem': 'Image Import',
                 'instagram': 'Insta',
                 'whatsapp': 'WhatsApp',
                 'imessage': 'iMessage',

@@ -290,6 +290,14 @@ func (h *ImageHandler) Search(w http.ResponseWriter, r *http.Request) {
 		}
 		p.AIClassified = &b
 	}
+	if v := q.Get("ai_unclassified"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "ai_unclassified must be true or false")
+			return
+		}
+		p.AIUnclassified = &b
+	}
 	if v := q.Get("available_for_task"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {

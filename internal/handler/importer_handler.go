@@ -137,6 +137,11 @@ var (
 		"updated": 0, "error_message": nil,
 	})
 
+	mediaClassificationTagQAJob = importer.NewImportJob("Media classification tag QA", map[string]any{
+		"status": "idle", "status_line": nil, "error_message": nil,
+		"total": 0, "processed": 0, "reflagged": 0, "errors": 0,
+	})
+
 	imageExportJob = importer.NewImportJob("Image export", map[string]any{
 		"status": "idle", "status_line": nil, "total": 0, "processed": 0,
 		"exported": 0, "skipped": 0, "errors": 0, "error_message": nil, "error_messages": []string{},
@@ -254,6 +259,12 @@ func (h *ImporterHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/images/recalculate-regions/stream", h.ImageRegionsRecalcStream)
 	r.Post("/images/recalculate-regions/cancel", h.ImageRegionsRecalcCancel)
 	r.Get("/images/recalculate-regions/status", h.ImageRegionsRecalcStatus)
+
+	// Media classification tag QA (re-flag under-tagged classified images)
+	r.Post("/images/classification-tag-qa", h.MediaClassificationTagQAStart)
+	r.Get("/images/classification-tag-qa/stream", h.MediaClassificationTagQAStream)
+	r.Post("/images/classification-tag-qa/cancel", h.MediaClassificationTagQACancel)
+	r.Get("/images/classification-tag-qa/status", h.MediaClassificationTagQAStatus)
 
 	// Image export (export images to filesystem)
 	r.Post("/images/export", h.ImageExportStart)
@@ -1118,6 +1129,130 @@ func (h *ImporterHandler) ImageRegionsRecalcCancel(w http.ResponseWriter, r *htt
 
 func (h *ImporterHandler) ImageRegionsRecalcStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, imageRegionsRecalcJob.Status())
+}
+
+// ── Media classification tag QA ───────────────────────────────────────────────
+
+const classificationTagQAMinTags = 5
+
+func (h *ImporterHandler) MediaClassificationTagQAStart(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	if err := mediaClassificationTagQAJob.AssertNotRunning(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if h.imageRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "media classification tag QA not configured")
+		return
+	}
+
+	mediaClassificationTagQAJob.Start()
+	mediaClassificationTagQAJob.UpdateState(map[string]any{
+		"status": "in_progress", "status_line": "Starting media classification tag QA...",
+		"total": 0, "processed": 0, "reflagged": 0, "errors": 0, "error_message": nil,
+	})
+	mediaClassificationTagQAJob.Broadcast("status", map[string]any{"status_line": "Starting media classification tag QA..."})
+
+	uid := appctx.UserIDFromCtx(r.Context())
+	go runMediaClassificationTagQA(h.imageRepo, mediaClassificationTagQAJob, uid)
+
+	writeJSON(w, map[string]any{"message": "Media classification tag QA started", "status": "started"})
+}
+
+func runMediaClassificationTagQA(repo *repository.ImageRepo, job *importer.ImportJob, uid int64) {
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
+	defer job.Finish()
+
+	rows, err := repo.ListMediaItemsForClassificationTagQA(ctx)
+	if err != nil {
+		msg := fmt.Sprintf("list classified media items: %v", err)
+		job.UpdateState(map[string]any{
+			"status": "error", "error_message": msg, "status_line": msg,
+		})
+		job.Broadcast("error", job.GetState())
+		return
+	}
+
+	total := len(rows)
+	job.UpdateState(map[string]any{
+		"total":       total,
+		"status_line": fmt.Sprintf("Checking tag counts on %d classified image(s)", total),
+	})
+	job.Broadcast("progress", job.GetState())
+
+	if total == 0 {
+		statusLine := "Completed: no classified images to check"
+		job.UpdateState(map[string]any{
+			"status": "completed", "status_line": statusLine,
+			"processed": 0, "reflagged": 0, "errors": 0, "error_message": nil,
+		})
+		job.Broadcast("completed", job.GetState())
+		return
+	}
+
+	var processed, reflagged, errs int
+	for _, row := range rows {
+		if job.IsCancelled() {
+			statusLine := fmt.Sprintf("Cancelled after checking %d/%d image(s); re-flagged %d", processed, total, reflagged)
+			job.UpdateState(map[string]any{
+				"status": "cancelled", "status_line": statusLine,
+				"processed": processed, "reflagged": reflagged, "errors": errs,
+			})
+			job.Broadcast("cancelled", job.GetState())
+			return
+		}
+
+		processed++
+		tags := ""
+		if row.Tags != nil {
+			tags = *row.Tags
+		}
+		if repository.CountCommaSeparatedTags(tags) < classificationTagQAMinTags {
+			ok, setErr := repo.SetRequireClassification(ctx, row.ID, true)
+			if setErr != nil {
+				errs++
+			} else if ok {
+				reflagged++
+			}
+		}
+
+		if processed == total || processed%50 == 0 {
+			job.UpdateState(map[string]any{
+				"processed":   processed,
+				"reflagged":   reflagged,
+				"errors":      errs,
+				"status_line": fmt.Sprintf("Checked %d/%d image(s); re-flagged %d", processed, total, reflagged),
+			})
+			job.Broadcast("progress", job.GetState())
+		}
+	}
+
+	statusLine := fmt.Sprintf("Completed: checked %d image(s), re-flagged %d with fewer than %d tags", processed, reflagged, classificationTagQAMinTags)
+	if errs > 0 {
+		statusLine += fmt.Sprintf(" (%d errors)", errs)
+	}
+	job.UpdateState(map[string]any{
+		"status": "completed", "status_line": statusLine,
+		"processed": processed, "reflagged": reflagged, "errors": errs, "error_message": nil,
+	})
+	job.Broadcast("completed", job.GetState())
+}
+
+func (h *ImporterHandler) MediaClassificationTagQAStream(w http.ResponseWriter, r *http.Request) {
+	mediaClassificationTagQAJob.ServeSSE(w, r)
+}
+
+func (h *ImporterHandler) MediaClassificationTagQACancel(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	writeJSON(w, mediaClassificationTagQAJob.Cancel())
+}
+
+func (h *ImporterHandler) MediaClassificationTagQAStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, mediaClassificationTagQAJob.Status())
 }
 
 // ── Image export ───────────────────────────────────────────────────────────────
