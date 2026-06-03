@@ -86,6 +86,12 @@ Modals.ReferenceDocuments = (() => {
             return { class: 'fas fa-file', color: '#666' };
         }
 
+        function refreshChatContextStatus() {
+            if (typeof App !== 'undefined' && App.refreshChatAvailability) {
+                void App.refreshChatAvailability();
+            }
+        }
+
         async function loadDocuments() {
             if (!DOM.referenceDocumentsList) return;
             
@@ -146,6 +152,7 @@ Modals.ReferenceDocuments = (() => {
                 });
                 checkboxEl.checked = v;
                 Modals.ReferenceDocumentsNotification.reset();
+                refreshChatContextStatus();
             } catch (error) {
                 console.error('Failed to update available_for_task:', error);
                 checkboxEl.checked = !checked;
@@ -180,6 +187,7 @@ Modals.ReferenceDocuments = (() => {
                 });
                 checkboxEl.checked = v;
                 Modals.ReferenceDocumentsNotification.reset();
+                refreshChatContextStatus();
             } catch (error) {
                 console.error('Failed to update include_in_system_prompt:', error);
                 checkboxEl.checked = !checked;
@@ -438,8 +446,6 @@ Modals.ReferenceDocuments = (() => {
             document.getElementById('reference-documents-edit-id').value = doc.id;
             document.getElementById('reference-documents-edit-title').value = doc.title || '';
             document.getElementById('reference-documents-edit-description').value = doc.description || '';
-            document.getElementById('reference-documents-edit-tags').value = doc.tags || '';
-            document.getElementById('reference-documents-edit-categories').value = doc.categories || '';
             document.getElementById('reference-documents-edit-task').checked = doc.available_for_task || false;
             const sysEl = document.getElementById('reference-documents-edit-system-prompt');
             if (sysEl) sysEl.checked = !!doc.include_in_system_prompt;
@@ -469,6 +475,7 @@ Modals.ReferenceDocuments = (() => {
                 await loadDocuments();
                 // Reset notification flag when document is deleted
                 Modals.ReferenceDocumentsNotification.reset();
+                refreshChatContextStatus();
             } catch (error) {
                 console.error("Failed to delete document:", error);
                 await AppDialogs.showAppAlert('Error', 'Failed to delete document: ' + error.message);
@@ -534,33 +541,27 @@ Modals.ReferenceDocuments = (() => {
             const refDocPickBtn = document.getElementById('reference-documents-upload-pick');
             const refDocPathInput = document.getElementById('reference-documents-upload-path');
             if (refDocPickBtn && refDocPathInput) {
-                const showPickerUnavailable = async () => {
-                    if (window.AppDialogs && typeof AppDialogs.showAppAlert === 'function') {
-                        await AppDialogs.showAppAlert('File picker unavailable', 'Native file selection is only available in the desktop app.');
-                    } else {
-                        console.warn('[ReferenceDocuments] Native picker unavailable');
-                    }
-                };
                 const handlePickClick = async () => {
-                    if (!window.electronAPI || typeof window.electronAPI.showOpenDialog !== 'function') {
-                        await showPickerUnavailable();
-                        return;
-                    }
+                    refDocPickBtn.disabled = true;
                     try {
-                        const result = await window.electronAPI.showOpenDialog({
-                            properties: ['openFile'],
-                        });
-                        if (!result || result.canceled || !Array.isArray(result.filePaths) || result.filePaths.length === 0) {
-                            return;
+                        const res = await fetch('/api/pick-file', { method: 'POST' });
+                        const data = await res.json();
+                        if (!res.ok) {
+                            throw new Error(data.error || 'Could not open file picker.');
                         }
-                        refDocPathInput.value = result.filePaths[0] || '';
-                        updateReferenceDocumentsUploadFileList();
+                        if (data.path) {
+                            refDocPathInput.value = data.path;
+                            updateReferenceDocumentsUploadFileList();
+                        }
                     } catch (err) {
+                        const message = (err && err.message) ? err.message : 'Could not open file picker.';
                         if (window.AppDialogs && typeof AppDialogs.showAppAlert === 'function') {
-                            await AppDialogs.showAppAlert('Error', (err && err.message) ? err.message : 'Could not open file picker.');
+                            await AppDialogs.showAppAlert('Error', message);
                         } else {
                             console.error('[ReferenceDocuments] Picker error:', err);
                         }
+                    } finally {
+                        refDocPickBtn.disabled = false;
                     }
                 };
                 refDocPickBtn.addEventListener('click', handlePickClick);
@@ -579,8 +580,6 @@ Modals.ReferenceDocuments = (() => {
                     }
 
                     const description = document.getElementById('reference-documents-upload-description').value;
-                    const tags = document.getElementById('reference-documents-upload-tags').value;
-                    const categories = document.getElementById('reference-documents-upload-categories').value;
                     const availableForTask = document.getElementById('reference-documents-upload-task').checked;
                     const includeInSystemPrompt = document.getElementById('reference-documents-upload-system-prompt')?.checked || false;
 
@@ -594,8 +593,6 @@ Modals.ReferenceDocuments = (() => {
                             body: JSON.stringify({
                                 file_path: selectedPath,
                                 description: description || '',
-                                tags: tags || '',
-                                categories: categories || '',
                                 available_for_task: !!availableForTask,
                                 include_in_system_prompt: !!includeInSystemPrompt
                             })
@@ -614,6 +611,7 @@ Modals.ReferenceDocuments = (() => {
                         updateReferenceDocumentsUploadFileList();
                         await loadDocuments();
                         Modals.ReferenceDocumentsNotification.reset();
+                        refreshChatContextStatus();
                     } catch (error) {
                         await AppDialogs.showAppAlert('Error', 'Failed to add reference document: ' + (error.message || String(error)));
                     } finally {
@@ -642,8 +640,6 @@ Modals.ReferenceDocuments = (() => {
                     const updateData = {
                         title: document.getElementById('reference-documents-edit-title').value || null,
                         description: document.getElementById('reference-documents-edit-description').value || null,
-                        tags: document.getElementById('reference-documents-edit-tags').value || null,
-                        categories: document.getElementById('reference-documents-edit-categories').value || null,
                         available_for_task: document.getElementById('reference-documents-edit-task').checked,
                         include_in_system_prompt: document.getElementById('reference-documents-edit-system-prompt')?.checked || false
                     };
@@ -666,6 +662,7 @@ Modals.ReferenceDocuments = (() => {
                         await loadDocuments();
                         // Reset notification flag when document is edited
                         Modals.ReferenceDocumentsNotification.reset();
+                        refreshChatContextStatus();
                     } catch (error) {
                         console.error("Failed to update document:", error);
                         await AppDialogs.showAppAlert('Error', 'Failed to update document: ' + error.message);
@@ -3603,6 +3600,7 @@ Modals.initAll = () => {
         //Modals.HaveYourSay.init();
         Modals.Locations.init();
         Modals.NearbyLocations.init();
+        if (Modals.BulkGpsPicker && Modals.BulkGpsPicker.init) Modals.BulkGpsPicker.init();
         // Modals.ImageGallery.init();
         Modals.EmailGallery.init();
         Modals.EmailEditor.init();
@@ -3696,6 +3694,12 @@ Modals.closeAll = (options) => {
                 Modals.NearbyLocations.close();
             }
         } catch (e) { console.debug('Error closing NearbyLocations modal:', e); }
+
+        try {
+            if (Modals.BulkGpsPicker && Modals.BulkGpsPicker.close && keepOpen !== DOM.bulkGpsPickModal) {
+                Modals.BulkGpsPicker.close();
+            }
+        } catch (e) { console.debug('Error closing BulkGpsPicker modal:', e); }
         
         try {
             if (Modals.ConfirmationModal && Modals.ConfirmationModal.close) Modals.ConfirmationModal.close();

@@ -215,6 +215,14 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	regionsHandler := handler.NewRegionsHandler(regionsSvc)
 	regionsHandler.RegisterRoutes(r)
 
+	// ── Native file/folder pickers (Windows shell dialogs via Go) ─────────────
+	nativePickerHandler := handler.NewNativePickerHandler()
+	nativePickerHandler.RegisterRoutes(r)
+
+	// ── Duplicate File Tool ───────────────────────────────────────────────────
+	fileDupeHandler := handler.NewFileDupeHandler()
+	fileDupeHandler.RegisterRoutes(r)
+
 	// ── Saved responses ───────────────────────────────────────────────────────
 	savedResponseRepo := repository.NewSavedResponseRepo(pool)
 	savedResponseSvc := service.NewSavedResponseService(savedResponseRepo)

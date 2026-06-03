@@ -9,9 +9,36 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/model"
 	"github.com/daveontour/aimuseum/internal/sqlutil"
 )
+
+const maxBulkSetGPSIDs = 500
+
+// GPS spread radii (meters) for circle placement around a center point.
+const (
+	GPSSpreadRadiusStandardM = 100.0
+	GPSSpreadRadiusLargeM    = 150.0
+	gpsDuplicateSpreadMaxSmall = 20
+)
+
+const metersPerDegreeLatitude = 111320.0
+
+// DuplicateGPSGroup is a set of image media_items sharing the same latitude/longitude.
+type DuplicateGPSGroup struct {
+	Latitude  float64
+	Longitude float64
+	IDs       []int64
+}
+
+// GPSDuplicateSpreadRadiusForCount returns the circle radius for spreading a duplicate group.
+func GPSDuplicateSpreadRadiusForCount(count int) float64 {
+	if count > gpsDuplicateSpreadMaxSmall {
+		return GPSSpreadRadiusLargeM
+	}
+	return GPSSpreadRadiusStandardM
+}
 
 // ImageRepo runs queries against media_items, media_blobs, and facebook_albums tables.
 type ImageRepo struct {
@@ -887,6 +914,242 @@ func (r *ImageRepo) UpdateTags(ctx context.Context, id int64, newTags string) (b
 	return n > 0, nil
 }
 
+// gpsOffsetOnCircle returns lat/lng for point index of total evenly spaced on a circle of
+// radiusM meters around centerLat/centerLng (flat-earth approximation).
+func gpsOffsetOnCircle(centerLat, centerLng float64, index, total int, radiusM float64) (float64, float64) {
+	if total <= 1 || radiusM <= 0 {
+		return centerLat, centerLng
+	}
+	angle := 2 * math.Pi * float64(index) / float64(total)
+	northM := radiusM * math.Cos(angle)
+	eastM := radiusM * math.Sin(angle)
+	lat := centerLat + northM/metersPerDegreeLatitude
+	lngDenom := metersPerDegreeLatitude * math.Cos(centerLat*math.Pi/180)
+	if lngDenom < 1e-9 {
+		lngDenom = 1e-9
+	}
+	lng := centerLng + eastM/lngDenom
+	return lat, lng
+}
+
+// BulkSetGPS assigns coordinates to multiple images. A single image gets the picked center;
+// multiple images are placed on a 100m-radius circle so map markers remain visible. Rows that
+// already have GPS are skipped.
+func (r *ImageRepo) BulkSetGPS(ctx context.Context, ids []int64, centerLat, centerLng float64) (updated int, skipped []int64, updates []model.BulkGPSUpdate, err error) {
+	if len(ids) == 0 {
+		return 0, nil, nil, nil
+	}
+	if len(ids) > maxBulkSetGPSIDs {
+		return 0, nil, nil, fmt.Errorf("at most %d image ids per request", maxBulkSetGPSIDs)
+	}
+	seen := make(map[int64]struct{}, len(ids))
+	var eligible []int64
+	for _, id := range ids {
+		if id <= 0 {
+			skipped = append(skipped, id)
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+
+		item, err := r.GetMediaItemByID(ctx, id)
+		if err != nil {
+			return updated, skipped, updates, err
+		}
+		if item == nil {
+			skipped = append(skipped, id)
+			continue
+		}
+		if item.HasGPS || (item.Latitude != nil && item.Longitude != nil) {
+			skipped = append(skipped, id)
+			continue
+		}
+		eligible = append(eligible, id)
+	}
+
+	for i, id := range eligible {
+		itemLat, itemLng := gpsOffsetOnCircle(centerLat, centerLng, i, len(eligible), GPSSpreadRadiusStandardM)
+		region := georegion.RegionFromLatLng(itemLat, itemLng)
+		mapsURL := fmt.Sprintf("https://www.google.com/maps?q=%g,%g", itemLat, itemLng)
+		ok, err := r.setGPSOnMediaItem(ctx, id, itemLat, itemLng, region, mapsURL)
+		if err != nil {
+			return updated, skipped, updates, err
+		}
+		if ok {
+			updated++
+			updates = append(updates, model.BulkGPSUpdate{
+				ID:        id,
+				Latitude:  itemLat,
+				Longitude: itemLng,
+			})
+		} else {
+			skipped = append(skipped, id)
+		}
+	}
+	return updated, skipped, updates, nil
+}
+
+// ListDuplicateImageGPSGroups returns image rows grouped by identical non-null latitude/longitude
+// where at least two rows share the same coordinates.
+func (r *ImageRepo) ListDuplicateImageGPSGroups(ctx context.Context) ([]DuplicateGPSGroup, error) {
+	uid := uidFromCtx(ctx)
+	q := `
+		SELECT latitude, longitude, COUNT(*) AS cnt
+		FROM media_items
+		WHERE media_type LIKE 'image/%'
+		  AND latitude IS NOT NULL AND longitude IS NOT NULL`
+	args := []any{}
+	q, args = addUIDFilter(q, args, uid)
+	q += `
+		GROUP BY latitude, longitude
+		HAVING COUNT(*) >= 2
+		ORDER BY cnt DESC, latitude, longitude`
+
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("ListDuplicateImageGPSGroups: %w", err)
+	}
+
+	type gpsKey struct {
+		lat, lng float64
+	}
+	var keys []gpsKey
+	for rows.Next() {
+		var lat, lng float64
+		var cnt int
+		if err := rows.Scan(&lat, &lng, &cnt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		keys = append(keys, gpsKey{lat: lat, lng: lng})
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	var groups []DuplicateGPSGroup
+	for _, key := range keys {
+		ids, err := r.listImageIDsAtGPS(ctx, key.lat, key.lng)
+		if err != nil {
+			return nil, err
+		}
+		if len(ids) < 2 {
+			continue
+		}
+		groups = append(groups, DuplicateGPSGroup{
+			Latitude:  key.lat,
+			Longitude: key.lng,
+			IDs:       ids,
+		})
+	}
+	if groups == nil {
+		groups = []DuplicateGPSGroup{}
+	}
+	return groups, nil
+}
+
+func (r *ImageRepo) listImageIDsAtGPS(ctx context.Context, lat, lng float64) ([]int64, error) {
+	uid := uidFromCtx(ctx)
+	q := `
+		SELECT id
+		FROM media_items
+		WHERE media_type LIKE 'image/%'
+		  AND latitude = ? AND longitude = ?`
+	args := []any{lat, lng}
+	q, args = addUIDFilter(q, args, uid)
+	q += ` ORDER BY id ASC`
+
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("listImageIDsAtGPS: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// SpreadImageGPSOnCircle updates each image id to an evenly spaced point on a circle of
+// radiusM meters around centerLat/centerLng. IDs should already be ordered (e.g. by id ASC).
+func (r *ImageRepo) SpreadImageGPSOnCircle(ctx context.Context, ids []int64, centerLat, centerLng, radiusM float64) (updated int, err error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	for i, id := range ids {
+		itemLat, itemLng := gpsOffsetOnCircle(centerLat, centerLng, i, len(ids), radiusM)
+		region := georegion.RegionFromLatLng(itemLat, itemLng)
+		mapsURL := fmt.Sprintf("https://www.google.com/maps?q=%g,%g", itemLat, itemLng)
+		ok, err := r.updateGPSOnMediaItem(ctx, id, itemLat, itemLng, region, mapsURL)
+		if err != nil {
+			return updated, err
+		}
+		if ok {
+			updated++
+		}
+	}
+	return updated, nil
+}
+
+func (r *ImageRepo) setGPSOnMediaItem(ctx context.Context, id int64, lat, lng float64, region, mapsURL string) (bool, error) {
+	uid := uidFromCtx(ctx)
+	q := `UPDATE media_items
+	      SET latitude = ?, longitude = ?, has_gps = 1,
+	          google_maps_url = ?, region = ?, updated_at = CURRENT_TIMESTAMP
+	      WHERE id = ?
+	        AND has_gps = 0
+	        AND (latitude IS NULL OR longitude IS NULL)`
+	args := []any{lat, lng, mapsURL, region, id}
+	q, args = addUIDFilter(q, args, uid)
+	res, err := r.pool.ExecContext(ctx, q, args...)
+	if err != nil {
+		return false, fmt.Errorf("setGPSOnMediaItem %d: %w", id, err)
+	}
+	return rowsAffectedOrZero(res) > 0, nil
+}
+
+func (r *ImageRepo) updateGPSOnMediaItem(ctx context.Context, id int64, lat, lng float64, region, mapsURL string) (bool, error) {
+	uid := uidFromCtx(ctx)
+	q := `UPDATE media_items
+	      SET latitude = ?, longitude = ?, has_gps = 1,
+	          google_maps_url = ?, region = ?, updated_at = CURRENT_TIMESTAMP
+	      WHERE id = ?`
+	args := []any{lat, lng, mapsURL, region, id}
+	q, args = addUIDFilter(q, args, uid)
+	res, err := r.pool.ExecContext(ctx, q, args...)
+	if err != nil {
+		return false, fmt.Errorf("updateGPSOnMediaItem %d: %w", id, err)
+	}
+	return rowsAffectedOrZero(res) > 0, nil
+}
+
+// ClearGPSOnMediaItem removes GPS coordinates, map URL, and region from one image.
+func (r *ImageRepo) ClearGPSOnMediaItem(ctx context.Context, id int64) (bool, error) {
+	uid := uidFromCtx(ctx)
+	q := `UPDATE media_items
+	      SET latitude = NULL, longitude = NULL, has_gps = 0,
+	          google_maps_url = NULL, region = NULL, updated_at = CURRENT_TIMESTAMP
+	      WHERE id = ?`
+	args := []any{id}
+	q, args = addUIDFilter(q, args, uid)
+	res, err := r.pool.ExecContext(ctx, q, args...)
+	if err != nil {
+		return false, fmt.Errorf("ClearGPSOnMediaItem %d: %w", id, err)
+	}
+	return rowsAffectedOrZero(res) > 0, nil
+}
+
 // UpdateMetadata updates description, tags, and/or rating for a media item.
 func (r *ImageRepo) UpdateMetadata(ctx context.Context, id int64, description, tags *string, rating *int) (bool, error) {
 	item, err := r.GetMediaItemByID(ctx, id)
@@ -1119,6 +1382,60 @@ func (r *ImageRepo) ListMediaItemsForExport(ctx context.Context) ([]ExportItem, 
 		items = append(items, it)
 	}
 	return items, rows.Err()
+}
+
+// ListImageMetadataForJSONExport returns image metadata for JSON export, ordered by id ASC.
+func (r *ImageRepo) ListImageMetadataForJSONExport(ctx context.Context) ([]model.ImageMetadataJSONRecord, error) {
+	uid := uidFromCtx(ctx)
+	q := `
+		SELECT id, source_reference, source, latitude, longitude, has_gps, google_maps_url, tags
+		FROM media_items
+		WHERE media_type LIKE 'image/%'`
+	args := []any{}
+	q, args = addUIDFilter(q, args, uid)
+	q += ` ORDER BY id ASC`
+
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("ListImageMetadataForJSONExport: %w", err)
+	}
+	defer rows.Close()
+
+	var items []model.ImageMetadataJSONRecord
+	for rows.Next() {
+		var rec model.ImageMetadataJSONRecord
+		var srcRef, src, mapsURL, tags sql.NullString
+		var lat, lng sql.NullFloat64
+		if err := rows.Scan(&rec.ID, &srcRef, &src, &lat, &lng, &rec.HasGPS, &mapsURL, &tags); err != nil {
+			return nil, err
+		}
+		if srcRef.Valid {
+			rec.SourceReference = &srcRef.String
+		}
+		if src.Valid {
+			rec.Source = &src.String
+		}
+		if lat.Valid {
+			rec.Latitude = &lat.Float64
+		}
+		if lng.Valid {
+			rec.Longitude = &lng.Float64
+		}
+		if mapsURL.Valid {
+			rec.GoogleMapsURL = &mapsURL.String
+		}
+		if tags.Valid {
+			rec.Tags = &tags.String
+		}
+		items = append(items, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if items == nil {
+		items = []model.ImageMetadataJSONRecord{}
+	}
+	return items, nil
 }
 
 // GetBlobImageData returns image_data for a blob. Returns nil if not found or empty.

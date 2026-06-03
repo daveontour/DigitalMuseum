@@ -173,6 +173,56 @@ Imports are managed from the **Data Import** panel. Supported sources:
 
 All imports run as background jobs with real-time progress streamed to the UI.
 
+## CLI utilities
+
+### `image-tag-sync` — write archive tags onto exported image files
+
+Standalone Go CLI (`cmd/image-tag-sync`) that reads a **metadata JSON export** from the app and writes comma-separated tags into image files on disk using **bundled ExifTool**.
+
+**Typical workflow**
+
+1. In the app: **Import & Manage Data → Data Maintenance → Export Image Metadata JSON** — choose an output path (e.g. `C:\Exports\image-metadata.json`). The file is a JSON array ordered by image `id`, with fields such as `id`, `source_reference`, `source`, GPS fields, and `tags`.
+2. Export or copy image files to a directory (filesystem export names files `{id}.{ext}`, e.g. `144573.jpg`).
+3. Run the CLI against that JSON file and image directory.
+
+**Prerequisites**
+
+- Build from the repo root (uses the same module as the server; no CGO required for this tool).
+- Place ExifTool at `bin/ExifTool/exiftool.exe` (Windows) or `bin/ExifTool/exiftool` (Linux/macOS), mirroring the bundled `bin/ImageMagick/` layout. The binary is not shipped with the repo.
+
+**Usage**
+
+```bash
+# Build
+go build -o bin/image-tag-sync.exe ./cmd/image-tag-sync
+
+# Run
+bin/image-tag-sync.exe -json C:\Exports\image-metadata.json -dir C:\Photos\export
+
+# Optional: override ExifTool path
+bin/image-tag-sync.exe -json export.json -dir C:\Photos -exiftool C:\Tools\exiftool.exe
+
+# Via Makefile
+make image-tag-sync JSON=C:/Exports/image-metadata.json DIR=C:/Photos/export
+```
+
+**Behaviour**
+
+| Topic | Detail |
+|---|---|
+| **File matching** | Walks `-dir` recursively; each image stem (basename without extension) is looked up in the JSON index. |
+| **Index keys** | String form of `id` and `source_reference` (so `144573.jpg` matches `"id": 144573`). |
+| **Tags** | Comma-separated `tags` in JSON are split, trimmed, and written as separate `IPTC:Keywords` and `XMP-dc:Subject` values via ExifTool (`-overwrite_original`). The entry `source` is appended as an additional keyword when present (skipped if already listed, case-insensitive). |
+| **GPS** | Not written (tags only). |
+| **Misses** | No JSON match, empty tags, or ExifTool errors are **skipped and logged** to stderr; the run continues. |
+| **Duplicate JSON keys** | If two rows share the same lookup key, the first entry wins; duplicates are logged. |
+
+Supported image extensions: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.heic`, `.heif`, `.tif`, `.tiff`, `.bmp`.
+
+Exit code `1` if any errors occurred; a summary line is printed at the end (`seen`, `tagged`, `skipped`, `errors`).
+
+Implementation: `cmd/image-tag-sync/`, `internal/imagetagsync/`.
+
 ## Seed Data Files
 
 Three JSON files in `static/data/` are read at server startup and upserted into the database. Editing them and restarting is safe.
@@ -231,8 +281,13 @@ electron/
   preload.js        ← IPC bridge (contextBridge) exposed to renderer pages
 bin/
   digitalmuseum.exe ← Compiled Go server
+  image-tag-sync.exe ← Optional: tag sync CLI (go build ./cmd/image-tag-sync)
   Ollama/           ← Bundled Ollama executable
-cmd/server/         ← HTTP server entry point
+  ExifTool/         ← Place bundled exiftool here for image-tag-sync (not in repo)
+  ImageMagick/      ← Bundled ImageMagick for thumbnails
+cmd/
+  server/           ← HTTP server entry point
+  image-tag-sync/   ← CLI: write JSON export tags onto image files
 internal/
   ai/               ← Claude, Gemini, DeepSeek & LocalAI providers, tool definitions & executor
   api/router/       ← Route wiring
@@ -245,6 +300,7 @@ internal/
   database/         ← Migrations and connection pool
   middleware/        ← Logger, Recoverer, AuthMiddleware
   sqlutil/          ← SQLite dialect helpers
+  imagetagsync/     ← image-tag-sync CLI logic (ExifTool, JSON index, walk)
 static/
   js/museum/        ← Frontend JavaScript modules
   css/              ← Stylesheets (museum_of.css)

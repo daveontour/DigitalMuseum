@@ -142,9 +142,19 @@ var (
 		"total": 0, "processed": 0, "reflagged": 0, "errors": 0,
 	})
 
+	mediaGPSDuplicateSpreadJob = importer.NewImportJob("Media GPS duplicate spread", map[string]any{
+		"status": "idle", "status_line": nil, "error_message": nil,
+		"total": 0, "processed": 0, "updated": 0, "errors": 0,
+	})
+
 	imageExportJob = importer.NewImportJob("Image export", map[string]any{
 		"status": "idle", "status_line": nil, "total": 0, "processed": 0,
 		"exported": 0, "skipped": 0, "errors": 0, "error_message": nil, "error_messages": []string{},
+	})
+
+	imageMetadataJSONExportJob = importer.NewImportJob("Image metadata JSON export", map[string]any{
+		"status": "idle", "status_line": nil, "error_message": nil,
+		"total": 0, "processed": 0, "exported": 0, "errors": 0,
 	})
 
 	emailEmbeddingBackfillJob = importer.NewImportJob("Email embedding backfill", map[string]any{
@@ -266,11 +276,23 @@ func (h *ImporterHandler) RegisterRoutes(r chi.Router) {
 	r.Post("/images/classification-tag-qa/cancel", h.MediaClassificationTagQACancel)
 	r.Get("/images/classification-tag-qa/status", h.MediaClassificationTagQAStatus)
 
+	// Spread duplicate GPS coordinates on image media_items
+	r.Post("/images/gps-duplicate-spread", h.MediaGPSDuplicateSpreadStart)
+	r.Get("/images/gps-duplicate-spread/stream", h.MediaGPSDuplicateSpreadStream)
+	r.Post("/images/gps-duplicate-spread/cancel", h.MediaGPSDuplicateSpreadCancel)
+	r.Get("/images/gps-duplicate-spread/status", h.MediaGPSDuplicateSpreadStatus)
+
 	// Image export (export images to filesystem)
 	r.Post("/images/export", h.ImageExportStart)
 	r.Get("/images/export/stream", h.ImageExportStream)
 	r.Post("/images/export/cancel", h.ImageExportCancel)
 	r.Get("/images/export/status", h.ImageExportStatus)
+
+	// Image metadata JSON export
+	r.Post("/images/metadata-json-export", h.ImageMetadataJSONExportStart)
+	r.Get("/images/metadata-json-export/stream", h.ImageMetadataJSONExportStream)
+	r.Post("/images/metadata-json-export/cancel", h.ImageMetadataJSONExportCancel)
+	r.Get("/images/metadata-json-export/status", h.ImageMetadataJSONExportStatus)
 
 	// WhatsApp
 	r.Post("/whatsapp/import", h.WhatsAppStart)
@@ -1255,6 +1277,126 @@ func (h *ImporterHandler) MediaClassificationTagQAStatus(w http.ResponseWriter, 
 	writeJSON(w, mediaClassificationTagQAJob.Status())
 }
 
+// ── Media GPS duplicate spread ─────────────────────────────────────────────────
+
+func (h *ImporterHandler) MediaGPSDuplicateSpreadStart(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	if err := mediaGPSDuplicateSpreadJob.AssertNotRunning(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if h.imageRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "GPS duplicate spread not configured")
+		return
+	}
+
+	mediaGPSDuplicateSpreadJob.Start()
+	mediaGPSDuplicateSpreadJob.UpdateState(map[string]any{
+		"status": "in_progress", "status_line": "Starting duplicate GPS spread...",
+		"total": 0, "processed": 0, "updated": 0, "errors": 0, "error_message": nil,
+	})
+	mediaGPSDuplicateSpreadJob.Broadcast("status", map[string]any{"status_line": "Starting duplicate GPS spread..."})
+
+	uid := appctx.UserIDFromCtx(r.Context())
+	go runMediaGPSDuplicateSpread(h.imageRepo, mediaGPSDuplicateSpreadJob, uid)
+
+	writeJSON(w, map[string]any{"message": "Duplicate GPS spread started", "status": "started"})
+}
+
+func runMediaGPSDuplicateSpread(repo *repository.ImageRepo, job *importer.ImportJob, uid int64) {
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
+	defer job.Finish()
+
+	job.UpdateState(map[string]any{
+		"status_line": "Scanning for duplicate GPS groups...",
+	})
+	job.Broadcast("progress", job.GetState())
+
+	groups, err := repo.ListDuplicateImageGPSGroups(ctx)
+	if err != nil {
+		msg := fmt.Sprintf("list duplicate GPS groups: %v", err)
+		job.UpdateState(map[string]any{
+			"status": "error", "error_message": msg, "status_line": msg,
+		})
+		job.Broadcast("error", job.GetState())
+		return
+	}
+
+	total := len(groups)
+	job.UpdateState(map[string]any{
+		"total":       total,
+		"status_line": fmt.Sprintf("Spreading %d duplicate GPS group(s)", total),
+	})
+	job.Broadcast("progress", job.GetState())
+
+	if total == 0 {
+		statusLine := "Completed: no duplicate GPS groups found"
+		job.UpdateState(map[string]any{
+			"status": "completed", "status_line": statusLine,
+			"processed": 0, "updated": 0, "errors": 0, "error_message": nil,
+		})
+		job.Broadcast("completed", job.GetState())
+		return
+	}
+
+	var processed, updated, errs int
+	for _, group := range groups {
+		if job.IsCancelled() {
+			statusLine := fmt.Sprintf("Cancelled after %d/%d group(s); %d image(s) spread", processed, total, updated)
+			job.UpdateState(map[string]any{
+				"status": "cancelled", "status_line": statusLine,
+				"processed": processed, "updated": updated, "errors": errs,
+			})
+			job.Broadcast("cancelled", job.GetState())
+			return
+		}
+
+		radius := repository.GPSDuplicateSpreadRadiusForCount(len(group.IDs))
+		n, spreadErr := repo.SpreadImageGPSOnCircle(ctx, group.IDs, group.Latitude, group.Longitude, radius)
+		processed++
+		if spreadErr != nil {
+			errs++
+		} else {
+			updated += n
+		}
+
+		job.UpdateState(map[string]any{
+			"processed":   processed,
+			"updated":     updated,
+			"errors":      errs,
+			"status_line": fmt.Sprintf("Group: %d/%d | %d image(s) spread | %d errors", processed, total, updated, errs),
+		})
+		job.Broadcast("progress", job.GetState())
+	}
+
+	statusLine := fmt.Sprintf("Completed: %d group(s), %d image(s) spread", processed, updated)
+	if errs > 0 {
+		statusLine += fmt.Sprintf(" (%d errors)", errs)
+	}
+	job.UpdateState(map[string]any{
+		"status": "completed", "status_line": statusLine,
+		"processed": processed, "updated": updated, "errors": errs, "error_message": nil,
+	})
+	job.Broadcast("completed", job.GetState())
+}
+
+func (h *ImporterHandler) MediaGPSDuplicateSpreadStream(w http.ResponseWriter, r *http.Request) {
+	mediaGPSDuplicateSpreadJob.ServeSSE(w, r)
+}
+
+func (h *ImporterHandler) MediaGPSDuplicateSpreadCancel(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	writeJSON(w, mediaGPSDuplicateSpreadJob.Cancel())
+}
+
+func (h *ImporterHandler) MediaGPSDuplicateSpreadStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, mediaGPSDuplicateSpreadJob.Status())
+}
+
 // ── Image export ───────────────────────────────────────────────────────────────
 
 func (h *ImporterHandler) ImageExportStart(w http.ResponseWriter, r *http.Request) {
@@ -1412,6 +1554,129 @@ func (h *ImporterHandler) ImageExportCancel(w http.ResponseWriter, r *http.Reque
 }
 func (h *ImporterHandler) ImageExportStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, imageExportJob.Status())
+}
+
+// ── Image metadata JSON export ────────────────────────────────────────────────
+
+func (h *ImporterHandler) ImageMetadataJSONExportStart(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	if err := imageMetadataJSONExportJob.AssertNotRunning(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if h.imageRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "image metadata JSON export not configured")
+		return
+	}
+	var req struct {
+		OutputPath string `json:"output_path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	outputPath := strings.TrimSpace(req.OutputPath)
+	if outputPath == "" {
+		writeError(w, http.StatusBadRequest, "output_path is required")
+		return
+	}
+
+	imageMetadataJSONExportJob.Start()
+	imageMetadataJSONExportJob.UpdateState(map[string]any{
+		"status": "in_progress", "status_line": "Starting image metadata JSON export...",
+		"total": 0, "processed": 0, "exported": 0, "errors": 0, "error_message": nil,
+	})
+	imageMetadataJSONExportJob.Broadcast("status", map[string]any{"status_line": "Starting image metadata JSON export..."})
+
+	uid := appctx.UserIDFromCtx(r.Context())
+	go runImageMetadataJSONExport(h.imageRepo, imageMetadataJSONExportJob, outputPath, uid)
+
+	writeJSON(w, map[string]any{"message": "Image metadata JSON export started", "status": "started"})
+}
+
+func runImageMetadataJSONExport(repo *repository.ImageRepo, job *importer.ImportJob, outputPath string, uid int64) {
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
+	defer job.Finish()
+
+	job.UpdateState(map[string]any{"status_line": "Loading image metadata..."})
+	job.Broadcast("progress", job.GetState())
+
+	if job.IsCancelled() {
+		job.UpdateState(map[string]any{"status": "cancelled", "status_line": "Export cancelled."})
+		job.Broadcast("cancelled", job.GetState())
+		return
+	}
+
+	records, err := repo.ListImageMetadataForJSONExport(ctx)
+	if err != nil {
+		msg := fmt.Sprintf("load image metadata: %v", err)
+		job.UpdateState(map[string]any{"status": "error", "error_message": msg, "status_line": msg})
+		job.Broadcast("error", job.GetState())
+		return
+	}
+
+	total := len(records)
+	job.UpdateState(map[string]any{
+		"total":       total,
+		"processed":   total,
+		"status_line": fmt.Sprintf("Writing %d image(s) to JSON file", total),
+	})
+	job.Broadcast("progress", job.GetState())
+
+	if job.IsCancelled() {
+		job.UpdateState(map[string]any{
+			"status": "cancelled", "status_line": "Export cancelled.",
+			"processed": total, "exported": 0,
+		})
+		job.Broadcast("cancelled", job.GetState())
+		return
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		msg := fmt.Sprintf("create output directory: %v", err)
+		job.UpdateState(map[string]any{"status": "error", "error_message": msg, "status_line": msg})
+		job.Broadcast("error", job.GetState())
+		return
+	}
+
+	data, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		msg := fmt.Sprintf("encode JSON: %v", err)
+		job.UpdateState(map[string]any{"status": "error", "error_message": msg, "status_line": msg})
+		job.Broadcast("error", job.GetState())
+		return
+	}
+
+	if err := os.WriteFile(outputPath, data, 0o644); err != nil {
+		msg := fmt.Sprintf("write JSON file: %v", err)
+		job.UpdateState(map[string]any{"status": "error", "error_message": msg, "status_line": msg, "errors": 1})
+		job.Broadcast("error", job.GetState())
+		return
+	}
+
+	statusLine := fmt.Sprintf("Completed: wrote %d image(s) to %s", total, outputPath)
+	job.UpdateState(map[string]any{
+		"status": "completed", "status_line": statusLine,
+		"processed": total, "exported": total, "errors": 0, "error_message": nil,
+	})
+	job.Broadcast("completed", job.GetState())
+}
+
+func (h *ImporterHandler) ImageMetadataJSONExportStream(w http.ResponseWriter, r *http.Request) {
+	imageMetadataJSONExportJob.ServeSSE(w, r)
+}
+
+func (h *ImporterHandler) ImageMetadataJSONExportCancel(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	writeJSON(w, imageMetadataJSONExportJob.Cancel())
+}
+
+func (h *ImporterHandler) ImageMetadataJSONExportStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, imageMetadataJSONExportJob.Status())
 }
 
 // ── WhatsApp ──────────────────────────────────────────────────────────────────

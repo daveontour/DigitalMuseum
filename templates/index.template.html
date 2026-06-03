@@ -327,7 +327,7 @@
                     <span class="chat-context-status-seg chat-context-status-clickable" id="chat-context-status-refs-seg" role="button" tabindex="0" title="Open Reference Documents (owner master key required)">
                         <i class="fas fa-book" aria-hidden="true"></i>
                         <span id="chat-context-status-refs">—</span> ref docs
-                        <i id="chat-context-status-warn-refs" class="fas fa-exclamation-triangle chat-context-status-warn" style="display:none;" title="No reference documents available for task"></i>
+                        <i id="chat-context-status-warn-refs" class="fas fa-exclamation-triangle chat-context-status-warn" style="display:none;" title="No reference documents enabled for the AI"></i>
                     </span>
                     <span class="chat-context-status-sep" aria-hidden="true">|</span>
                     <span id="chat-context-failover-wrap" class="chat-context-failover-wrap" style="display:none" role="status">
@@ -739,6 +739,9 @@
                         </button>
                         <button id="config-tab-btn-guide-topics-config" type="button" class="config-tab-button" data-tab="guide-topics-config">
                             <i class="fas fa-map-signs"></i> Guide Topics
+                        </button>
+                        <button id="config-tab-btn-file-dupe" type="button" class="config-tab-button" data-tab="file-dupe">
+                            <i class="fas fa-clone"></i> Duplicate File Tool
                         </button>
                         <button id="config-tab-btn-custom-voices" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="custom-voices">
                             <i class="fas fa-microphone-alt"></i> Custom Voices
@@ -1438,6 +1441,98 @@
                         </div>
                     </section>
                 </div>
+                <div class="config-tab-content" id="file-dupe-tab">
+                    <section class="section-config">
+                        <h1>Duplicate File Tool</h1>
+                        <p class="config-tab-lead">Find duplicate files between two directories by filename and size. Select and delete unwanted copies after review.</p>
+                    </section>
+                    <div class="file-dupe-panel">
+                        <section class="file-dupe-panel-section">
+                            <div class="file-dupe-dir-row">
+                                <label for="file-dupe-dir1">Directory 1</label>
+                                <div class="file-dupe-input-group">
+                                    <input type="text" id="file-dupe-dir1" class="form-control" placeholder="C:\path\to\first\folder" autocomplete="off">
+                                    <button type="button" id="file-dupe-browse-dir1" class="modal-btn modal-btn-secondary file-dupe-browse-btn" data-target="file-dupe-dir1">Browse</button>
+                                </div>
+                            </div>
+                            <div class="file-dupe-dir-row">
+                                <label for="file-dupe-dir1-exclude">Directory 1 — exclude folder patterns</label>
+                                <textarea id="file-dupe-dir1-exclude" class="file-dupe-exclude-input form-control" rows="3" spellcheck="false">\.photostructure</textarea>
+                                <p class="file-dupe-field-hint">One regular expression per line, matched against folder names.</p>
+                            </div>
+                            <div class="file-dupe-dir-row">
+                                <label for="file-dupe-dir2">Directory 2</label>
+                                <div class="file-dupe-input-group">
+                                    <input type="text" id="file-dupe-dir2" class="form-control" placeholder="C:\path\to\second\folder" autocomplete="off">
+                                    <button type="button" id="file-dupe-browse-dir2" class="modal-btn modal-btn-secondary file-dupe-browse-btn" data-target="file-dupe-dir2">Browse</button>
+                                </div>
+                            </div>
+                            <div class="file-dupe-dir-row">
+                                <label for="file-dupe-dir2-exclude">Directory 2 — exclude folder patterns</label>
+                                <textarea id="file-dupe-dir2-exclude" class="file-dupe-exclude-input form-control" rows="3" spellcheck="false">\.photostructure</textarea>
+                                <p class="file-dupe-field-hint">One regular expression per line, matched against folder names.</p>
+                            </div>
+                            <div class="file-dupe-actions">
+                                <button type="button" id="file-dupe-scan-btn" class="modal-btn modal-btn-primary">Scan for Duplicates</button>
+                                <button type="button" id="file-dupe-cancel-btn" class="modal-btn modal-btn-secondary hidden">Cancel</button>
+                            </div>
+                        </section>
+                        <section id="file-dupe-progress-section" class="file-dupe-panel-section hidden">
+                            <h2 class="file-dupe-section-title">Progress</h2>
+                            <div class="file-dupe-progress-bar">
+                                <div id="file-dupe-progress-fill" class="file-dupe-progress-fill indeterminate"></div>
+                            </div>
+                            <p id="file-dupe-progress-phase" class="file-dupe-progress-phase">—</p>
+                            <p id="file-dupe-progress-detail" class="file-dupe-progress-detail">—</p>
+                            <p id="file-dupe-progress-count" class="file-dupe-progress-count">—</p>
+                        </section>
+                        <section id="file-dupe-results-section" class="file-dupe-panel-section file-dupe-results-panel hidden">
+                            <div class="file-dupe-results-header">
+                                <div class="file-dupe-results-title">
+                                    <h2 class="file-dupe-section-title">Results</h2>
+                                    <p id="file-dupe-results-summary" class="file-dupe-results-summary"></p>
+                                </div>
+                                <div class="file-dupe-results-actions">
+                                    <label class="file-dupe-filter-switch" for="file-dupe-same-dir-only">
+                                        <input type="checkbox" id="file-dupe-same-dir-only">
+                                        <span>Same directory only</span>
+                                    </label>
+                                    <button type="button" id="file-dupe-delete-btn" class="modal-btn modal-btn-danger hidden" disabled>Delete Selected</button>
+                                </div>
+                            </div>
+                            <div id="file-dupe-results-empty" class="file-dupe-results-empty hidden">No duplicates found.</div>
+                            <div class="file-dupe-table-wrap">
+                                <table id="file-dupe-results-table" class="file-dupe-results-table hidden">
+                                    <thead>
+                                        <tr>
+                                            <th class="file-dupe-col-check"><input type="checkbox" id="file-dupe-select-all" title="Select all files"></th>
+                                            <th class="file-dupe-col-filename">Filename</th>
+                                            <th class="file-dupe-col-size">Size</th>
+                                            <th class="file-dupe-col-path">Path in Directory 1</th>
+                                            <th class="file-dupe-col-check" title="Directory 2 selection">Dir 2</th>
+                                            <th class="file-dupe-col-path">Path in Directory 2</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="file-dupe-results-body"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                        <div id="file-dupe-error-banner" class="file-dupe-error-banner hidden" role="alert"></div>
+                    </div>
+                    <div id="file-dupe-preview-modal" class="file-dupe-preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="file-dupe-preview-title">
+                        <div class="file-dupe-preview-backdrop" data-file-dupe-close-preview></div>
+                        <div class="file-dupe-preview-dialog">
+                            <div class="file-dupe-preview-header">
+                                <h3 id="file-dupe-preview-title">Image Preview</h3>
+                                <button type="button" class="file-dupe-preview-close" data-file-dupe-close-preview aria-label="Close preview">&times;</button>
+                            </div>
+                            <p id="file-dupe-preview-path" class="file-dupe-preview-path"></p>
+                            <div id="file-dupe-preview-loading" class="file-dupe-preview-loading">Loading image...</div>
+                            <p id="file-dupe-preview-error" class="file-dupe-preview-error hidden"></p>
+                            <img id="file-dupe-preview-image" class="file-dupe-preview-image hidden" alt="">
+                        </div>
+                    </div>
+                </div>
                 <div class="config-tab-content" id="tool-test-tab">
                     <section class="section-config">
                         <h1>Tool Test</h1>
@@ -1774,6 +1869,40 @@
                                             <div class="data-import-action-group">
                                             <button id="data-import-start-media-classification-tag-qa-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="media_classification_tag_qa"><i class="fas fa-play"></i> Run QA</button>
                                             <button id="data-import-cancel-btn-21" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+                                <article class="data-import-card data-import-row" data-import="media_gps_duplicate_spread">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-map-marker-alt"></i> Spread Duplicate GPS Coordinates</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Finds images sharing the exact same latitude and longitude, then spreads each group evenly on a circle (100&nbsp;m for up to 20 images, 150&nbsp;m for larger groups).</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-media-gps-duplicate-spread-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="media_gps_duplicate_spread"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-22" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+                                <article class="data-import-card data-import-row" data-import="image_metadata_json_export">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-file-code"></i> Export Image Metadata JSON</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                        <span class="data-import-count" data-import-count-key="imported_images">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Writes a JSON file listing every image (ordered by id) with id, source, source reference, GPS fields, and tags.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-image-metadata-json-export-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_metadata_json_export"><i class="fas fa-play"></i> Export</button>
+                                            <button id="data-import-cancel-btn-23" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
                                             </div>
                                         </div>
                                     </div>
@@ -2516,6 +2645,31 @@
             </div>
         </div>
 
+        <!-- Bulk GPS pick (Images gallery) -->
+        <div id="bulk-gps-pick-modal" class="modal" style="display: none; z-index: 4200;">
+            <div class="modal-content geo-metadata-modal-content bulk-gps-pick-modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2 id="bulk-gps-pick-title"><i class="fas fa-map-marker-alt"></i> Set GPS Location</h2>
+                    <button type="button" class="modal-close-btn" id="close-bulk-gps-pick-modal" aria-label="Close">&times;</button>
+                </div>
+                <p id="bulk-gps-pick-skipped-note" class="bulk-gps-pick-skipped-note" style="display: none;"></p>
+                <p class="bulk-gps-pick-hint">Click the map to place the marker. One image gets this exact point; multiple images are placed on a 100&nbsp;m circle so they stay visible on the map.</p>
+                <div class="bulk-gps-pick-coords-row">
+                    <span>Latitude: <strong id="bulk-gps-pick-lat">—</strong></span>
+                    <span>Longitude: <strong id="bulk-gps-pick-lng">—</strong></span>
+                </div>
+                <div class="bulk-gps-pick-map-wrap geo-metadata-tab-content geo-tab-images">
+                    <div id="bulk-gps-pick-map"></div>
+                </div>
+                <div class="bulk-gps-pick-footer">
+                    <button type="button" id="bulk-gps-pick-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
+                    <button type="button" id="bulk-gps-pick-apply-btn" class="modal-btn modal-btn-primary">
+                        <i class="fas fa-check"></i> Apply to Images
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Nearby Locations Modal -->
         <div id="nearby-locations-modal" class="modal">
             <div class="modal-content geo-metadata-modal-content">
@@ -2889,8 +3043,8 @@
                                         Has GPS
                                     </label>
                                     <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
-                                        <input type="checkbox" id="new-image-gallery-has-thumbnail">
-                                        Has Thumbnail
+                                        <input type="checkbox" id="new-image-gallery-no-gps">
+                                        No GPS
                                     </label>
                                     <label class="new-image-gallery-checkbox-label email-gallery-checkbox-label">
                                         <input type="checkbox" id="new-image-gallery-ai-classified">
@@ -2946,6 +3100,9 @@
                                 </div>
                                 <input type="text" id="new-image-gallery-bulk-tags" placeholder="Enter tags to apply..." class="new-image-gallery-input email-gallery-input" style="width: 100%; box-sizing: border-box; margin-bottom: 0.5em;">
                                 <div class="new-image-gallery-bulk-actions" id="new-image-gallery-bulk-actions">
+                                    <button type="button" id="new-image-gallery-set-gps-btn" class="modal-btn modal-btn-secondary" disabled>
+                                        <i class="fas fa-map-marker-alt"></i> Set Location on Map
+                                    </button>
                                     <button id="new-image-gallery-apply-tags-btn" class="modal-btn modal-btn-primary" disabled>
                                         <i class="fas fa-tags"></i> Apply Tags
                                     </button>
@@ -2988,10 +3145,10 @@
                     <!-- Metadata Section -->
                     <div class="new-image-gallery-detail-metadata-section">
                         <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1em; gap: 0.4em; flex-wrap: nowrap;">
-                                <button type="button" id="new-image-detail-find-similar-btn" class="modal-btn modal-btn-secondary" style="padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" title="Search the gallery for images with similar tags (local AI)">
+                                <button type="button" id="new-image-detail-find-similar-btn" class="modal-btn image-detail-toolbar-btn image-detail-toolbar-btn--similar" title="Search the gallery for images with similar tags (local AI)">
                                     <i class="fas fa-search"></i> Find Similar
                                 </button>
-                                <button type="button" id="new-image-detail-find-same-time-btn" class="modal-btn modal-btn-secondary" style="padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" title="Search the gallery for images created within +/- 1 week of this image's created date">
+                                <button type="button" id="new-image-detail-find-same-time-btn" class="modal-btn image-detail-toolbar-btn image-detail-toolbar-btn--same-time" title="Search the gallery for images created within +/- 1 week of this image's created date">
                                     <i class="fas fa-clock"></i> Find Same Time
                                 </button>
                                 <button id="new-image-gallery-save-btn" class="modal-btn modal-btn-primary" style="display:none; padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" disabled>
@@ -3663,14 +3820,6 @@
                         <textarea id="reference-documents-upload-description" name="description" rows="3" placeholder="Document description"></textarea>
                     </div>
                     <div class="reference-documents-form-group">
-                        <label for="reference-documents-upload-tags">Tags (comma-separated)</label>
-                        <input type="text" id="reference-documents-upload-tags" name="tags" placeholder="tag1, tag2, tag3">
-                    </div>
-                    <div class="reference-documents-form-group">
-                        <label for="reference-documents-upload-categories">Categories (comma-separated)</label>
-                        <input type="text" id="reference-documents-upload-categories" name="categories" placeholder="category1, category2">
-                    </div>
-                    <div class="reference-documents-form-group">
                         <label class="reference-documents-checkbox-label">
                             <input type="checkbox" id="reference-documents-upload-task" name="available_for_task">
                             Make available to the AI
@@ -3707,14 +3856,6 @@
                     <div class="reference-documents-form-group">
                         <label for="reference-documents-edit-description">Description</label>
                         <textarea id="reference-documents-edit-description" name="description" rows="3" placeholder="Document description"></textarea>
-                    </div>
-                    <div class="reference-documents-form-group">
-                        <label for="reference-documents-edit-tags">Tags (comma-separated)</label>
-                        <input type="text" id="reference-documents-edit-tags" name="tags" placeholder="tag1, tag2, tag3">
-                    </div>
-                    <div class="reference-documents-form-group">
-                        <label for="reference-documents-edit-categories">Categories (comma-separated)</label>
-                        <input type="text" id="reference-documents-edit-categories" name="categories" placeholder="category1, category2">
                     </div>
                     <div class="reference-documents-form-group">
                         <label class="reference-documents-checkbox-label">
@@ -4396,18 +4537,19 @@
     <script src="/static/js/museum/app-dialogs.js" defer></script>
     <script src="/static/js/museum/chat.js" defer></script>
     <script src="/static/js/museum/modals-core.js" defer></script>
-    <script src="/static/js/museum/modals-media.js" defer></script>
+    <script src="/static/js/museum/modals-media.js?v={{ static_modals_media_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-suggestions.js" defer></script>
     <script src="/static/js/museum/modals-email.js" defer></script>
     <script src="/static/js/museum/modals-comms.js?v={{ static_modals_comms_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-people.js" defer></script>
-    <script src="/static/js/museum/modals-artefacts.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/modals-artefacts.js?v={{ static_modals_artefacts_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-sensitive.js" defer></script>
     <script src="/static/js/museum/modals-settings.js?v={{ static_modals_settings_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/local-ai-setup.js" defer></script>
     <script src="/static/js/museum/modals-regions.js" defer></script>
     <script src="/static/js/museum/modals-suggestions-config.js" defer></script>
     <script src="/static/js/museum/modals-guide-topics-config.js" defer></script>
+    <script src="/static/js/museum/modals-filedupe.js" defer></script>
     <script src="/static/js/museum/modals-tool-test.js" defer></script>
     <script src="/static/js/museum/identity-profile-wizard.js" defer></script>
     <script src="/static/js/museum/guide.js?v={{ static_app_js_cache_bust }}" defer></script>

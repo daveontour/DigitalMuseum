@@ -124,6 +124,31 @@ func (s *ImageService) BulkUpdateTags(ctx context.Context, imageIDs []int64, tag
 	return updated, errs
 }
 
+const maxBulkSetGPSIDs = 500
+
+// BulkSetGPS assigns coordinates to multiple images (spread on a circle when count > 1).
+// Rows that already have GPS are skipped.
+func (s *ImageService) BulkSetGPS(ctx context.Context, imageIDs []int64, lat, lng float64) (updated int, skipped []int64, updates []model.BulkGPSUpdate, err error) {
+	if len(imageIDs) == 0 {
+		return 0, nil, nil, fmt.Errorf("image_ids must be non-empty")
+	}
+	if len(imageIDs) > maxBulkSetGPSIDs {
+		return 0, nil, nil, fmt.Errorf("at most %d image ids per request", maxBulkSetGPSIDs)
+	}
+	if lat < -90 || lat > 90 {
+		return 0, nil, nil, fmt.Errorf("latitude must be between -90 and 90")
+	}
+	if lng < -180 || lng > 180 {
+		return 0, nil, nil, fmt.Errorf("longitude must be between -180 and 180")
+	}
+	return s.repo.BulkSetGPS(ctx, imageIDs, lat, lng)
+}
+
+// ClearGPS removes GPS coordinates, map URL, and region from one image.
+func (s *ImageService) ClearGPS(ctx context.Context, id int64) (bool, error) {
+	return s.repo.ClearGPSOnMediaItem(ctx, id)
+}
+
 // UpdateTagsMerge appends comma-separated tags into existing media_items.tags (see repository.UpdateTags).
 // Tags already on the image (case-insensitive) are not appended again.
 // Does not refresh sqlite-vec tag embeddings; run the tag-embedding backfill job when needed.

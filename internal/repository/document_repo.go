@@ -90,10 +90,12 @@ func (r *DocumentRepo) List(ctx context.Context, search, category, tag, contentT
 	return out, rows.Err()
 }
 
-// CountAvailableForAI returns how many reference documents are enabled for the AI task (non-sensitive), user-scoped.
+// CountAvailableForAI returns non-sensitive reference documents exposed to the AI: either listed
+// via tools (available_for_task, not system-prompt inlined) or inlined in the system prompt.
 func (r *DocumentRepo) CountAvailableForAI(ctx context.Context) (int64, error) {
 	uid := uidFromCtx(ctx)
-	q := `SELECT COUNT(*) FROM reference_documents WHERE available_for_task = TRUE AND NOT include_in_system_prompt AND is_sensitive = FALSE`
+	q := `SELECT COUNT(*) FROM reference_documents WHERE is_sensitive = FALSE
+	      AND (available_for_task = TRUE OR include_in_system_prompt = TRUE)`
 	args := []any{}
 	q, args = addUIDFilter(q, args, uid)
 	var n int64

@@ -788,27 +788,21 @@ Modals.Artefacts = (() => {
         const fileBtn = document.getElementById('artefact-add-photo-file-btn');
         if (fileBtn) {
             fileBtn.addEventListener('click', async () => {
-                if (!window.electronAPI || typeof window.electronAPI.showOpenDialog !== 'function') {
-                    await AppDialogs.showAppAlert('Import unavailable', 'Native file import is only available in the desktop app.');
-                    return;
-                }
+                fileBtn.disabled = true;
                 try {
-                    const result = await window.electronAPI.showOpenDialog({
-                        properties: ['openFile'],
-                        filters: [
-                            { name: 'Supported files', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic', 'heif', 'pdf', 'txt', 'md', 'markdown'] },
-                            { name: 'All files', extensions: ['*'] }
-                        ]
-                    });
-                    if (!result || result.canceled || !Array.isArray(result.filePaths) || result.filePaths.length === 0) {
-                        return;
+                    const res = await fetch('/api/pick-file', { method: 'POST', credentials: 'same-origin' });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        throw new Error(data.error || 'Could not open file picker.');
                     }
-                    const selectedPath = result.filePaths[0];
+                    const selectedPath = (data.path || '').trim();
                     if (!selectedPath) return;
                     await _handleFileImport(selectedPath);
                 } catch (err) {
                     console.error('Error selecting import file:', err);
                     await AppDialogs.showAppAlert('Error', `Could not open file picker: ${err.message || String(err)}`);
+                } finally {
+                    fileBtn.disabled = false;
                 }
             });
         }

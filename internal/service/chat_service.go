@@ -390,7 +390,7 @@ func (s *ChatService) buildChatTools(ctx context.Context, r *http.Request, subje
 	return wrapped, &filtered
 }
 
-// ChatContextStatus returns the number of LLM tools offered for this request (policy + unlock tier) and reference documents available for task.
+// ChatContextStatus returns the number of LLM tools offered for this request (policy + unlock tier) and reference documents enabled for the AI (task tools and/or system prompt).
 func (s *ChatService) ChatContextStatus(ctx context.Context, r *http.Request) (toolCount int, refDocCount int64, err error) {
 	_, decls := s.buildChatTools(ctx, r, "")
 	if decls != nil {

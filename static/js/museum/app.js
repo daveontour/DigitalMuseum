@@ -2209,6 +2209,8 @@ const App = (() => {
                 reference_import: 'Reference Images',
                 image_regions_recalc: 'Image Regions',
                 media_classification_tag_qa: 'Classification Tag QA',
+                media_gps_duplicate_spread: 'Spread Duplicate GPS',
+                image_metadata_json_export: 'Export Metadata JSON',
                 email_embeddings: 'Optimise Emails',
                 message_embeddings: 'Message Embeddings',
                 message_context_embeddings: 'Message Context Embeddings',
@@ -2578,6 +2580,8 @@ const App = (() => {
             reference_import: '/images/import-reference/cancel',
             image_regions_recalc: '/images/recalculate-regions/cancel',
             media_classification_tag_qa: '/images/classification-tag-qa/cancel',
+            media_gps_duplicate_spread: '/images/gps-duplicate-spread/cancel',
+            image_metadata_json_export: '/images/metadata-json-export/cancel',
             email_embeddings: '/emails/embeddings/backfill/cancel',
             message_embeddings: '/messages/embeddings/backfill/cancel',
             message_context_embeddings: '/messages/context-embeddings/backfill/cancel',
@@ -2774,6 +2778,10 @@ const App = (() => {
                     return `Item: ${data.processed || 0}/${data.total || 0} | ${data.updated || 0} updated`;
                 case 'media_classification_tag_qa':
                     return `Item: ${data.processed || 0}/${data.total || 0} | ${data.reflagged || 0} re-flagged | ${data.errors || 0} errors`;
+                case 'media_gps_duplicate_spread':
+                    return `Group: ${data.processed || 0}/${data.total || 0} | ${data.updated || 0} images | ${data.errors || 0} errors`;
+                case 'image_metadata_json_export':
+                    return `Item: ${data.processed || 0}/${data.total || 0} | ${data.exported || 0} exported | ${data.errors || 0} errors`;
                 case 'email_embeddings':
                     return `Email: ${data.processed || 0}/${data.total || 0} | ${data.embedded || 0} embedded, ${data.skipped || 0} skipped | ${data.errors || 0} errors`;
                 case 'message_embeddings':
@@ -2888,6 +2896,8 @@ const App = (() => {
             reference_import: { needsInput: false, title: 'Import Reference Images to Database', run: async () => { const r = await fetch('/images/import-reference', { method: 'POST' }); return r; }, stream: '/images/import-reference/stream' },
             image_regions_recalc: { needsInput: false, title: 'Recalculate Image Regions', run: async () => { const r = await fetch('/images/recalculate-regions', { method: 'POST' }); return r; }, stream: '/images/recalculate-regions/stream' },
             media_classification_tag_qa: { needsInput: false, title: 'QA Check Image Classification Tags', run: async () => { const r = await fetch('/images/classification-tag-qa', { method: 'POST' }); return r; }, stream: '/images/classification-tag-qa/stream' },
+            media_gps_duplicate_spread: { needsInput: false, title: 'Spread Duplicate GPS Coordinates', run: async () => { const r = await fetch('/images/gps-duplicate-spread', { method: 'POST' }); return r; }, stream: '/images/gps-duplicate-spread/stream' },
+            image_metadata_json_export: { needsInput: true, title: 'Export Image Metadata JSON', fields: [{ id: 'output_path', key: 'image_metadata_export_path', label: 'Output JSON file path', placeholder: 'e.g., C:\\Users\\Dave\\Exports\\image-metadata.json', required: true }], run: async (vals) => { const r = await fetch('/images/metadata-json-export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ output_path: vals.output_path }) }); return r; }, stream: '/images/metadata-json-export/stream' },
             email_embeddings: { needsInput: false, title: 'Optimise Emails for Searching', run: async () => { const r = await fetch('/emails/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/emails/embeddings/backfill/stream' },
             message_embeddings: { needsInput: false, title: 'Generate missing message embedding vectors', run: async () => { const r = await fetch('/messages/embeddings/backfill', { method: 'POST' }); return r; }, stream: '/messages/embeddings/backfill/stream' },
             message_context_embeddings: { needsInput: false, title: 'Build message context embeddings', run: async () => { const r = await fetch('/messages/context-embeddings/backfill', { method: 'POST' }); return r; }, stream: '/messages/context-embeddings/backfill/stream' },
@@ -3883,7 +3893,7 @@ const App = (() => {
         })();
 
         async function checkInitialImportStatus() {
-            const types = ['upload_zip','email_processing','imap_processing','filesystem','reference_import','image_regions_recalc','media_classification_tag_qa','email_embeddings','message_embeddings','message_context_embeddings','image_tag_embeddings','artefact_embeddings','facebook_post_text_embeddings','facebook_album_description_embeddings','image_export','thumbnails','contacts','image_ai_gemma_unclassified'];
+            const types = ['upload_zip','email_processing','imap_processing','filesystem','reference_import','image_regions_recalc','media_classification_tag_qa','media_gps_duplicate_spread','image_metadata_json_export','email_embeddings','message_embeddings','message_context_embeddings','image_tag_embeddings','artefact_embeddings','facebook_post_text_embeddings','facebook_album_description_embeddings','image_export','thumbnails','contacts','image_ai_gemma_unclassified'];
             const statusEndpoints = {
                 upload_zip: '/import/upload/status',
                 email_processing: '/gmail/process/status',
@@ -3892,6 +3902,8 @@ const App = (() => {
                 reference_import: '/images/import-reference/status',
                 image_regions_recalc: '/images/recalculate-regions/status',
                 media_classification_tag_qa: '/images/classification-tag-qa/status',
+                media_gps_duplicate_spread: '/images/gps-duplicate-spread/status',
+                image_metadata_json_export: '/images/metadata-json-export/status',
                 email_embeddings: '/emails/embeddings/backfill/status',
                 message_embeddings: '/messages/embeddings/backfill/status',
                 message_context_embeddings: '/messages/context-embeddings/backfill/status',

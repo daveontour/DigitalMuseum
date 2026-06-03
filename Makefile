@@ -1,4 +1,4 @@
-.PHONY: check-go build build-exe build-exe-electron build-linux build-launcher test generate lint run clean tidy sqlitevec-demo sqlitevec-demo-seed message-search-cli
+.PHONY: check-go build build-exe build-exe-electron build-linux build-launcher test generate lint run clean tidy sqlitevec-demo sqlitevec-demo-seed message-search-cli image-tag-sync
 
 MODULE := github.com/daveontour/aimuseum
 BINARY := digitalmuseum
@@ -120,3 +120,8 @@ sqlitevec-demo-seed: check-go
 # make message-search-cli QUERY="text to search" N=5
 message-search-cli: check-go
 	go run ./cmd/message-search-cli -q "$(if $(QUERY),$(QUERY),family and photos)" -n "$(if $(N),$(N),5)"
+
+# Write archive tags onto exported images via bundled ExifTool. Usage:
+# make image-tag-sync JSON=export.json DIR=C:/Photos/export
+image-tag-sync: check-go
+	go run ./cmd/image-tag-sync -json "$(if $(JSON),$(JSON),)" -dir "$(if $(DIR),$(DIR),)"

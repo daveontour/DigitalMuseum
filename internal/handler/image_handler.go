@@ -167,6 +167,7 @@ func (h *ImageHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/images/regions", h.GetImageRegions)
 	r.Post("/images/locations/nearby", h.GetNearbyLocations)
 	r.Put("/images/bulk-update", h.BulkUpdate)
+	r.Put("/images/bulk-set-gps", h.BulkSetGPS)
 	r.Delete("/images/bulk-delete", h.BulkDelete)
 	r.Delete("/images", h.DeleteByRange)
 
@@ -174,6 +175,7 @@ func (h *ImageHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/images/{image_id}/thumbnail", h.GetThumbnail)
 	r.Get("/images/{image_id}", h.GetContent)
 	r.Put("/images/{image_id}", h.UpdateMetadata)
+	r.Delete("/images/{image_id}/gps", h.ClearGPS)
 	r.Delete("/images/{image_id}", h.Delete)
 
 	// Location map endpoints
@@ -744,6 +746,62 @@ func (h *ImageHandler) BulkUpdate(w http.ResponseWriter, r *http.Request) {
 		resp["errors"] = errs
 	}
 	writeJSON(w, resp)
+}
+
+func (h *ImageHandler) BulkSetGPS(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlock(w, r, h.sessionStore) {
+		return
+	}
+	var req model.BulkSetGPSRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	updated, skipped, updates, err := h.svc.BulkSetGPS(r.Context(), req.ImageIDs, req.Latitude, req.Longitude)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	msg := fmt.Sprintf("Updated GPS on %d image(s)", updated)
+	if updated > 1 {
+		msg += " (placed on a 100 m circle around the picked point)"
+	}
+	if len(skipped) > 0 {
+		msg += fmt.Sprintf("; skipped %d with existing GPS or not found", len(skipped))
+	}
+	if updates == nil {
+		updates = []model.BulkGPSUpdate{}
+	}
+	writeJSON(w, map[string]any{
+		"message":        msg,
+		"updated_count":  updated,
+		"skipped_count":  len(skipped),
+		"skipped_ids":    skipped,
+		"updates":        updates,
+	})
+}
+
+func (h *ImageHandler) ClearGPS(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlock(w, r, h.sessionStore) {
+		return
+	}
+	id, ok := parseImageID(w, r, "image_id")
+	if !ok {
+		return
+	}
+	cleared, err := h.svc.ClearGPS(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !cleared {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("Image with ID %d not found", id))
+		return
+	}
+	writeJSON(w, map[string]any{
+		"message":  fmt.Sprintf("GPS info removed from image %d", id),
+		"image_id": id,
+	})
 }
 
 // ImageAIClassificationStart starts a background stub job that processes the given image IDs.

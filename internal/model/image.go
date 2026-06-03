@@ -149,6 +149,20 @@ type NearbyLocationsRequest struct {
 	Limit     int     `json:"limit"`
 }
 
+// BulkSetGPSRequest is the body for PUT /images/bulk-set-gps.
+type BulkSetGPSRequest struct {
+	ImageIDs  []int64 `json:"image_ids"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
+// BulkGPSUpdate is one image row updated by bulk-set-gps (coordinates may be offset on a circle).
+type BulkGPSUpdate struct {
+	ID        int64   `json:"id"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
 // NearbyLocationItem is one GPS-tagged image within a radius search.
 type NearbyLocationItem struct {
 	LocationItem
@@ -173,6 +187,18 @@ type LocationItem struct {
 	MediaType       *string            `json:"media_type"`
 	Source          *string            `json:"source"`
 	SourceReference *string            `json:"source_reference"`
+}
+
+// ImageMetadataJSONRecord is one row in the image metadata JSON export file.
+type ImageMetadataJSONRecord struct {
+	ID              int64    `json:"id"`
+	SourceReference *string  `json:"source_reference"`
+	Source          *string  `json:"source"`
+	Latitude        *float64 `json:"latitude"`
+	Longitude       *float64 `json:"longitude"`
+	HasGPS          bool     `json:"has_gps"`
+	GoogleMapsURL   *string  `json:"google_maps_url"`
+	Tags            *string  `json:"tags"`
 }
 
 // FacebookAlbumResponse is the shape returned by GET /facebook/albums.

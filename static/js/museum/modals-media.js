@@ -608,10 +608,23 @@ Modals.NewImageGallery = (() => {
                 DOM.newImageGalleryRatingMin,
                 DOM.newImageGalleryRatingMax,
                 DOM.newImageGalleryHasGps,
-                DOM.newImageGalleryHasThumbnail,
+                DOM.newImageGalleryNoGps,
                 DOM.newImageGalleryAIClassified,
                 DOM.newImageGalleryAIUnclassified
             ];
+
+            if (DOM.newImageGalleryHasGps && DOM.newImageGalleryNoGps) {
+                DOM.newImageGalleryHasGps.addEventListener('change', () => {
+                    if (DOM.newImageGalleryHasGps.checked) {
+                        DOM.newImageGalleryNoGps.checked = false;
+                    }
+                });
+                DOM.newImageGalleryNoGps.addEventListener('change', () => {
+                    if (DOM.newImageGalleryNoGps.checked) {
+                        DOM.newImageGalleryHasGps.checked = false;
+                    }
+                });
+            }
 
             filterInputs.forEach(input => {
                 if (input) {
@@ -653,6 +666,28 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryAIClassificationBtn) {
                 DOM.newImageGalleryAIClassificationBtn.addEventListener('click', async () => {
                     await _startAIClassificationForSelected();
+                });
+            }
+
+            if (DOM.newImageGallerySetGpsBtn) {
+                DOM.newImageGallerySetGpsBtn.addEventListener('click', () => {
+                    Modals.BulkGpsPicker.open(Array.from(selectedImageIds), {
+                        getImageById: (id) => imageData.find((img) => img.id === id),
+                        onSuccess: (result) => {
+                            const updates = Array.isArray(result.updates) ? result.updates : [];
+                            updates.forEach((u) => {
+                                const img = imageData.find((im) => im.id === u.id);
+                                if (!img) return;
+                                img.latitude = u.latitude;
+                                img.longitude = u.longitude;
+                                img.has_gps = true;
+                            });
+                            _renderThumbnailGrid();
+                            _updateSelectionUI();
+                            const msg = result.message || `Updated ${result.updated_count} image(s).`;
+                            void AppDialogs.showAppAlert('Set location', msg);
+                        }
+                    });
                 });
             }
             
@@ -785,7 +820,7 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryRatingMin) DOM.newImageGalleryRatingMin.value = '';
             if (DOM.newImageGalleryRatingMax) DOM.newImageGalleryRatingMax.value = '';
             if (DOM.newImageGalleryHasGps) DOM.newImageGalleryHasGps.checked = false;
-            if (DOM.newImageGalleryHasThumbnail) DOM.newImageGalleryHasThumbnail.checked = false;
+            if (DOM.newImageGalleryNoGps) DOM.newImageGalleryNoGps.checked = false;
             if (DOM.newImageGalleryAIClassified) DOM.newImageGalleryAIClassified.checked = false;
             if (DOM.newImageGalleryAIUnclassified) DOM.newImageGalleryAIUnclassified.checked = false;
         }
@@ -1115,8 +1150,8 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryHasGps && DOM.newImageGalleryHasGps.checked) {
                 params.append('has_gps', 'true');
             }
-            if (DOM.newImageGalleryHasThumbnail && DOM.newImageGalleryHasThumbnail.checked) {
-                params.append('has_thumbnail', 'true');
+            if (DOM.newImageGalleryNoGps && DOM.newImageGalleryNoGps.checked) {
+                params.append('has_gps', 'false');
             }
             if (DOM.newImageGalleryAIClassified && DOM.newImageGalleryAIClassified.checked) {
                 params.append('ai_classified', 'true');
@@ -1180,7 +1215,6 @@ Modals.NewImageGallery = (() => {
                 (DOM.newImageGalleryRatingMin && DOM.newImageGalleryRatingMin.value) ||
                 (DOM.newImageGalleryRatingMax && DOM.newImageGalleryRatingMax.value) ||
                 (DOM.newImageGalleryHasGps && DOM.newImageGalleryHasGps.checked) ||
-                (DOM.newImageGalleryHasThumbnail && DOM.newImageGalleryHasThumbnail.checked) ||
                 (DOM.newImageGalleryAIClassified && DOM.newImageGalleryAIClassified.checked) ||
                 (DOM.newImageGalleryAIUnclassified && DOM.newImageGalleryAIUnclassified.checked)
             );
@@ -1368,6 +1402,13 @@ Modals.NewImageGallery = (() => {
                         imageData[imageIndex].description = updateData.description;
                         imageData[imageIndex].tags = updateData.tags;
                         imageData[imageIndex].rating = updateData.rating;
+                        if (updateData && updateData.cleared_gps) {
+                            imageData[imageIndex].has_gps = false;
+                            imageData[imageIndex].latitude = null;
+                            imageData[imageIndex].longitude = null;
+                            imageData[imageIndex].region = null;
+                            imageData[imageIndex].google_maps_url = null;
+                        }
                     }
                 },
                 onDelete: (deletedImage) => {
@@ -1405,6 +1446,10 @@ Modals.NewImageGallery = (() => {
 
             if (DOM.newImageGalleryAIClassificationBtn) {
                 DOM.newImageGalleryAIClassificationBtn.disabled = selectedImageIds.size === 0;
+            }
+
+            if (DOM.newImageGallerySetGpsBtn) {
+                DOM.newImageGallerySetGpsBtn.disabled = selectedImageIds.size === 0;
             }
 
             if (DOM.newImageGalleryClearSelectionBtn) {
@@ -1878,6 +1923,43 @@ Modals.ImageDetailModal = (() => {
             }
         }
 
+        async function removeGpsInfo() {
+            if (!currentImageInModal) return;
+
+            const okRemove = await AppDialogs.showAppConfirm(
+                'Remove GPS info',
+                'Remove latitude, longitude, region, and Google Maps link for this image?',
+                { danger: true }
+            );
+            if (!okRemove) return;
+
+            const imageId = currentImageInModal.id;
+            try {
+                const response = await fetch(`/images/${imageId}/gps`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                currentImageInModal.has_gps = false;
+                currentImageInModal.latitude = null;
+                currentImageInModal.longitude = null;
+                currentImageInModal.google_maps_url = null;
+                currentImageInModal.region = null;
+
+                DOM.newImageDetailRegion.textContent = 'N/A';
+                DOM.newImageDetailGps.innerHTML = '';
+                DOM.newImageDetailGpsRow.style.display = 'none';
+
+                if (onSaveCallback) {
+                    onSaveCallback(currentImageInModal, { cleared_gps: true });
+                }
+            } catch (error) {
+                console.error('Error removing GPS info:', error);
+                await AppDialogs.showAppAlert('Error', `Error removing GPS info: ${error.message}`);
+            }
+        }
+
         async function deleteImage() {
             if (!currentImageInModal) return;
             
@@ -2123,6 +2205,16 @@ Modals.ImageDetailModal = (() => {
                         }
                         Modals.NearbyLocations.open(image.latitude, image.longitude, radiusKm, image.id);
                     };
+
+                    const removeGpsButton = document.createElement('button');
+                    removeGpsButton.type = 'button';
+                    removeGpsButton.className = 'modal-btn image-detail-gps-btn image-detail-gps-btn--remove';
+                    removeGpsButton.innerHTML = '<i class="fas fa-eraser"></i> Remove GPS Info';
+                    removeGpsButton.onclick = async function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        await removeGpsInfo();
+                    };
                     
                     // Clear existing content and add coordinates and buttons
                     DOM.newImageDetailGps.innerHTML = '';
@@ -2133,8 +2225,12 @@ Modals.ImageDetailModal = (() => {
                     actionsWrap.className = 'image-detail-gps-actions';
                     actionsWrap.appendChild(openMapsButton);
                     actionsWrap.appendChild(findNearbyButton);
+                    const removeActionsWrap = document.createElement('div');
+                    removeActionsWrap.className = 'image-detail-gps-actions image-detail-gps-actions--remove';
+                    removeActionsWrap.appendChild(removeGpsButton);
                     DOM.newImageDetailGps.appendChild(coordsSpan);
                     DOM.newImageDetailGps.appendChild(actionsWrap);
+                    DOM.newImageDetailGps.appendChild(removeActionsWrap);
                 } else {
                     DOM.newImageDetailGps.textContent = 'GPS data available';
                 }
@@ -2662,6 +2758,221 @@ Modals.SingleImageDisplay = (() => {
         }
 
         return { init, showSingleImageModal};
+})();
+
+
+Modals.BulkGpsPicker = (() => {
+        const SESSION_KEY = 'dm_bulk_gps_last';
+        let map = null;
+        let marker = null;
+        let markerIcon = null;
+        let mapInitialized = false;
+        let pendingEligibleIds = [];
+        let pendingOptions = null;
+        let pickedLat = null;
+        let pickedLng = null;
+
+        function _imageWithoutGps(img) {
+            if (!img) return false;
+            if (img.has_gps) return false;
+            if (img.latitude != null && img.longitude != null) return false;
+            return true;
+        }
+
+        function _eligibleIds(imageIds, getImageById) {
+            const out = [];
+            const seen = new Set();
+            imageIds.forEach((id) => {
+                if (seen.has(id)) return;
+                seen.add(id);
+                const img = getImageById(id);
+                if (_imageWithoutGps(img)) {
+                    out.push(id);
+                }
+            });
+            return out;
+        }
+
+        function _updateCoordDisplay() {
+            if (DOM.bulkGpsPickLat) {
+                DOM.bulkGpsPickLat.textContent = pickedLat != null ? pickedLat.toFixed(6) : '—';
+            }
+            if (DOM.bulkGpsPickLng) {
+                DOM.bulkGpsPickLng.textContent = pickedLng != null ? pickedLng.toFixed(6) : '—';
+            }
+        }
+
+        function _placeMarker(lat, lng) {
+            pickedLat = lat;
+            pickedLng = lng;
+            _updateCoordDisplay();
+            if (!map) return;
+            if (marker) {
+                marker.setLatLng([lat, lng]);
+            } else {
+                marker = L.marker([lat, lng], { draggable: true, icon: markerIcon }).addTo(map);
+                marker.on('dragend', () => {
+                    const p = marker.getLatLng();
+                    _placeMarker(p.lat, p.lng);
+                });
+            }
+        }
+
+        function _ensureMap() {
+            if (!DOM.bulkGpsPickMap || typeof L === 'undefined') return;
+            if (mapInitialized) {
+                setTimeout(() => {
+                    if (map) map.invalidateSize();
+                }, 150);
+                return;
+            }
+            map = L.map(DOM.bulkGpsPickMap, { minZoom: 1, maxZoom: 19 });
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+            markerIcon = L.icon({
+                iconUrl: '/static/images/marker-dark-blue.png',
+                iconSize: [25, 35],
+                iconAnchor: [12, 32],
+                popupAnchor: [0, -32]
+            });
+            map.on('click', (e) => {
+                _placeMarker(e.latlng.lat, e.latlng.lng);
+            });
+            mapInitialized = true;
+        }
+
+        function close() {
+            if (DOM.bulkGpsPickModal) {
+                Modals._closeModal(DOM.bulkGpsPickModal);
+            }
+        }
+
+        function open(imageIds, options) {
+            if (!DOM.bulkGpsPickModal || typeof L === 'undefined') {
+                void AppDialogs.showAppAlert('Set location', 'Map library is not available.');
+                return;
+            }
+            const getImageById = options && options.getImageById;
+            if (!getImageById) return;
+
+            const eligible = _eligibleIds(imageIds, getImageById);
+            const skippedInSelection = imageIds.length - eligible.length;
+            if (eligible.length === 0) {
+                void AppDialogs.showAppAlert('Set location', 'No selected images without GPS can be updated.');
+                return;
+            }
+
+            pendingEligibleIds = eligible;
+            pendingOptions = options;
+
+            if (DOM.bulkGpsPickTitle) {
+                DOM.bulkGpsPickTitle.innerHTML = `<i class="fas fa-map-marker-alt"></i> Set GPS for ${eligible.length} image(s)`;
+            }
+            if (DOM.bulkGpsPickSkippedNote) {
+                if (skippedInSelection > 0) {
+                    DOM.bulkGpsPickSkippedNote.textContent =
+                        `${skippedInSelection} selected image(s) already have GPS and will be skipped.`;
+                    DOM.bulkGpsPickSkippedNote.style.display = 'block';
+                } else {
+                    DOM.bulkGpsPickSkippedNote.style.display = 'none';
+                }
+            }
+
+            pickedLat = null;
+            pickedLng = null;
+            _updateCoordDisplay();
+            if (marker && map) {
+                map.removeLayer(marker);
+                marker = null;
+            }
+
+            Modals._openModal(DOM.bulkGpsPickModal);
+            _ensureMap();
+
+            let lat = 20;
+            let lng = 0;
+            let zoom = 2;
+            try {
+                const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+                if (saved && typeof saved.lat === 'number' && typeof saved.lng === 'number') {
+                    lat = saved.lat;
+                    lng = saved.lng;
+                    zoom = saved.zoom || 10;
+                    _placeMarker(lat, lng);
+                }
+            } catch (_) { /* ignore */ }
+            if (map) {
+                map.setView([lat, lng], zoom);
+            }
+        }
+
+        async function _apply() {
+            if (pickedLat == null || pickedLng == null) {
+                await AppDialogs.showAppAlert('Set location', 'Click the map to choose a location first.');
+                return;
+            }
+            const btn = DOM.bulkGpsPickApplyBtn;
+            const originalHTML = btn ? btn.innerHTML : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying…';
+            }
+            try {
+                const response = await fetch('/images/bulk-set-gps', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        image_ids: pendingEligibleIds,
+                        latitude: pickedLat,
+                        longitude: pickedLng
+                    })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(result.detail || result.error || `HTTP ${response.status}`);
+                }
+                try {
+                    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+                        lat: pickedLat,
+                        lng: pickedLng,
+                        zoom: map ? map.getZoom() : 10
+                    }));
+                } catch (_) { /* ignore */ }
+                if (pendingOptions && pendingOptions.onSuccess) {
+                    pendingOptions.onSuccess(result);
+                }
+                close();
+            } catch (e) {
+                console.error('bulk-set-gps failed:', e);
+                await AppDialogs.showAppAlert('Set location', e.message || 'Request failed.');
+            } finally {
+                if (btn && originalHTML !== null) {
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        function init() {
+            if (!DOM.bulkGpsPickModal) return;
+            if (DOM.closeBulkGpsPickModalBtn) {
+                DOM.closeBulkGpsPickModalBtn.addEventListener('click', close);
+            }
+            if (DOM.bulkGpsPickCancelBtn) {
+                DOM.bulkGpsPickCancelBtn.addEventListener('click', close);
+            }
+            if (DOM.bulkGpsPickApplyBtn) {
+                DOM.bulkGpsPickApplyBtn.addEventListener('click', () => { void _apply(); });
+            }
+            DOM.bulkGpsPickModal.addEventListener('click', (e) => {
+                if (e.target === DOM.bulkGpsPickModal) close();
+            });
+        }
+
+        return { init, open, close };
 })();
 
 

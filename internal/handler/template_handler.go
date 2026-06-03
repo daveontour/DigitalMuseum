@@ -173,6 +173,18 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 	} else {
 		extras["static_modals_comms_js_cache_bust"] = "0"
 	}
+	// Bust cache for modals-media.js (image detail modal, GPS actions, gallery).
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "modals-media.js")); err == nil {
+		extras["static_modals_media_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		extras["static_modals_media_js_cache_bust"] = "0"
+	}
+	// Bust cache for modals-artefacts.js (artefact gallery, native file import).
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "modals-artefacts.js")); err == nil {
+		extras["static_modals_artefacts_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		extras["static_modals_artefacts_js_cache_bust"] = "0"
+	}
 	// Bust cache for museum_of.css and images-grid.js (Email Attachments layout lives here).
 	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "css", "museum_of.css")); err == nil {
 		extras["static_museum_css_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
