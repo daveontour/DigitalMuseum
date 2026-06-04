@@ -155,9 +155,8 @@ body {
     box-sizing: border-box;
 }
 
-/* Electron Window Controls Overlay: draggable title bar strip (inert in normal browsers) */
-body::before {
-    content: '';
+/* Electron Window Controls Overlay: draggable title bar strip */
+#electron-titlebar {
     position: fixed;
     top: env(titlebar-area-y, 0);
     left: env(titlebar-area-x, 0);
@@ -166,6 +165,14 @@ body::before {
     background: #1a2540;
     -webkit-app-region: drag;
     z-index: 2147483646;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    overflow: hidden;
+    color: #8fa4c8;
+    font-size: var(--text-xs);
+    user-select: none;
 }
 
 .app-container {

@@ -5331,6 +5331,13 @@ const App = (() => {
     }
 
     async function init() {
+        if (window.electronAPI && typeof window.electronAPI.getAppInfo === 'function') {
+            window.electronAPI.getAppInfo().then(info => {
+                const el = document.getElementById('electron-titlebar-text');
+                if (el && info) el.textContent = `${info.description}  v${info.version}`;
+            }).catch(() => {});
+        }
+
         // Info box modal: set up close first (before other inits that might throw)
         window.closeInfoBoxModal = function(options = {}) {
             const modal = document.getElementById('info-box-modal');

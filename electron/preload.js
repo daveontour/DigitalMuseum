@@ -22,4 +22,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getProfileDbPath: (id)   => ipcRenderer.invoke('get-profile-db-path', id),
   getAdminDataDir:  ()     => ipcRenderer.invoke('get-admin-data-dir'),
   suggestArchiveDbPath: (name) => ipcRenderer.invoke('suggest-archive-db-path', name),
+  getAppInfo:          ()     => ipcRenderer.invoke('get-app-info'),
 });

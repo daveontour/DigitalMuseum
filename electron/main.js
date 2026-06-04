@@ -555,7 +555,7 @@ function createLoadingWindow() {
 function createMainWindow(port) {
   mainWindow = new BrowserWindow({
     width: 1680,
-    height: 1080,
+    height: 1000,
     show: false,
     title: 'Digital Museum',
     frame: false,
@@ -795,6 +795,8 @@ app.on('window-all-closed', () => {
   // On Windows/Linux, keep running in tray instead of quitting
   // (macOS convention would be different but this is a Windows-first app)
 });
+
+ipcMain.handle('get-app-info', () => ({ version: app.getVersion(), name:app.getName(),description: app.getName() }));
 
 // ── File / directory picker (used by import dialogs) ─────────────────────────
 ipcMain.handle('show-open-dialog', (_event, options) => dialog.showOpenDialog(options));
