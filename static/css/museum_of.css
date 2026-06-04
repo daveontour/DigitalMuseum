@@ -152,7 +152,6 @@ body {
     display: flex;
     height: 100vh;
     overflow: hidden; /* Prevent body scrolling */
-    padding-top: env(titlebar-area-height, 0px);
     box-sizing: border-box;
 }
 
@@ -169,20 +168,13 @@ body::before {
     z-index: 2147483646;
 }
 
-.top-bar button,
-.top-bar select,
-.top-bar input,
-.top-bar a,
-.top-bar label,
-.top-bar .voice-selector {
-    -webkit-app-region: no-drag;
-}
-
 .app-container {
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: 100%;
+    height: 100vh;
+    padding-top: env(titlebar-area-height, 0px);
+    box-sizing: border-box;
 }
 
 /* --- Top Bar --- */
@@ -195,6 +187,15 @@ body::before {
     border-bottom: 1px solid rgba(255, 255, 255, 0.15);
     box-sizing: border-box;
     -webkit-app-region: drag;
+}
+
+.top-bar button,
+.top-bar select,
+.top-bar input,
+.top-bar a,
+.top-bar label,
+.top-bar .voice-selector {
+    -webkit-app-region: no-drag;
 }
 
 .top-bar-title {
@@ -5610,6 +5611,13 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     justify-content: center;
     align-items: center;
     overflow-y: auto; /* For modals taller than viewport */
+    -webkit-app-region: no-drag;
+}
+
+.modal *,
+.modal *::before,
+.modal *::after {
+    -webkit-app-region: no-drag;
 }
 
 /* Info box modal is visible on load (welcome popup) */
@@ -5774,6 +5782,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     width: 90vw; /* Default width, can be overridden */
     max-width: 90vw; /* Default max-width */
     animation: modal-telescope 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+    transform: none;
 }
 
 .modal-close-btn { /* General close button for modals */
@@ -5819,6 +5828,15 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     top: auto !important;
     right: auto !important;
     transition: color 0.2s;
+    -webkit-app-region: no-drag;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0;
+    line-height: 1;
 }
 .modal-header .modal-close-btn:hover {
     color: var(--color-text) !important;
@@ -6004,8 +6022,8 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 @keyframes modal-telescope {
-    0% { transform: scale(0.65); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+    0% { opacity: 0; }
+    100% { opacity: 1; }
 }
 
 
@@ -6550,7 +6568,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 
     /* Example for modals on small screens if needed */
     .modal-content {
-        max-height: 95vh; /* Allow more height on smaller screens */
+        max-height: 90vh; /* Allow more height on smaller screens */
         width: 95vw;
     }
     #fb-albums-modal .modal-content { /* Specific small screen adjustments */
@@ -9039,7 +9057,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     width: 95vw;
     max-width: 1400px;
     max-height: 95vh;
-    height: 95vh;
+    height: 85vh;
     display: flex;
     flex-direction: column;
     padding: 0;
@@ -9092,13 +9110,31 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     padding-bottom: 0.5em;
 }
 
+.image-detail-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4em;
+    margin-bottom: 1em;
+}
+
+.image-detail-toolbar-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4em;
+    width: 100%;
+}
+
 .image-detail-toolbar-btn {
     padding: 0.3em 0.8em;
     font-size: var(--text-sm);
     white-space: nowrap;
     margin-left: 0;
+    width: 100%;
+    box-sizing: border-box;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.35em;
 }
 
@@ -10013,7 +10049,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     box-shadow: none;
     padding: 0;
     max-width: 95vw;
-    max-height: 95vh;
+    max-height: 85vh;
     width: auto;
     height: auto;
 }
@@ -10112,7 +10148,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 @media (max-width: 768px) {
     .single-image-container {
         max-width: 95vw;
-        max-height: 95vh;
+        max-height: 85vh;
         padding: 0.5em;
     }
     
@@ -11629,8 +11665,8 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 .relationships-modal-content {
     width: 95vw;
     max-width: 95vw;
-    max-height: 95vh;
-    height: 95vh;
+    max-height: 85vh;
+    height: 85vh;
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -12883,7 +12919,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     width: 70vw;
     height: 70vh;
     max-width: 95vw;
-    max-height: 95vh;
+    max-height: 85vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;

@@ -11,6 +11,8 @@ const ChatInactivityNudge = (() => {
     let scheduledSeconds = 0;
     let nudgeInFlight = false;
     let hadActiveTimer = false;
+    /** @type {Set<string>} */
+    const suppressionReasons = new Set();
 
     function log(...args) {
         console.log(LOG_PREFIX, ...args);
@@ -62,6 +64,30 @@ const ChatInactivityNudge = (() => {
         }
     }
 
+    function isSuppressed() {
+        return suppressionReasons.size > 0;
+    }
+
+    /** Pause inactivity nudges while another chat mode is active (Have a Chat, Interviewer, etc.). */
+    function setSuppressed(reason, suppressed) {
+        const key = String(reason || '').trim();
+        if (!key) return;
+        if (suppressed) {
+            if (!suppressionReasons.has(key)) {
+                suppressionReasons.add(key);
+                log('suppressed', { reason: key, active: [...suppressionReasons] });
+            }
+            clearTimer(`suppressed:${key}`);
+            return;
+        }
+        if (suppressionReasons.delete(key)) {
+            log('suppression cleared', { reason: key, active: [...suppressionReasons] });
+        }
+        if (!isSuppressed() && settings.enabled && !document.hidden) {
+            scheduleTimer(`${key}_ended`);
+        }
+    }
+
     function isChatBusy() {
         return typeof App !== 'undefined'
             && App.isChatRequestInFlight
@@ -70,8 +96,8 @@ const ChatInactivityNudge = (() => {
 
     function canSchedule() {
         if (!settings.enabled) return false;
+        if (isSuppressed()) return false;
         if (document.hidden) return false;
-        if (typeof InterviewerMode !== 'undefined' && InterviewerMode.isActive()) return false;
         if (isChatBusy()) return false;
         if (nudgeInFlight) return false;
         return true;
@@ -94,7 +120,8 @@ const ChatInactivityNudge = (() => {
             log('timer not scheduled: blocked by current state', {
                 reason,
                 hidden: document.hidden,
-                interviewerActive: typeof InterviewerMode !== 'undefined' && InterviewerMode.isActive(),
+                suppressed: isSuppressed(),
+                suppressionReasons: [...suppressionReasons],
                 chatBusy: isChatBusy(),
                 nudgeInFlight,
             });
@@ -119,7 +146,9 @@ const ChatInactivityNudge = (() => {
 
     async function onTimerExpired() {
         if (!canSchedule()) {
-            if (settings.enabled && !document.hidden) scheduleTimer('timer_expired_retry');
+            if (settings.enabled && !document.hidden && !isSuppressed()) {
+                scheduleTimer('timer_expired_retry');
+            }
             return;
         }
         await fireNudge();
@@ -219,7 +248,7 @@ const ChatInactivityNudge = (() => {
             }
             return;
         }
-        if (settings.enabled && hadActiveTimer) {
+        if (settings.enabled && hadActiveTimer && !isSuppressed()) {
             hadActiveTimer = false;
             scheduleTimer('visibility_resume');
         }
@@ -232,5 +261,5 @@ const ChatInactivityNudge = (() => {
         if (settings.enabled) scheduleTimer('app_load');
     }
 
-    return { init, onUserMessageSent, reloadSettings, clearTimer };
+    return { init, onUserMessageSent, reloadSettings, clearTimer, setSuppressed };
 })();

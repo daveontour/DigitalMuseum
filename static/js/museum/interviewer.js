@@ -443,6 +443,10 @@ const InterviewerMode = (() => {
         // Hide the loading indicator if visible
         const loadingEl = document.getElementById('loading-indicator');
         if (loadingEl) loadingEl.style.display = 'none';
+
+        if (typeof ChatInactivityNudge !== 'undefined' && ChatInactivityNudge.setSuppressed) {
+            ChatInactivityNudge.setSuppressed('interviewer', true);
+        }
     }
 
     function _exitInterviewMode() {
@@ -470,6 +474,10 @@ const InterviewerMode = (() => {
             input.placeholder = 'Enter your question or comment...';
         }
         _setControlsEnabled(true);
+
+        if (typeof ChatInactivityNudge !== 'undefined' && ChatInactivityNudge.setSuppressed) {
+            ChatInactivityNudge.setSuppressed('interviewer', false);
+        }
     }
 
     function _handleFormSubmit(e) {

@@ -3176,19 +3176,23 @@
                     </div>
                     <!-- Metadata Section -->
                     <div class="new-image-gallery-detail-metadata-section">
-                        <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1em; gap: 0.4em; flex-wrap: nowrap;">
+                        <div class="image-detail-toolbar">
+                            <div class="image-detail-toolbar-row">
                                 <button type="button" id="new-image-detail-find-similar-btn" class="modal-btn image-detail-toolbar-btn image-detail-toolbar-btn--similar" title="Search the gallery for images with similar tags (local AI)">
                                     <i class="fas fa-search"></i> Find Similar
                                 </button>
                                 <button type="button" id="new-image-detail-find-same-time-btn" class="modal-btn image-detail-toolbar-btn image-detail-toolbar-btn--same-time" title="Search the gallery for images created within +/- 1 week of this image's created date">
                                     <i class="fas fa-clock"></i> Find Same Time
                                 </button>
-                                <button id="new-image-gallery-save-btn" class="modal-btn modal-btn-primary" style="display:none; padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;" disabled>
+                            </div>
+                            <div class="image-detail-toolbar-row">
+                                <button id="new-image-gallery-save-btn" class="modal-btn modal-btn-primary image-detail-toolbar-btn" style="display:none;" disabled>
                                     <i class="fas fa-save"></i> Save Changes
                                 </button>
-                                <button id="new-image-gallery-delete-btn" class="modal-btn modal-btn-danger" style="display:none; padding:0.3em 0.8em; font-size:var(--text-sm); white-space:nowrap;">
+                                <button id="new-image-gallery-delete-btn" class="modal-btn modal-btn-danger image-detail-toolbar-btn" style="display:none;">
                                     <i class="fas fa-trash-alt"></i> Delete Image
                                 </button>
+                            </div>
                         </div>
                         <div class="new-image-gallery-detail-metadata-content">
                             <div class="new-image-gallery-detail-metadata-row">

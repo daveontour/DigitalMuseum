@@ -639,6 +639,10 @@ const HaveAChat = (() => {
         const firstLLMLabel = _llmDisplayName(firstLLM);
         _setStatus(`Starting — ${firstVoice} (${firstLLMLabel}) goes first…`);
 
+        if (typeof ChatInactivityNudge !== 'undefined' && ChatInactivityNudge.setSuppressed) {
+            ChatInactivityNudge.setSuppressed('have_a_chat', true);
+        }
+
         _loop();
     }
 
@@ -753,6 +757,9 @@ const HaveAChat = (() => {
         _disableChatForm(false);
         _setStatus('');
         _syncContextStatusBar();
+        if (typeof ChatInactivityNudge !== 'undefined' && ChatInactivityNudge.setSuppressed) {
+            ChatInactivityNudge.setSuppressed('have_a_chat', false);
+        }
         if (hadHistory) _openSavePromptAfterStop();
     }
 

@@ -37,7 +37,7 @@ extraResources:
     filter:
       - "**/*"
   - from: ../bin/exiftool
-    to: bin/Ollama
+    to: bin/exiftool
     filter:
       - "**/*"
   - from: ../templates
