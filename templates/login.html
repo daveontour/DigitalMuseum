@@ -19,6 +19,18 @@
             min-height: 100vh;
             background: #0d1117;
             font-family: inherit;
+            box-sizing: border-box;
+            padding-top: env(titlebar-area-height, 32px);
+        }
+        .titlebar-drag {
+            position: fixed;
+            top: env(titlebar-area-y, 0);
+            left: env(titlebar-area-x, 0);
+            width: env(titlebar-area-width, 100%);
+            height: env(titlebar-area-height, 32px);
+            background: #1a2540;
+            -webkit-app-region: drag;
+            z-index: 9999;
         }
 
         /* ── Step indicator ── */
@@ -191,11 +203,21 @@
         }
 
         #login-admin-login-btn {
-            position: fixed; top: 14px; right: 14px; z-index: 100;
-            padding: 8px 14px; border-radius: 6px; border: 1px solid #3d5278;
-            background: #1a2540; color: #cdd6e8; font-size: 0.88rem; font-weight: 600;
-            cursor: pointer; font-family: inherit;
+            position: fixed;
+            top: calc(env(titlebar-area-height, 0px) + 14px);
+            right: 14px;
+            z-index: 100;
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid #3d5278;
+            background: #1a2540;
+            color: #cdd6e8;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
             transition: background 0.15s, border-color 0.15s, color 0.15s;
+            -webkit-app-region: no-drag;
         }
         #login-admin-login-btn:hover { background: #243358; border-color: #3b82f6; color: #fff; }
 
@@ -206,6 +228,7 @@
     </style>
 </head>
 <body>
+    <div class="titlebar-drag" aria-hidden="true"></div>
     <button type="button" id="login-admin-login-btn" style="display:none;">Admin Login</button>
 
     <!-- First-run step indicator (shown by JS when HAS_REGISTERED_USER=false) -->

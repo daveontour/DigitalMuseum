@@ -86,8 +86,12 @@ func (h *ChatHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
-	if req.Prompt == "" {
+	if req.Prompt == "" && !req.InactivityNudge {
 		writeError(w, http.StatusBadRequest, "prompt is required")
+		return
+	}
+	if req.InactivityNudge && req.InactivitySeconds <= 0 {
+		writeError(w, http.StatusBadRequest, "inactivity_seconds must be positive when inactivity_nudge is set")
 		return
 	}
 	if req.Provider == "" {

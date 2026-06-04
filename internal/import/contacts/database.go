@@ -8,13 +8,67 @@ import (
 	"os"
 	"strings"
 
+	"github.com/daveontour/aimuseum/internal/appctx"
 	"github.com/daveontour/aimuseum/internal/sqlutil"
 )
 
+// activeEmailsWhere returns a WHERE clause that excludes soft-deleted emails and scopes by user_id when set in ctx.
+func activeEmailsWhere(ctx context.Context) (string, []any) {
+	where := "user_deleted = FALSE"
+	var args []any
+	if uid := appctx.UserIDFromCtx(ctx); uid > 0 {
+		where += " AND user_id = ?"
+		args = append(args, uid)
+	}
+	return where, args
+}
+
+// activeEmailsUnionQuery returns a UNION query over from/to addresses for non-deleted emails.
+func activeEmailsUnionQuery(ctx context.Context) (string, []any) {
+	w, args := activeEmailsWhere(ctx)
+	q := fmt.Sprintf(
+		`SELECT from_address FROM emails WHERE %s UNION SELECT to_addresses FROM emails WHERE %s`,
+		w, w,
+	)
+	if len(args) == 0 {
+		return q, nil
+	}
+	return q, append(append([]any{}, args...), args...)
+}
+
+// socialMediaCountsQuery counts messages per chat_session/service, scoped to the current user when ctx carries user_id.
+func socialMediaCountsQuery(ctx context.Context) (string, []any) {
+	q := `
+SELECT
+    chat_session,
+    is_group_chat,
+    COUNT(CASE WHEN service = 'WhatsApp' THEN 1 END) AS number_of_whatsapp,
+    COUNT(CASE WHEN service = 'iMessage' THEN 1 END) AS number_of_imessage,
+    COUNT(CASE WHEN service = 'Facebook Messenger' THEN 1 END) AS number_of_facebook,
+    COUNT(CASE WHEN service = 'SMS' THEN 1 END) AS number_of_sms,
+    COUNT(CASE WHEN service = 'Instagram' THEN 1 END) AS number_of_insta,
+    COUNT(CASE WHEN service LIKE '%' THEN 1 END) AS total
+FROM
+    messages`
+	var args []any
+	if uid := appctx.UserIDFromCtx(ctx); uid > 0 {
+		q += `
+WHERE
+    user_id = ?`
+		args = append(args, uid)
+	}
+	q += `
+GROUP BY
+    chat_session, is_group_chat
+ORDER BY
+    is_group_chat, total DESC`
+	return q, args
+}
+
 // ReadFromDatabase reads contact records from the database using the given query.
 // The query must return a single column with comma-separated email entries.
-func ReadFromDatabase(ctx context.Context, db *sql.DB, query string) ([]InputRecord, error) {
-	rows, err := db.QueryContext(ctx, query)
+func ReadFromDatabase(ctx context.Context, db *sql.DB, query string, args ...any) ([]InputRecord, error) {
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -216,6 +270,117 @@ func WriteContactsToDatabase(ctx context.Context, db *sql.DB, records []Formatte
 		return fmt.Errorf("commit contacts transaction: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "Contacts transaction committed\n")
+	return nil
+}
+
+// ownerContactLink captures subject_configuration.subject_contact_id before contacts are rebuilt.
+// Deleting contacts triggers ON DELETE SET NULL on subject_contact_id; restore after rewrite.
+type ownerContactLink struct {
+	active      bool
+	configRowID int64
+	contactID   int64
+	name        string
+	email       string
+}
+
+func loadOwnerContactLink(ctx context.Context, db *sql.DB) (ownerContactLink, error) {
+	if db == nil {
+		return ownerContactLink{}, nil
+	}
+	uid := appctx.UserIDFromCtx(ctx)
+	q := `
+		SELECT sc.id, sc.subject_contact_id, COALESCE(c.name, ''), COALESCE(c.email, '')
+		FROM subject_configuration sc
+		LEFT JOIN contacts c ON c.id = sc.subject_contact_id
+		WHERE sc.subject_contact_id IS NOT NULL`
+	args := []any{}
+	if uid > 0 {
+		q += ` AND (sc.user_id = ? OR sc.user_id IS NULL)`
+		args = append(args, uid)
+	}
+	q += ` ORDER BY CASE WHEN sc.user_id IS NULL THEN 1 ELSE 0 END, sc.id ASC LIMIT 1`
+
+	var link ownerContactLink
+	var contactID sql.NullInt64
+	err := db.QueryRowContext(ctx, q, args...).Scan(&link.configRowID, &contactID, &link.name, &link.email)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ownerContactLink{}, nil
+	}
+	if err != nil {
+		return ownerContactLink{}, fmt.Errorf("load owner contact link: %w", err)
+	}
+	if !contactID.Valid {
+		return ownerContactLink{}, nil
+	}
+	link.active = true
+	link.contactID = contactID.Int64
+	return link, nil
+}
+
+func resolveContactIDAfterRebuild(ctx context.Context, db *sql.DB, link ownerContactLink) (int64, bool) {
+	if !link.active {
+		return 0, false
+	}
+	if link.contactID == 0 {
+		var one int
+		if err := db.QueryRowContext(ctx, `SELECT 1 FROM contacts WHERE id = 0 LIMIT 1`).Scan(&one); err == nil {
+			return 0, true
+		}
+	} else {
+		var one int
+		if err := db.QueryRowContext(ctx, `SELECT 1 FROM contacts WHERE id = ? LIMIT 1`, link.contactID).Scan(&one); err == nil {
+			return link.contactID, true
+		}
+	}
+	name := strings.TrimSpace(link.name)
+	if name != "" {
+		var id int64
+		if err := db.QueryRowContext(ctx,
+			`SELECT id FROM contacts WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) ORDER BY id LIMIT 1`,
+			name).Scan(&id); err == nil {
+			return id, true
+		}
+	}
+	for _, part := range strings.Split(link.email, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		email, _ := ParseEmailEntry(part)
+		if email == "" {
+			email = strings.ToLower(part)
+		}
+		norm := NormalizeEmailForMatching(email)
+		if norm == "" {
+			continue
+		}
+		var id int64
+		pat := "%" + norm + "%"
+		if err := db.QueryRowContext(ctx,
+			`SELECT id FROM contacts WHERE LOWER(COALESCE(email, '')) LIKE ? ORDER BY id LIMIT 1`,
+			pat).Scan(&id); err == nil {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
+func restoreOwnerContactLink(ctx context.Context, db *sql.DB, link ownerContactLink) error {
+	if db == nil || !link.active {
+		return nil
+	}
+	newID, ok := resolveContactIDAfterRebuild(ctx, db, link)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "warning: could not remap archive owner contact %q after contacts rebuild\n", link.name)
+		return nil
+	}
+	_, err := db.ExecContext(ctx,
+		`UPDATE subject_configuration SET subject_contact_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		newID, link.configRowID)
+	if err != nil {
+		return fmt.Errorf("restore owner contact link: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "Restored archive owner contact link (contact id=%d)\n", newID)
 	return nil
 }
 

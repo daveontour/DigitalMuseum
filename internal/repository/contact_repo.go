@@ -190,14 +190,18 @@ func (r *ContactRepo) ListNames(ctx context.Context) ([]struct {
 
 // ContactExistsForUser reports whether a contact row exists for the current user.
 func (r *ContactRepo) ContactExistsForUser(ctx context.Context, contactID int64) (bool, error) {
-	if contactID <= 0 {
+	if contactID < 0 {
 		return false, nil
 	}
 	uid := uidFromCtx(ctx)
 	q := `SELECT 1 FROM contacts WHERE id = ?`
 	args := []any{contactID}
-	q, args = addUIDFilter(q, args, uid)
-	q += " LIMIT 1"
+	if contactID == 0 {
+		q += " LIMIT 1"
+	} else {
+		q, args = addUIDFilterNullableGlobal(q, args, uid)
+		q += " LIMIT 1"
+	}
 	var one int
 	err := r.pool.QueryRowContext(ctx, q, args...).Scan(&one)
 	if err != nil {
@@ -210,15 +214,19 @@ func (r *ContactRepo) ContactExistsForUser(ctx context.Context, contactID int64)
 }
 
 // GetContact loads one contact by id for the current user (id, name, email, alternative_names).
-// Returns (nil, nil) when not found or id <= 0.
+// Returns (nil, nil) when not found or id < 0.
 func (r *ContactRepo) GetContact(ctx context.Context, id int64) (*model.ContactDetail, error) {
-	if id <= 0 {
+	if id < 0 {
 		return nil, nil
 	}
 	uid := uidFromCtx(ctx)
 	q := `SELECT id, name, email, alternative_names FROM contacts WHERE id = ?`
 	args := []any{id}
-	q, args = addUIDFilter(q, args, uid)
+	if id == 0 {
+		// Archive subject row (id=0) is shared per archive.
+	} else {
+		q, args = addUIDFilterNullableGlobal(q, args, uid)
+	}
 	var (
 		out      model.ContactDetail
 		em       sql.NullString
@@ -297,8 +305,8 @@ func (r *ContactRepo) ListOwnerContactSuggestions(ctx context.Context, subjectNa
 		orConds = append(orConds, "(LOWER(COALESCE(name,'')) LIKE ? OR LOWER(COALESCE(email,'')) LIKE ?)")
 		args = append(args, pat, pat)
 	}
-	q := `SELECT DISTINCT id, name, email FROM contacts WHERE id <> 0 AND (` + strings.Join(orConds, " OR ") + `)`
-	q, args = addUIDFilter(q, args, uidFromCtx(ctx))
+	q := `SELECT DISTINCT id, name, email FROM contacts WHERE (` + strings.Join(orConds, " OR ") + `)`
+	q, args = addUIDFilterNullableGlobal(q, args, uidFromCtx(ctx))
 	q += ` ORDER BY name COLLATE NOCASE LIMIT 200`
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
@@ -467,23 +475,36 @@ func (r *ContactRepo) GetRelationshipGraph(ctx context.Context, types, sources [
 	}
 
 	args := typeArgs
-	uidCond := ""
+	uidCondSubject := ""
+	uidCondContacts := ""
 	if uid > 0 {
 		args = append(args, uid)
-		uidCond = fmt.Sprintf(" AND user_id = ?%d", len(args))
+		uidCondSubject = fmt.Sprintf(" AND user_id = ?%d", len(args))
+		args = append(args, uid)
+		uidCondContacts = fmt.Sprintf(" AND user_id = ?%d", len(args))
 	}
 
+	// Always include the archive subject (id = 0); apply max_nodes only to other contacts.
 	q := fmt.Sprintf(`
 		SELECT id, name, rel_type, numemails, numimessages, numfacebook, numwhatsapp, numsms, numinstagram,
-		       (%s) AS total
+		       (%[1]s) AS total
 		FROM contacts
-		WHERE (id = 0 OR (
-		    %s
-		    AND (%s)
-		    AND ((%s) > 3)
-		))%s
-		ORDER BY total DESC
-		LIMIT %d`, sumClause, typeClause, sourceClause, sumClause, uidCond, maxNodes)
+		WHERE id = 0%[2]s
+		UNION ALL
+		SELECT id, name, rel_type, numemails, numimessages, numfacebook, numwhatsapp, numsms, numinstagram,
+		       (%[1]s) AS total
+		FROM (
+		    SELECT id, name, rel_type, numemails, numimessages, numfacebook, numwhatsapp, numsms, numinstagram,
+		           (%[1]s) AS total
+		    FROM contacts
+		    WHERE id != 0
+		      AND (%[3]s)
+		      AND (%[4]s)
+		      AND ((%[1]s) > 3)
+		      %[5]s
+		    ORDER BY total DESC
+		    LIMIT %[6]d
+		)`, sumClause, uidCondSubject, typeClause, sourceClause, uidCondContacts, maxNodes)
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {

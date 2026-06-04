@@ -114,6 +114,10 @@ const App = (() => {
         }
     }
 
+    function isChatRequestInFlight() {
+        return chatRequestAbortController !== null;
+    }
+
     function getChatProviderDisplayLabel() {
         const sel = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
         if (!sel || sel.selectedIndex < 0) return '';
@@ -285,6 +289,9 @@ const App = (() => {
                     Chat.addMessage('assistant', data.response, true, null, data.embedded_json);
                     if (typeof UI !== 'undefined' && UI.setChatLastRequestStatsFromEmbedded) {
                         UI.setChatLastRequestStatsFromEmbedded(data.embedded_json);
+                    }
+                    if (typeof ChatInactivityNudge !== 'undefined' && ChatInactivityNudge.onUserMessageSent) {
+                        ChatInactivityNudge.onUserMessageSent();
                     }
                 }
 
@@ -1023,6 +1030,11 @@ const App = (() => {
                 if (targetTab === 'settings' || targetTab === 'api-keys') {
                     if (Modals.UserLLMSettings && Modals.UserLLMSettings.load) void Modals.UserLLMSettings.load();
                     if (targetTab === 'settings') void loadLLMProviderAvailability();
+                }
+                if (targetTab === 'inactivity-prompt') {
+                    if (Modals.InactivityPromptConfig && Modals.InactivityPromptConfig.load) {
+                        void Modals.InactivityPromptConfig.load();
+                    }
                 }
             });
         });
@@ -5370,6 +5382,9 @@ const App = (() => {
         Chat.renderExistingMessages();
         VoiceSelector.init(); // Sets initial voice state, creativity lock, listeners
         Modals.initAll();
+        if (typeof ChatInactivityNudge !== 'undefined' && ChatInactivityNudge.init) {
+            void ChatInactivityNudge.init();
+        }
         if (typeof Modals.ConversationManager !== 'undefined' && Modals.ConversationManager.ensureChatConversationContext) {
             await Modals.ConversationManager.ensureChatConversationContext();
         }
@@ -5551,6 +5566,8 @@ const App = (() => {
         processAnswerSubmit,
         refreshChatAvailability: loadLLMProviderAvailability,
         abortCurrentChatRequest,
+        runChatWithProviderFailover,
+        isChatRequestInFlight,
     };
 })();
 

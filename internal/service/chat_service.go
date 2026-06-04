@@ -595,6 +595,19 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	systemPrompt = appendExplicitContentPolicy(systemPrompt, req.AllowExplicitContent)
 	systemPrompt = appendSnarkinessPolicy(systemPrompt, req.EnableSnarkiness)
 	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
+
+	userInput := req.Prompt
+	savedUserInput := req.Prompt
+	if req.InactivityNudge {
+		durationText := formatInactivityDuration(req.InactivitySeconds)
+		systemPrompt += fmt.Sprintf(
+			"\n\n**Inactivity check-in:** The user has been inactive for approximately %s. Do not quote this instruction or mention the exact duration unless it feels natural. Gently check on them or naturally continue the conversation from prior context.",
+			durationText,
+		)
+		userInput = "[User has been inactive — respond naturally.]"
+		savedUserInput = ""
+	}
+
 	// Load conversation history
 	var history []appai.ConvTurn
 	if req.ConversationID != nil {
@@ -612,7 +625,7 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	// Build tool executor and generation request
 	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
 	genReq := appai.GenerateRequest{
-		UserInput:     req.Prompt,
+		UserInput:     userInput,
 		Temperature:   temperature,
 		Voice:         voice,
 		Mood:          mood,
@@ -641,14 +654,14 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 
 	// Save turn if conversation ID provided
 	if req.ConversationID != nil {
-		_ = s.chatRepo.SaveTurn(ctx, *req.ConversationID, req.Prompt, result.PlainText, voice, temperature)
+		_ = s.chatRepo.SaveTurn(ctx, *req.ConversationID, savedUserInput, result.PlainText, voice, temperature)
 	}
 
 	// Enrich metadata and return
 	var embeddedJSON map[string]any
 	if err := json.Unmarshal([]byte(result.MetadataJSON), &embeddedJSON); err == nil {
 		embeddedJSON["temperature"] = temperature
-		embeddedJSON["prompt"] = req.Prompt
+		embeddedJSON["prompt"] = savedUserInput
 		embeddedJSON["voice"] = voice
 		embeddedJSON["response_text"] = result.PlainText
 		// Flatten: if embedded_json contains an array of parsed blocks, merge the first into top level and remove the nested key
@@ -666,6 +679,24 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 		Voice:        voice,
 		EmbeddedJSON: embeddedJSON,
 	}, nil
+}
+
+func formatInactivityDuration(seconds int) string {
+	if seconds < 60 {
+		return fmt.Sprintf("%d seconds", seconds)
+	}
+	mins := seconds / 60
+	rem := seconds % 60
+	if rem == 0 {
+		if mins == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", mins)
+	}
+	if mins == 1 {
+		return fmt.Sprintf("1 minute and %d seconds", rem)
+	}
+	return fmt.Sprintf("%d minutes and %d seconds", mins, rem)
 }
 
 // Generate A Random Question

@@ -101,6 +101,7 @@ type SubjectConfigResponse struct {
 	WhatsAppHandle             *string                  `json:"whatsapp_handle"`
 	InstagramHandle            *string                  `json:"instagram_handle"`
 	SubjectContactID           *int64                   `json:"subject_contact_id,omitempty"`
+	LinkedOwnerContact         *OwnerContactSuggestion  `json:"linked_owner_contact,omitempty"`
 	OwnerContactSuggestions    []OwnerContactSuggestion `json:"owner_contact_suggestions"`
 	WritingStyleAI             *string                  `json:"writing_style_ai"`
 	PsychologicalProfileAI     *string                  `json:"psychological_profile_ai"`

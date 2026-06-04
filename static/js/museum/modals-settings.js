@@ -1144,7 +1144,9 @@ Modals.ConversationManager = (() => {
                 const displayTurns = turns.slice(-30); // Get last 30 turns
                 
                 displayTurns.forEach(turn => {
-                    Chat.addMessage('user', turn.user_input, false);
+                    if (turn.user_input) {
+                        Chat.addMessage('user', turn.user_input, false);
+                    }
                     Chat.addMessage('assistant', turn.response_text, true);
                 });
                 
@@ -1421,6 +1423,7 @@ Modals.SubjectConfiguration = (() => {
         let loadedInstagramHandle = '';
         let ownerContactSuggestions = [];
         let ownerContactAllCache = null;
+        let linkedOwnerContact = null;
         /** Saved subject_contact_id from last successful GET / POST response; generate buttons require this. */
         let persistedSubjectContactId = null;
 
@@ -1430,11 +1433,11 @@ Modals.SubjectConfiguration = (() => {
                 return;
             }
             const n = Number(config.subject_contact_id, 10);
-            persistedSubjectContactId = Number.isFinite(n) && n > 0 ? n : null;
+            persistedSubjectContactId = Number.isFinite(n) && n >= 0 ? n : null;
         }
 
         function hasPersistedOwnerContact() {
-            return persistedSubjectContactId != null && Number(persistedSubjectContactId) > 0;
+            return persistedSubjectContactId != null && Number(persistedSubjectContactId) >= 0;
         }
 
         const subjectConfigSubtabPanelIds = {
@@ -1573,13 +1576,27 @@ Modals.SubjectConfiguration = (() => {
             return em ? `${name} — ${em}` : name;
         }
 
-        function _ensureSelectedInOwnerRows(rows, selectedId) {
-            const id = selectedId === '' || selectedId == null ? 0 : Number(selectedId, 10);
-            if (!id || Number.isNaN(id)) {
-                return Array.isArray(rows) ? rows.slice() : [];
-            }
+        function _ensureSelectedInOwnerRows(rows, selectedId, linkedContact) {
+            const id = selectedId === '' || selectedId == null ? null : Number(selectedId, 10);
             const r = Array.isArray(rows) ? rows.slice() : [];
-            if (r.some((x) => x && Number(x.id) === id)) {
+            if (id == null || Number.isNaN(id) || id < 0) {
+                return r;
+            }
+            const idx = r.findIndex((x) => x && Number(x.id) === id);
+            if (linkedContact && linkedContact.id != null && Number(linkedContact.id) === id) {
+                const row = {
+                    id: linkedContact.id,
+                    name: linkedContact.name || '',
+                    email: linkedContact.email != null ? linkedContact.email : null
+                };
+                if (idx >= 0) {
+                    r[idx] = row;
+                } else {
+                    r.push(row);
+                }
+                return r;
+            }
+            if (idx >= 0) {
                 return r;
             }
             r.push({ id, name: `Contact #${id}`, email: null });
@@ -1604,7 +1621,7 @@ Modals.SubjectConfiguration = (() => {
             return ownerContactAllCache;
         }
 
-        async function fillOwnerContactSelect(selectedId) {
+        async function fillOwnerContactSelect(selectedId, linkedContact) {
             const sel = DOM.subjectOwnerContactSelect;
             if (!sel) {
                 return;
@@ -1619,7 +1636,7 @@ Modals.SubjectConfiguration = (() => {
                 console.error('Owner contact full list:', e);
                 rows = ownerContactSuggestions;
             }
-            rows = _ensureSelectedInOwnerRows(rows, selectedId);
+            rows = _ensureSelectedInOwnerRows(rows, selectedId, linkedContact);
             rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
             const keep = selectedId == null || selectedId === '' ? '' : String(selectedId);
             sel.innerHTML = '<option value="">None (not linked)</option>';
@@ -1848,7 +1865,7 @@ Modals.SubjectConfiguration = (() => {
                     const raw = DOM.subjectOwnerContactSelect.value.trim();
                     if (raw !== '') {
                         const n = Number(raw, 10);
-                        if (Number.isFinite(n) && n > 0) {
+                        if (Number.isFinite(n) && n >= 0) {
                             subjectContactId = n;
                         }
                     }
@@ -1924,6 +1941,7 @@ Modals.SubjectConfiguration = (() => {
                     DOM.psychologicalProfileSaveStatus.textContent = '';
                 }
                 setPersistedOwnerContactFromConfig(null);
+                linkedOwnerContact = null;
                 syncSubjectProfileGenerateButtons();
                 return;
             }
@@ -1934,10 +1952,13 @@ Modals.SubjectConfiguration = (() => {
             if (DOM.otherNamesInput) DOM.otherNamesInput.value = config.other_names || '';
             if (DOM.emailAddressesInput) DOM.emailAddressesInput.value = config.email_addresses || '';
             ownerContactSuggestions = Array.isArray(config.owner_contact_suggestions) ? config.owner_contact_suggestions : [];
+            linkedOwnerContact = config.linked_owner_contact && config.linked_owner_contact.id != null
+                ? config.linked_owner_contact
+                : null;
             const chosen = config.subject_contact_id != null && config.subject_contact_id !== undefined
                 ? String(config.subject_contact_id)
                 : '';
-            await fillOwnerContactSelect(chosen);
+            await fillOwnerContactSelect(chosen, linkedOwnerContact);
             loadedPhoneNumbers = config.phone_numbers != null ? String(config.phone_numbers) : '';
             loadedWhatsappHandle = config.whatsapp_handle != null ? String(config.whatsapp_handle) : '';
             loadedInstagramHandle = config.instagram_handle != null ? String(config.instagram_handle) : '';
@@ -2074,12 +2095,11 @@ Modals.SubjectConfiguration = (() => {
             }
 
             try {
-                await saveConfiguration(subjectName, gender, familyName, otherNames, emailAddresses);
+                const config = await saveConfiguration(subjectName, gender, familyName, otherNames, emailAddresses);
                 await saveSystemInstructions(systemInstructions, coreSystemInstructions, questionSystemInstructions);
+                await populateFormFromConfig(config);
 
                 await AppDialogs.showAppAlert('Success', 'Subject configuration saved successfully!');
-
-                window.location.reload();
             } catch (error) {
                 await AppDialogs.showAppAlert('Error', `Error saving configuration: ${error.message}`);
             }
@@ -2091,13 +2111,6 @@ Modals.SubjectConfiguration = (() => {
             // Set up event listeners
             if (DOM.saveSubjectConfigBtn) {
                 DOM.saveSubjectConfigBtn.addEventListener('click', () => { void handleSave(); });
-            }
-
-            if (DOM.cancelSubjectConfigBtn) {
-                DOM.cancelSubjectConfigBtn.addEventListener('click', () => {
-                    ownerContactAllCache = null;
-                    loadAndPopulateForm();
-                });
             }
 
             // Writing style generate button
@@ -2129,7 +2142,7 @@ Modals.SubjectConfiguration = (() => {
                 DOM.subjectOwnerContactShowAll.addEventListener('change', () => {
                     const sel = DOM.subjectOwnerContactSelect;
                     const v = sel ? sel.value : '';
-                    void fillOwnerContactSelect(v);
+                    void fillOwnerContactSelect(v, linkedOwnerContact);
                 });
             }
 
@@ -3174,6 +3187,135 @@ Modals.ManageKeys = (() => {
 })();
 
 
+Modals.InactivityPromptConfig = (() => {
+    const CONFIG_KEY = 'chat_inactivity_nudge';
+    const DEFAULTS = { enabled: false, min_seconds: 120, max_seconds: 300 };
+    const MIN_ALLOWED = 30;
+
+    function getEl(id) { return document.getElementById(id); }
+
+    function setStatus(msg, isErr) {
+        const el = getEl('inactivity-prompt-status');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.color = isErr ? '#dc3545' : (msg ? '#1a7f37' : 'var(--color-text-muted)');
+    }
+
+    function populateForm(settings) {
+        const enabledEl = getEl('inactivity-prompt-enabled');
+        const minEl = getEl('inactivity-prompt-min-seconds');
+        const maxEl = getEl('inactivity-prompt-max-seconds');
+        if (enabledEl) enabledEl.checked = !!settings.enabled;
+        if (minEl) minEl.value = String(settings.min_seconds);
+        if (maxEl) maxEl.value = String(settings.max_seconds);
+    }
+
+    function readFormSettings() {
+        const enabledEl = getEl('inactivity-prompt-enabled');
+        const minEl = getEl('inactivity-prompt-min-seconds');
+        const maxEl = getEl('inactivity-prompt-max-seconds');
+        let minSeconds = parseInt(minEl?.value, 10);
+        let maxSeconds = parseInt(maxEl?.value, 10);
+        if (!Number.isFinite(minSeconds) || minSeconds < MIN_ALLOWED) {
+            throw new Error(`Minimum seconds must be at least ${MIN_ALLOWED}.`);
+        }
+        if (!Number.isFinite(maxSeconds) || maxSeconds < MIN_ALLOWED) {
+            throw new Error(`Maximum seconds must be at least ${MIN_ALLOWED}.`);
+        }
+        if (minSeconds > maxSeconds) {
+            throw new Error('Minimum seconds cannot exceed maximum seconds.');
+        }
+        return {
+            enabled: !!(enabledEl && enabledEl.checked),
+            min_seconds: minSeconds,
+            max_seconds: maxSeconds,
+        };
+    }
+
+    function parseSettingsFromRows(rows) {
+        const row = Array.isArray(rows) ? rows.find((r) => r && r.key === CONFIG_KEY) : null;
+        if (!row || row.value == null || String(row.value).trim() === '') return { ...DEFAULTS };
+        try {
+            const parsed = JSON.parse(row.value);
+            return {
+                enabled: !!parsed.enabled,
+                min_seconds: Math.max(MIN_ALLOWED, parseInt(parsed.min_seconds, 10) || DEFAULTS.min_seconds),
+                max_seconds: Math.max(MIN_ALLOWED, parseInt(parsed.max_seconds, 10) || DEFAULTS.max_seconds),
+            };
+        } catch (_) {
+            return { ...DEFAULTS };
+        }
+    }
+
+    async function load() {
+        setStatus('Loading…');
+        try {
+            const res = await fetch('/api/configuration', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const rows = await res.json();
+            const settings = parseSettingsFromRows(rows);
+            if (settings.min_seconds > settings.max_seconds) {
+                const swap = settings.min_seconds;
+                settings.min_seconds = settings.max_seconds;
+                settings.max_seconds = swap;
+            }
+            populateForm(settings);
+            setStatus('');
+        } catch (e) {
+            setStatus(`Error loading settings: ${e.message}`, true);
+        }
+    }
+
+    async function save() {
+        let settings;
+        try {
+            settings = readFormSettings();
+        } catch (e) {
+            setStatus(e.message, true);
+            return;
+        }
+        const saveBtn = getEl('inactivity-prompt-save-btn');
+        if (saveBtn) saveBtn.disabled = true;
+        setStatus('Saving…');
+        try {
+            const res = await fetch('/api/configuration', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    key: CONFIG_KEY,
+                    value: JSON.stringify(settings),
+                    description: 'Inactivity chat prompt timer settings',
+                }),
+            });
+            if (!res.ok) {
+                let detail = await res.text();
+                try {
+                    const j = JSON.parse(detail);
+                    if (j.detail) detail = j.detail;
+                } catch (_) { /* keep body */ }
+                throw new Error(detail || `HTTP ${res.status}`);
+            }
+            setStatus('Saved.');
+            if (typeof ChatInactivityNudge !== 'undefined' && ChatInactivityNudge.reloadSettings) {
+                await ChatInactivityNudge.reloadSettings();
+            }
+        } catch (e) {
+            setStatus(`Error saving: ${e.message}`, true);
+        } finally {
+            if (saveBtn) saveBtn.disabled = false;
+        }
+    }
+
+    function init() {
+        const saveBtn = getEl('inactivity-prompt-save-btn');
+        if (saveBtn) saveBtn.addEventListener('click', () => { void save(); });
+    }
+
+    return { init, load, save };
+})();
+
+
 Modals.LLMToolsAccess = (() => {
     function _status(msg, isErr) {
         const el = document.getElementById('llm-tools-access-status');
@@ -3620,6 +3762,7 @@ Modals.initAll = () => {
         Modals.SensitiveData.init();
         Modals.ManageKeys.init();
         if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.init) Modals.LLMToolsAccess.init();
+        if (Modals.InactivityPromptConfig && Modals.InactivityPromptConfig.init) Modals.InactivityPromptConfig.init();
         if (Modals.ToolTest && Modals.ToolTest.init) Modals.ToolTest.init();
         if (Modals.BackgroundJobs && Modals.BackgroundJobs.init) Modals.BackgroundJobs.init();
         Modals.Profiles.init();

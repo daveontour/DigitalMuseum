@@ -87,6 +87,17 @@ func (s *SubjectConfigService) GetConfiguration(ctx context.Context) (*model.Sub
 func (s *SubjectConfigService) mergedResponse(ctx context.Context, cfg *model.SubjectConfig) (*model.SubjectConfigResponse, error) {
 	resp := toSubjectConfigResponse(cfg)
 	if s.contacts != nil {
+		if cfg.SubjectContactID.Valid {
+			if linked, err := s.contacts.GetContact(ctx, cfg.SubjectContactID.Int64); err != nil {
+				return nil, err
+			} else if linked != nil {
+				row := model.OwnerContactSuggestion{ID: linked.ID, Name: linked.Name}
+				if linked.Email != nil {
+					row.Email = linked.Email
+				}
+				resp.LinkedOwnerContact = &row
+			}
+		}
 		sug, err := s.contacts.ListOwnerContactSuggestions(ctx, cfg.SubjectName, strPtr(cfg.FamilyName), cfg.OtherNames, cfg.EmailAddresses)
 		if err != nil {
 			return nil, err

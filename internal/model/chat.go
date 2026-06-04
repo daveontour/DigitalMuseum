@@ -37,6 +37,8 @@ type ChatRequest struct {
 	Provider             string   `json:"provider"` // gemini, claude, deepseek, or localai
 	WhosAsking           string   `json:"whos_asking"`
 	RepeatQuestion       bool     `json:"repeat_question"`
+	InactivityNudge      bool     `json:"inactivity_nudge"`
+	InactivitySeconds    int      `json:"inactivity_seconds"`
 }
 
 // ChatResponse is the JSON response for POST /chat/generate.

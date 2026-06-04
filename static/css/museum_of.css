@@ -152,6 +152,30 @@ body {
     display: flex;
     height: 100vh;
     overflow: hidden; /* Prevent body scrolling */
+    padding-top: env(titlebar-area-height, 0px);
+    box-sizing: border-box;
+}
+
+/* Electron Window Controls Overlay: draggable title bar strip (inert in normal browsers) */
+body::before {
+    content: '';
+    position: fixed;
+    top: env(titlebar-area-y, 0);
+    left: env(titlebar-area-x, 0);
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 0px);
+    background: #1a2540;
+    -webkit-app-region: drag;
+    z-index: 2147483646;
+}
+
+.top-bar button,
+.top-bar select,
+.top-bar input,
+.top-bar a,
+.top-bar label,
+.top-bar .voice-selector {
+    -webkit-app-region: no-drag;
 }
 
 .app-container {
@@ -170,6 +194,7 @@ body {
     flex-shrink: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.15);
     box-sizing: border-box;
+    -webkit-app-region: drag;
 }
 
 .top-bar-title {
@@ -11029,6 +11054,61 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+}
+
+/* Contacts tab — compact table typography and wrapped email column */
+#contacts-modal #contacts-table-container .contacts-table {
+    font-size: var(--text-xs);
+}
+#contacts-modal #contacts-table-container .contacts-table thead th {
+    padding: 6px 8px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+}
+#contacts-modal #contacts-table-container .contacts-table tbody td {
+    padding: 4px 6px;
+    font-size: var(--text-xs);
+    vertical-align: top;
+}
+#contacts-modal #contacts-table-container .contacts-col-select {
+    text-align: center;
+    width: 40px;
+}
+#contacts-modal #contacts-table-container .contacts-col-name {
+    width: 234px;
+    max-width: 234px;
+    word-break: break-word;
+}
+#contacts-modal #contacts-table-container .contacts-col-email {
+    width: 450px;
+    max-width: 450px;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: var(--line-height-snug, 1.35);
+}
+#contacts-modal #contacts-table-container .contacts-col-count {
+    text-align: center;
+    width: 100px;
+    white-space: nowrap;
+}
+#contacts-modal #contacts-table-container .contacts-col-actions {
+    text-align: center;
+    width: 140px;
+    white-space: nowrap;
+}
+#contacts-modal #contacts-table-container .contacts-col-actions .contacts-generate-profile-btn {
+    padding: 3px 6px;
+    font-size: var(--text-xs);
+    line-height: var(--line-height-snug);
+}
+#contacts-modal #contacts-table-container .contacts-col-actions .modal-btn:not(.contacts-generate-profile-btn) {
+    padding: 2px 4px;
+    font-size: calc(var(--text-xs) * 0.75);
+    line-height: 1;
+}
+#contacts-modal #contacts-table-container .contacts-col-actions .modal-btn:not(.contacts-generate-profile-btn) i {
+    font-size: calc(var(--text-xs) * 0.75);
 }
 
 /* Contacts and Relationships dialog — table chrome */

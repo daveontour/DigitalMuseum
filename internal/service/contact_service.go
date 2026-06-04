@@ -97,6 +97,9 @@ type RelGraphLink struct {
 	Strength int    `json:"strength"`
 }
 
+// relGraphSubjectNodeID is the cytoscape hub node for the archive subject (never use "0" — falsy/coercion issues).
+const relGraphSubjectNodeID = "__subject__"
+
 func (s *ContactService) GetRelationshipGraph(ctx context.Context, types, sources []string, maxNodes int) (*RelationshipGraph, error) {
 	rows, err := s.repo.GetRelationshipGraph(ctx, types, sources, maxNodes)
 	if err != nil {
@@ -109,21 +112,26 @@ func (s *ContactService) GetRelationshipGraph(ctx context.Context, types, source
 	nodeTotals := map[string]int64{}
 
 	for _, c := range rows {
-		nodeID := "0"
-		if c.ID != 0 {
-			if c.Name != "" {
-				nodeID = c.Name
-			} else {
-				nodeID = fmt.Sprintf("%d", c.ID)
+		displayName := strings.TrimSpace(c.Name)
+		var nodeID string
+		if c.ID == 0 {
+			nodeID = relGraphSubjectNodeID
+			if displayName != "" && subjectName == "Subject" {
+				subjectName = displayName
 			}
-		}
-		// Fallback when subject_configuration is incomplete.
-		if c.ID == 0 && c.Name != "" && subjectName == "Subject" {
-			subjectName = c.Name
+			if displayName == "" {
+				displayName = subjectName
+			}
+		} else {
+			nodeID = fmt.Sprintf("c:%d", c.ID)
+			if displayName == "" {
+				displayName = fmt.Sprintf("Contact %d", c.ID)
+			}
+			nodeTotals[nodeID] = c.Total
 		}
 		nodes = append(nodes, RelGraphNode{
 			ID:           nodeID,
-			Name:         c.Name,
+			Name:         displayName,
 			ContactType:  c.RelType,
 			NumEmails:    c.NumEmails,
 			NumIMessages: c.NumIMessages,
@@ -132,24 +140,38 @@ func (s *ContactService) GetRelationshipGraph(ctx context.Context, types, source
 			NumSMS:       c.NumSMS,
 			NumInstagram: c.NumInstagram,
 		})
-		if c.ID != 0 {
-			nodeTotals[nodeID] = c.Total
-		}
 	}
 
-	// Ensure subject node is first; add placeholder if absent
-	hasSubject := false
+	// Dedupe by graph id (same contact should not appear twice).
+	seenIDs := make(map[string]struct{}, len(nodes))
+	deduped := make([]RelGraphNode, 0, len(nodes))
+	for _, n := range nodes {
+		if _, ok := seenIDs[n.ID]; ok {
+			continue
+		}
+		seenIDs[n.ID] = struct{}{}
+		deduped = append(deduped, n)
+	}
+	nodes = deduped
+
+	// Ensure subject hub exists and is first.
+	subjectIdx := -1
 	for i, n := range nodes {
-		if n.ID == "0" {
-			hasSubject = true
-			if i != 0 {
-				nodes = append([]RelGraphNode{nodes[i]}, append(nodes[:i], nodes[i+1:]...)...)
-			}
+		if n.ID == relGraphSubjectNodeID {
+			subjectIdx = i
 			break
 		}
 	}
-	if !hasSubject {
-		nodes = append([]RelGraphNode{{ID: "0", Name: subjectName}}, nodes...)
+	if subjectIdx < 0 {
+		nodes = append([]RelGraphNode{{ID: relGraphSubjectNodeID, Name: subjectName}}, nodes...)
+	} else if subjectIdx > 0 {
+		subject := nodes[subjectIdx]
+		nodes = append([]RelGraphNode{subject}, append(nodes[:subjectIdx], nodes[subjectIdx+1:]...)...)
+	}
+
+	nodeIDs := make(map[string]struct{}, len(nodes))
+	for _, n := range nodes {
+		nodeIDs[n.ID] = struct{}{}
 	}
 
 	// Build links with log-scaled strength
@@ -163,7 +185,7 @@ func (s *ContactService) GetRelationshipGraph(ctx context.Context, types, source
 
 	var links []RelGraphLink
 	for _, n := range nodes {
-		if n.ID == "0" {
+		if n.ID == relGraphSubjectNodeID {
 			continue
 		}
 		raw := nodeTotals[n.ID]
@@ -177,8 +199,24 @@ func (s *ContactService) GetRelationshipGraph(ctx context.Context, types, source
 		if strength > 10 {
 			strength = 10
 		}
-		links = append(links, RelGraphLink{Source: n.ID, Target: "0", Strength: strength})
+		links = append(links, RelGraphLink{
+			Source:   n.ID,
+			Target:   relGraphSubjectNodeID,
+			Strength: strength,
+		})
 	}
+	// Drop any edge whose endpoint is missing (defensive; should not happen after ensure above).
+	filtered := links[:0]
+	for _, l := range links {
+		if _, ok := nodeIDs[l.Source]; !ok {
+			continue
+		}
+		if _, ok := nodeIDs[l.Target]; !ok {
+			continue
+		}
+		filtered = append(filtered, l)
+	}
+	links = filtered
 
 	return &RelationshipGraph{Nodes: nodes, Links: links}, nil
 }

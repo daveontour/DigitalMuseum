@@ -93,7 +93,7 @@ func (h *DashboardHandler) UpsertSubjectConfiguration(w http.ResponseWriter, r *
 				writeError(w, http.StatusBadRequest, "subject_contact_id must be a number or null")
 				return
 			}
-			if v <= 0 {
+			if v < 0 {
 				cid = sql.NullInt64{Valid: false}
 			} else {
 				cid = sql.NullInt64{Valid: true, Int64: v}

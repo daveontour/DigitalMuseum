@@ -521,17 +521,26 @@ async function restartGoServer(logLevel) {
 // Window management
 // ---------------------------------------------------------------------------
 
+// Shared custom title bar (Windows WCO requires frame: false + hidden style).
+const TITLE_BAR_OVERLAY = {
+  color: '#1a2540',
+  symbolColor: '#e6edf3',
+  height: 32,
+};
+
+
+
 function createLoadingWindow() {
   loadingWindow = new BrowserWindow({
     width: 480,
     height: 300,
-    frame: false,
     resizable: false,
     center: true,
     show: true,
-    backgroundColor: '#1a1a2e',
+    frame: false,
+    backgroundColor: '#0d1117',
     titleBarStyle: 'hidden',
-    ...(process.platform !== 'darwin' ? { titleBarOverlay: true } : {}),
+    titleBarOverlay: TITLE_BAR_OVERLAY,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -549,6 +558,10 @@ function createMainWindow(port) {
     height: 1080,
     show: false,
     title: 'Digital Museum',
+    frame: false,
+    backgroundColor: '#0d1117',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: TITLE_BAR_OVERLAY,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

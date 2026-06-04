@@ -42,7 +42,8 @@ func RunContactsNormalise(ctx context.Context, opts RunOptions) error {
 		return fmt.Errorf("Database required for CONTACTS_QUERY mode")
 	}
 	progress("Reading contacts from database")
-	records, err = ReadFromDatabase(ctx, opts.ContactsDB, "SELECT from_address FROM emails UNION SELECT to_addresses FROM emails")
+	emailUnionQ, emailUnionArgs := activeEmailsUnionQuery(ctx)
+	records, err = ReadFromDatabase(ctx, opts.ContactsDB, emailUnionQ, emailUnionArgs...)
 	if err != nil {
 		return fmt.Errorf("read from database: %w", err)
 	}
@@ -121,6 +122,11 @@ func RunContactsNormalise(ctx context.Context, opts RunOptions) error {
 		return fmt.Errorf("compute email counts: %w", err)
 	}
 
+	ownerLink, err := loadOwnerContactLink(ctx, opts.ContactsDB)
+	if err != nil {
+		return err
+	}
+
 	progress("Truncating contacts table")
 	if err := TruncateContactsTable(ctx, opts.ContactsDB); err != nil {
 		return fmt.Errorf("truncate contacts table: %w", err)
@@ -130,6 +136,10 @@ func RunContactsNormalise(ctx context.Context, opts RunOptions) error {
 	}
 	progress("Writing contacts and classifications to database")
 	if err := writeContactsAndClassifications(ctx, opts.ContactsDB, opts.ClassificationsFile, formattedOutput, opts.OwnerUserID); err != nil {
+		return err
+	}
+	progress("Restoring archive owner contact link")
+	if err := restoreOwnerContactLink(ctx, opts.ContactsDB, ownerLink); err != nil {
 		return err
 	}
 	if opts.RelationshipQuery != "" {
@@ -310,7 +320,11 @@ func computeEmailMessageCounts(ctx context.Context, db *sql.DB, records []Format
 		return nil
 	}
 
-	rows, err := db.QueryContext(ctx, `SELECT from_address, to_addresses FROM emails`)
+	emailWhere, emailArgs := activeEmailsWhere(ctx)
+	rows, err := db.QueryContext(ctx,
+		fmt.Sprintf(`SELECT from_address, to_addresses FROM emails WHERE %s`, emailWhere),
+		emailArgs...,
+	)
 	if err != nil {
 		return fmt.Errorf("query emails for counts: %w", err)
 	}
@@ -379,26 +393,9 @@ func computeEmailMessageCounts(ctx context.Context, db *sql.DB, records []Format
 	return rows.Err()
 }
 
-const socialMediaQuery = `
-SELECT
-    chat_session,
-    is_group_chat,
-    COUNT(CASE WHEN service = 'WhatsApp' THEN 1 END) AS number_of_whatsapp,
-    COUNT(CASE WHEN service = 'iMessage' THEN 1 END) AS number_of_imessage,
-    COUNT(CASE WHEN service = 'Facebook Messenger' THEN 1 END) AS number_of_facebook,
-    COUNT(CASE WHEN service = 'SMS' THEN 1 END) AS number_of_sms,
-    COUNT(CASE WHEN service = 'Instagram' THEN 1 END) AS number_of_insta,
-    COUNT(CASE WHEN service LIKE '%' THEN 1 END) AS total
-FROM
-    messages
-GROUP BY
-    chat_session, is_group_chat
-ORDER BY
-    is_group_chat, total DESC;
-`
-
 func runSocialMediaQuery(ctx context.Context, db *sql.DB) ([]SocialMediaRecord, error) {
-	rows, err := db.QueryContext(ctx, socialMediaQuery)
+	q, args := socialMediaCountsQuery(ctx)
+	rows, err := db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("execute query: %w", err)
 	}

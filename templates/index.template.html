@@ -722,6 +722,9 @@
                         <button id="config-tab-btn-settings" type="button" class="config-tab-button active" data-tab="settings">
                             <i class="fas fa-sliders-h"></i> Appearance
                         </button>
+                        <button id="config-tab-btn-inactivity-prompt" type="button" class="config-tab-button" data-tab="inactivity-prompt">
+                            <i class="fas fa-hourglass-half"></i> Inactivity Prompt
+                        </button>
                         <button id="config-tab-btn-api-keys" type="button" class="config-tab-button" data-tab="api-keys">
                             <i class="fas fa-plug"></i> API Keys
                         </button>
@@ -804,6 +807,36 @@
                         </div>
                     </section>
                     </div>
+                </div>
+                <div class="config-tab-content" id="inactivity-prompt-tab">
+                    <section class="section-config">
+                        <h1>Inactivity Prompt</h1>
+                        <p class="config-tab-lead" style="max-width: none;">
+                            After you send a chat message, a random timer runs between the minimum and maximum seconds below.
+                            When it expires, the assistant silently checks in or continues the conversation.
+                            Each LLM check-in counts toward usage billing.
+                        </p>
+                    </section>
+                    <section class="config-section">
+                        <div class="setting-group">
+                            <label for="inactivity-prompt-enabled">
+                                <input type="checkbox" id="inactivity-prompt-enabled">
+                                Enable inactivity prompts
+                            </label>
+                        </div>
+                        <div class="setting-group">
+                            <label for="inactivity-prompt-min-seconds">Minimum seconds</label>
+                            <input type="number" id="inactivity-prompt-min-seconds" class="modal-input" min="30" step="1" value="120" style="max-width: 8rem;">
+                        </div>
+                        <div class="setting-group">
+                            <label for="inactivity-prompt-max-seconds">Maximum seconds</label>
+                            <input type="number" id="inactivity-prompt-max-seconds" class="modal-input" min="30" step="1" value="300" style="max-width: 8rem;">
+                        </div>
+                        <div class="setting-group" style="margin-top: 1rem;">
+                            <button type="button" id="inactivity-prompt-save-btn" class="modal-btn modal-btn-primary">Save</button>
+                            <span id="inactivity-prompt-status" class="config-tab-lead" style="margin-left: 1rem; color: var(--color-text-muted);"></span>
+                        </div>
+                    </section>
                 </div>
                 <div class="config-tab-content" id="api-keys-tab">
                     <section class="section-config">
@@ -1182,7 +1215,6 @@
                         </section>
                         </div>
                         <div class="subject-config-details-actions">
-                            <button type="button" id="cancel-subject-config-btn" class="modal-btn modal-btn-secondary">Cancel</button>
                             <button type="button" id="save-subject-config-btn" class="modal-btn modal-btn-primary">Save</button>
                         </div>
                         </div>
@@ -3351,6 +3383,7 @@
                                     <input type="checkbox" checked id="contacts-exclude-phone-numbers" title="Exclude contacts whose name contains only digits, whitespace and '+'">
                                     Exclude Phone Numbers
                                 </label>
+                                <button type="button" id="contacts-recalculate-totals-btn" class="modal-btn modal-btn-secondary" style="padding: 4px 10px; font-size: var(--text-md);" title="Rebuild contacts from email and message data and refresh message counts"><i class="fas fa-calculator"></i> Recalculate Totals</button>
                                 <button type="button" id="contacts-delete-selected-btn" class="modal-btn modal-btn-secondary" style="display: none; padding: 4px 10px; font-size: var(--text-md); background-color: #dc3545; color: white;"><i class="fas fa-trash-alt"></i> Delete <span id="contacts-selected-count">0</span> selected</button>
                             </div>
                         </div>
@@ -3359,7 +3392,7 @@
                             <thead>
                                 <tr style="background: var(--color-bg-base); border-bottom: 2px solid var(--color-border);">
                                     <th style="padding: 10px; text-align: center; width: 40px;"><input type="checkbox" id="contacts-select-all" title="Select all on page"></th>
-                                    <th class="contacts-sortable-header" data-sort="name" style="padding: 10px; text-align: left; width: 120px; cursor: pointer;">Name</th>
+                                    <th class="contacts-sortable-header" data-sort="name" style="padding: 10px; text-align: left; width: 234px; cursor: pointer;">Name</th>
                                     <th class="contacts-sortable-header" data-sort="email" style="padding: 10px; text-align: left; width: 450px; cursor: pointer;">Email</th>
                                     <th class="contacts-sortable-header" data-sort="numemails" style="padding: 10px; text-align: center; width: 100px; cursor: pointer;">Emails</th>
                                     <th class="contacts-sortable-header" data-sort="numsms" style="padding: 10px; text-align: center;width: 100px; cursor: pointer;">SMS</th>
@@ -3367,7 +3400,7 @@
                                     <th class="contacts-sortable-header" data-sort="numimessages" style="padding: 10px; text-align: center;width: 100px; cursor: pointer;">iMessage</th>
                                     <th class="contacts-sortable-header" data-sort="numinstagram" style="padding: 10px; text-align: center;width: 100px; cursor: pointer;">Instagram</th>
                                     <th class="contacts-sortable-header" data-sort="numfacebook" style="padding: 10px; text-align: center;width: 100px; cursor: pointer;">Facebook</th>
-                                    <th style="padding: 10px; text-align: center; width: 110px; white-space: nowrap;">Actions</th>
+                                    <th style="padding: 10px; text-align: center; width: 140px; white-space: nowrap;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="contacts-table-body">
@@ -4555,6 +4588,7 @@
     <script src="/static/js/museum/guide.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/interviewer.js" defer></script>
     <script src="/static/js/museum/chat-voice-input.js" defer></script>
+    <script src="/static/js/museum/chat-inactivity-nudge.js" defer></script>
     <script src="/static/js/museum/app.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/chat-message-stars.js" defer></script>
     <script src="/static/js/museum/have-a-chat.js" defer></script>

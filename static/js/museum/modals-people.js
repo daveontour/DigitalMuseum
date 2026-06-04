@@ -82,23 +82,23 @@ Modals.Contacts = (() => {
                     row.dataset.contactId = c.id;
                     const canSelect = c.id !== 0;
                     const cb = canSelect ? `<input type="checkbox" class="contacts-row-cb" data-contact-id="${c.id}">` : '';
-                    const deleteBtn = canSelect ? `<button type="button" class="contacts-delete-btn modal-btn modal-btn-secondary" data-contact-id="${c.id}" title="Delete contact" style="padding: 4px 8px; font-size: 0.85em; background-color: #dc3545; color: white;"><i class="fas fa-trash-alt"></i></button>` : '';
                     const contactName = c.name || '';
                     const hasProfile = contactName && profileNamesSet.has(contactName);
-                    const runProfileBtn = contactName ? `<button type="button" class="contacts-run-profile-btn modal-btn modal-btn-secondary" data-contact-name="${escapeHtml(contactName)}" title="Generate complete profile" style="padding: 4px 8px; font-size: 0.85em;"><i class="fas fa-sync-alt"></i></button>` : '';
-                    const viewProfileBtn = hasProfile ? `<button type="button" class="contacts-view-profile-btn modal-btn modal-btn-primary" data-contact-name="${escapeHtml(contactName)}" title="View complete profile" style="padding: 4px 8px; font-size: 0.85em;"><i class="fas fa-id-card"></i></button>` : '';
-                    const actionBtns = [viewProfileBtn, runProfileBtn, deleteBtn].filter(Boolean).join(' ');
+                    const totalMessages = (c.numemail || 0) + (c.numsms || 0) + (c.numwhatsapp || 0) + (c.numimessages || 0) + (c.numinstagram || 0) + (c.numfacebook || 0);
+                    const runProfileBtn = contactName && totalMessages > 10 ? `<button type="button" class="contacts-run-profile-btn contacts-generate-profile-btn modal-btn modal-btn-secondary" data-contact-name="${escapeHtml(contactName)}" title="Generate complete profile">Generate Profile</button>` : '';
+                    const viewProfileBtn = hasProfile ? `<button type="button" class="contacts-view-profile-btn modal-btn modal-btn-primary" data-contact-name="${escapeHtml(contactName)}" title="View complete profile"><i class="fas fa-id-card"></i></button>` : '';
+                    const actionBtns = [viewProfileBtn, runProfileBtn].filter(Boolean).join(' ');
                     row.innerHTML = `
-                        <td style="padding: 2px; text-align: center;">${cb}</td>
-                        <td style="padding: 2px; width: 180px;">${escapeHtml(contactName)}</td>
-                        <td style="padding: 2px; width: 450px; max-width: 450px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(c.email || '-')}</td>
-                        <td style="padding: 2px; text-align: center;width: 100px;">${renderEmailCountCell(c.numemail, contactName)}</td>
-                        <td style="padding: 2px; text-align: center;width: 100px;">${renderCountCell(c.numsms, contactName)}</td>
-                        <td style="padding: 2px; text-align: center;width: 100px;">${renderCountCell(c.numwhatsapp, contactName)}</td>
-                        <td style="padding: 2px; text-align: center;width: 100px;">${renderCountCell(c.numimessages, contactName)}</td>
-                        <td style="padding: 2px; text-align: center;width: 100px;">${renderCountCell(c.numinstagram, contactName)}</td>
-                        <td style="padding: 2px; text-align: center;width: 100px;">${renderCountCell(c.numfacebook, contactName)}</td>
-                        <td style="padding: 2px; text-align: center; width: 110px; white-space: nowrap;">${actionBtns}</td>
+                        <td class="contacts-col-select">${cb}</td>
+                        <td class="contacts-col-name">${escapeHtml(contactName)}</td>
+                        <td class="contacts-col-email">${escapeHtml(c.email || '-')}</td>
+                        <td class="contacts-col-count">${renderEmailCountCell(c.numemail, contactName)}</td>
+                        <td class="contacts-col-count">${renderCountCell(c.numsms, contactName)}</td>
+                        <td class="contacts-col-count">${renderCountCell(c.numwhatsapp, contactName)}</td>
+                        <td class="contacts-col-count">${renderCountCell(c.numimessages, contactName)}</td>
+                        <td class="contacts-col-count">${renderCountCell(c.numinstagram, contactName)}</td>
+                        <td class="contacts-col-count">${renderCountCell(c.numfacebook, contactName)}</td>
+                        <td class="contacts-col-actions">${actionBtns}</td>
                     `;
                     DOM.contactsTableBody.appendChild(row);
                 });
@@ -113,9 +113,6 @@ Modals.Contacts = (() => {
                     if (selectedIds.has(parseInt(el.dataset.contactId, 10))) el.checked = true;
                 });
 
-                DOM.contactsTableBody.querySelectorAll('.contacts-delete-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => handleDeleteSingle(e));
-                });
                 DOM.contactsTableBody.querySelectorAll('.contacts-run-profile-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => handleRunCompleteProfile(e));
                 });
@@ -138,33 +135,6 @@ Modals.Contacts = (() => {
                 DOM.contactsLoading.innerHTML = `<span style="color: #c00;">Error: ${err.message}</span>`;
                 DOM.contactsLoading.style.display = 'block';
                 DOM.contactsTableContainer.style.display = 'none';
-            }
-        }
-
-        async function handleDeleteSingle(e) {
-            const btn = e.target.closest('.contacts-delete-btn');
-            if (!btn) return;
-            const id = parseInt(btn.dataset.contactId, 10);
-            if (isNaN(id) || id === 0) return;
-            const row = btn.closest('tr');
-            const name = row ? (row.querySelector('td:nth-child(2)')?.textContent?.trim() || 'this contact') : 'this contact';
-            const ok = await AppDialogs.showAppConfirm(
-                'Delete contact',
-                `Delete "${name}"? This cannot be undone.`,
-                { danger: true }
-            );
-            if (!ok) return;
-            try {
-                const response = await fetch(`/contacts/${id}`, { method: 'DELETE' });
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({}));
-                    throw new Error(err.detail || `HTTP ${response.status}`);
-                }
-                selectedIds.delete(id);
-                await loadContacts();
-            } catch (err) {
-                console.error('Error deleting contact:', err);
-                await AppDialogs.showAppAlert('Error', `${err.message}`);
             }
         }
 
@@ -422,32 +392,117 @@ Modals.Contacts = (() => {
             if (Modals.Relationships?.tearDown) Modals.Relationships.tearDown();
             Modals._closeModal(DOM.contactsModal);
         }
-        async function extractContacts() {
-            if (!DOM.extractContactsBtn) return;
-            const btn = DOM.extractContactsBtn;
+        async function pollContactsExtractUntilDone(maxMs = 600000) {
+            const start = Date.now();
+            while (Date.now() - start < maxMs) {
+                await new Promise((r) => setTimeout(r, 1500));
+                const res = await fetch('/contacts/extract/status');
+                if (!res.ok) {
+                    continue;
+                }
+                const st = await res.json();
+                if (!st || !st.in_progress) {
+                    if (st.status === 'completed') {
+                        return st.status_line || 'Contact totals recalculated.';
+                    }
+                    if (st.status === 'error') {
+                        throw new Error(st.error_message || st.status_line || 'Contacts recalculation failed');
+                    }
+                    if (st.status === 'cancelled') {
+                        throw new Error(st.status_line || 'Contacts recalculation cancelled');
+                    }
+                    return st.status_line || 'Contact totals recalculated.';
+                }
+            }
+            throw new Error('Timed out waiting for contact totals to finish recalculating');
+        }
+
+        function waitForContactsExtract(onProgress) {
+            return new Promise((resolve, reject) => {
+                let settled = false;
+                const finish = (ok, msg) => {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    es.close();
+                    if (ok) {
+                        resolve(msg);
+                    } else {
+                        reject(new Error(msg || 'Contacts recalculation failed'));
+                    }
+                };
+                const es = new EventSource('/contacts/extract/stream');
+                es.onmessage = (event) => {
+                    try {
+                        const ed = JSON.parse(event.data);
+                        const type = ed.type;
+                        const data = ed.data || {};
+                        if (typeof onProgress === 'function' && (type === 'progress' || type === 'status')) {
+                            onProgress(data.status_line || 'Recalculating totals…');
+                        }
+                        if (type === 'completed') {
+                            finish(true, data.status_line || 'Contact totals recalculated.');
+                        } else if (type === 'error') {
+                            finish(false, data.error_message || data.status_line || 'Contacts recalculation failed');
+                        } else if (type === 'cancelled') {
+                            finish(false, data.status_line || 'Contacts recalculation cancelled');
+                        }
+                    } catch (e) {
+                        console.warn('Contacts extract SSE parse error:', e);
+                    }
+                };
+                es.onerror = () => {
+                    es.close();
+                    if (settled) {
+                        return;
+                    }
+                    pollContactsExtractUntilDone()
+                        .then((msg) => finish(true, msg))
+                        .catch((err) => finish(false, err.message));
+                };
+            });
+        }
+
+        async function recalculateContactTotals() {
+            const btn = DOM.contactsRecalculateTotalsBtn || DOM.extractContactsBtn;
+            if (!btn || btn.disabled) {
+                return;
+            }
             const origHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting...';
+            const setLabel = (text) => {
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(String(text || 'Recalculating totals…'))}`;
+            };
+            setLabel('Starting…');
             try {
+                const statusRes = await fetch('/contacts/extract/status');
+                if (statusRes.ok) {
+                    const st = await statusRes.json();
+                    if (st && st.in_progress) {
+                        await waitForContactsExtract(setLabel);
+                        await loadContacts();
+                        return;
+                    }
+                }
                 const response = await fetch('/contacts/extract', { method: 'POST' });
                 if (!response.ok) {
                     const err = await response.json().catch(() => ({}));
                     throw new Error(err.detail || `HTTP ${response.status}`);
                 }
-                const data = await response.json();
-                if (data.status === 'started') {
-                    await AppDialogs.showAppAlert(
-                        'Contacts extract',
-                        'Contacts extract started. Open Import Messages Controls tab for progress.'
-                    );
-                }
+                await waitForContactsExtract(setLabel);
+                await loadContacts();
             } catch (err) {
-                console.error('Error extracting contacts:', err);
-                await AppDialogs.showAppAlert('Error', `${err.message}`);
+                console.error('Error recalculating contact totals:', err);
+                await AppDialogs.showAppAlert('Error', err.message || 'Could not recalculate contact totals');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = origHtml;
             }
+        }
+
+        async function extractContacts() {
+            await recalculateContactTotals();
         }
         function onSelectAllClick(e) {
             const checked = e.target.checked;
@@ -465,6 +520,7 @@ Modals.Contacts = (() => {
             if (DOM.closeContactsModalBtn) DOM.closeContactsModalBtn.addEventListener('click', close);
             if (DOM.contactsModal) DOM.contactsModal.addEventListener('click', (e) => { if (e.target === DOM.contactsModal) close(); });
             if (DOM.extractContactsBtn) DOM.extractContactsBtn.addEventListener('click', extractContacts);
+            if (DOM.contactsRecalculateTotalsBtn) DOM.contactsRecalculateTotalsBtn.addEventListener('click', () => { void recalculateContactTotals(); });
             if (DOM.contactsDeleteSelectedBtn) DOM.contactsDeleteSelectedBtn.addEventListener('click', handleDeleteSelected);
             if (DOM.contactsSelectAll) DOM.contactsSelectAll.addEventListener('click', onSelectAllClick);
             document.querySelectorAll('.contacts-sortable-header').forEach(th => {
@@ -1019,6 +1075,8 @@ Modals.Relationships = (() => {
         let cy = null;
         let hideTimeout = null;
         let controlsBound = false;
+        const REL_SUBJECT_NODE_ID = '__subject__';
+        const LEGACY_SUBJECT_NODE_ID = '0';
 
         function relTab() {
             return document.getElementById('relationships-tab-content');
@@ -1063,6 +1121,54 @@ Modals.Relationships = (() => {
             return response.json();
         }
 
+        function isSubjectNodeId(id) {
+            const s = String(id);
+            return s === REL_SUBJECT_NODE_ID || s === LEGACY_SUBJECT_NODE_ID;
+        }
+
+        function buildGraphElements(data) {
+            const rawNodes = Array.isArray(data.nodes) ? data.nodes : [];
+            const rawLinks = Array.isArray(data.links) ? data.links : [];
+            const nodes = rawNodes.map((n) => ({
+                ...n,
+                id: String(n.id),
+            }));
+            const nodeIds = new Set(nodes.map((n) => n.id));
+
+            const needsSubject = rawLinks.some((l) => {
+                const t = String(l.target);
+                return t === REL_SUBJECT_NODE_ID || t === LEGACY_SUBJECT_NODE_ID;
+            });
+            if (needsSubject && !nodeIds.has(REL_SUBJECT_NODE_ID) && !nodeIds.has(LEGACY_SUBJECT_NODE_ID)) {
+                nodes.unshift({ id: REL_SUBJECT_NODE_ID, name: 'Subject' });
+                nodeIds.add(REL_SUBJECT_NODE_ID);
+            }
+
+            // Migrate legacy hub id "0" to __subject__ so cytoscape never sees a missing target.
+            for (const n of nodes) {
+                if (n.id === LEGACY_SUBJECT_NODE_ID) {
+                    n.id = REL_SUBJECT_NODE_ID;
+                }
+            }
+            nodeIds.delete(LEGACY_SUBJECT_NODE_ID);
+            nodeIds.add(REL_SUBJECT_NODE_ID);
+
+            const links = rawLinks
+                .map((l) => {
+                    let source = String(l.source);
+                    let target = String(l.target);
+                    if (target === LEGACY_SUBJECT_NODE_ID) target = REL_SUBJECT_NODE_ID;
+                    if (source === LEGACY_SUBJECT_NODE_ID) source = REL_SUBJECT_NODE_ID;
+                    return { ...l, source, target };
+                })
+                .filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target));
+
+            return [
+                ...nodes.map((n) => ({ data: n })),
+                ...links.map((l) => ({ data: l })),
+            ];
+        }
+
         function updateGraph() {
             if (!cy) return;
             const slider = document.getElementById('rel-filter-slider');
@@ -1070,7 +1176,7 @@ Modals.Relationships = (() => {
             if (!slider || !sizeSlider ) return;
             const threshold = parseInt(slider.value);
             const baseSize = parseFloat(sizeSlider.value);
-            const hub = cy.getElementById('0');
+            const hub = cy.getElementById(REL_SUBJECT_NODE_ID);
 
             cy.edges().forEach(e => {
                 if (e.data('strength') < threshold) e.addClass('hidden');
@@ -1100,7 +1206,7 @@ Modals.Relationships = (() => {
         function reLayout() {
             if (!cy) return;
             updateGraph();
-            const hub = cy.getElementById('0');
+            const hub = cy.getElementById(REL_SUBJECT_NODE_ID);
             if (!hub || hub.length === 0) return;
             hub.unlock();
             hub.position({ x: cy.width() / 2, y: cy.height() / 2 });
@@ -1245,7 +1351,7 @@ Modals.Relationships = (() => {
                     html += '</ul>';
                 }
  
-                if (nodeId !== '0') {
+                if (!isSubjectNodeId(nodeId)) {
                     html += '<label style="display:block; margin-top: 0.75em; font-weight: 600;">Contact Type:</label>';
                     html += '<div id="rel-contact-type-radios" style="margin-top: 0.25em; display: flex; flex-wrap: wrap; gap: 0.5em;">';
                     CONTACT_TYPES.forEach(t => {
@@ -1256,7 +1362,7 @@ Modals.Relationships = (() => {
                     html += '</div>';
                 }
                 detailsPanel.innerHTML = html;
-                if (nodeId !== '0') {
+                if (!isSubjectNodeId(nodeId)) {
                     let lastSavedType = currentType;
                     const radioContainer = document.getElementById('rel-contact-type-radios');
                     if (radioContainer) {
@@ -1320,7 +1426,7 @@ Modals.Relationships = (() => {
                 else await AppDialogs.showAppAlert('Could not load relationship data. Please try again.');
                 return;
             }
-            const elements = [...data.nodes.map(n => ({data: n})), ...data.links.map(l => ({data: l}))];
+            const elements = buildGraphElements(data);
 
             cy = cytoscape({
                 container: container,
@@ -1340,7 +1446,7 @@ Modals.Relationships = (() => {
                         'text-valign': 'bottom',
                         'text-margin-y': 4
                     } },
-                    { selector: 'node[id="0"]', style: { 'background-color': '#1a73e8', 'border-width': 3, 'border-color': '#1a2540', 'z-index': 1000 } },
+                    { selector: `node[id="${REL_SUBJECT_NODE_ID}"]`, style: { 'background-color': '#1a73e8', 'border-width': 3, 'border-color': '#1a2540', 'z-index': 1000 } },
                     { selector: 'node[contact_type="friend"]', style: { 'background-color': '#4CAF50' } },
                     { selector: 'node[contact_type="family"]', style: { 'background-color': '#E91E63' } },
                     { selector: 'node[contact_type="colleague"]', style: { 'background-color': '#FF9800' } },
@@ -1352,7 +1458,7 @@ Modals.Relationships = (() => {
                     { selector: 'node[contact_type="important"]', style: { 'background-color': '#00BCD4' } },
                     { selector: 'node[contact_type="unknown"]', style: { 'background-color': '#BDBDBD' } },
                     { selector: 'edge', style: { 'width': 'data(strength)', 'line-color': '#64748b', 'curve-style': 'bezier', 'opacity': 0.7 } },
-                    { selector: 'edge[source="0"], edge[target="0"]', style: { 'line-color': '#2563eb', 'opacity': 0.85 } },
+                    { selector: `edge[source="${REL_SUBJECT_NODE_ID}"], edge[target="${REL_SUBJECT_NODE_ID}"]`, style: { 'line-color': '#2563eb', 'opacity': 0.85 } },
                     { selector: '.hidden', style: { 'display': 'none' } },
                     { selector: 'edge:selected', style: { 'line-color': '#ff5722', 'opacity': 1, 'z-index': 999 } },
                     { selector: '.faded', style: { 'opacity': 0.08, 'text-opacity': 0 } },

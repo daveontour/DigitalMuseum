@@ -72,11 +72,14 @@ func (r *SubjectConfigRepo) Upsert(ctx context.Context, p UpsertSubjectConfigPar
 		gender = *p.Gender
 	}
 
-	// Check whether a row already exists (scoped by uid when uid > 0).
+	// Check whether a row already exists (scoped by uid when uid > 0; include legacy NULL user_id row).
 	q := `SELECT id FROM subject_configuration WHERE TRUE`
 	args := []any{}
-	q, args = addUIDFilter(q, args, uid)
-	q += " LIMIT 1"
+	if uid > 0 {
+		args = append(args, uid)
+		q += " AND (user_id = ? OR user_id IS NULL)"
+	}
+	q += " ORDER BY CASE WHEN user_id IS NULL THEN 1 ELSE 0 END, id ASC LIMIT 1"
 	var id int64
 	err := r.pool.QueryRowContext(ctx, q, args...).Scan(&id)
 	noRow := isNoRows(err)
@@ -113,6 +116,10 @@ func (r *SubjectConfigRepo) Upsert(ctx context.Context, p UpsertSubjectConfigPar
 		// Always update the required fields; only overwrite optional fields when provided.
 		set := []string{"subject_name = ?", "gender = ?", "updated_at = CURRENT_TIMESTAMP"}
 		args := []any{p.SubjectName, gender}
+		if uid > 0 {
+			set = append(set, "user_id = ?")
+			args = append(args, uid)
+		}
 
 		addOpt := func(col string, v *string) {
 			if v != nil {
@@ -160,8 +167,11 @@ func (r *SubjectConfigRepo) GetFirst(ctx context.Context) (*model.SubjectConfig,
 		FROM subject_configuration
 		WHERE TRUE`
 	args := []any{}
-	q, args = addUIDFilter(q, args, uid)
-	q += " LIMIT 1"
+	if uid > 0 {
+		args = append(args, uid)
+		q += " AND (user_id = ? OR user_id IS NULL)"
+	}
+	q += " ORDER BY CASE WHEN user_id IS NULL THEN 1 ELSE 0 END, id ASC LIMIT 1"
 
 	row := r.pool.QueryRowContext(ctx, q, args...)
 
@@ -188,8 +198,11 @@ func (r *SubjectConfigRepo) GetContactID(ctx context.Context) (int64, error) {
 	uid := uidFromCtx(ctx)
 	q := `SELECT subject_contact_id FROM subject_configuration WHERE TRUE`
 	args := []any{}
-	q, args = addUIDFilter(q, args, uid)
-	q += " LIMIT 1"
+	if uid > 0 {
+		args = append(args, uid)
+		q += " AND (user_id = ? OR user_id IS NULL)"
+	}
+	q += " ORDER BY CASE WHEN user_id IS NULL THEN 1 ELSE 0 END, id ASC LIMIT 1"
 	var nid sql.NullInt64
 	err := r.pool.QueryRowContext(ctx, q, args...).Scan(&nid)
 	if err != nil {
