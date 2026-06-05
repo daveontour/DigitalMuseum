@@ -18,8 +18,8 @@ const maxBulkSetGPSIDs = 500
 
 // GPS spread radii (meters) for circle placement around a center point.
 const (
-	GPSSpreadRadiusStandardM = 100.0
-	GPSSpreadRadiusLargeM    = 150.0
+	GPSSpreadRadiusStandardM   = 100.0
+	GPSSpreadRadiusLargeM      = 150.0
 	gpsDuplicateSpreadMaxSmall = 20
 )
 
@@ -1352,19 +1352,27 @@ func (r *ImageRepo) UpdateBlobImageDataAndClearReferenced(ctx context.Context, i
 	return tx.Commit()
 }
 
-// ExportItem holds fields needed for image export.
+// ExportItem holds fields needed for image export and ExifTool metadata embedding.
 type ExportItem struct {
 	ID          int64
 	MediaBlobID int64
 	Title       *string
 	MediaType   *string
 	SourceRef   *string
+	Source      *string
+	Latitude    *float64
+	Longitude   *float64
+	HasGPS      bool
+	Tags        *string
+	CreatedAt   sqlutil.NullDBTime
 }
 
-// ListMediaItemsForExport returns all media_items (id, blob_id, title, media_type, source_reference).
+// ListMediaItemsForExport returns all media_items with export and metadata columns.
 func (r *ImageRepo) ListMediaItemsForExport(ctx context.Context) ([]ExportItem, error) {
 	uid := uidFromCtx(ctx)
-	q := `SELECT id, media_blob_id, title, media_type, source_reference FROM media_items WHERE TRUE`
+	q := `SELECT id, media_blob_id, title, media_type, source_reference,
+	             source, latitude, longitude, has_gps, tags, created_at
+	      FROM media_items WHERE TRUE`
 	args := []any{}
 	q, args = addUIDFilter(q, args, uid)
 	q += " ORDER BY id"
@@ -1376,7 +1384,10 @@ func (r *ImageRepo) ListMediaItemsForExport(ctx context.Context) ([]ExportItem, 
 	var items []ExportItem
 	for rows.Next() {
 		var it ExportItem
-		if err := rows.Scan(&it.ID, &it.MediaBlobID, &it.Title, &it.MediaType, &it.SourceRef); err != nil {
+		if err := rows.Scan(
+			&it.ID, &it.MediaBlobID, &it.Title, &it.MediaType, &it.SourceRef,
+			&it.Source, &it.Latitude, &it.Longitude, &it.HasGPS, &it.Tags, &it.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, it)

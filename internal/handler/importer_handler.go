@@ -20,6 +20,8 @@ import (
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/daveontour/aimuseum/internal/appctx"
+	"github.com/daveontour/aimuseum/internal/georegion"
+	"github.com/daveontour/aimuseum/internal/imagetagsync"
 	contactsimport "github.com/daveontour/aimuseum/internal/import/contacts"
 	facebookimport "github.com/daveontour/aimuseum/internal/import/facebook"
 	facebookalbumsimport "github.com/daveontour/aimuseum/internal/import/facebookalbums"
@@ -31,7 +33,6 @@ import (
 	instagramimport "github.com/daveontour/aimuseum/internal/import/instagram"
 	thumbnailsimport "github.com/daveontour/aimuseum/internal/import/thumbnails"
 	whatsappimport "github.com/daveontour/aimuseum/internal/import/whatsapp"
-	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/importer"
 	"github.com/daveontour/aimuseum/internal/importstorage"
 	"github.com/daveontour/aimuseum/internal/keystore"
@@ -150,6 +151,8 @@ var (
 	imageExportJob = importer.NewImportJob("Image export", map[string]any{
 		"status": "idle", "status_line": nil, "total": 0, "processed": 0,
 		"exported": 0, "skipped": 0, "errors": 0, "error_message": nil, "error_messages": []string{},
+		"metadata_queued": 0, "metadata_processed": 0, "metadata_written": 0,
+		"metadata_skipped": 0, "metadata_errors": 0, "metadata_error_messages": []string{},
 	})
 
 	imageMetadataJSONExportJob = importer.NewImportJob("Image metadata JSON export", map[string]any{
@@ -1088,7 +1091,7 @@ func runImageRegionsRecalc(pool *sql.DB, job *importer.ImportJob, uid int64) {
 
 	total := countGPS()
 	job.UpdateState(map[string]any{
-		"total": total,
+		"total":       total,
 		"status_line": fmt.Sprintf("Recalculating regions for %d GPS-tagged images", total),
 	})
 	job.Broadcast("progress", job.GetState())
@@ -1106,8 +1109,8 @@ func runImageRegionsRecalc(pool *sql.DB, job *importer.ImportJob, uid int64) {
 	updated, err := georegion.RecalculateImageRegions(ctx, pool, &georegion.RegionRecalcOptions{
 		Progress: func(processed, total int) {
 			job.UpdateState(map[string]any{
-				"processed": processed,
-				"updated":   processed,
+				"processed":   processed,
+				"updated":     processed,
 				"status_line": fmt.Sprintf("Item %d/%d: recalculating regions", processed, total),
 			})
 			job.Broadcast("progress", job.GetState())
@@ -1429,6 +1432,8 @@ func (h *ImporterHandler) ImageExportStart(w http.ResponseWriter, r *http.Reques
 		"status": "in_progress", "status_line": "Starting image export...",
 		"total": 0, "processed": 0, "exported": 0, "skipped": 0, "errors": 0,
 		"error_message": nil, "error_messages": []string{},
+		"metadata_queued": 0, "metadata_processed": 0, "metadata_written": 0,
+		"metadata_skipped": 0, "metadata_errors": 0, "metadata_error_messages": []string{},
 	})
 	imageExportJob.Broadcast("status", map[string]any{"status_line": "Starting image export..."})
 
@@ -1436,6 +1441,27 @@ func (h *ImporterHandler) ImageExportStart(w http.ResponseWriter, r *http.Reques
 	go runImageExport(h.imageRepo, imageExportJob, targetDir, uid)
 
 	writeJSON(w, map[string]any{"message": "Image export started", "status": "started"})
+}
+
+const (
+	imageExportMetadataWorkers = 5
+	imageExportMetadataQueue   = 64
+)
+
+func exportMetadataFromItem(path string, it repository.ExportItem) imagetagsync.ExportMetadata {
+	meta := imagetagsync.ExportMetadata{
+		FilePath:  path,
+		Source:    it.Source,
+		Latitude:  it.Latitude,
+		Longitude: it.Longitude,
+		HasGPS:    it.HasGPS,
+		Tags:      it.Tags,
+	}
+	if it.CreatedAt.Valid {
+		t := it.CreatedAt.Time
+		meta.CreatedAt = &t
+	}
+	return meta
 }
 
 func runImageExport(repo *repository.ImageRepo, job *importer.ImportJob, targetDir string, uid int64) {
@@ -1463,9 +1489,74 @@ func runImageExport(repo *repository.ImageRepo, job *importer.ImportJob, targetD
 	subdirCount := 0
 	const maxPerDir = 200
 
+	metaCh := make(chan imagetagsync.ExportMetadata, imageExportMetadataQueue)
+	metadataQueued := 0
+	metaWritten, metaSkipped, metaErrors, metaProcessed := 0, 0, 0, 0
+	var metaErrMsgs []string
+	var metaMu sync.Mutex
+
+	updateMetadataJobState := func(statusLine string) {
+		metaMu.Lock()
+		defer metaMu.Unlock()
+		job.UpdateState(map[string]any{
+			"processed": total, "exported": exported, "skipped": skipped, "errors": errCount,
+			"error_messages": errMsgs, "metadata_queued": metadataQueued,
+			"metadata_processed": metaProcessed, "metadata_written": metaWritten,
+			"metadata_skipped": metaSkipped, "metadata_errors": metaErrors,
+			"metadata_error_messages": metaErrMsgs,
+			"status_line":             statusLine,
+		})
+		job.Broadcast("progress", job.GetState())
+	}
+
+	exifTool, exifErr := imagetagsync.ResolveExifTool("")
+	var metaWg sync.WaitGroup
+	for w := 0; w < imageExportMetadataWorkers; w++ {
+		metaWg.Add(1)
+		go func() {
+			defer metaWg.Done()
+			for meta := range metaCh {
+				if job.IsCancelled() {
+					return
+				}
+				var err error
+				if exifErr != nil {
+					err = exifErr
+				} else {
+					err = imagetagsync.WriteExportMetadata(exifTool, meta)
+				}
+				metaMu.Lock()
+				metaProcessed++
+				processed := metaProcessed
+				queued := metadataQueued
+				if err != nil {
+					if errors.Is(err, imagetagsync.ErrNothingToWrite) {
+						metaSkipped++
+					} else {
+						metaErrors++
+						metaErrMsgs = append(metaErrMsgs, fmt.Sprintf("%s: %v", meta.FilePath, err))
+					}
+				} else {
+					metaWritten++
+				}
+				written, skippedMeta, errMeta := metaWritten, metaSkipped, metaErrors
+				metaMu.Unlock()
+
+				statusLine := fmt.Sprintf("Metadata %d/%d: %d written, %d skipped, %d errors",
+					processed, queued, written, skippedMeta, errMeta)
+				updateMetadataJobState(statusLine)
+			}
+		}()
+	}
+
 	for i, it := range items {
 		if job.IsCancelled() {
-			job.UpdateState(map[string]any{"status": "cancelled", "status_line": "Export cancelled.", "processed": i, "exported": exported, "skipped": skipped, "errors": errCount, "error_messages": errMsgs})
+			close(metaCh)
+			job.UpdateState(map[string]any{
+				"status": "cancelled", "status_line": "Export cancelled.",
+				"processed": i, "exported": exported, "skipped": skipped, "errors": errCount,
+				"error_messages": errMsgs, "metadata_queued": metadataQueued,
+			})
 			job.Broadcast("cancelled", job.GetState())
 			return
 		}
@@ -1494,17 +1585,41 @@ func runImageExport(repo *repository.ImageRepo, job *importer.ImportJob, targetD
 				errMsgs = append(errMsgs, fmt.Sprintf("Image %d: %v", it.ID, err))
 			} else {
 				exported++
+				metadataQueued++
+				metaCh <- exportMetadataFromItem(path, it)
 			}
 		}
 		job.UpdateState(map[string]any{
 			"processed": i + 1, "exported": exported, "skipped": skipped, "errors": errCount,
-			"error_messages": errMsgs,
-			"status_line":    fmt.Sprintf("Item %d/%d: %d exported, %d skipped, %d errors", i+1, total, exported, skipped, errCount),
+			"error_messages": errMsgs, "metadata_queued": metadataQueued,
+			"status_line": fmt.Sprintf("Item %d/%d: %d exported, %d skipped, %d errors",
+				i+1, total, exported, skipped, errCount),
 		})
 		job.Broadcast("progress", job.GetState())
 	}
+	close(metaCh)
+	if metadataQueued > 0 {
+		updateMetadataJobState(fmt.Sprintf("Writing metadata to %d files…", metadataQueued))
+	}
+	metaWg.Wait()
 
-	statusLine := fmt.Sprintf("Completed: %d exported, %d skipped, %d errors", exported, skipped, errCount)
+	if job.IsCancelled() {
+		job.UpdateState(map[string]any{
+			"status": "cancelled",
+			"status_line": fmt.Sprintf("Cancelled: %d exported; metadata %d/%d written",
+				exported, metaWritten, metadataQueued),
+			"processed": total, "exported": exported, "skipped": skipped, "errors": errCount,
+			"error_messages": errMsgs, "metadata_queued": metadataQueued,
+			"metadata_processed": metaProcessed, "metadata_written": metaWritten,
+			"metadata_skipped": metaSkipped, "metadata_errors": metaErrors,
+			"metadata_error_messages": metaErrMsgs,
+		})
+		job.Broadcast("cancelled", job.GetState())
+		return
+	}
+
+	statusLine := fmt.Sprintf("Completed: %d exported, %d skipped, %d file errors; metadata %d written, %d skipped, %d errors",
+		exported, skipped, errCount, metaWritten, metaSkipped, metaErrors)
 	var errMsg any
 	if len(errMsgs) > 0 {
 		end := 5
@@ -1513,10 +1628,22 @@ func runImageExport(repo *repository.ImageRepo, job *importer.ImportJob, targetD
 		}
 		errMsg = strings.Join(errMsgs[:end], "; ")
 	}
+	var metaErrMsg any
+	if len(metaErrMsgs) > 0 {
+		end := 5
+		if len(metaErrMsgs) < end {
+			end = len(metaErrMsgs)
+		}
+		metaErrMsg = strings.Join(metaErrMsgs[:end], "; ")
+	}
 	job.UpdateState(map[string]any{
 		"status": "completed", "status_line": statusLine,
 		"processed": total, "exported": exported, "skipped": skipped, "errors": errCount,
 		"error_message": errMsg, "error_messages": errMsgs,
+		"metadata_queued": metadataQueued, "metadata_processed": metaProcessed,
+		"metadata_written": metaWritten, "metadata_skipped": metaSkipped,
+		"metadata_errors":        metaErrors,
+		"metadata_error_message": metaErrMsg, "metadata_error_messages": metaErrMsgs,
 	})
 	job.Broadcast("completed", job.GetState())
 }

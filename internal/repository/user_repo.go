@@ -154,6 +154,38 @@ func (r *UserRepo) TouchLastLogin(ctx context.Context, id int64) {
 	_, _ = r.pool.ExecContext(ctx, `UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?1`, id)
 }
 
+// AdminExists reports whether any user has is_admin = true.
+func (r *UserRepo) AdminExists(ctx context.Context) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = TRUE)`,
+	).Scan(&exists)
+	return exists, err
+}
+
+// SetIsAdmin sets the is_admin flag for a user.
+func (r *UserRepo) SetIsAdmin(ctx context.Context, id int64, isAdmin bool) error {
+	_, err := r.pool.ExecContext(ctx,
+		`UPDATE users SET is_admin = ?1 WHERE id = ?2`,
+		isAdmin, id,
+	)
+	return err
+}
+
+// CreateAdmin inserts a new admin user and returns the created record.
+func (r *UserRepo) CreateAdmin(ctx context.Context, email, passwordHash, displayName, firstName, familyName string) (*User, error) {
+	var u User
+	err := r.pool.QueryRowContext(ctx,
+		`INSERT INTO users (email, password_hash, display_name, first_name, family_name, is_admin)
+		 VALUES (?1, ?2, NULLIF(?3, ''), NULLIF(?4, ''), NULLIF(?5, ''), TRUE)
+		 RETURNING id, email, password_hash,
+		           COALESCE(display_name, ''), COALESCE(first_name, ''), COALESCE(family_name, ''),
+		           is_active, is_admin, created_at`,
+		email, passwordHash, displayName, firstName, familyName,
+	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.DisplayName, &u.FirstName, &u.FamilyName, &u.IsActive, &u.IsAdmin, &u.CreatedAt)
+	return &u, err
+}
+
 // AnyNonAdminUserExists reports whether at least one non-admin user account exists.
 // Used by single-tenant registration to enforce the one-account limit.
 // Ignores the reserved placeholder row at users.id=1.
