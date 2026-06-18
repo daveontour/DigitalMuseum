@@ -31,11 +31,12 @@ var exemptPrefixes = []string{
 
 // exemptExact lists paths that are always accessible without authentication.
 var exemptExact = map[string]bool{
-	"/health":        true,
-	"/auth/login":    true,
-	"/auth/register": true,
-	"/login":         true,
-	"/profiles":      true,
+	"/health":                        true,
+	"/favicon.ico":                   true,
+	"/auth/login":                    true,
+	"/auth/register":                 true,
+	"/login":                         true,
+	"/profiles":                      true,
 	"/api/resolved-main-sqlite-path": true,
 }
 
@@ -46,6 +47,7 @@ var exemptExact = map[string]bool{
 //
 // Exempt from authentication:
 //   - GET /health
+//   - GET /favicon.ico
 //   - GET /static/*
 //   - POST /auth/login
 //   - POST /auth/register

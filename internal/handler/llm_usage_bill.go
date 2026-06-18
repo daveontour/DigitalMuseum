@@ -12,7 +12,7 @@ import (
 )
 
 // WriteLLMUsageBillPDF writes a PDF usage statement for userID and optional time range [from, to) (to exclusive in queries).
-func WriteLLMUsageBillPDF(w http.ResponseWriter, r *http.Request, userRepo *repository.UserRepo, billing *repository.BillingRepo, userID int64, from, to *time.Time) {
+func WriteLLMUsageBillPDF(w http.ResponseWriter, r *http.Request, userRepo *repository.UserRepo, billing *repository.BillingRepo, userID int64, userEmail *string, from, to *time.Time) {
 	ctx := r.Context()
 	u, err := userRepo.FindByID(ctx, userID)
 	if err != nil {
@@ -24,7 +24,7 @@ func WriteLLMUsageBillPDF(w http.ResponseWriter, r *http.Request, userRepo *repo
 		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
-	sum, byProv, byVis, err := billing.SummaryByUser(ctx, userID, from, to)
+	sum, byProv, byVis, err := billing.SummaryByUser(ctx, userID, userEmail, from, to)
 	if err != nil {
 		slog.Error("bill pdf summary", "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to load usage summary")
@@ -36,7 +36,7 @@ func WriteLLMUsageBillPDF(w http.ResponseWriter, r *http.Request, userRepo *repo
 		writeError(w, http.StatusInternalServerError, "failed to load usage events")
 		return
 	}
-	buckets, err := billing.TimeseriesByUser5Min(ctx, userID, from, to)
+	buckets, err := billing.TimeseriesByUser5Min(ctx, userID, userEmail, from, to)
 	if err != nil {
 		slog.Error("bill pdf timeseries", "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to load timeseries")

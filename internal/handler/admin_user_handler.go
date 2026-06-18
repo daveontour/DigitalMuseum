@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -33,6 +35,9 @@ type AdminUsersHandler struct {
 	dashboardSvc     *service.DashboardService
 	billing          *repository.BillingRepo
 	appInstr         *repository.AppSystemInstructionsRepo
+	profileRepo      *repository.ProfileRepo
+	mainPool         *sql.DB
+	keyringPepper    string
 	secure           bool
 	sessions         adminSessions
 	// Admin credentials from ADMIN_EMAIL / ADMIN_PASSWORD (server config).
@@ -70,6 +75,15 @@ func (h *AdminUsersHandler) WithBootstrapAdminCredentials(email, password string
 	h.bootstrapAdminPassword = normalizeAdminSecret(password)
 }
 
+// WithArchiveContext wires billing profile lookup and the server's main archive pool
+// so admin APIs can target a selected archive via ?profile_id=.
+func (h *AdminUsersHandler) WithArchiveContext(profileRepo *repository.ProfileRepo, mainPool *sql.DB, keyringPepper string) *AdminUsersHandler {
+	h.profileRepo = profileRepo
+	h.mainPool = mainPool
+	h.keyringPepper = keyringPepper
+	return h
+}
+
 func normalizeAdminSecret(v string) string {
 	v = strings.TrimSpace(v)
 	v = strings.TrimSuffix(v, "\r")
@@ -89,14 +103,6 @@ func (h *AdminUsersHandler) bootstrapAdminOK(email, password string) bool {
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
-}
-
-func (h *AdminUsersHandler) archiveUsersUnavailable(w http.ResponseWriter) bool {
-	if h.userRepo != nil {
-		return false
-	}
-	writeError(w, http.StatusServiceUnavailable, "no user archive is open — create an archive first")
-	return true
 }
 
 // RegisterRoutes mounts the admin routes.
@@ -125,11 +131,15 @@ func (h *AdminUsersHandler) GetAdminSystemInstructions(w http.ResponseWriter, r 
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.appInstr == nil {
-		writeError(w, http.StatusServiceUnavailable, "system instructions store not configured")
+	instrRepo, closeFn, err := h.adminAppInstrRepo(r.Context(), r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	ins, err := h.appInstr.Get(r.Context())
+	if closeFn != nil {
+		defer closeFn()
+	}
+	ins, err := instrRepo.Get(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load system instructions")
 		return
@@ -146,9 +156,13 @@ func (h *AdminUsersHandler) PutAdminSystemInstructions(w http.ResponseWriter, r 
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.appInstr == nil {
-		writeError(w, http.StatusServiceUnavailable, "system instructions store not configured")
+	instrRepo, closeFn, err := h.adminAppInstrRepo(r.Context(), r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if closeFn != nil {
+		defer closeFn()
 	}
 	var body struct {
 		SystemInstructions         string `json:"system_instructions"`
@@ -159,7 +173,7 @@ func (h *AdminUsersHandler) PutAdminSystemInstructions(w http.ResponseWriter, r 
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := h.appInstr.Upsert(r.Context(), body.SystemInstructions, body.CoreSystemInstructions, body.QuestionSystemInstructions); err != nil {
+	if err := instrRepo.Upsert(r.Context(), body.SystemInstructions, body.CoreSystemInstructions, body.QuestionSystemInstructions); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save system instructions")
 		return
 	}
@@ -171,11 +185,15 @@ func (h *AdminUsersHandler) GetAdminPamBotInstructions(w http.ResponseWriter, r 
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.appInstr == nil {
-		writeError(w, http.StatusServiceUnavailable, "system instructions store not configured")
+	instrRepo, closeFn, err := h.adminAppInstrRepo(r.Context(), r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	ins, err := h.appInstr.Get(r.Context())
+	if closeFn != nil {
+		defer closeFn()
+	}
+	ins, err := instrRepo.Get(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load pam bot instructions")
 		return
@@ -188,9 +206,13 @@ func (h *AdminUsersHandler) PutAdminPamBotInstructions(w http.ResponseWriter, r 
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.appInstr == nil {
-		writeError(w, http.StatusServiceUnavailable, "system instructions store not configured")
+	instrRepo, closeFn, err := h.adminAppInstrRepo(r.Context(), r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if closeFn != nil {
+		defer closeFn()
 	}
 	var body struct {
 		PamBotInstructions string `json:"pam_bot_instructions"`
@@ -199,7 +221,7 @@ func (h *AdminUsersHandler) PutAdminPamBotInstructions(w http.ResponseWriter, r 
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := h.appInstr.UpsertPamBotInstructions(r.Context(), body.PamBotInstructions); err != nil {
+	if err := instrRepo.UpsertPamBotInstructions(r.Context(), body.PamBotInstructions); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save pam bot instructions")
 		return
 	}
@@ -270,11 +292,30 @@ func (h *AdminUsersHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.userRepo == nil {
-		writeJSON(w, []any{})
+	profileID := strings.TrimSpace(r.URL.Query().Get("profile_id"))
+	if profileID == "" {
+		if h.profileRepo != nil {
+			writeError(w, http.StatusBadRequest, "profile_id query parameter is required — select an archive in the Archives tab")
+			return
+		}
+		if h.userRepo == nil {
+			writeJSON(w, []any{})
+			return
+		}
+	}
+	arc, err := h.openAdminArchive(r.Context(), profileID)
+	if err != nil {
+		if errors.Is(err, errAdminArchiveNotAvailable) {
+			writeError(w, http.StatusBadRequest, "no archive database is available — select an archive in the Archives tab")
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	users, err := h.userRepo.ListAll(r.Context())
+	defer arc.close()
+
+	userRepo := repository.NewUserRepo(arc.db)
+	users, err := userRepo.ListAll(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list users")
 		return
@@ -310,7 +351,7 @@ func (h *AdminUsersHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.archiveUsersUnavailable(w) {
+	if h.archiveUsersUnavailable(w, r) {
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
@@ -329,7 +370,15 @@ func (h *AdminUsersHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "allow_server_llm_keys is required")
 		return
 	}
-	if err := h.userRepo.SetAllowServerLLMKeys(r.Context(), id, *req.AllowServerLLMKeys); err != nil {
+	profileID := strings.TrimSpace(r.URL.Query().Get("profile_id"))
+	arc, err := h.openAdminArchive(r.Context(), profileID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer arc.close()
+	userRepo := repository.NewUserRepo(arc.db)
+	if err := userRepo.SetAllowServerLLMKeys(r.Context(), id, *req.AllowServerLLMKeys); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update user")
 		return
 	}
@@ -344,7 +393,7 @@ func (h *AdminUsersHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.archiveUsersUnavailable(w) {
+	if h.archiveUsersUnavailable(w, r) {
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
@@ -352,7 +401,15 @@ func (h *AdminUsersHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
-	if err := h.userRepo.Delete(r.Context(), id); err != nil {
+	profileID := strings.TrimSpace(r.URL.Query().Get("profile_id"))
+	arc, err := h.openAdminArchive(r.Context(), profileID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer arc.close()
+	userRepo := repository.NewUserRepo(arc.db)
+	if err := userRepo.Delete(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete user")
 		return
 	}
@@ -364,7 +421,7 @@ func (h *AdminUsersHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.archiveUsersUnavailable(w) {
+	if h.archiveUsersUnavailable(w, r) {
 		return
 	}
 	var req struct {
@@ -398,7 +455,15 @@ func (h *AdminUsersHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	familyName := strings.TrimSpace(req.FamilyName)
-	user, err := h.userRepo.Create(r.Context(), req.Email, hash, req.DisplayName, req.DisplayName, familyName)
+	profileID := strings.TrimSpace(r.URL.Query().Get("profile_id"))
+	arc, err := h.openAdminArchive(r.Context(), profileID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer arc.close()
+	userRepo := repository.NewUserRepo(arc.db)
+	user, err := userRepo.Create(r.Context(), req.Email, hash, req.DisplayName, req.DisplayName, familyName)
 	if err != nil {
 		writeError(w, http.StatusConflict, "could not create user — email may already be registered")
 		return
@@ -406,19 +471,29 @@ func (h *AdminUsersHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	userCtx := context.WithValue(r.Context(), appctx.ContextKeyUserID, user.ID)
 
-	// Initialise keyring so the user is ready to unlock immediately on first login.
-	if err := h.sensitiveSvc.InitKeyring(userCtx, req.Password); err != nil {
-		slog.Warn("admin: keyring init failed", "user_id", user.ID, "err", err)
+	if profileID == "" && h.sensitiveSvc != nil {
+		if err := h.sensitiveSvc.InitKeyring(userCtx, req.Password); err != nil {
+			slog.Warn("admin: keyring init failed", "user_id", user.ID, "err", err)
+		}
+	} else if err := appcrypto.InitSensitiveKeyring(userCtx, arc.db, req.Password, h.keyringPepper); err != nil {
+		slog.Warn("admin: keyring init failed", "user_id", user.ID, "profile_id", profileID, "err", err)
 	}
 
-	// Create the subject configuration.
 	gender := req.Gender
-	if _, err := h.subjectConfigSvc.CreateOrUpdate(userCtx, service.SubjectConfigUpdateParams{
+	subjectParams := service.SubjectConfigUpdateParams{
 		SubjectName: req.DisplayName,
 		FamilyName:  &familyName,
 		Gender:      &gender,
-	}); err != nil {
-		slog.Warn("admin: subject config init failed", "user_id", user.ID, "err", err)
+	}
+	if profileID == "" && h.subjectConfigSvc != nil {
+		if _, err := h.subjectConfigSvc.CreateOrUpdate(userCtx, subjectParams); err != nil {
+			slog.Warn("admin: subject config init failed", "user_id", user.ID, "err", err)
+		}
+	} else {
+		subjectLocal := service.NewSubjectConfigService(repository.NewSubjectConfigRepo(arc.db), nil, nil)
+		if _, err := subjectLocal.CreateOrUpdate(userCtx, subjectParams); err != nil {
+			slog.Warn("admin: subject config init failed", "user_id", user.ID, "profile_id", profileID, "err", err)
+		}
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -436,7 +511,7 @@ func (h *AdminUsersHandler) GetUserDashboard(w http.ResponseWriter, r *http.Requ
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.archiveUsersUnavailable(w) {
+	if h.archiveUsersUnavailable(w, r) {
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
@@ -444,8 +519,21 @@ func (h *AdminUsersHandler) GetUserDashboard(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
+	profileID := strings.TrimSpace(r.URL.Query().Get("profile_id"))
+	arc, err := h.openAdminArchive(r.Context(), profileID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer arc.close()
 	userCtx := context.WithValue(r.Context(), appctx.ContextKeyUserID, id)
-	dash, err := h.dashboardSvc.GetDashboard(userCtx)
+	var dashSvc *service.DashboardService
+	if profileID == "" && h.dashboardSvc != nil {
+		dashSvc = h.dashboardSvc
+	} else {
+		dashSvc = newDashboardServiceForDB(arc.db)
+	}
+	dash, err := dashSvc.GetDashboard(userCtx)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load dashboard")
 		return
@@ -472,7 +560,7 @@ func (h *AdminUsersHandler) GetLLMUsageSummary(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadRequest, "invalid from or to (use RFC3339)")
 		return
 	}
-	sum, byProv, byVis, err := h.billing.SummaryByUser(r.Context(), id, from, to)
+	sum, byProv, byVis, err := h.billing.SummaryByUser(r.Context(), id, parseOptionalUserEmail(r), from, to)
 	if err != nil {
 		slog.Error("llm usage summary", "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to load summary")
@@ -519,7 +607,7 @@ func (h *AdminUsersHandler) GetLLMUsageEvents(w http.ResponseWriter, r *http.Req
 			offset = n
 		}
 	}
-	events, err := h.billing.ListEventsByUser(r.Context(), id, from, to, limit, offset)
+	events, err := h.billing.ListEventsByUser(r.Context(), id, parseOptionalUserEmail(r), from, to, limit, offset)
 	if err != nil {
 		slog.Error("llm usage events", "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to load events")
@@ -567,7 +655,15 @@ func (h *AdminUsersHandler) GetLLMUsageErrorEvents(w http.ResponseWriter, r *htt
 			offset = n
 		}
 	}
-	events, err := h.billing.ListFailedEvents(r.Context(), userID, from, to, limit, offset)
+	var userEmails []string
+	if profileID := strings.TrimSpace(r.URL.Query().Get("profile_id")); profileID != "" {
+		userEmails, err = h.listArchiveUserEmails(r.Context(), profileID)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	events, err := h.billing.ListFailedEvents(r.Context(), userID, userEmails, from, to, limit, offset)
 	if err != nil {
 		slog.Error("llm usage error events", "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to load error events")
@@ -604,7 +700,7 @@ func (h *AdminUsersHandler) GetLLMUsageTimeseries(w http.ResponseWriter, r *http
 		writeError(w, http.StatusBadRequest, "invalid from or to (use RFC3339)")
 		return
 	}
-	buckets, err := h.billing.TimeseriesByUser5Min(r.Context(), id, from, to)
+	buckets, err := h.billing.TimeseriesByUser5Min(r.Context(), id, parseOptionalUserEmail(r), from, to)
 	if err != nil {
 		slog.Error("llm usage timeseries", "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to load timeseries")
@@ -629,7 +725,7 @@ func (h *AdminUsersHandler) GetLLMUsageBillPDF(w http.ResponseWriter, r *http.Re
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	if h.archiveUsersUnavailable(w) {
+	if h.archiveUsersUnavailable(w, r) {
 		return
 	}
 	if h.billing == nil || h.billing.PgxPool() == nil {
@@ -646,7 +742,15 @@ func (h *AdminUsersHandler) GetLLMUsageBillPDF(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadRequest, "invalid from or to (use RFC3339)")
 		return
 	}
-	WriteLLMUsageBillPDF(w, r, h.userRepo, h.billing, id, from, to)
+	profileID := strings.TrimSpace(r.URL.Query().Get("profile_id"))
+	arc, err := h.openAdminArchive(r.Context(), profileID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer arc.close()
+	userRepo := repository.NewUserRepo(arc.db)
+	WriteLLMUsageBillPDF(w, r, userRepo, h.billing, id, parseOptionalUserEmail(r), from, to)
 }
 
 func parseLLMUsageTimeRange(r *http.Request) (from, to *time.Time, err error) {
@@ -745,7 +849,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .topbar h1 i{color:#3b82f6}
 #logout-btn{background:none;border:1px solid #2e4068;color:#8fa4c8;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.85rem}
 #logout-btn:hover{background:#2a3a6b;color:#fff}
-.container{max-width:1300px;width:1300px;min-width:900px;margin:40px auto;padding:0 20px}
+.container{max-width:1300px;width:100%;min-width:0;margin:40px auto;padding:0 20px}
 .card{background:#19264d;border-radius:10px;padding:32px;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
 .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .card-header h2{color:#fff;font-size:1.2rem;margin:0}
@@ -775,7 +879,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-compact-secondary:disabled{opacity:0.45;cursor:not-allowed}
 .btn-info{background:#0e7490;color:#fff;padding:6px 12px;font-size:0.82rem}.btn-info:hover{background:#0c5f75}
 .error{color:#f87171;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);padding:10px 14px;border-radius:6px;margin-bottom:16px;font-size:0.9rem;display:none}
-#login-section{display:flex;align-items:center;justify-content:center;min-height:100vh}
+#login-section{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;box-sizing:border-box}
 #admin-user-login-btn{position:fixed;top:14px;right:14px;z-index:100;padding:8px 14px;border-radius:6px;border:1px solid #2e4068;background:#19264d;color:#cdd6e8;font-size:0.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s,color .15s}
 #admin-user-login-btn:hover{background:#243368;border-color:#3b82f6;color:#fff}
 #admin-section{display:none}
@@ -789,6 +893,11 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600}
 .badge-active{background:rgba(34,197,94,0.15);color:#4ade80}
 .badge-inactive{background:rgba(248,113,113,0.15);color:#f87171}
+.admin-context-bar{max-width:1300px;width:100%;margin:12px auto 0;padding:10px 16px;background:#19264d;border:1px solid #2a3a6b;border-radius:8px;color:#8fa4c8;font-size:0.88rem;box-sizing:border-box}
+.admin-context-bar strong{color:#cdd6e8}
+.archive-row-selected td{background:rgba(59,130,246,0.12)!important}
+tr.archive-selectable{cursor:pointer}
+tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;align-items:center;justify-content:center;padding:20px}
 .modal-overlay.open{display:flex}
@@ -811,6 +920,20 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .admin-tab-panel{display:none;padding:32px}
 .admin-tab-panel.active{display:block}
 .admin-tab-shell{background:#19264d;border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
+@media (max-width:900px){
+  .container{margin:20px auto;padding:0 12px}
+  .admin-tab-panel{padding:20px}
+  .card-header{flex-wrap:wrap;gap:12px}
+}
+@media (max-width:640px){
+  .form-row{grid-template-columns:1fr}
+  .topbar{flex-wrap:wrap;gap:10px;padding:12px 16px}
+  .admin-tabs{flex-wrap:wrap;padding:0 4px}
+  .admin-tab{padding:10px 12px;font-size:0.85rem}
+  .admin-tab-panel{padding:16px}
+  #login-section{padding:16px}
+  #admin-user-login-btn,#login-admin-login-btn{font-size:0.82rem;padding:7px 10px}
+}
 </style>
 </head>
 <body>
@@ -841,17 +964,95 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <h1><i class="fas fa-shield-halved"></i>Digital Museum — Admin</h1>
     <button id="logout-btn"><i class="fas fa-sign-out-alt" style="margin-right:6px"></i>Logout</button>
   </div>
+  <div id="admin-context-bar" class="admin-context-bar">
+    <strong id="admin-context-name">No archive selected</strong>
+    <span id="admin-context-hint" style="margin-left:8px">— click a row in the Archives table to manage that archive in the other tabs.</span>
+  </div>
   <div class="container">
     <div class="card admin-tab-shell">
       <div class="admin-tabs" role="tablist">
-        <button type="button" class="admin-tab active" id="tab-btn-users" role="tab" aria-selected="true" aria-controls="tab-panel-users">Users</button>
+        <button type="button" class="admin-tab active" id="tab-btn-archives" role="tab" aria-selected="true" aria-controls="tab-panel-archives">Archives</button>
+        <button type="button" class="admin-tab" id="tab-btn-users" role="tab" aria-selected="false" aria-controls="tab-panel-users">Users</button>
         <button type="button" class="admin-tab" id="tab-btn-billing" role="tab" aria-selected="false" aria-controls="tab-panel-billing">Usage &amp; Billing</button>
         <button type="button" class="admin-tab" id="tab-btn-errors" role="tab" aria-selected="false" aria-controls="tab-panel-errors">Errors</button>
         <button type="button" class="admin-tab" id="tab-btn-sys" role="tab" aria-selected="false" aria-controls="tab-panel-sys">System instructions</button>
         <button type="button" class="admin-tab" id="tab-btn-pambot" role="tab" aria-selected="false" aria-controls="tab-panel-pambot">Pam Bot</button>
-        <button type="button" class="admin-tab" id="tab-btn-archives" role="tab" aria-selected="false" aria-controls="tab-panel-archives">Archives</button>
       </div>
-      <div id="tab-panel-users" class="admin-tab-panel active" role="tabpanel">
+      <div id="tab-panel-archives" class="admin-tab-panel active" role="tabpanel">
+      <div class="card-header" style="padding:0 0 16px;margin-bottom:0">
+        <h2 style="margin:0"><i class="fas fa-archive" style="color:#3b82f6;margin-right:8px"></i>Archives</h2>
+      </div>
+      <p style="color:#8fa4c8;font-size:.88rem;margin-bottom:16px">
+        Archive profiles stored in the admin database.
+        <strong style="color:#cdd6e8">Click a row</strong> to select an archive for the Users, Billing, and instructions tabs.
+        Disabling an archive hides it from the login dropdown.
+        The server opens the archive marked as <strong style="color:#cdd6e8">startup default</strong>.
+      </p>
+      <div id="archives-error" class="error" style="margin-bottom:12px;display:none"></div>
+      <div style="overflow-x:auto;margin-bottom:16px">
+        <table id="archives-table" style="min-width:640px">
+          <thead><tr>
+            <th>Name</th><th>Username</th><th>DB Path</th>
+            <th>Status</th><th>Startup default</th><th>Last Used</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="archives-body"></tbody>
+        </table>
+      </div>
+      <div style="border:1px solid #2e4068;border-radius:8px;padding:12px;margin-bottom:12px;background:#0f1922">
+        <p style="color:#8fa4c8;font-size:0.82rem;margin:0 0 10px 0"><span style="color:#cdd6e8;font-weight:600;margin-bottom:8px;font-size:1.0rem">Create New Archive</span> Creates a new SQLite file at the path below, runs migrations, and registers the first owner account in that archive.</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="archive-add-first-name">First name *</label>
+            <input id="archive-add-first-name" type="text" placeholder="e.g. Jane">
+          </div>
+          <div class="form-group">
+            <label for="archive-add-family-name">Family name *</label>
+            <input id="archive-add-family-name" type="text" placeholder="e.g. Smith">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="archive-add-username">Username *</label>
+            <input id="archive-add-username" type="text" placeholder="login username">
+          </div>
+          <div class="form-group admin-archive-visible-login">
+            <label class="admin-archive-visible-field-label" for="archive-add-enabled">Visible on login</label>
+            <label class="admin-archive-enabled-label" for="archive-add-enabled">
+              <input id="archive-add-enabled" type="checkbox" checked style="accent-color:#3b82f6;width:auto;margin:0">
+              Enabled
+            </label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="archive-add-password">Password *</label>
+            <div class="admin-pw-wrap">
+              <input id="archive-add-password" type="password" placeholder="At least 12 characters" autocomplete="new-password">
+              <button type="button" class="admin-pw-toggle" id="archive-add-password-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="archive-add-password-confirm">Confirm password *</label>
+            <div class="admin-pw-wrap">
+              <input id="archive-add-password-confirm" type="password" placeholder="Re-enter" autocomplete="new-password">
+              <button type="button" class="admin-pw-toggle" id="archive-add-password-confirm-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="archive-add-db-path">DB Path</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="archive-add-db-path" type="text" placeholder="Leave blank for server default (next to admin database)" style="font-family:monospace;font-size:.88rem;flex:1">
+            <button class="btn btn-secondary" id="archive-add-browse-btn" type="button" style="display:none"><i class="fas fa-folder-open" style="margin-right:6px"></i>Browse…</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn btn-primary" id="archive-add-btn" type="button"><i class="fas fa-plus" style="margin-right:6px"></i>Create archive</button>
+        </div>
+      </div>
+      </div>
+
+      <div id="tab-panel-users" class="admin-tab-panel" role="tabpanel">
       <div class="card-header" style="padding:0 0 20px 0;margin-bottom:0">
         <h2 style="margin:0">Users</h2>
         <button class="btn btn-success" id="add-user-btn">
@@ -990,79 +1191,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
       </div>
 
-      <div id="tab-panel-archives" class="admin-tab-panel" role="tabpanel">
-      <div class="card-header" style="padding:0 0 16px;margin-bottom:0">
-        <h2 style="margin:0"><i class="fas fa-archive" style="color:#3b82f6;margin-right:8px"></i>Archives</h2>
-      </div>
-      <p style="color:#8fa4c8;font-size:.88rem;margin-bottom:16px">
-        Archive profiles stored in the admin database.
-        Disabling an archive hides it from the login dropdown.
-        The server opens the archive marked as <strong style="color:#cdd6e8">startup default</strong>. 
-      </p>
-      <div id="archives-error" class="error" style="margin-bottom:12px;display:none"></div>
-      <div style="border:1px solid #2e4068;border-radius:8px;padding:12px;margin-bottom:12px;background:#0f1922">
-        <p style="color:#8fa4c8;font-size:0.82rem;margin:0 0 10px 0"><span style="color:#cdd6e8;font-weight:600;margin-bottom:8px;font-size:1.0rem">Create New Archive</span> Creates a new SQLite file at the path below, runs migrations, and registers the first owner account in that archive.</p>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="archive-add-first-name">First name *</label>
-            <input id="archive-add-first-name" type="text" placeholder="e.g. Jane">
-          </div>
-          <div class="form-group">
-            <label for="archive-add-family-name">Family name *</label>
-            <input id="archive-add-family-name" type="text" placeholder="e.g. Smith">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="archive-add-username">Username *</label>
-            <input id="archive-add-username" type="text" placeholder="login username">
-          </div>
-          <div class="form-group admin-archive-visible-login">
-            <label class="admin-archive-visible-field-label" for="archive-add-enabled">Visible on login</label>
-            <label class="admin-archive-enabled-label" for="archive-add-enabled">
-              <input id="archive-add-enabled" type="checkbox" checked style="accent-color:#3b82f6;width:auto;margin:0">
-              Enabled
-            </label>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="archive-add-password">Password *</label>
-            <div class="admin-pw-wrap">
-              <input id="archive-add-password" type="password" placeholder="At least 12 characters" autocomplete="new-password">
-              <button type="button" class="admin-pw-toggle" id="archive-add-password-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="archive-add-password-confirm">Confirm password *</label>
-            <div class="admin-pw-wrap">
-              <input id="archive-add-password-confirm" type="password" placeholder="Re-enter" autocomplete="new-password">
-              <button type="button" class="admin-pw-toggle" id="archive-add-password-confirm-toggle" aria-label="Show password" aria-pressed="false" title="Show password"><i class="far fa-eye" aria-hidden="true"></i></button>
-            </div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="archive-add-db-path">DB Path *</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input id="archive-add-db-path" type="text" placeholder="Leave blank for default next to admin database" style="font-family:monospace;font-size:.88rem;flex:1">
-            <button class="btn btn-secondary" id="archive-add-browse-btn" type="button"><i class="fas fa-folder-open" style="margin-right:6px"></i>Browse…</button>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
-          <button class="btn btn-primary" id="archive-add-btn" type="button"><i class="fas fa-plus" style="margin-right:6px"></i>Create archive</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto">
-        <table id="archives-table" style="min-width:640px">
-          <thead><tr>
-            <th>Name</th><th>Username</th><th>DB Path</th>
-            <th>Status</th><th>Startup default</th><th>Last Used</th><th>Actions</th>
-          </tr></thead>
-          <tbody id="archives-body"></tbody>
-        </table>
-      </div>
-      </div>
-
     </div>
   </div>
 </div>
@@ -1161,9 +1289,50 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <script>
 (function() {
   let pendingDelUserId = null;
+  let selectedProfileId = sessionStorage.getItem('dm_admin_profile_id') || '';
+  let selectedProfileName = sessionStorage.getItem('dm_admin_profile_name') || '';
+  let cachedArchives = [];
+
+  function withProfileQuery(url) {
+    if (!selectedProfileId) return url;
+    return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'profile_id=' + encodeURIComponent(selectedProfileId);
+  }
+
+  function updateAdminContextBar() {
+    var nameEl = document.getElementById('admin-context-name');
+    var hint = document.getElementById('admin-context-hint');
+    if (!nameEl) return;
+    if (selectedProfileId && selectedProfileName) {
+      nameEl.textContent = selectedProfileName;
+      if (hint) hint.style.display = 'none';
+    } else {
+      nameEl.textContent = 'No archive selected';
+      if (hint) hint.style.display = '';
+    }
+  }
+
+  window.selectArchiveProfile = function(id, name) {
+    selectedProfileId = id || '';
+    selectedProfileName = name || '';
+    if (id) {
+      sessionStorage.setItem('dm_admin_profile_id', id);
+      sessionStorage.setItem('dm_admin_profile_name', name || '');
+    } else {
+      sessionStorage.removeItem('dm_admin_profile_id');
+      sessionStorage.removeItem('dm_admin_profile_name');
+    }
+    updateAdminContextBar();
+    if (cachedArchives.length) renderArchives(cachedArchives);
+    refreshArchiveScopedPanels();
+  };
+
+  function refreshArchiveScopedPanels() {
+    if (!selectedProfileId) return;
+    loadUsers();
+  }
 
   async function apiFetch(path, opts) {
-    return fetch(path, { credentials: 'same-origin', ...opts });
+    return fetch(withProfileQuery(path), { credentials: 'same-origin', ...opts });
   }
 
   /** Prefer server writeError JSON shape ({ detail }) over legacy { error }. */
@@ -1173,6 +1342,71 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     if (typeof d.error === 'string' && d.error !== '') return d.error;
     if (typeof d.message === 'string' && d.message !== '') return d.message;
     return fallback;
+  }
+
+  function showAdminLogin() {
+    document.getElementById('admin-section').style.display = 'none';
+    document.getElementById('login-section').style.display = 'flex';
+    showAdminUserLoginBtn(true);
+  }
+
+  function renderArchives(profiles) {
+    var tbody = document.getElementById('archives-body');
+    if (!tbody) return;
+    if (!profiles.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="color:#8fa4c8;text-align:center;padding:24px">No archive profiles.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = profiles.map(function(p) {
+      var lu = p.last_used ? new Date(p.last_used).toLocaleString() : '—';
+      var badge = p.enabled
+        ? '<span class="badge badge-active">Enabled</span>'
+        : '<span class="badge badge-inactive">Disabled</span>';
+      var defCell = p.is_default
+        ? '<span class="badge badge-active" title="Opened at server startup when the file exists">Default</span>'
+        : '<span style="color:#6b7c99">—</span>';
+      var rowCls = (p.id === selectedProfileId ? 'archive-row-selected ' : '') + 'archive-selectable';
+      var actionDefault = '';
+      if (p.is_default) {
+        actionDefault = '<button type="button" class="btn-compact-secondary" style="margin-right:6px;margin-bottom:4px" onclick="event.stopPropagation();clearStartupDefaultArchive(\'' + escAttr(p.id) + '\')">Clear default</button>';
+      } else if (p.enabled) {
+        actionDefault = '<button type="button" class="btn-compact-secondary" style="margin-right:6px;margin-bottom:4px" onclick="event.stopPropagation();setStartupDefaultArchive(\'' + escAttr(p.id) + '\')">Set Default</button>';
+      } else {
+        actionDefault = '<button type="button" class="btn-compact-secondary" style="margin-right:6px;margin-bottom:4px" disabled title="Enable this archive first">Set Default</button>';
+      }
+      return '<tr class="' + rowCls + '" onclick="selectArchiveProfile(\'' + escAttr(p.id) + '\',\'' + escAttr(p.name) + '\')">' +
+        '<td>' + escHtml(p.name) + (p.id === selectedProfileId ? ' <span class="badge badge-active" title="Selected for other admin tabs">Selected</span>' : '') + '</td>' +
+        '<td>' + escHtml(p.username || '—') + '</td>' +
+        '<td style="font-family:monospace;font-size:.82rem;word-break:break-all">' + escHtml(p.db_path) + '</td>' +
+        '<td>' + badge + '</td>' +
+        '<td style="vertical-align:middle">' + defCell + '</td>' +
+        '<td style="color:#8fa4c8">' + lu + '</td>' +
+        '<td style="white-space:normal;max-width:320px" onclick="event.stopPropagation()">' + actionDefault +
+          '<button class="btn btn-warning" style="margin-right:6px;margin-bottom:4px" onclick="event.stopPropagation();toggleArchive(\'' +
+            escAttr(p.id) + '\',' + (!p.enabled) + ')">' +
+            (p.enabled ? 'Disable' : 'Enable') + '</button>' +
+          '<button class="btn btn-danger" style="margin-bottom:4px" onclick="event.stopPropagation();openDelArchiveModal(\'' +
+            escAttr(p.id) + '\',\'' + escAttr(p.name) + '\',\'' + escAttr(p.db_path) + '\')">Delete</button>' +
+        '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  async function loadArchives() {
+    var errEl = document.getElementById('archives-error');
+    if (!errEl) return;
+    errEl.style.display = 'none';
+    try {
+      var res = await fetch('/admin/profiles', { credentials: 'same-origin' });
+      if (res.status === 401) { showAdminLogin(); return; }
+      if (!res.ok) {
+        var ed = await res.json().catch(function() { return {}; });
+        throw new Error(apiErrorMessage(ed, 'Failed to load archives'));
+      }
+      var data = await res.json();
+      cachedArchives = data.profiles || data || [];
+      renderArchives(cachedArchives);
+    } catch(e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
   }
 
   function showAdminUserLoginBtn(visible) {
@@ -1233,7 +1467,23 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     document.getElementById('login-section').style.display = 'none';
     document.getElementById('admin-section').style.display = 'block';
     showAdminUserLoginBtn(false);
-    loadUsers();
+    updateAdminContextBar();
+    loadArchives().then(function() {
+      if (selectedProfileId && !cachedArchives.some(function(p) { return p.id === selectedProfileId; })) {
+        selectedProfileId = '';
+        selectedProfileName = '';
+        sessionStorage.removeItem('dm_admin_profile_id');
+        sessionStorage.removeItem('dm_admin_profile_name');
+        updateAdminContextBar();
+      }
+      if (!selectedProfileId && cachedArchives.length) {
+        var def = cachedArchives.find(function(p) { return p.is_default; }) || cachedArchives[0];
+        if (def && def.id) selectArchiveProfile(def.id, def.name || '');
+      } else if (selectedProfileId) {
+        refreshArchiveScopedPanels();
+      }
+      if (window._adminSetTab) window._adminSetTab('archives');
+    });
   }
 
   window.setAllowServerKeys = async function(userId, allow) {
@@ -1263,7 +1513,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   // ── Load / render users ────────────────────────────────────────────────────
   async function loadUsers() {
     const errEl = document.getElementById('users-error');
+    const tbody = document.getElementById('users-body');
     errEl.style.display = 'none';
+    if (!selectedProfileId) {
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:#8fa4c8;text-align:center;padding:24px">Select an archive in the Archives tab first.</td></tr>';
+      }
+      return;
+    }
     try {
       const res = await apiFetch('/admin/users');
       if (res.status === 401) {
@@ -1272,8 +1529,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         showAdminUserLoginBtn(true);
         return;
       }
-      if (!res.ok) throw new Error('Failed to load users');
-      renderUsers((await res.json()) || []);
+      if (!res.ok) {
+        const ed = await res.json().catch(function() { return {}; });
+        throw new Error(apiErrorMessage(ed, 'Failed to load users'));
+      }
+      var users = (await res.json()) || [];
+      renderUsers(users);
+      populateLLMUserSelect(users);
+      populateErrUserSelect(users);
     } catch (e) {
       errEl.textContent = e.message;
       errEl.style.display = 'block';
@@ -1309,8 +1572,24 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         '</div></td>' +
       '</tr>';
     }).join('');
-    populateLLMUserSelect(users);
-    populateErrUserSelect(users);
+  }
+
+  function selectedLLMUserEmail() {
+    const sel = document.getElementById('llm-user-select');
+    if (!sel || !sel.value) return '';
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? (opt.getAttribute('data-email') || '') : '';
+  }
+
+  function buildLLMQuery() {
+    const p = new URLSearchParams();
+    const f = document.getElementById('llm-from').value;
+    const t = document.getElementById('llm-to').value;
+    if (f) { p.set('from', new Date(f).toISOString()); }
+    if (t) { p.set('to', new Date(t).toISOString()); }
+    const em = selectedLLMUserEmail();
+    if (em) p.set('user_email', em);
+    return p.toString();
   }
 
   function populateLLMUserSelect(users) {
@@ -1319,9 +1598,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     const cur = sel.value;
     sel.innerHTML = '<option value="">— Select user —</option>' +
       users.map(function(u) {
-        return '<option value="' + u.id + '">' + escHtml(u.email) + ' (#' + u.id + ')</option>';
+        return '<option value="' + u.id + '" data-email="' + escAttr(u.email) + '">' + escHtml(u.email) + ' (#' + u.id + ')</option>';
       }).join('');
-    if (cur) { sel.value = cur; }
+    if (cur && users.some(function(u) { return String(u.id) === cur; })) {
+      sel.value = cur;
+    } else {
+      sel.value = '';
+    }
   }
 
   function populateErrUserSelect(users) {
@@ -1337,15 +1620,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     } else {
       sel.value = 'all';
     }
-  }
-
-  function buildLLMQuery() {
-    const p = new URLSearchParams();
-    const f = document.getElementById('llm-from').value;
-    const t = document.getElementById('llm-to').value;
-    if (f) { p.set('from', new Date(f).toISOString()); }
-    if (t) { p.set('to', new Date(t).toISOString()); }
-    return p.toString();
   }
 
   function buildErrQuery() {
@@ -1426,7 +1700,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       return;
     }
     const q = buildLLMQuery();
-    window.location.href = '/admin/llm-usage/users/' + uid + '/bill.pdf' + (q ? '?' + q : '');
+    window.location.href = withProfileQuery('/admin/llm-usage/users/' + uid + '/bill.pdf' + (q ? '?' + q : ''));
   });
 
   async function loadLLMUsage() {
@@ -1839,13 +2113,15 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       if (isSys) loadSystemInstructions();
       if (isPambot) loadPambotInstructions();
       if (isArchives) loadArchives();
+      if (isUsers) loadUsers();
     }
+    window._adminSetTab = setTab;
+    btnArchives.addEventListener('click', function() { setTab('archives'); });
     btnUsers.addEventListener('click', function() { setTab('users'); });
     btnBilling.addEventListener('click', function() { setTab('billing'); });
     btnErrors.addEventListener('click', function() { setTab('errors'); });
     btnSys.addEventListener('click', function() { setTab('sys'); });
     btnPambot.addEventListener('click', function() { setTab('pambot'); });
-    btnArchives.addEventListener('click', function() { setTab('archives'); });
 
     var sysReload = document.getElementById('sys-reload-btn');
     var sysSave = document.getElementById('sys-save-btn');
@@ -1886,23 +2162,11 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       }
     });
 
-    async function loadArchives() {
-      var errEl = document.getElementById('archives-error');
-      errEl.style.display = 'none';
-      try {
-        var res = await apiFetch('/admin/profiles');
-        if (res.status === 401) { showAdminLogin(); return; }
-        if (!res.ok) {
-          var ed = await res.json().catch(function() { return {}; });
-          throw new Error(apiErrorMessage(ed, 'Failed to load archives'));
-        }
-        var data = await res.json();
-        renderArchives(data.profiles || data || []);
-      } catch(e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
-    }
-
     var archiveAddBtn = document.getElementById('archive-add-btn');
     var archiveBrowseBtn = document.getElementById('archive-add-browse-btn');
+    if (archiveBrowseBtn && window.electronAPI && window.electronAPI.showSaveDialog) {
+      archiveBrowseBtn.style.display = '';
+    }
     if (archiveBrowseBtn) archiveBrowseBtn.addEventListener('click', async function() {
       var errEl = document.getElementById('archives-error');
       var dbPathEl = document.getElementById('archive-add-db-path');
@@ -1963,11 +2227,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         var sug = await window.electronAPI.suggestArchiveDbPath(displayName + ' ' + familyName);
         if (sug && sug.ok && sug.dbPath) dbPath = sug.dbPath;
       }
-      if (!dbPath) {
-        errEl.textContent = 'DB path is required (leave blank in the desktop app to use the default next to the admin database).';
-        errEl.style.display = 'block';
-        return;
-      }
       if (password.length < 12) {
         errEl.textContent = 'Password must be at least 12 characters.';
         errEl.style.display = 'block';
@@ -1988,9 +2247,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           username: username,
           password: password,
           password_confirm: confirm,
-          db_path: dbPath,
           enabled: !!enabledEl.checked
         };
+        if (dbPath) payload.db_path = dbPath;
         var res = await apiFetch('/admin/profiles', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
@@ -2001,6 +2260,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           var d = await res.json().catch(function(){return{};});
           throw new Error(apiErrorMessage(d, 'Failed to create archive'));
         }
+        var created = await res.json().catch(function() { return null; });
         firstEl.value = '';
         familyEl.value = '';
         usernameEl.value = '';
@@ -2020,6 +2280,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         dbPathEl.value = '';
         enabledEl.checked = true;
         loadArchives();
+        if (created && created.id) selectArchiveProfile(created.id, created.name || '');
       } catch(e) {
         errEl.textContent = e && e.message ? e.message : 'Network error.';
         errEl.style.display = 'block';
@@ -2045,52 +2306,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     }
     wireAdminArchivePwToggle('archive-add-password-toggle', 'archive-add-password');
     wireAdminArchivePwToggle('archive-add-password-confirm-toggle', 'archive-add-password-confirm');
-
-    function renderArchives(profiles) {
-      var tbody = document.getElementById('archives-body');
-      if (!profiles.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="color:#8fa4c8;text-align:center;padding:24px">No archive profiles.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = profiles.map(function(p) {
-        var lu = p.last_used ? new Date(p.last_used).toLocaleString() : '—';
-        var badge = p.enabled
-          ? '<span class="badge badge-active">Enabled</span>'
-          : '<span class="badge badge-inactive">Disabled</span>';
-        var defCell = p.is_default
-          ? '<span class="badge badge-active" title="Opened at server startup when the file exists">Default</span>'
-          : '<span style="color:#6b7c99">—</span>';
-        var actionDefault = '';
-        if (p.is_default) {
-          actionDefault = '<button type="button" class="btn-compact-secondary" style="margin-right:6px;margin-bottom:4px" onclick="clearStartupDefaultArchive(\'' + escAttr(p.id) + '\')">Clear default</button>';
-        } else if (p.enabled) {
-          actionDefault = '<button type="button" class="btn-compact-secondary" style="margin-right:6px;margin-bottom:4px" onclick="setStartupDefaultArchive(\'' + escAttr(p.id) + '\')">Set Default</button>';
-        } else {
-          actionDefault = '<button type="button" class="btn-compact-secondary" style="margin-right:6px;margin-bottom:4px" disabled title="Enable this archive first">Set Default</button>';
-        }
-        return '<tr>' +
-          '<td>' + escHtml(p.name) + '</td>' +
-          '<td>' + escHtml(p.username || '—') + '</td>' +
-          '<td style="font-family:monospace;font-size:.82rem;word-break:break-all">' + escHtml(p.db_path) + '</td>' +
-          '<td>' + badge + '</td>' +
-          '<td style="vertical-align:middle">' + defCell + '</td>' +
-          '<td style="color:#8fa4c8">' + lu + '</td>' +
-          '<td style="white-space:normal;max-width:320px">' + actionDefault +
-            '<button class="btn btn-warning" style="margin-right:6px;margin-bottom:4px" onclick="toggleArchive(\'' +
-              escAttr(p.id) + '\',' + (!p.enabled) + ')">' +
-              (p.enabled ? 'Disable' : 'Enable') + '</button>' +
-            '<button class="btn btn-danger" style="margin-bottom:4px" onclick="openDelArchiveModal(\'' +
-              escAttr(p.id) + '\',\'' + escAttr(p.name) + '\',\'' + escAttr(p.db_path) + '\')">Delete</button>' +
-          '</td>' +
-          '</tr>';
-      }).join('');
-    }
-
-    function showAdminLogin() {
-      document.getElementById('admin-section').style.display = 'none';
-      document.getElementById('login-section').style.display = 'flex';
-      showAdminUserLoginBtn(true);
-    }
 
     window.toggleArchive = async function(id, enable) {
       try {
@@ -2222,7 +2437,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
   // Auto-check if already logged in on page load.
   (async function() {
-    const res = await apiFetch('/admin/users');
+    const res = await fetch('/admin/profiles', { credentials: 'same-origin' });
     if (res.ok) showAdmin();
   })();
 })();

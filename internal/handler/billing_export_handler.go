@@ -55,5 +55,5 @@ func (h *BillingExportHandler) GetMyBillPDF(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "period must be current or previous")
 		return
 	}
-	WriteLLMUsageBillPDF(w, r, h.userRepo, h.billing, uid, fromPtr, toPtr)
+	WriteLLMUsageBillPDF(w, r, h.userRepo, h.billing, uid, nil, fromPtr, toPtr)
 }

@@ -20,6 +20,7 @@ import (
 
 // TemplateHandler serves the templated endpoints:
 //   - GET /                              → index.template.html (or non_user_init)
+//   - GET /favicon.ico                   → templates/favicon.ico
 //   - GET /api/suggestions               → suggestions from DB, rendered with subject vars
 //   - GET /api/regions                   → in-memory registry (loaded from DB at startup)
 //   - GET /static/js/museum/foundation.js
@@ -62,6 +63,7 @@ func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, userRepo *rep
 // is served here (with {{ }} substitution) instead of the raw file from disk.
 func (h *TemplateHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/", h.GetRoot)
+	r.Get("/favicon.ico", h.GetFavicon)
 	r.Get("/api/suggestions", h.GetSuggestions)
 	r.Get("/api/regions", h.GetRegions)
 	r.Get("/static/js/museum/foundation.js", h.GetFoundationJS)
@@ -83,6 +85,18 @@ func loginHostShowsAdvancedPanel(host string) bool {
 	}
 	h = strings.Trim(h, "[]")
 	return h == "localhost" || h == "127.0.0.1" || h == "::1"
+}
+
+// GetFavicon handles GET /favicon.ico → serves templates/favicon.ico.
+func (h *TemplateHandler) GetFavicon(w http.ResponseWriter, r *http.Request) {
+	data, err := os.ReadFile(filepath.Join(h.templatesDir, "favicon.ico"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/x-icon")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(data)
 }
 
 // GetLogin handles GET /login → serves login.html.

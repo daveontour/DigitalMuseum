@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/daveontour/aimuseum/internal/sqlutil"
@@ -84,13 +85,19 @@ type VisitorBreakdown struct {
 }
 
 // SummaryByUser returns aggregate totals and optional breakdowns.
-func (r *BillingRepo) SummaryByUser(ctx context.Context, userID int64, from, to *time.Time) (sum LLMUsageSummary, byProvider []ProviderBreakdown, byVisitor []VisitorBreakdown, err error) {
+// When userEmail is non-nil and non-empty, rows are also matched on user_email (disambiguates user_id across archives).
+func (r *BillingRepo) SummaryByUser(ctx context.Context, userID int64, userEmail *string, from, to *time.Time) (sum LLMUsageSummary, byProvider []ProviderBreakdown, byVisitor []VisitorBreakdown, err error) {
 	if r == nil || r.pool == nil {
 		return sum, nil, nil, errors.New("billing: not configured")
 	}
 	q := `SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0), COUNT(*) FROM llm_usage_events WHERE user_id = ?1`
 	args := []any{userID}
 	n := 2
+	if userEmail != nil && strings.TrimSpace(*userEmail) != "" {
+		q += fmt.Sprintf(" AND LOWER(COALESCE(user_email,'')) = LOWER(?%d)", n)
+		args = append(args, strings.TrimSpace(*userEmail))
+		n++
+	}
 	if from != nil {
 		q += fmt.Sprintf(" AND created_at >= ?%d", n)
 		args = append(args, *from)
@@ -108,6 +115,11 @@ func (r *BillingRepo) SummaryByUser(ctx context.Context, userID int64, from, to 
 	q2 := `SELECT provider, COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0), COUNT(*) FROM llm_usage_events WHERE user_id = ?1`
 	args2 := []any{userID}
 	n2 := 2
+	if userEmail != nil && strings.TrimSpace(*userEmail) != "" {
+		q2 += fmt.Sprintf(" AND LOWER(COALESCE(user_email,'')) = LOWER(?%d)", n2)
+		args2 = append(args2, strings.TrimSpace(*userEmail))
+		n2++
+	}
 	if from != nil {
 		q2 += fmt.Sprintf(" AND created_at >= ?%d", n2)
 		args2 = append(args2, *from)
@@ -137,6 +149,11 @@ func (r *BillingRepo) SummaryByUser(ctx context.Context, userID int64, from, to 
 	q3 := `SELECT is_visitor, COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0), COUNT(*) FROM llm_usage_events WHERE user_id = ?1`
 	args3 := []any{userID}
 	n3 := 2
+	if userEmail != nil && strings.TrimSpace(*userEmail) != "" {
+		q3 += fmt.Sprintf(" AND LOWER(COALESCE(user_email,'')) = LOWER(?%d)", n3)
+		args3 = append(args3, strings.TrimSpace(*userEmail))
+		n3++
+	}
 	if from != nil {
 		q3 += fmt.Sprintf(" AND created_at >= ?%d", n3)
 		args3 = append(args3, *from)
@@ -163,7 +180,8 @@ func (r *BillingRepo) SummaryByUser(ctx context.Context, userID int64, from, to 
 }
 
 // ListEventsByUser returns paginated events for the detail table.
-func (r *BillingRepo) ListEventsByUser(ctx context.Context, userID int64, from, to *time.Time, limit, offset int) ([]LLMUsageEvent, error) {
+// When userEmail is non-nil and non-empty, rows are also matched on user_email.
+func (r *BillingRepo) ListEventsByUser(ctx context.Context, userID int64, userEmail *string, from, to *time.Time, limit, offset int) ([]LLMUsageEvent, error) {
 	if r == nil || r.pool == nil {
 		return nil, errors.New("billing: not configured")
 	}
@@ -179,6 +197,11 @@ func (r *BillingRepo) ListEventsByUser(ctx context.Context, userID int64, from, 
 		FROM llm_usage_events WHERE user_id = ?1`
 	args := []any{userID}
 	n := 2
+	if userEmail != nil && strings.TrimSpace(*userEmail) != "" {
+		q += fmt.Sprintf(" AND LOWER(COALESCE(user_email,'')) = LOWER(?%d)", n)
+		args = append(args, strings.TrimSpace(*userEmail))
+		n++
+	}
 	if from != nil {
 		q += fmt.Sprintf(" AND created_at >= ?%d", n)
 		args = append(args, *from)
@@ -236,7 +259,8 @@ func (r *BillingRepo) ListEventsByUser(ctx context.Context, userID int64, from, 
 
 // ListFailedEvents returns paginated LLM usage rows where succeeded is false.
 // If userID is nil, events for all users are returned (newest first).
-func (r *BillingRepo) ListFailedEvents(ctx context.Context, userID *int64, from, to *time.Time, limit, offset int) ([]LLMUsageEvent, error) {
+// When userEmails is non-empty, only rows whose user_email (case-insensitive) is in the list are returned.
+func (r *BillingRepo) ListFailedEvents(ctx context.Context, userID *int64, userEmails []string, from, to *time.Time, limit, offset int) ([]LLMUsageEvent, error) {
 	if r == nil || r.pool == nil {
 		return nil, errors.New("billing: not configured")
 	}
@@ -256,6 +280,15 @@ func (r *BillingRepo) ListFailedEvents(ctx context.Context, userID *int64, from,
 		q += fmt.Sprintf(" AND user_id = ?%d", n)
 		args = append(args, *userID)
 		n++
+	}
+	if len(userEmails) > 0 {
+		placeholders := make([]string, len(userEmails))
+		for i, em := range userEmails {
+			placeholders[i] = fmt.Sprintf("?%d", n)
+			args = append(args, strings.ToLower(strings.TrimSpace(em)))
+			n++
+		}
+		q += " AND LOWER(COALESCE(user_email,'')) IN (" + strings.Join(placeholders, ",") + ")"
 	}
 	if from != nil {
 		q += fmt.Sprintf(" AND created_at >= ?%d", n)
@@ -401,7 +434,8 @@ type TimeseriesBucket struct {
 }
 
 // TimeseriesByUser5Min aggregates token sums into 300-second buckets (UTC epoch alignment).
-func (r *BillingRepo) TimeseriesByUser5Min(ctx context.Context, userID int64, from, to *time.Time) ([]TimeseriesBucket, error) {
+// When userEmail is non-nil and non-empty, rows are also matched on user_email.
+func (r *BillingRepo) TimeseriesByUser5Min(ctx context.Context, userID int64, userEmail *string, from, to *time.Time) ([]TimeseriesBucket, error) {
 	if r == nil || r.pool == nil {
 		return nil, errors.New("billing: not configured")
 	}
@@ -423,6 +457,11 @@ func (r *BillingRepo) TimeseriesByUser5Min(ctx context.Context, userID int64, fr
 	}
 	args := []any{userID}
 	n := 2
+	if userEmail != nil && strings.TrimSpace(*userEmail) != "" {
+		q += fmt.Sprintf(" AND LOWER(COALESCE(user_email,'')) = LOWER(?%d)", n)
+		args = append(args, strings.TrimSpace(*userEmail))
+		n++
+	}
 	if from != nil {
 		q += fmt.Sprintf(" AND created_at >= ?%d", n)
 		args = append(args, *from)

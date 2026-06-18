@@ -3036,9 +3036,6 @@
                                     <input type="text" id="new-image-gallery-title" placeholder="Title..." class="new-image-gallery-input email-gallery-input">
                                 </div>
                                 <div class="new-image-gallery-search-row email-gallery-search-row">
-                                    <input type="text" id="new-image-gallery-description" placeholder="Description..." class="new-image-gallery-input email-gallery-input">
-                                </div>
-                                <div class="new-image-gallery-search-row email-gallery-search-row">
                                     <input type="text" id="new-image-gallery-tags" placeholder="Tags..." class="new-image-gallery-input email-gallery-input" list="new-image-gallery-tags-list">
                                     <datalist id="new-image-gallery-tags-list"></datalist>
                                 </div>
@@ -3179,24 +3176,6 @@
                     </div>
                     <!-- Metadata Section -->
                     <div class="new-image-gallery-detail-metadata-section">
-                        <div class="image-detail-toolbar">
-                            <div class="image-detail-toolbar-row">
-                                <button type="button" id="new-image-detail-find-similar-btn" class="modal-btn image-detail-toolbar-btn image-detail-toolbar-btn--similar" title="Search the gallery for images with similar tags (local AI)">
-                                    <i class="fas fa-search"></i> Find Similar
-                                </button>
-                                <button type="button" id="new-image-detail-find-same-time-btn" class="modal-btn image-detail-toolbar-btn image-detail-toolbar-btn--same-time" title="Search the gallery for images created within +/- 1 week of this image's created date">
-                                    <i class="fas fa-clock"></i> Find Same Time
-                                </button>
-                            </div>
-                            <div class="image-detail-toolbar-row">
-                                <button id="new-image-gallery-save-btn" class="modal-btn modal-btn-primary image-detail-toolbar-btn" style="display:none;" disabled>
-                                    <i class="fas fa-save"></i> Save Changes
-                                </button>
-                                <button id="new-image-gallery-delete-btn" class="modal-btn modal-btn-danger image-detail-toolbar-btn" style="display:none;">
-                                    <i class="fas fa-trash-alt"></i> Delete Image
-                                </button>
-                            </div>
-                        </div>
                         <div class="new-image-gallery-detail-metadata-content">
                             <div class="new-image-gallery-detail-metadata-row">
                                 <span class="new-image-gallery-detail-metadata-label">Title:</span>
@@ -3207,35 +3186,17 @@
                                 <span class="new-image-gallery-detail-metadata-value" id="new-image-detail-author"></span>
                             </div>
                             <div class="new-image-gallery-detail-metadata-row new-image-gallery-detail-metadata-row-full">
-                                <span class="new-image-gallery-detail-metadata-label">Description:</span>
-                                <textarea class="new-image-gallery-detail-metadata-editable" id="new-image-detail-description-edit" rows="3" placeholder="Enter description"></textarea>
-                            </div>
-                            <div class="new-image-gallery-detail-metadata-row new-image-gallery-detail-metadata-row-full">
                                 <span class="new-image-gallery-detail-metadata-label">Tags:</span>
-                                <input type="text" class="new-image-gallery-detail-metadata-editable" id="new-image-detail-tags-edit" placeholder="Enter tags (comma-separated)">
+                                <textarea rows="3" class="new-image-gallery-detail-metadata-editable new-image-gallery-detail-metadata-tags" id="new-image-detail-tags-edit" placeholder="Enter tags (comma-separated)"></textarea>
                             </div>
-                            <div class="new-image-gallery-detail-metadata-row">
-                                <span class="new-image-gallery-detail-metadata-label">Categories:</span>
-                                <span class="new-image-gallery-detail-metadata-value" id="new-image-detail-categories"></span>
-                            </div>
-                            <div class="new-image-gallery-detail-metadata-row">
-                                <span class="new-image-gallery-detail-metadata-label">Notes:</span>
-                                <span class="new-image-gallery-detail-metadata-value" id="new-image-detail-notes"></span>
+                            <div class="image-detail-tags-save-row">
+                                <button id="new-image-gallery-save-btn" class="modal-btn modal-btn-primary image-detail-tags-save-btn" disabled>
+                                    <i class="fas fa-save"></i> Save Changes
+                                </button>
                             </div>
                             <div class="new-image-gallery-detail-metadata-row">
                                 <span class="new-image-gallery-detail-metadata-label">Date:</span>
                                 <span class="new-image-gallery-detail-metadata-value" id="new-image-detail-date"></span>
-                            </div>
-                            <div class="new-image-gallery-detail-metadata-row">
-                                <span class="new-image-gallery-detail-metadata-label">Rating:</span>
-                                <div class="star-rating-container" id="new-image-detail-rating-container">
-                                    <span class="star" data-rating="1">★</span>
-                                    <span class="star" data-rating="2">★</span>
-                                    <span class="star" data-rating="3">★</span>
-                                    <span class="star" data-rating="4">★</span>
-                                    <span class="star" data-rating="5">★</span>
-                                    <input type="hidden" id="new-image-detail-rating-edit" value="">
-                                </div>
                             </div>
                             <div class="new-image-gallery-detail-metadata-row">
                                 <span class="new-image-gallery-detail-metadata-label">Image Type:</span>
@@ -3262,10 +3223,6 @@
                                 <span class="new-image-gallery-detail-metadata-value" id="new-image-detail-altitude"></span>
                             </div>
                             <div class="new-image-gallery-detail-metadata-row">
-                                <span class="new-image-gallery-detail-metadata-label">Available to the AI:</span>
-                                <span class="new-image-gallery-detail-metadata-value" id="new-image-detail-available-for-task"></span>
-                            </div>
-                            <div class="new-image-gallery-detail-metadata-row">
                                 <span class="new-image-gallery-detail-metadata-label">Processed:</span>
                                 <span class="new-image-gallery-detail-metadata-value" id="new-image-detail-processed"></span>
                             </div>
@@ -3276,6 +3233,21 @@
                             <div class="new-image-gallery-detail-metadata-row">
                                 <span class="new-image-gallery-detail-metadata-label">Updated At:</span>
                                 <span class="new-image-gallery-detail-metadata-value" id="new-image-detail-updated-at"></span>
+                            </div>
+                        </div>
+                        <div class="image-detail-actions">
+                            <div class="image-detail-actions-grid" id="new-image-detail-actions-grid">
+                                <button type="button" id="new-image-detail-find-similar-btn" class="modal-btn image-detail-action-btn image-detail-action-btn--similar" title="Search the gallery for images with similar tags (local AI)">
+                                    <i class="fas fa-search"></i> Find Similar
+                                </button>
+                                <button type="button" id="new-image-detail-find-same-time-btn" class="modal-btn image-detail-action-btn image-detail-action-btn--same-time" title="Search the gallery for images created within +/- 1 week of this image's created date">
+                                    <i class="fas fa-clock"></i> Find Same Time
+                                </button>
+                            </div>
+                            <div class="image-detail-actions-bottom-row" id="new-image-detail-actions-bottom">
+                                <button id="new-image-gallery-delete-btn" class="modal-btn modal-btn-danger image-detail-action-btn">
+                                    <i class="fas fa-trash-alt"></i> Delete Image
+                                </button>
                             </div>
                         </div>
                     </div>

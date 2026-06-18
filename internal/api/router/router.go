@@ -49,6 +49,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 			billingRepo, nil, cfg.Server.SessionCookieSecure,
 		)
 		adminUsersHandler.WithBootstrapAdminCredentials(cfg.Server.AdminEmail, cfg.Server.AdminPassword)
+		adminUsersHandler.WithArchiveContext(profileRepo, nil, cfg.Crypto.KeyringPepper)
 		adminUsersHandler.RegisterRoutes(r)
 
 		archiveProvision := service.NewArchiveProvisionService(
@@ -288,6 +289,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	// ── Admin user management ──────────────────────────────────────────────────
 	adminUsersHandler := handler.NewAdminUsersHandler(userRepo, sensitiveSvc, subjectConfigSvc, dashboardSvc, billingRepo, appInstrRepo, cfg.Server.SessionCookieSecure)
 	adminUsersHandler.WithBootstrapAdminCredentials(cfg.Server.AdminEmail, cfg.Server.AdminPassword)
+	adminUsersHandler.WithArchiveContext(profileRepo, pool, cfg.Crypto.KeyringPepper)
 	adminUsersHandler.RegisterRoutes(r)
 
 	// ── Archive profiles (billing DB) ─────────────────────────────────────────

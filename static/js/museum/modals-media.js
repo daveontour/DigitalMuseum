@@ -597,7 +597,6 @@ Modals.NewImageGallery = (() => {
             // Add event listeners for filter changes with debouncing
             const filterInputs = [
                 DOM.newImageGalleryTitle,
-                DOM.newImageGalleryDescription,
                 DOM.newImageGalleryTags,
                 DOM.newImageGalleryAuthor,
                 DOM.newImageGallerySource,
@@ -805,7 +804,6 @@ Modals.NewImageGallery = (() => {
         /** Clears metadata / similar / filter inputs only (no grid refresh). Call after _setupFilters when selects exist. */
         function _resetGallerySearchCriteria() {
             if (DOM.newImageGalleryTitle) DOM.newImageGalleryTitle.value = '';
-            if (DOM.newImageGalleryDescription) DOM.newImageGalleryDescription.value = '';
             if (DOM.newImageGalleryTags) DOM.newImageGalleryTags.value = '';
             if (DOM.newImageGallerySimilarTags) DOM.newImageGallerySimilarTags.value = '';
             if (DOM.newImageGallerySimilarN) DOM.newImageGallerySimilarN.value = '25';
@@ -1100,9 +1098,6 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryTitle && DOM.newImageGalleryTitle.value.trim()) {
                 params.append('title', DOM.newImageGalleryTitle.value.trim());
             }
-            if (DOM.newImageGalleryDescription && DOM.newImageGalleryDescription.value.trim()) {
-                params.append('description', DOM.newImageGalleryDescription.value.trim());
-            }
             if (DOM.newImageGalleryTags && DOM.newImageGalleryTags.value.trim()) {
                 params.append('tags', DOM.newImageGalleryTags.value.trim());
             }
@@ -1204,7 +1199,6 @@ Modals.NewImageGallery = (() => {
         function _hasSearchCriteria() {
             return (
                 (DOM.newImageGalleryTitle && DOM.newImageGalleryTitle.value.trim()) ||
-                (DOM.newImageGalleryDescription && DOM.newImageGalleryDescription.value.trim()) ||
                 (DOM.newImageGalleryTags && DOM.newImageGalleryTags.value.trim()) ||
                 (DOM.newImageGallerySimilarTags && DOM.newImageGallerySimilarTags.value.trim()) ||
                 (DOM.newImageGalleryAuthor && DOM.newImageGalleryAuthor.value.trim()) ||
@@ -1399,9 +1393,9 @@ Modals.NewImageGallery = (() => {
                 onSave: (updatedImage, updateData) => {
                     const imageIndex = imageData.findIndex(img => img.id === updatedImage.id);
                     if (imageIndex !== -1) {
-                        imageData[imageIndex].description = updateData.description;
-                        imageData[imageIndex].tags = updateData.tags;
-                        imageData[imageIndex].rating = updateData.rating;
+                        if ('tags' in updateData) {
+                            imageData[imageIndex].tags = updateData.tags;
+                        }
                         if (updateData && updateData.cleared_gps) {
                             imageData[imageIndex].has_gps = false;
                             imageData[imageIndex].latitude = null;
@@ -1729,7 +1723,6 @@ Modals.NewImageGallery = (() => {
 Modals.ImageDetailModal = (() => {
         let currentImageInModal = null;
         let originalImageData = null;
-        let starRatingListenerAttached = false;
         let onSaveCallback = null;
         let onDeleteCallback = null;
         let allowRedirects = true;
@@ -1769,81 +1762,18 @@ Modals.ImageDetailModal = (() => {
             }
         }
 
-        function _setupStarRating(rating) {
-            if (!DOM.newImageDetailRatingContainer || !DOM.newImageDetailRatingEdit) {
-                return;
-            }
-            
-            const stars = DOM.newImageDetailRatingContainer.querySelectorAll('.star');
-            if (!stars || stars.length === 0) {
-                return;
-            }
-            
-            // Convert rating to number - handle various input types
-            let currentRating = 0;
-            if (rating !== null && rating !== undefined && rating !== '') {
-                // Handle both string and number inputs
-                const parsed = typeof rating === 'number' ? rating : parseInt(String(rating), 10);
-                if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) {
-                    currentRating = parsed;
-                }
-            }
-            
-            // Set hidden input value
-            DOM.newImageDetailRatingEdit.value = currentRating > 0 ? currentRating : '';
-            
-            // Update star display - clear all first, then add active to stars up to rating
-            stars.forEach((star, index) => {
-                const starRating = index + 1;
-                // Remove active class first
-                star.classList.remove('active');
-                // Add active class if this star should be active
-                if (starRating <= currentRating) {
-                    star.classList.add('active');
-                }
+        function _clearGpsActionButtons() {
+            [DOM.newImageDetailActionsGrid, DOM.newImageDetailActionsBottom].forEach((container) => {
+                if (!container) return;
+                container
+                    .querySelectorAll('.image-detail-action-btn--gps')
+                    .forEach((btn) => btn.remove());
             });
-            
-            
-            // Set up click handler using event delegation (only once)
-            if (!starRatingListenerAttached) {
-                DOM.newImageDetailRatingContainer.addEventListener('click', (e) => {
-                    const star = e.target.closest('.star');
-                    if (!star) return;
-                    
-                    e.stopPropagation();
-                    const starRating = parseInt(star.getAttribute('data-rating'), 10);
-                    if (isNaN(starRating) || starRating < 1 || starRating > 5) return;
-                    
-                    // Update hidden input
-                    DOM.newImageDetailRatingEdit.value = starRating;
-                    
-                    // Update all stars - clear all first, then add active to stars up to clicked rating
-                    const allStars = DOM.newImageDetailRatingContainer.querySelectorAll('.star');
-                    allStars.forEach((s) => {
-                        s.classList.remove('active');
-                        const sRating = parseInt(s.getAttribute('data-rating'), 10);
-                        if (sRating <= starRating) {
-                            s.classList.add('active');
-                        }
-                    });
-                    
-                    
-                    _checkForChanges();
-                });
-                starRatingListenerAttached = true;
-            }
         }
-        
+
         function _setupChangeTracking() {
             // Remove existing listeners to avoid duplicates
-            const descriptionEdit = DOM.newImageDetailDescriptionEdit;
             const tagsEdit = DOM.newImageDetailTagsEdit;
-            
-            if (descriptionEdit) {
-                descriptionEdit.removeEventListener('input', _checkForChanges);
-                descriptionEdit.addEventListener('input', _checkForChanges);
-            }
-            
             if (tagsEdit) {
                 tagsEdit.removeEventListener('input', _checkForChanges);
                 tagsEdit.addEventListener('input', _checkForChanges);
@@ -1853,14 +1783,8 @@ Modals.ImageDetailModal = (() => {
         function _checkForChanges() {
             if (!originalImageData || !currentImageInModal) return;
             
-            const currentDescription = DOM.newImageDetailDescriptionEdit ? DOM.newImageDetailDescriptionEdit.value.trim() : '';
             const currentTags = DOM.newImageDetailTagsEdit ? DOM.newImageDetailTagsEdit.value.trim() : '';
-            const currentRating = DOM.newImageDetailRatingEdit ? parseInt(DOM.newImageDetailRatingEdit.value) || null : null;
-            
-            const hasChanges = 
-                currentDescription !== (originalImageData.description || '') ||
-                currentTags !== (originalImageData.tags || '') ||
-                currentRating !== (originalImageData.rating || null);
+            const hasChanges = currentTags !== (originalImageData.tags || '');
             
             if (DOM.newImageGallerySaveBtn) {
                 DOM.newImageGallerySaveBtn.disabled = !hasChanges;
@@ -1871,14 +1795,10 @@ Modals.ImageDetailModal = (() => {
             if (!currentImageInModal) return;
             
             const imageId = currentImageInModal.id;
-            const description = DOM.newImageDetailDescriptionEdit ? DOM.newImageDetailDescriptionEdit.value.trim() : null;
             const tags = DOM.newImageDetailTagsEdit ? DOM.newImageDetailTagsEdit.value.trim() : null;
-            const rating = DOM.newImageDetailRatingEdit ? parseInt(DOM.newImageDetailRatingEdit.value) || null : null;
             
             const updateData = {};
-            if (description !== null) updateData.description = description || null;
             if (tags !== null) updateData.tags = tags || null;
-            if (rating !== null) updateData.rating = rating;
             
             try {
                 const response = await fetch(`/images/${imageId}`, {
@@ -1895,15 +1815,11 @@ Modals.ImageDetailModal = (() => {
                 }
                 
                 // Update currentImageInModal
-                currentImageInModal.description = description;
                 currentImageInModal.tags = tags;
-                currentImageInModal.rating = rating;
                 
                 // Update original data
                 originalImageData = {
-                    description: description || '',
-                    tags: tags || '',
-                    rating: rating || null
+                    tags: tags || ''
                 };
                 
                 // Disable save button
@@ -1950,6 +1866,7 @@ Modals.ImageDetailModal = (() => {
                 DOM.newImageDetailRegion.textContent = 'N/A';
                 DOM.newImageDetailGps.innerHTML = '';
                 DOM.newImageDetailGpsRow.style.display = 'none';
+                _clearGpsActionButtons();
 
                 if (onSaveCallback) {
                     onSaveCallback(currentImageInModal, { cleared_gps: true });
@@ -2045,21 +1962,17 @@ Modals.ImageDetailModal = (() => {
             
             // Store original values for change detection
             originalImageData = {
-                description: image.description || '',
-                tags: image.tags || '',
-                rating: image.rating || null
+                tags: image.tags || ''
             };
             
             // Set image source
             DOM.newImageGalleryDetailImage.src = `/images/${image.id}?type=metadata&convert_heic_to_jpg=true`;
             DOM.newImageGalleryDetailImage.alt = image.title || 'Image';
             
-            // Show delete and save buttons
-            if (DOM.newImageGalleryDeleteBtn) {
-                DOM.newImageGalleryDeleteBtn.style.display = 'inline-block';
-            }
+            // Remove GPS buttons left over from a previously shown image
+            _clearGpsActionButtons();
+            
             if (DOM.newImageGallerySaveBtn) {
-                DOM.newImageGallerySaveBtn.style.display = 'inline-block';
                 DOM.newImageGallerySaveBtn.disabled = true;
             }
             
@@ -2067,19 +1980,11 @@ Modals.ImageDetailModal = (() => {
             DOM.newImageDetailTitle.textContent = image.title || 'N/A';
             
             // Populate editable fields
-            if (DOM.newImageDetailDescriptionEdit) {
-                DOM.newImageDetailDescriptionEdit.value = image.description || '';
-            }
             if (DOM.newImageDetailTagsEdit) {
                 DOM.newImageDetailTagsEdit.value = image.tags || '';
             }
             
-            // Set up star rating
-            _setupStarRating(image.rating || null);
-            
             DOM.newImageDetailAuthor.textContent = image.author || 'N/A';
-            DOM.newImageDetailCategories.textContent = image.categories || 'N/A';
-            DOM.newImageDetailNotes.textContent = image.notes || 'N/A';
             DOM.newImageDetailDate.textContent = formatDate(image.year, image.month, image.day);
             DOM.newImageDetailImageType.textContent = image.media_type || image.image_type || 'N/A';
             
@@ -2158,7 +2063,6 @@ Modals.ImageDetailModal = (() => {
             DOM.newImageDetailRegion.textContent = (image.region != null && String(image.region).trim() !== '')
                 ? Regions.label(image.region)
                 : 'N/A';
-            DOM.newImageDetailAvailableForTask.textContent = image.available_for_task ? 'Yes' : 'No';
             DOM.newImageDetailProcessed.textContent = image.processed ? 'Yes' : 'No';
             DOM.newImageDetailCreatedAt.textContent = formatDateTime(image.created_at);
             DOM.newImageDetailUpdatedAt.textContent = formatDateTime(image.updated_at);
@@ -2176,7 +2080,7 @@ Modals.ImageDetailModal = (() => {
                     // Add button to open Google Maps in new tab
                     const openMapsButton = document.createElement('button');
                     openMapsButton.type = 'button';
-                    openMapsButton.className = 'modal-btn image-detail-gps-btn image-detail-gps-btn--maps';
+                    openMapsButton.className = 'modal-btn image-detail-action-btn image-detail-action-btn--gps image-detail-action-btn--maps';
                     openMapsButton.innerHTML = '<i class="fas fa-map-marker-alt"></i> Open in Google Maps';
                     openMapsButton.onclick = function(e) {
                         e.preventDefault();
@@ -2186,7 +2090,7 @@ Modals.ImageDetailModal = (() => {
 
                     const findNearbyButton = document.createElement('button');
                     findNearbyButton.type = 'button';
-                    findNearbyButton.className = 'modal-btn image-detail-gps-btn image-detail-gps-btn--nearby';
+                    findNearbyButton.className = 'modal-btn image-detail-action-btn image-detail-action-btn--gps image-detail-action-btn--nearby';
                     findNearbyButton.innerHTML = '<i class="fas fa-search-location"></i> Find Nearby';
                     findNearbyButton.onclick = async function(e) {
                         e.preventDefault();
@@ -2208,7 +2112,7 @@ Modals.ImageDetailModal = (() => {
 
                     const removeGpsButton = document.createElement('button');
                     removeGpsButton.type = 'button';
-                    removeGpsButton.className = 'modal-btn image-detail-gps-btn image-detail-gps-btn--remove';
+                    removeGpsButton.className = 'modal-btn image-detail-action-btn image-detail-action-btn--gps image-detail-action-btn--remove-gps';
                     removeGpsButton.innerHTML = '<i class="fas fa-eraser"></i> Remove GPS Info';
                     removeGpsButton.onclick = async function(e) {
                         e.preventDefault();
@@ -2216,21 +2120,15 @@ Modals.ImageDetailModal = (() => {
                         await removeGpsInfo();
                     };
                     
-                    // Clear existing content and add coordinates and buttons
-                    DOM.newImageDetailGps.innerHTML = '';
-                    const coordsSpan = document.createElement('span');
-                    coordsSpan.className = 'image-detail-gps-coords';
-                    coordsSpan.textContent = gpsText;
-                    const actionsWrap = document.createElement('div');
-                    actionsWrap.className = 'image-detail-gps-actions';
-                    actionsWrap.appendChild(openMapsButton);
-                    actionsWrap.appendChild(findNearbyButton);
-                    const removeActionsWrap = document.createElement('div');
-                    removeActionsWrap.className = 'image-detail-gps-actions image-detail-gps-actions--remove';
-                    removeActionsWrap.appendChild(removeGpsButton);
-                    DOM.newImageDetailGps.appendChild(coordsSpan);
-                    DOM.newImageDetailGps.appendChild(actionsWrap);
-                    DOM.newImageDetailGps.appendChild(removeActionsWrap);
+                    // Coordinates stay in the metadata row; buttons go to the actions block
+                    DOM.newImageDetailGps.textContent = gpsText;
+                    if (DOM.newImageDetailActionsGrid) {
+                        DOM.newImageDetailActionsGrid.appendChild(openMapsButton);
+                        DOM.newImageDetailActionsGrid.appendChild(findNearbyButton);
+                    }
+                    if (DOM.newImageDetailActionsBottom) {
+                        DOM.newImageDetailActionsBottom.appendChild(removeGpsButton);
+                    }
                 } else {
                     DOM.newImageDetailGps.textContent = 'GPS data available';
                 }

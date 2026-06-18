@@ -462,8 +462,10 @@
             });
             errorMsg.style.display = 'none';
             document.getElementById('success-msg').style.display = 'none';
+            // Always visible in browser and desktop — operators may need /admin on first-run
+            // (Register tab) before any archive user exists.
             const adminBtn = document.getElementById('login-admin-login-btn');
-            if (adminBtn) adminBtn.style.display = (tab === 'login' && tabLogin.style.display !== 'none') ? 'block' : 'none';
+            if (adminBtn) adminBtn.style.display = 'block';
         }
         function showSuccess(msg) {
             const el = document.getElementById('success-msg');

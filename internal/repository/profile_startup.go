@@ -39,10 +39,22 @@ func ResolveMainSQLiteStartupPath(ctx context.Context, r *ProfileRepo) string {
 	return ""
 }
 
-func normalizeMainDBPath(p string) string {
+// ResolveProfileDBPath normalises an archive_profiles.db_path for open/stat.
+// Absolute paths are cleaned as-is; relative paths resolve against the executable directory.
+func ResolveProfileDBPath(p string) string {
 	clean := filepath.Clean(strings.TrimSpace(p))
+	if filepath.IsAbs(clean) {
+		return clean
+	}
+	if exe, err := os.Executable(); err == nil {
+		return filepath.Clean(filepath.Join(filepath.Dir(exe), clean))
+	}
 	if abs, err := filepath.Abs(clean); err == nil {
 		return abs
 	}
 	return clean
+}
+
+func normalizeMainDBPath(p string) string {
+	return ResolveProfileDBPath(p)
 }

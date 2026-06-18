@@ -9,6 +9,7 @@ directories:
 # Custom icons: add electron/build/icon.ico (multi-size .ico), then set win.icon + nsis installer/uninstaller icons.
 win:
   target: nsis
+  icon: build/icon.ico
   requestedExecutionLevel: asInvoker
 
 nsis:
@@ -16,6 +17,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
   include: "build/installer.nsh" # Add this line
 
 files:
