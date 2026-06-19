@@ -201,7 +201,9 @@ body {
 .top-bar input,
 .top-bar a,
 .top-bar label,
-.top-bar .voice-selector {
+.top-bar .voice-selector,
+.top-bar .its-me-visitor-switch,
+.top-bar .its-me-visitor-option {
     -webkit-app-region: no-drag;
 }
 
