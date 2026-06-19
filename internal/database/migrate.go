@@ -537,46 +537,9 @@ func schemaDDL() []string {
 			chat_instructions       TEXT NOT NULL DEFAULT '',
 			core_instructions       TEXT NOT NULL DEFAULT '',
 			question_instructions   TEXT NOT NULL DEFAULT '',
-			pam_bot_instructions    TEXT,
 			user_id                 BIGINT REFERENCES users(id) ON DELETE SET NULL,
 			updated_at              TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
-
-		// ── pam_bot (dementia companion — same multi-tenant rules as other archive tables) ──
-		`CREATE TABLE IF NOT EXISTS pam_bot_sessions (
-			id                    SERIAL PRIMARY KEY,
-			user_id               BIGINT REFERENCES users(id) ON DELETE CASCADE,
-			started_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			last_interaction_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			interaction_count     INTEGER NOT NULL DEFAULT 0,
-			latest_summary        TEXT,
-			latest_analysis       TEXT,
-			latest_summary_at     TIMESTAMPTZ,
-			last_facebook_post_id   BIGINT,
-			last_facebook_album_id  BIGINT
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_pam_bot_sessions_user ON pam_bot_sessions (user_id, started_at DESC)`,
-		`CREATE TABLE IF NOT EXISTS pam_bot_turns (
-			id               SERIAL PRIMARY KEY,
-			user_id          BIGINT REFERENCES users(id) ON DELETE CASCADE,
-			session_id       INTEGER NOT NULL REFERENCES pam_bot_sessions(id) ON DELETE CASCADE,
-			turn_number      INTEGER NOT NULL,
-			subject_tag      VARCHAR(200),
-			subject_category VARCHAR(100),
-			bot_message      TEXT NOT NULL,
-			user_action      VARCHAR(50),
-			created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_pbt_session_turn ON pam_bot_turns (session_id, turn_number)`,
-		`CREATE TABLE IF NOT EXISTS pam_bot_subjects (
-			id                SERIAL PRIMARY KEY,
-			user_id           BIGINT REFERENCES users(id) ON DELETE CASCADE,
-			subject_tag       VARCHAR(200) NOT NULL,
-			subject_category  VARCHAR(100),
-			last_discussed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			discuss_count     INTEGER NOT NULL DEFAULT 1
-		)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_pbs_user_tag ON pam_bot_subjects (user_id, subject_tag)`,
 
 		// ── custom_voices ─────────────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS custom_voices (
@@ -882,7 +845,6 @@ func rlsDDL() []string {
 		"complete_profiles", "saved_responses",
 		"interviews", "interview_turns",
 		"have_a_chat_sessions",
-		"pam_bot_sessions", "pam_bot_turns", "pam_bot_subjects",
 		"import_control_last_run",
 		"email_classifications", "email_matches", "email_exclusions",
 		"sensitive_keyring", "visitor_key_hints", "visitor_key_hint_reference_documents", "visitor_key_hint_sensitive_reference_documents",
@@ -1178,6 +1140,9 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 	}
 	if err := seedReservedUserSlot(ctx, db); err != nil {
 		return err
+	}
+	if err := dropPamBotSchema(ctx, db); err != nil {
+		return fmt.Errorf("drop pam bot schema: %w", err)
 	}
 
 	slog.Info("sqlite database migration complete")

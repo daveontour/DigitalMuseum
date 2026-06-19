@@ -130,9 +130,6 @@ func run() error {
 		if err := database.MigrateSQLite(migrateCtx, db.Std); err != nil {
 			return fmt.Errorf("run migrations: %w", err)
 		}
-		if err := database.MigratePamBot(migrateCtx, db.Std); err != nil {
-			return fmt.Errorf("run pam bot migrations: %w", err)
-		}
 	}
 
 	if db != nil {

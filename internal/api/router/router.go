@@ -362,18 +362,6 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	backgroundJobsHandler := handler.NewBackgroundJobsHandler(backgroundJobsRepo, backgroundJobsRunner, backgroundJobsScheduler)
 	backgroundJobsHandler.RegisterRoutes(r)
 
-	// ── Pam Bot (dementia companion) ─────────────────────────────────────────
-	pamBotRepo := repository.NewPamBotRepo(pool)
-	pamBotSvc := service.NewPamBotService(
-		pamBotRepo, subjectConfigRepo, appInstrRepo, pool, userRepo,
-		cfg.AI.GeminiAPIKey, cfg.AI.GeminiModelName,
-		cfg.AI.AnthropicAPIKey, cfg.AI.ClaudeModelName,
-		cfg.AI.TavilyAPIKey, cfg.Crypto.KeyringPepper,
-		sessionMasterStore, billingRepo,
-	)
-	pamBotHandler := handler.NewPamBotHandler(pamBotSvc)
-	pamBotHandler.RegisterRoutes(r)
-
 	// ── Share tokens ──────────────────────────────────────────────────────────
 	shareRepo := repository.NewArchiveShareRepo(pool)
 	shareSvc := service.NewArchiveShareService(shareRepo, authSvc)

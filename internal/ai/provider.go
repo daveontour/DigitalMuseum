@@ -9,7 +9,7 @@ import (
 )
 
 // maxToolCallIterations caps assistant→tool→tool_result rounds per GenerateResponse
-// (Claude and Gemini). PamBot and similar flows may chain many archive tools.
+// (Claude and Gemini). Tool-heavy chat flows may chain many archive tools.
 const maxToolCallIterations = 15
 
 // ConvTurn is a previous conversation turn used to build context.

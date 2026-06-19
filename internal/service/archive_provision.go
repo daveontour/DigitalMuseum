@@ -111,9 +111,6 @@ func (s *ArchiveProvisionService) CreateArchiveWithFirstUser(
 	if err := database.MigrateSQLite(migrateCtx, db); err != nil {
 		return fmt.Errorf("migrate archive: %w", err)
 	}
-	if err := database.MigratePamBot(migrateCtx, db); err != nil {
-		return fmt.Errorf("migrate pambot: %w", err)
-	}
 	if err := database.SeedAppSystemInstructionsFromFiles(migrateCtx, db, "static"); err != nil {
 		return fmt.Errorf("seed app system instructions: %w", err)
 	}

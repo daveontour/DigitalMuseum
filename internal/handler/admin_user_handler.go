@@ -122,8 +122,6 @@ func (h *AdminUsersHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/admin/llm-usage/error-events", h.GetLLMUsageErrorEvents)
 	r.Get("/admin/system-instructions", h.GetAdminSystemInstructions)
 	r.Put("/admin/system-instructions", h.PutAdminSystemInstructions)
-	r.Get("/admin/pambot-instructions", h.GetAdminPamBotInstructions)
-	r.Put("/admin/pambot-instructions", h.PutAdminPamBotInstructions)
 }
 
 // GetAdminSystemInstructions returns the universal LLM system prompts (admin session).
@@ -175,54 +173,6 @@ func (h *AdminUsersHandler) PutAdminSystemInstructions(w http.ResponseWriter, r 
 	}
 	if err := instrRepo.Upsert(r.Context(), body.SystemInstructions, body.CoreSystemInstructions, body.QuestionSystemInstructions); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save system instructions")
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// GetAdminPamBotInstructions returns the Pam Bot companion persona instructions (admin session).
-func (h *AdminUsersHandler) GetAdminPamBotInstructions(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
-		return
-	}
-	instrRepo, closeFn, err := h.adminAppInstrRepo(r.Context(), r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if closeFn != nil {
-		defer closeFn()
-	}
-	ins, err := instrRepo.Get(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load pam bot instructions")
-		return
-	}
-	writeJSON(w, map[string]string{"pam_bot_instructions": ins.PamBotInstructions})
-}
-
-// PutAdminPamBotInstructions replaces the Pam Bot companion persona instructions (admin session).
-func (h *AdminUsersHandler) PutAdminPamBotInstructions(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
-		return
-	}
-	instrRepo, closeFn, err := h.adminAppInstrRepo(r.Context(), r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if closeFn != nil {
-		defer closeFn()
-	}
-	var body struct {
-		PamBotInstructions string `json:"pam_bot_instructions"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := instrRepo.UpsertPamBotInstructions(r.Context(), body.PamBotInstructions); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save pam bot instructions")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -843,7 +793,8 @@ const adminPageHTML = `<!DOCTYPE html>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1922;color:#cdd6e8;min-height:100vh}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1922;color:#cdd6e8;min-height:100vh;padding-top:env(titlebar-area-height,32px)}
+.titlebar-drag{position:fixed;top:env(titlebar-area-y,0);left:env(titlebar-area-x,0);width:env(titlebar-area-width,100%);height:env(titlebar-area-height,32px);background:#1a2540;-webkit-app-region:drag;z-index:9999}
 .topbar{background:#19264d;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2a3a6b}
 .topbar h1{font-size:1.1rem;color:#fff;display:flex;align-items:center;gap:10px}
 .topbar h1 i{color:#3b82f6}
@@ -880,8 +831,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-info{background:#0e7490;color:#fff;padding:6px 12px;font-size:0.82rem}.btn-info:hover{background:#0c5f75}
 .error{color:#f87171;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);padding:10px 14px;border-radius:6px;margin-bottom:16px;font-size:0.9rem;display:none}
 #login-section{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;box-sizing:border-box}
-#admin-user-login-btn{position:fixed;top:14px;right:14px;z-index:100;padding:8px 14px;border-radius:6px;border:1px solid #2e4068;background:#19264d;color:#cdd6e8;font-size:0.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s,color .15s}
-#admin-user-login-btn:hover{background:#243368;border-color:#3b82f6;color:#fff}
+#admin-user-login-btn{position:fixed;top:calc(env(titlebar-area-height,0px) + 14px);right:14px;z-index:10000;padding:8px 14px;border-radius:6px;border:1px solid #3d5278;background:#1a2540;color:#cdd6e8;font-size:0.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s,color .15s;-webkit-app-region:no-drag}
+#admin-user-login-btn:hover{background:#243358;border-color:#3b82f6;color:#fff}
 #admin-section{display:none}
 table{width:100%;border-collapse:collapse}
 th{text-align:left;color:#8fa4c8;font-size:0.82rem;font-weight:600;padding:8px 12px;border-bottom:1px solid #2a3a6b}
@@ -932,11 +883,12 @@ tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
   .admin-tab{padding:10px 12px;font-size:0.85rem}
   .admin-tab-panel{padding:16px}
   #login-section{padding:16px}
-  #admin-user-login-btn,#login-admin-login-btn{font-size:0.82rem;padding:7px 10px}
+  #admin-user-login-btn{font-size:0.82rem;padding:7px 10px}
 }
 </style>
 </head>
 <body>
+<div class="titlebar-drag" aria-hidden="true"></div>
 <button type="button" id="admin-user-login-btn">User Login</button>
 
 <!-- Login screen -->
@@ -976,7 +928,6 @@ tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
         <button type="button" class="admin-tab" id="tab-btn-billing" role="tab" aria-selected="false" aria-controls="tab-panel-billing">Usage &amp; Billing</button>
         <button type="button" class="admin-tab" id="tab-btn-errors" role="tab" aria-selected="false" aria-controls="tab-panel-errors">Errors</button>
         <button type="button" class="admin-tab" id="tab-btn-sys" role="tab" aria-selected="false" aria-controls="tab-panel-sys">System instructions</button>
-        <button type="button" class="admin-tab" id="tab-btn-pambot" role="tab" aria-selected="false" aria-controls="tab-panel-pambot">Pam Bot</button>
       </div>
       <div id="tab-panel-archives" class="admin-tab-panel active" role="tabpanel">
       <div class="card-header" style="padding:0 0 16px;margin-bottom:0">
@@ -1171,23 +1122,6 @@ tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
         <button class="btn btn-secondary" id="sys-reload-btn" type="button"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Reload from server</button>
         <button class="btn btn-primary" id="sys-save-btn" type="button"><i class="fas fa-save" style="margin-right:6px"></i>Save</button>
-      </div>
-      </div>
-
-      <div id="tab-panel-pambot" class="admin-tab-panel" role="tabpanel">
-      <div class="card-header" style="padding:0 0 16px 0;margin-bottom:0">
-        <h2 style="margin:0"><i class="fas fa-heart" style="color:#3b82f6;margin-right:8px"></i>Pam Bot — companion persona instructions</h2>
-      </div>
-      <p style="color:#8fa4c8;font-size:0.88rem;margin-bottom:16px">These instructions define how the Pam Bot memory companion speaks and behaves. They are loaded from the database at the start of every interaction. Changes take effect on the next request.</p>
-      <div id="pambot-instr-error" class="error" style="margin-bottom:12px"></div>
-      <p id="pambot-instr-ok" style="display:none;color:#4ade80;font-size:0.88rem;margin-bottom:12px">Saved.</p>
-      <div class="form-group">
-        <label for="pambot-instructions">Companion persona instructions</label>
-        <textarea id="pambot-instructions" rows="18" spellcheck="false" placeholder="Loading\u2026" style="font-family:monospace;font-size:0.92rem"></textarea>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-        <button class="btn btn-secondary" id="pambot-reload-btn" type="button"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Reload from server</button>
-        <button class="btn btn-primary" id="pambot-save-btn" type="button"><i class="fas fa-save" style="margin-right:6px"></i>Save</button>
       </div>
       </div>
 
@@ -2019,22 +1953,20 @@ tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
     return String(s).replace(/'/g,"\\'");
   }
 
-  // ── Tabs: Users | Usage & Billing | Errors | System instructions | Pam Bot | Archives ─
+  // ── Tabs: Users | Usage & Billing | Errors | System instructions | Archives ─
   (function initAdminTabs() {
     var btnUsers = document.getElementById('tab-btn-users');
     var btnBilling = document.getElementById('tab-btn-billing');
     var btnErrors = document.getElementById('tab-btn-errors');
     var btnSys = document.getElementById('tab-btn-sys');
-    var btnPambot = document.getElementById('tab-btn-pambot');
     var btnArchives = document.getElementById('tab-btn-archives');
     var panelUsers = document.getElementById('tab-panel-users');
     var panelBilling = document.getElementById('tab-panel-billing');
     var panelErrors = document.getElementById('tab-panel-errors');
     var panelSys = document.getElementById('tab-panel-sys');
-    var panelPambot = document.getElementById('tab-panel-pambot');
     var panelArchives = document.getElementById('tab-panel-archives');
-    if (!btnUsers || !btnBilling || !btnErrors || !btnSys || !btnPambot || !btnArchives ||
-        !panelUsers || !panelBilling || !panelErrors || !panelSys || !panelPambot || !panelArchives) return;
+    if (!btnUsers || !btnBilling || !btnErrors || !btnSys || !btnArchives ||
+        !panelUsers || !panelBilling || !panelErrors || !panelSys || !panelArchives) return;
 
     async function loadSystemInstructions() {
       var errEl = document.getElementById('sys-instr-error');
@@ -2059,46 +1991,26 @@ tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
       }
     }
 
-    async function loadPambotInstructions() {
-      var errEl = document.getElementById('pambot-instr-error');
-      var okEl = document.getElementById('pambot-instr-ok');
-      if (okEl) okEl.style.display = 'none';
-      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-      try {
-        var res = await apiFetch('/admin/pambot-instructions');
-        var d = await res.json().catch(function() { return {}; });
-        if (!res.ok) throw new Error(apiErrorMessage(d, 'Failed to load'));
-        var ta = document.getElementById('pambot-instructions');
-        if (ta) ta.value = d.pam_bot_instructions || '';
-      } catch (e) {
-        if (errEl) { errEl.textContent = e.message || 'Network error'; errEl.style.display = 'block'; }
-      }
-    }
-
     function setTab(which) {
       var isUsers = which === 'users';
       var isBilling = which === 'billing';
       var isErrors = which === 'errors';
       var isSys = which === 'sys';
-      var isPambot = which === 'pambot';
       var isArchives = which === 'archives';
       btnUsers.classList.toggle('active', isUsers);
       btnBilling.classList.toggle('active', isBilling);
       btnErrors.classList.toggle('active', isErrors);
       btnSys.classList.toggle('active', isSys);
-      btnPambot.classList.toggle('active', isPambot);
       btnArchives.classList.toggle('active', isArchives);
       btnUsers.setAttribute('aria-selected', isUsers);
       btnBilling.setAttribute('aria-selected', isBilling);
       btnErrors.setAttribute('aria-selected', isErrors);
       btnSys.setAttribute('aria-selected', isSys);
-      btnPambot.setAttribute('aria-selected', isPambot);
       btnArchives.setAttribute('aria-selected', isArchives);
       panelUsers.classList.toggle('active', isUsers);
       panelBilling.classList.toggle('active', isBilling);
       panelErrors.classList.toggle('active', isErrors);
       panelSys.classList.toggle('active', isSys);
-      panelPambot.classList.toggle('active', isPambot);
       panelArchives.classList.toggle('active', isArchives);
       if (isErrors) {
         var ef = document.getElementById('err-from');
@@ -2111,7 +2023,6 @@ tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
         }
       }
       if (isSys) loadSystemInstructions();
-      if (isPambot) loadPambotInstructions();
       if (isArchives) loadArchives();
       if (isUsers) loadUsers();
     }
@@ -2121,7 +2032,6 @@ tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
     btnBilling.addEventListener('click', function() { setTab('billing'); });
     btnErrors.addEventListener('click', function() { setTab('errors'); });
     btnSys.addEventListener('click', function() { setTab('sys'); });
-    btnPambot.addEventListener('click', function() { setTab('pambot'); });
 
     var sysReload = document.getElementById('sys-reload-btn');
     var sysSave = document.getElementById('sys-save-btn');
@@ -2405,34 +2315,6 @@ tr.archive-selectable:hover td{background:rgba(255,255,255,0.04)}
       }
     });
 
-    var pambotReload = document.getElementById('pambot-reload-btn');
-    var pambotSave = document.getElementById('pambot-save-btn');
-    if (pambotReload) pambotReload.addEventListener('click', function() { loadPambotInstructions(); });
-    if (pambotSave) pambotSave.addEventListener('click', async function() {
-      var btn = this;
-      var errEl = document.getElementById('pambot-instr-error');
-      var okEl = document.getElementById('pambot-instr-ok');
-      if (okEl) okEl.style.display = 'none';
-      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-      btn.disabled = true;
-      try {
-        var res = await apiFetch('/admin/pambot-instructions', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pam_bot_instructions: document.getElementById('pambot-instructions').value })
-        });
-        if (res.ok) {
-          if (okEl) { okEl.style.display = 'block'; setTimeout(function() { if (okEl) okEl.style.display = 'none'; }, 4000); }
-        } else {
-          var d = await res.json().catch(function() { return {}; });
-          if (errEl) { errEl.textContent = apiErrorMessage(d, 'Save failed'); errEl.style.display = 'block'; }
-        }
-      } catch (e) {
-        if (errEl) { errEl.textContent = 'Network error'; errEl.style.display = 'block'; }
-      } finally {
-        btn.disabled = false;
-      }
-    });
   })();
 
   // Auto-check if already logged in on page load.

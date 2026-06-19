@@ -193,10 +193,6 @@
                         <i class="fas fa-box-open"></i> Artefacts
                     </button>
 
-                    <!-- This isn't ready yet -->
-                    <!-- <button type="button" class="more-options-btn" id="pam-bot-trigger-btn" style="background:linear-gradient(135deg,#2c5282,#4a7fcb);color:#fff;margin-top:6px;">
-                        <i class="fas fa-heart"></i> Memory Companion
-                    </button> -->
                     <!-- <button type="button" class="more-options-btn" id="identity-profile-wizard-btn-legacy" title="Create or edit your identity profile" style="margin-top:4px;">
                         <i class="fas fa-id-card"></i> Identity Profile
                     </button> -->
@@ -4571,7 +4567,6 @@
     <script src="/static/js/museum/app.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/chat-message-stars.js" defer></script>
     <script src="/static/js/museum/have-a-chat.js" defer></script>
-    <script src="/static/js/museum/pam-bot.js" defer></script>
     <script src="/static/js/museum/auth.js" defer></script>
     <script src="/static/js/museum/upload-import.js" defer></script>
     <script src="/static/js/museum/images-grid.js?v={{ static_images_grid_js_cache_bust }}" defer></script>
@@ -5421,53 +5416,6 @@
             <button type="button" id="archive-overview-llm-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
             <span id="archive-overview-llm-save-status" style="font-size:var(--text-md);color:var(--color-text-muted);"></span>
         </div>
-    </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════
-     PAM BOT — Memory Companion Full-Screen Overlay
-     ═══════════════════════════════════════════════════════════ -->
-<div id="pam-bot-overlay">
-    <button id="pam-bot-speech-btn" class="pam-bot-corner-btn" title="Toggle voice reading">
-        <i class="fas fa-volume-up"></i>
-    </button>
-    <div class="pam-bot-header">
-        Memory Companion for <span class="pam-bot-name" id="pam-bot-subject-name">you</span>
-    </div>
-    <div class="pam-bot-message-area">
-        <div id="pam-bot-message" class="pam-bot-loading-text">One moment&hellip;</div>
-    </div>
-    <div class="pam-bot-input-area">
-        <textarea id="pam-bot-input" class="pam-bot-text-input" rows="2"
-            placeholder="Type something here, or use the microphone&hellip;"
-            aria-label="Your response"></textarea>
-        <button id="pam-bot-mic-btn" class="pam-bot-mic-btn"
-            aria-label="Voice input" aria-pressed="false"
-            title="Speak your response (click again to stop)">
-            <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
-                <path fill="currentColor" d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm6.25 9a.75.75 0 0 1 .743.648l.007.102a7.002 7.002 0 0 1-6.25 6.957V20h2.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.5v-2.293A7.002 7.002 0 0 1 5 10.75a.75.75 0 0 1 1.5 0 5.5 5.5 0 0 0 11 0 .75.75 0 0 1 .75-.75z"/>
-            </svg>
-        </button>
-        <button class="pam-bot-btn pam-bot-btn-send" id="pam-bot-send-btn" disabled>Send</button>
-    </div>
-    <div id="pam-bot-dictation-status" class="pam-bot-dictation-status"></div>
-    <div class="pam-bot-buttons">
-        <button class="pam-bot-btn pam-bot-btn-more"      id="pam-bot-more-btn"     disabled>Tell me more</button>
-        <button class="pam-bot-btn pam-bot-btn-different"  id="pam-bot-diff-btn"     disabled>Something else</button>
-        <button class="pam-bot-btn pam-bot-btn-goodbye"   id="pam-bot-bye-btn">Goodbye</button>
-    </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════
-     PAM BOT — Floating Photo Dialog
-     ═══════════════════════════════════════════════════════════ -->
-<div id="pam-bot-photo-dialog" aria-hidden="true" role="dialog" aria-label="Memory photo">
-    <div id="pam-bot-photo-titlebar">
-        <span id="pam-bot-photo-title">Photo</span>
-        <button id="pam-bot-photo-close" aria-label="Close photo">&times;</button>
-    </div>
-    <div id="pam-bot-photo-body">
-        <img id="pam-bot-photo-img" src="" alt="Memory photo" />
     </div>
 </div>
 
