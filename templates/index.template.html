@@ -42,10 +42,11 @@
                 <div class="top-bar-llm" style="margin-left: 25px;">
                     <label for="llm-provider-select" class="top-bar-label" style="margin-right: 10px;align-content: center;">AI Provider:</label>
                     <select id="llm-provider-select">
-                        <option value="auto">Auto</option>
-                        <option value="gemini" selected>Gemini</option>
+                        <option value="auto" selected>Auto</option>
+                        <option value="gemini">Gemini</option>
                         <option value="claude">Claude</option>
                         <option value="deepseek">DeepSeek</option>
+                        <option value="openai">ChatGPT</option>
                         <option value="localai">Local AI</option>
                     </select>
                 </div>
@@ -452,6 +453,7 @@
                                 <option value="claude">Claude</option>
                                 <option value="gemini">Gemini</option>
                                 <option value="deepseek">DeepSeek</option>
+                                <option value="openai">ChatGPT</option>
                                 <option value="localai">Local AI</option>
                             </select>
                         </div>
@@ -465,6 +467,7 @@
                                 <option value="claude">Claude</option>
                                 <option value="gemini" selected>Gemini</option>
                                 <option value="deepseek">DeepSeek</option>
+                                <option value="openai">ChatGPT</option>
                                 <option value="localai">Local AI</option>
                             </select>
                         </div>
@@ -703,6 +706,7 @@
                                 <option value="gemini">Gemini</option>
                                 <option value="claude">Claude</option>
                                 <option value="deepseek">DeepSeek</option>
+                                <option value="openai">ChatGPT</option>
                                 <option value="localai">Local AI</option>
                             </select>
                         </div>
@@ -753,6 +757,9 @@
                         </button>
                         <button id="config-tab-btn-ai-setup-config" type="button" class="config-tab-button" data-tab="ai-setup-config">
                             <i class="fas fa-microchip"></i> AI &amp; Setup
+                        </button>
+                        <button id="config-tab-btn-hosted-llm-order" type="button" class="config-tab-button" data-tab="hosted-llm-order">
+                            <i class="fas fa-sort-amount-down"></i> Hosted LLM Order
                         </button>
                         <button id="config-tab-btn-subject-configuration" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="subject-configuration">
                             <i class="fas fa-user"></i> Subject Configuration
@@ -925,6 +932,25 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="setting-group user-llm-provider-row">
+                            <div class="user-llm-field-col">
+                                <label for="user-llm-openai-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">OpenAI API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-openai-key" aria-label="Information about OpenAI API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-openai-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
+                                <div class="user-llm-field-controls">
+                                    <input type="password" id="user-llm-openai-key" class="modal-input user-llm-field-input" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="user-llm-field-col">
+                                <label for="user-llm-openai-model" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">ChatGPT model name</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-openai-model" aria-label="Information about ChatGPT model name"><i class="fas fa-info-circle" aria-hidden="true"></i></button></label>
+                                <div class="user-llm-field-controls">
+                                    <input type="text" id="user-llm-openai-model" class="modal-input user-llm-field-input user-llm-field-input--model">
+                                </div>
+                            </div>
+                            <div class="user-llm-field-col user-llm-field-col--actions">
+                                <div class="user-llm-field-controls user-llm-field-controls--action-only">
+                                    <button type="button" class="modal-btn modal-btn-secondary user-llm-clear-btn" id="user-llm-clear-openai" aria-label="Clear OpenAI API key and ChatGPT model overrides">Clear ChatGPT</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="setting-group user-llm-provider-row user-llm-provider-row--tavily">
                             <div class="user-llm-field-col user-llm-field-col--span-2">
                                 <label for="user-llm-tavily-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Tavily API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-tavily-key" aria-label="Information about Tavily API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(web search)</span><span id="user-llm-tavily-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
@@ -1035,6 +1061,53 @@
                             <p class="local-ai-setup-footer-hint">
                                 Prefer more capable cloud AI? Add a Claude, Gemini, or DeepSeek API key in <strong>API Keys</strong>.
                             </p>
+                        </div>
+                    </section>
+                </div>
+                <div class="config-tab-content" id="hosted-llm-order-tab">
+                    <section class="section-config">
+                        <h1>Hosted LLM Order</h1>
+                        <p class="config-tab-lead" style="max-width: none;">
+                            Choose the order in which cloud providers (Gemini, Claude, DeepSeek, ChatGPT) are tried when Auto routes to a hosted model or when the selected provider returns an error.
+                        </p>
+                    </section>
+                    <section class="config-section">
+                        <h3>Request classification (Auto)</h3>
+                        <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
+                            When Auto is selected, this provider classifies each request as local or hosted before the main chat runs.
+                            If the chosen provider is unavailable, Local AI is used as a fallback when possible.
+                        </p>
+                        <div class="setting-group">
+                            <label for="hosted-llm-classifier-provider">Classifier AI provider</label>
+                            <select id="hosted-llm-classifier-provider" class="form-control" aria-describedby="hosted-llm-classifier-provider-hint">
+                                <option value="localai">Local AI</option>
+                                <option value="gemini">Gemini</option>
+                                <option value="claude">Claude</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="openai">ChatGPT</option>
+                            </select>
+                            <p id="hosted-llm-classifier-provider-hint" class="config-tab-lead" style="margin: 0.5rem 0 0 0; color: var(--color-text-muted);">
+                                Default: Local AI. Hosted classifiers use a single JSON prompt (no tools).
+                            </p>
+                        </div>
+                    </section>
+                    <section class="config-section">
+                        <h3>Auto routing (hosted)</h3>
+                        <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
+                            After your last manually selected hosted provider (if available), try the providers below in this order.
+                        </p>
+                        <ol id="hosted-llm-auto-order-list" class="hosted-llm-order-list" aria-label="Auto routing provider order"></ol>
+                    </section>
+                    <section class="config-section">
+                        <h3>Error failover</h3>
+                        <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
+                            When the selected hosted provider fails, try the remaining providers in this order.
+                        </p>
+                        <ol id="hosted-llm-failover-order-list" class="hosted-llm-order-list" aria-label="Failover provider order"></ol>
+                        <div class="setting-group" style="margin-top: 1rem;">
+                            <button type="button" id="hosted-llm-order-save-btn" class="modal-btn modal-btn-primary">Save</button>
+                            <button type="button" id="hosted-llm-order-reset-btn" class="modal-btn modal-btn-secondary" style="margin-left: 0.5rem;">Reset to default</button>
+                            <span id="hosted-llm-order-status" class="config-tab-lead" style="margin-left: 1rem; color: var(--color-text-muted);"></span>
                         </div>
                     </section>
                 </div>
@@ -3692,6 +3765,7 @@
                                     <option value="gemini">Gemini</option>
                                     <option value="claude">Claude</option>
                                     <option value="deepseek">DeepSeek</option>
+                                    <option value="openai">ChatGPT</option>
                                     <option value="localai">Local AI</option>
                                 </select>
                             </div>
@@ -5490,6 +5564,14 @@
         <div class="setting-group" style="margin-bottom:12px;">
             <label for="overview-llm-deepseek-model">DeepSeek model <span style="color:#94a3b8;font-weight:normal;">(optional)</span></label>
             <input type="text" id="overview-llm-deepseek-model" class="modal-input" style="width:100%;box-sizing:border-box;" placeholder="e.g. deepseek-chat">
+        </div>
+        <div class="setting-group" style="margin-bottom:12px;">
+            <label for="overview-llm-openai-key">OpenAI API key</label>
+            <input type="password" id="overview-llm-openai-key" class="modal-input" style="width:100%;box-sizing:border-box;" autocomplete="off">
+        </div>
+        <div class="setting-group" style="margin-bottom:12px;">
+            <label for="overview-llm-openai-model">ChatGPT model <span style="color:#94a3b8;font-weight:normal;">(optional)</span></label>
+            <input type="text" id="overview-llm-openai-model" class="modal-input" style="width:100%;box-sizing:border-box;" placeholder="e.g. gpt-4.1-mini">
         </div>
         <div class="setting-group" style="margin-bottom:12px;">
             <label for="overview-llm-tavily-key">Tavily API key <span style="color:#94a3b8;font-weight:normal;">(optional, web search)</span></label>

@@ -22,7 +22,7 @@ Additional features beyond the core chat interface include:
 - **Backend:** Go 1.25, Chi v5 router, `database/sql` with `github.com/mattn/go-sqlite3` (CGO)
 - **Frontend:** Vanilla JavaScript (no framework), marked.js, highlight.js, Font Awesome
 - **Database:** SQLite (two files — main app DB and billing DB); vector fields use `sqlite-vec`
-- **AI Providers:** Anthropic Claude (`claude-sonnet-4-6`), Google Gemini (`gemini-2.5-flash`), DeepSeek (`deepseek-chat`) via Anthropic-compatible API, and local Ollama (`gemma4`) via native Ollama API
+- **AI Providers:** Anthropic Claude (`claude-sonnet-4-6`), Google Gemini (`gemini-2.5-flash`), DeepSeek (`deepseek-chat`) via Anthropic-compatible API, OpenAI ChatGPT (`gpt-4.1-mini`) via Chat Completions API, and local Ollama (`gemma4`) via native Ollama API
 - **Module:** `github.com/daveontour/aimuseum`
 
 ## Project Layout
@@ -98,6 +98,8 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 | `CLAUDE_MODEL_NAME` | No | Default: `claude-sonnet-4-6` |
 | `DEEPSEEK_API_KEY` | No | DeepSeek API key (Anthropic-compatible Messages API at `api.deepseek.com/anthropic`) |
 | `DEEPSEEK_MODEL_NAME` | No | Default: `deepseek-chat` |
+| `OPENAI_API_KEY` | No | OpenAI API key (Chat Completions API at `api.openai.com`) |
+| `OPENAI_MODEL_NAME` | No | Default: `gpt-4.1-mini` |
 | `GEMINI_API_KEY` | At least one AI key | Gemini API |
 | `GEMINI_MODEL_NAME` | No | Default: `gemini-2.5-flash` |
 | `LOCALAI_BASE_URL` | No | Ollama base URL, e.g. `http://localhost:11434` |
@@ -239,6 +241,18 @@ server (via the `select-db` IPC channel). The Electron `get-profiles` / `create-
 
 Select via `"provider": "deepseek"` in `POST /chat/generate` and `Have-a-Chat` requests.
 
+## OpenAI Provider
+
+`internal/ai/openai.go` implements `ChatProvider` using OpenAI's **Chat Completions API**:
+
+- Endpoint: `POST https://api.openai.com/v1/chat/completions`
+- Authentication: `Authorization: Bearer` header
+- Native `tools` / `tool_calls` loop (same max iterations as other providers)
+- Token counts from `usage.prompt_tokens` / `usage.completion_tokens`
+- Returns `nil` from constructor when `OPENAI_API_KEY` is empty
+
+Select via `"provider": "openai"` in `POST /chat/generate` and `Have-a-Chat` requests.
+
 ## Admin User Management
 
 `internal/handler/admin_user_handler.go` provides a web-based admin panel at `/admin`:
@@ -371,7 +385,7 @@ Admin JSON/UI lives under `/admin/llm-usage/…`. Users can download their own P
 - **Reference doc inlining:** `internal/service/reference_prompt_inline.go` appends any `reference_documents` rows with `include_in_system_prompt = true` directly into the system prompt (decrypts if needed; skips for restricted visitor sessions)
 - History: last 30 turns from `chat_turns` table
 - Tool loop: up to `maxToolCallIterations` per request in all providers
-- **Provider selection:** `"claude"`, `"gemini"`, `"deepseek"`, or `"localai"` in request body
+- **Provider selection:** `"claude"`, `"gemini"`, `"deepseek"`, `"openai"`, or `"localai"` in request body
 - All AI tool SQL is scoped by `user_id` via `toolsUIDFilter(ctx, q, args)` in `internal/ai/tools.go`
 
 ### Pam Bot (Dementia Companion)
@@ -634,6 +648,7 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | AI provider interface | `internal/ai/provider.go` |
 | Claude provider | `internal/ai/claude.go` |
 | DeepSeek (Anthropic-compatible API) | `internal/ai/deepseek.go` |
+| OpenAI / ChatGPT (Chat Completions API) | `internal/ai/openai.go` |
 | Gemini provider | `internal/ai/gemini.go` |
 | Local AI / Ollama provider | `internal/ai/localai.go` |
 | Tool definitions | `internal/ai/provider.go` → `GetToolDefinitions()` |

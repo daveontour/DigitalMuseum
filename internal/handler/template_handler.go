@@ -34,6 +34,7 @@ type TemplateHandler struct {
 	defaultGeminiOK                    bool
 	defaultClaudeOK                    bool
 	defaultDeepSeekOK                  bool
+	defaultOpenAIOK                    bool
 	defaultLocalAIOK                   bool
 	pageTitle                          string
 	deploymentNatureLocal              bool
@@ -51,6 +52,7 @@ func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, userRepo *rep
 		defaultGeminiOK:                    cfg.AI.GeminiAPIKey != "",
 		defaultClaudeOK:                    cfg.AI.AnthropicAPIKey != "",
 		defaultDeepSeekOK:                  strings.TrimSpace(cfg.AI.DeepSeekAPIKey) != "",
+		defaultOpenAIOK:                    strings.TrimSpace(cfg.AI.OpenAIAPIKey) != "",
 		defaultLocalAIOK:                   strings.TrimSpace(cfg.AI.LocalAIBaseURL) != "",
 		pageTitle:                          cfg.App.PageTitle,
 		deploymentNatureLocal:              strings.EqualFold(strings.TrimSpace(cfg.App.DeploymentNature), "local"),
@@ -304,6 +306,7 @@ func (h *TemplateHandler) GetFoundationJS(w http.ResponseWriter, r *http.Request
 	geminiOK := h.defaultGeminiOK
 	claudeOK := h.defaultClaudeOK
 	deepseekOK := h.defaultDeepSeekOK
+	openaiOK := h.defaultOpenAIOK
 	if uid := appctx.UserIDFromCtx(r.Context()); uid != 0 && h.userRepo != nil {
 		if stored, err := h.userRepo.GetUserLLMStored(r.Context(), uid); err == nil && stored != nil {
 			if strings.TrimSpace(stored.GeminiAPIKey) != "" {
@@ -314,6 +317,9 @@ func (h *TemplateHandler) GetFoundationJS(w http.ResponseWriter, r *http.Request
 			}
 			if strings.TrimSpace(stored.DeepSeekAPIKey) != "" {
 				deepseekOK = true
+			}
+			if strings.TrimSpace(stored.OpenAIAPIKey) != "" {
+				openaiOK = true
 			}
 		}
 	}
@@ -331,6 +337,11 @@ func (h *TemplateHandler) GetFoundationJS(w http.ResponseWriter, r *http.Request
 		ctx["deepseek_configured"] = "True"
 	} else {
 		ctx["deepseek_configured"] = "False"
+	}
+	if openaiOK {
+		ctx["openai_configured"] = "True"
+	} else {
+		ctx["openai_configured"] = "False"
 	}
 	if h.defaultLocalAIOK {
 		ctx["localai_configured"] = "True"

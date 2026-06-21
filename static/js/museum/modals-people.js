@@ -589,7 +589,7 @@ Modals.Profiles = (() => {
         const emptyMsg = () => document.getElementById('profiles-empty-msg');
         let profilesPollTimer = null;
         let profilesNameSortOrder = 'asc';
-        const ALLOWED_PROFILE_PROVIDERS = new Set(['gemini', 'claude', 'deepseek', 'localai']);
+        const ALLOWED_PROFILE_PROVIDERS = new Set(['gemini', 'claude', 'deepseek', 'openai', 'localai']);
 
         function profilesLlmProviderEl() {
             if (typeof DOM !== 'undefined' && DOM.profilesLlmProviderSelect) return DOM.profilesLlmProviderSelect;

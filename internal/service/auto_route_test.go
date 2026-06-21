@@ -63,30 +63,38 @@ func TestParseAutoClassifierResponse(t *testing.T) {
 		}
 	})
 
-	t.Run("empty reason gets default", func(t *testing.T) {
-		dec, err := parseAutoClassifierResponse(`{"route":"local","reason":""}`)
+	t.Run("json embedded in prose", func(t *testing.T) {
+		raw := `Here is the routing decision: {"route":"local","reason":"count query","confidence":0.9,"needs_reference_documents":false,"needs_user_profile":false} end`
+		dec, err := parseAutoClassifierResponse(raw)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if dec.Reason != "No reason provided" {
-			t.Fatalf("reason=%q", dec.Reason)
+		if dec.Decision != "local" {
+			t.Fatalf("decision=%q want local", dec.Decision)
 		}
 	})
 }
 
-func TestHostedProviderTryOrder(t *testing.T) {
+func TestExtractJSONObject(t *testing.T) {
+	got := extractJSONObject(`prefix {"route":"hosted","reason":"x"} suffix`)
+	if got != `{"route":"hosted","reason":"x"}` {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestHostedProviderTryOrderLegacy(t *testing.T) {
 	tests := []struct {
 		lastManual string
 		want       []string
 	}{
-		{"claude", []string{"claude", "gemini", "deepseek"}},
-		{"gemini", []string{"gemini", "claude", "deepseek"}},
-		{"", []string{"gemini", "claude", "deepseek"}},
-		{"invalid", []string{"gemini", "claude", "deepseek"}},
-		{"deepseek", []string{"deepseek", "gemini", "claude"}},
+		{"claude", []string{"claude", "gemini", "deepseek", "openai"}},
+		{"gemini", []string{"gemini", "claude", "deepseek", "openai"}},
+		{"", []string{"gemini", "claude", "deepseek", "openai"}},
+		{"invalid", []string{"gemini", "claude", "deepseek", "openai"}},
+		{"deepseek", []string{"deepseek", "gemini", "claude", "openai"}},
 	}
 	for _, tc := range tests {
-		got := hostedProviderTryOrder(tc.lastManual)
+		got := hostedProviderTryOrder(tc.lastManual, DefaultHostedLLMProviderOrder)
 		if len(got) != len(tc.want) {
 			t.Fatalf("lastManual=%q: got %v want %v", tc.lastManual, got, tc.want)
 		}

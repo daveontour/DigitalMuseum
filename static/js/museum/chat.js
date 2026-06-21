@@ -190,6 +190,40 @@ const Chat = (() => {
         }
     }
 
+    /** Normalize embedded JSON action values (string, number, or tag array) for UI actions. */
+    function _coerceEmbeddedActionValue(value) {
+        if (value === undefined || value === null) return null;
+        if (typeof value === 'boolean') return null;
+        if (Array.isArray(value)) {
+            const parts = value.map(v => (v == null ? '' : String(v).trim())).filter(Boolean);
+            return parts.length ? parts.join(', ') : null;
+        }
+        const s = String(value).trim();
+        if (!s || s.toLowerCase() === 'null') return null;
+        return s;
+    }
+
+    function _runEmbeddedActionAsync(actionFn) {
+        setTimeout(() => {
+            try {
+                const result = actionFn();
+                if (result && typeof result.then === 'function') {
+                    void result.catch((e) => console.error('Embedded response action failed:', e));
+                }
+            } catch (e) {
+                console.error('Embedded response action failed:', e);
+            }
+        }, 400);
+    }
+
+    /** When the model sets showImages, open the Images gallery and run a tag search. */
+    function _applyShowImagesFromEmbedded(embeddedJson) {
+        if (!embeddedJson) return;
+        const tagQuery = _coerceEmbeddedActionValue(embeddedJson.showImages);
+        if (!tagQuery) return;
+        _runEmbeddedActionAsync(() => Modals.NewImageGallery?.openTaggedImages?.(tagQuery));
+    }
+
     function _addResponseActionButtons(messageElement, role, embeddedJson) {
         if (!['assistant', 'model'].includes(role)) return;
         if (!embeddedJson) return;
@@ -245,10 +279,10 @@ const Chat = (() => {
         let firstRunnableAction = null;
 
         buttons.forEach(({ key, icon, modifier, title, action }) => {
-            const value = embeddedJson[key];
-            if (value === undefined || value === null || (typeof value !== 'string' && typeof value !== 'number' && !Array.isArray(value))) return;
+            const value = _coerceEmbeddedActionValue(embeddedJson[key]);
+            if (!value) return;
 
-            if (!firstRunnableAction) {
+            if (!firstRunnableAction && key !== 'showImages') {
                 firstRunnableAction = () => action(value);
             }
 
@@ -256,7 +290,12 @@ const Chat = (() => {
             btn.className = `response-action-btn response-action-btn--${modifier}`;
             btn.innerHTML = `<i class="fas ${icon}"></i>`;
             btn.title = title(value);
-            btn.addEventListener('click', () => action(value));
+            btn.addEventListener('click', () => {
+                const result = action(value);
+                if (result && typeof result.then === 'function') {
+                    void result.catch((e) => console.error('Response action failed:', e));
+                }
+            });
             row.appendChild(btn);
         });
 
@@ -280,13 +319,7 @@ const Chat = (() => {
         if (row.children.length > 0) {
             messageElement.appendChild(row);
             if (DOM.autoOpenSuggestions && DOM.autoOpenSuggestions.checked && firstRunnableAction) {
-                setTimeout(() => {
-                    try {
-                        firstRunnableAction();
-                    } catch (e) {
-                        console.error('Auto response action failed:', e);
-                    }
-                }, 400);
+                _runEmbeddedActionAsync(firstRunnableAction);
             }
         }
     }
@@ -457,6 +490,7 @@ const Chat = (() => {
 
         _addImagePreviews(messageElement, embeddedJson);
         _addResponseActionButtons(messageElement, role, embeddedJson);  //Add the buttons for the actions that the AI wants to perform
+        _applyShowImagesFromEmbedded(embeddedJson);
         _applyMessageInStarsFromEmbedded(embeddedJson);
         _addJsonViewer(messageElement, embeddedJson);
         _addSpeakButton(contentElement, role); // Pass contentElement as it appends to it

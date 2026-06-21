@@ -86,6 +86,7 @@ const HaveAChat = (() => {
     function _llmDisplayName(provider) {
         if (provider === 'claude') return 'Claude';
         if (provider === 'deepseek') return 'DeepSeek';
+        if (provider === 'openai') return 'ChatGPT';
         if (provider === 'localai') return 'Local AI';
         return 'Gemini';
     }

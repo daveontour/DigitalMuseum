@@ -62,6 +62,7 @@ func (h *ChatHandler) GetAvailability(w http.ResponseWriter, r *http.Request) {
 		"gemini_available":                    h.svc.GeminiAvailable(r.Context(), r),
 		"claude_available":                    h.svc.ClaudeAvailable(r.Context(), r),
 		"deepseek_available":                  h.svc.DeepSeekAvailable(r.Context(), r),
+		"openai_available":                    h.svc.OpenAIAvailable(r.Context(), r),
 		"localai_available":                   h.svc.LocalAIAvailable(),
 		"auto_available":                      h.svc.AutoAvailable(r.Context(), r),
 		"tavily_env_configured":               h.svc.ServerTavilyKeyConfigured(),
@@ -75,6 +76,8 @@ func (h *ChatHandler) GetAvailability(w http.ResponseWriter, r *http.Request) {
 		"server_claude_model_default":         h.svc.ServerClaudeModelDefault(),
 		"server_deepseek_model_default_set":   h.svc.ServerDeepSeekModelDefaultSet(),
 		"server_deepseek_model_default":       h.svc.ServerDeepSeekModelDefault(),
+		"server_openai_model_default_set":     h.svc.ServerOpenAIModelDefaultSet(),
+		"server_openai_model_default":         h.svc.ServerOpenAIModelDefault(),
 		"llm_tools_count":                     tools,
 		"reference_documents_available_count": refDocs,
 	})

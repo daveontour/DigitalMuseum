@@ -933,9 +933,13 @@ Modals.NewImageGallery = (() => {
         }
 
         async function openTaggedImages(tags) {
+            const tagStr = Array.isArray(tags)
+                ? tags.map(v => (v == null ? '' : String(v).trim())).filter(Boolean).join(', ')
+                : (tags != null ? String(tags).trim() : '');
+            if (!tagStr || tagStr.toLowerCase() === 'null') return;
             await open();
             if (DOM.newImageGalleryTags) {
-                DOM.newImageGalleryTags.value = tags;
+                DOM.newImageGalleryTags.value = tagStr;
             }
             await _loadImageData();
         }

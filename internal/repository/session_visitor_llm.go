@@ -52,6 +52,8 @@ type sessionLLMJSON struct {
 	TavilyAPIKey     string `json:"tavily_api_key,omitempty"`
 	DeepSeekAPIKey   string `json:"deepseek_api_key,omitempty"`
 	DeepSeekModel    string `json:"deepseek_model,omitempty"`
+	OpenAIAPIKey     string `json:"openai_api_key,omitempty"`
+	OpenAIModel      string `json:"openai_model,omitempty"`
 	RunpodAPIKey     string `json:"runpod_api_key,omitempty"`
 	ElevenLabsAPIKey string `json:"elevenlabs_api_key,omitempty"`
 	RunpodEndpointID string `json:"runpod_endpoint_id,omitempty"`
@@ -67,6 +69,8 @@ func sessionLLMFromStored(s UserLLMStored) sessionLLMJSON {
 		TavilyAPIKey:     s.TavilyAPIKey,
 		DeepSeekAPIKey:   s.DeepSeekAPIKey,
 		DeepSeekModel:    s.DeepSeekModel,
+		OpenAIAPIKey:     s.OpenAIAPIKey,
+		OpenAIModel:      s.OpenAIModel,
 		RunpodAPIKey:     s.RunpodAPIKey,
 		ElevenLabsAPIKey: s.ElevenLabsAPIKey,
 		RunpodEndpointID: s.RunpodEndpointID,
@@ -83,6 +87,8 @@ func (j sessionLLMJSON) toStored() UserLLMStored {
 		TavilyAPIKey:     j.TavilyAPIKey,
 		DeepSeekAPIKey:   j.DeepSeekAPIKey,
 		DeepSeekModel:    j.DeepSeekModel,
+		OpenAIAPIKey:     j.OpenAIAPIKey,
+		OpenAIModel:      j.OpenAIModel,
 		RunpodAPIKey:     j.RunpodAPIKey,
 		ElevenLabsAPIKey: j.ElevenLabsAPIKey,
 		RunpodEndpointID: j.RunpodEndpointID,

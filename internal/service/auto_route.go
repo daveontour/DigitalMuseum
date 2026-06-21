@@ -12,16 +12,31 @@ import (
 	"github.com/daveontour/aimuseum/internal/appctx"
 )
 
-// autoClassifierNumCtx is the Ollama context window for Auto routing classification only.
+// autoClassifierNumCtx is the preferred Ollama context window for Auto routing classification.
+// Some model tags (e.g. gemma4:e2b on Windows) crash Ollama when num_ctx is set too low;
+// SimpleGenerateClassifier retries without num_ctx on failure.
 const autoClassifierNumCtx = 4096
 
-// AutoRouteDecision is the parsed output of the Local AI classifier.
+var autoClassifierFormatSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"route":                     map[string]any{"type": "string", "enum": []any{"local", "hosted"}},
+		"reason":                    map[string]any{"type": "string"},
+		"confidence":                map[string]any{"type": "number"},
+		"needs_reference_documents": map[string]any{"type": "boolean"},
+		"needs_user_profile":        map[string]any{"type": "boolean"},
+	},
+	"required": []any{"route", "reason"},
+}
+
+// AutoRouteDecision is the parsed output of the Auto routing classifier.
 type AutoRouteDecision struct {
 	Decision                  string // "local" or "hosted"
 	Reason                    string
 	Confidence                float64
 	ClassifierFallback        bool
 	ClassifierError           string
+	ClassifierProvider        string // provider that ran classification (localai, gemini, claude, deepseek)
 	NeedsReferenceDocuments   bool
 	NeedsUserProfile          bool
 }
@@ -75,6 +90,27 @@ User request:
 %s`, toolsCount, refDocCount, profileAvail, userPrompt)
 }
 
+func extractJSONObject(raw string) string {
+	raw = strings.TrimSpace(raw)
+	start := strings.Index(raw, "{")
+	if start == -1 {
+		return raw
+	}
+	depth := 0
+	for i := start; i < len(raw); i++ {
+		switch raw[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return raw[start : i+1]
+			}
+		}
+	}
+	return raw[start:]
+}
+
 func parseAutoClassifierResponse(raw string) (AutoRouteDecision, error) {
 	raw = strings.TrimSpace(raw)
 	if strings.HasPrefix(raw, "```") {
@@ -86,6 +122,7 @@ func parseAutoClassifierResponse(raw string) (AutoRouteDecision, error) {
 		}
 		raw = strings.TrimSpace(raw)
 	}
+	raw = extractJSONObject(raw)
 	var parsed autoClassifierJSON
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
 		return AutoRouteDecision{}, fmt.Errorf("invalid classifier JSON: %w", err)
@@ -117,7 +154,7 @@ func parseAutoClassifierResponse(raw string) (AutoRouteDecision, error) {
 
 func isValidHostedProviderName(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "gemini", "claude", "deepseek":
+	case "gemini", "claude", "deepseek", "openai":
 		return true
 	default:
 		return false
@@ -125,30 +162,20 @@ func isValidHostedProviderName(name string) bool {
 }
 
 // hostedProviderTryOrder returns hosted provider names to try: last manual choice first, then defaults.
-func hostedProviderTryOrder(lastManualHosted string) []string {
-	last := strings.ToLower(strings.TrimSpace(lastManualHosted))
-	seen := map[string]bool{}
-	var order []string
-	if isValidHostedProviderName(last) {
-		order = append(order, last)
-		seen[last] = true
-	}
-	for _, p := range []string{"gemini", "claude", "deepseek"} {
-		if !seen[p] {
-			order = append(order, p)
-		}
-	}
-	return order
+func hostedProviderTryOrder(lastManualHosted string, configuredOrder []string) []string {
+	return HostedProviderTryOrder(lastManualHosted, configuredOrder)
 }
 
-func (s *ChatService) pickHostedProviderForAuto(ctx context.Context, r *http.Request, lastManualHosted string) (string, appai.ChatProvider) {
-	for _, name := range hostedProviderTryOrder(lastManualHosted) {
+func (s *ChatService) pickHostedProviderForAuto(ctx context.Context, r *http.Request, lastManualHosted string, autoOrder []string) (string, appai.ChatProvider) {
+	for _, name := range hostedProviderTryOrder(lastManualHosted, autoOrder) {
 		var p appai.ChatProvider
 		switch name {
 		case "claude":
 			p = s.effectiveClaudeProvider(ctx, r, "")
 		case "deepseek":
 			p = s.effectiveDeepSeekProvider(ctx, r, "")
+		case "openai":
+			p = s.effectiveOpenAIProvider(ctx, r, "")
 		default:
 			p = s.effectiveGeminiProvider(ctx, r, "")
 			name = "gemini"
@@ -192,7 +219,49 @@ func autoExecutionContextFromDecision(decision AutoRouteDecision) AutoExecutionC
 	}
 }
 
+func (s *ChatService) effectiveProviderByName(ctx context.Context, r *http.Request, name string) (appai.ChatProvider, string) {
+	switch normalizeClassifierProvider(name) {
+	case "claude":
+		return s.effectiveClaudeProvider(ctx, r, ""), "claude"
+	case "deepseek":
+		return s.effectiveDeepSeekProvider(ctx, r, ""), "deepseek"
+	case "openai":
+		return s.effectiveOpenAIProvider(ctx, r, ""), "openai"
+	case "localai":
+		return s.effectiveLocalAIProvider(), "localai"
+	default:
+		return s.effectiveGeminiProvider(ctx, r, ""), "gemini"
+	}
+}
+
+type classifierSimpleGen interface {
+	SimpleGenerate(context.Context, string) (string, *appai.LLMUsage, error)
+}
+
+func (s *ChatService) runClassifierGenerate(ctx context.Context, providerName string, provider appai.ChatProvider, prompt string) (string, *appai.LLMUsage, error) {
+	if provider == nil || !provider.IsAvailable() {
+		return "", nil, fmt.Errorf("classifier provider %q unavailable", providerName)
+	}
+	switch providerName {
+	case "localai":
+		lp, ok := provider.(*appai.LocalAIProvider)
+		if !ok || lp == nil {
+			return "", nil, fmt.Errorf("classifier provider %q unavailable", providerName)
+		}
+		return lp.SimpleGenerateClassifier(ctx, prompt, autoClassifierNumCtx, autoClassifierFormatSchema)
+	default:
+		sg, ok := provider.(classifierSimpleGen)
+		if !ok {
+			return "", nil, fmt.Errorf("classifier provider %q does not support simple generate", providerName)
+		}
+		return sg.SimpleGenerate(ctx, prompt)
+	}
+}
+
 func (s *ChatService) classifyAutoRoute(ctx context.Context, r *http.Request, prompt string, toolsCount, refDocCount int, hasSubjectProfile bool) AutoRouteDecision {
+	orderCfg := s.loadHostedLLMProviderOrderConfig(ctx)
+	configuredClassifier := orderCfg.ClassifierProvider
+
 	logAttrs := []any{
 		"user_id", appctx.UserIDFromCtx(ctx),
 		"user_prompt", prompt,
@@ -200,26 +269,41 @@ func (s *ChatService) classifyAutoRoute(ctx context.Context, r *http.Request, pr
 		"ref_doc_count", refDocCount,
 		"has_subject_profile", hasSubjectProfile,
 		"num_ctx", autoClassifierNumCtx,
-	}
-
-	local := s.effectiveLocalAIProvider()
-	lp, ok := local.(*appai.LocalAIProvider)
-	if !ok || lp == nil || !lp.IsAvailable() {
-		decision := hostedClassifierFallbackDecision("Local AI classifier unavailable", "")
-		slog.Warn("auto classifier request skipped", append(logAttrs, "decision", decision.Decision, "reason", decision.Reason)...)
-		return decision
+		"configured_classifier_provider", configuredClassifier,
 	}
 
 	classifierPrompt := buildAutoClassifierPrompt(prompt, toolsCount, refDocCount, hasSubjectProfile)
 	slog.Info("auto classifier request", append(logAttrs, "classifier_prompt", classifierPrompt)...)
 
-	raw, usage, err := lp.SimpleGenerateWithNumCtx(ctx, classifierPrompt, autoClassifierNumCtx)
+	provider, providerName := s.effectiveProviderByName(ctx, r, configuredClassifier)
+	classifierProviderUsed := providerName
+	raw, usage, err := s.runClassifierGenerate(ctx, providerName, provider, classifierPrompt)
+
+	if err != nil && normalizeClassifierProvider(configuredClassifier) != DefaultClassifierProvider {
+		fallbackProvider := s.effectiveLocalAIProvider()
+		raw2, usage2, err2 := s.runClassifierGenerate(ctx, DefaultClassifierProvider, fallbackProvider, classifierPrompt)
+		if err2 == nil {
+			if usage != nil && usage2 != nil {
+				usage.InputTokens += usage2.InputTokens
+				usage.OutputTokens += usage2.OutputTokens
+			} else if usage2 != nil {
+				usage = usage2
+			}
+			raw, err = raw2, nil
+			classifierProviderUsed = DefaultClassifierProvider
+		}
+	}
+
 	if usage != nil {
 		s.applyUsageKeySourceToLLMUsage(ctx, r, "", usage)
 		RecordLLMUsage(ctx, s.billing, s.userRepo, usage, err)
 	}
+
+	logAttrs = append(logAttrs, "classifier_provider", classifierProviderUsed)
+
 	if err != nil {
 		decision := hostedClassifierFallbackDecision("Classifier request failed", err.Error())
+		decision.ClassifierProvider = classifierProviderUsed
 		respAttrs := append(logAttrs,
 			"raw_response", raw,
 			"err", err,
@@ -236,20 +320,18 @@ func (s *ChatService) classifyAutoRoute(ctx context.Context, r *http.Request, pr
 	}
 
 	decision, parseErr := parseAutoClassifierResponse(raw)
+	decision.ClassifierProvider = classifierProviderUsed
 	if parseErr != nil {
 		decision = hostedClassifierFallbackDecision("Could not parse classifier response", parseErr.Error())
-		respAttrs := append(logAttrs,
+		decision.ClassifierProvider = classifierProviderUsed
+		slog.Warn("auto classifier response", append(logAttrs,
 			"raw_response", raw,
 			"err", parseErr,
 			"decision", decision.Decision,
 			"reason", decision.Reason,
 			"classifier_error", decision.ClassifierError,
 			"classifier_fallback", decision.ClassifierFallback,
-		)
-		if usage != nil {
-			respAttrs = append(respAttrs, "input_tokens", usage.InputTokens, "output_tokens", usage.OutputTokens, "model", usage.Model)
-		}
-		slog.Warn("auto classifier response", respAttrs...)
+		)...)
 		return decision
 	}
 
@@ -270,9 +352,13 @@ func (s *ChatService) classifyAutoRoute(ctx context.Context, r *http.Request, pr
 }
 
 func autoRouteMetaFromDecision(decision AutoRouteDecision, routedProvider string, executionFallback bool) map[string]any {
+	classifierProvider := strings.TrimSpace(decision.ClassifierProvider)
+	if classifierProvider == "" {
+		classifierProvider = DefaultClassifierProvider
+	}
 	meta := map[string]any{
 		"requested_provider":        "auto",
-		"classifier_provider":       "localai",
+		"classifier_provider":       classifierProvider,
 		"decision":                  decision.Decision,
 		"routed_provider":           routedProvider,
 		"reason":                    decision.Reason,
@@ -294,6 +380,7 @@ func autoRouteMetaFromDecision(decision AutoRouteDecision, routedProvider string
 func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, prompt string, toolsCount, refDocCount int, hasSubjectProfile bool, lastManualHosted string) (appai.ChatProvider, string, map[string]any, AutoExecutionContext, error) {
 	decision := s.classifyAutoRoute(ctx, r, prompt, toolsCount, refDocCount, hasSubjectProfile)
 	execCtx := autoExecutionContextFromDecision(decision)
+	autoOrder, _ := s.loadHostedLLMProviderOrder(ctx)
 
 	var provider appai.ChatProvider
 	var providerName string
@@ -303,11 +390,11 @@ func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, 
 		provider = s.effectiveLocalAIProvider()
 		providerName = "localai"
 		if provider == nil || !provider.IsAvailable() {
-			providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted)
+			providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted, autoOrder)
 			executionFallback = true
 		}
 	} else {
-		providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted)
+		providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted, autoOrder)
 		if provider == nil || !provider.IsAvailable() {
 			provider = s.effectiveLocalAIProvider()
 			providerName = "localai"
@@ -326,11 +413,28 @@ func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, 
 
 // AutoAvailable reports whether the Auto provider can classify and execute requests.
 func (s *ChatService) AutoAvailable(ctx context.Context, r *http.Request) bool {
-	if !s.LocalAIAvailable() {
+	cfg := s.loadHostedLLMProviderOrderConfig(ctx)
+	if !s.classifierAvailable(ctx, r, cfg.ClassifierProvider) {
 		return false
 	}
 	return s.LocalAIAvailable() ||
 		s.GeminiAvailable(ctx, r) ||
 		s.ClaudeAvailable(ctx, r) ||
-		s.DeepSeekAvailable(ctx, r)
+		s.DeepSeekAvailable(ctx, r) ||
+		s.OpenAIAvailable(ctx, r)
+}
+
+func (s *ChatService) classifierAvailable(ctx context.Context, r *http.Request, configured string) bool {
+	p, _ := s.effectiveProviderByName(ctx, r, configured)
+	if p != nil && p.IsAvailable() {
+		return true
+	}
+	if normalizeClassifierProvider(configured) != DefaultClassifierProvider {
+		lp := s.effectiveLocalAIProvider()
+		return lp != nil && lp.IsAvailable()
+	}
+	return s.GeminiAvailable(ctx, r) ||
+		s.ClaudeAvailable(ctx, r) ||
+		s.DeepSeekAvailable(ctx, r) ||
+		s.OpenAIAvailable(ctx, r)
 }

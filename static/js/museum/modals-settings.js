@@ -3316,6 +3316,276 @@ Modals.InactivityPromptConfig = (() => {
 })();
 
 
+Modals.HostedLLMOrderConfig = (() => {
+    const CONFIG_KEY = 'hosted_llm_provider_order_v1';
+    const DEFAULT_ORDER = ['gemini', 'claude', 'deepseek', 'openai'];
+    const DEFAULT_CLASSIFIER_PROVIDER = 'localai';
+    const PROVIDER_LABELS = {
+        localai: 'Local AI',
+        gemini: 'Gemini',
+        claude: 'Claude',
+        deepseek: 'DeepSeek',
+        openai: 'ChatGPT',
+    };
+
+    let cached = {
+        auto_order: DEFAULT_ORDER.slice(),
+        failover_order: DEFAULT_ORDER.slice(),
+        classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+    };
+    let working = null;
+
+    function getEl(id) { return document.getElementById(id); }
+
+    function cloneOrder(order) {
+        return Array.isArray(order) ? order.slice() : DEFAULT_ORDER.slice();
+    }
+
+    function normalizeClassifierProvider(value) {
+        const key = String(value || '').toLowerCase().trim();
+        return PROVIDER_LABELS[key] ? key : DEFAULT_CLASSIFIER_PROVIDER;
+    }
+
+    function normalizeOrder(order) {
+        const valid = { gemini: true, claude: true, deepseek: true, openai: true };
+        const out = [];
+        const seen = {};
+        (order || []).forEach((p) => {
+            const key = String(p || '').toLowerCase().trim();
+            if (!valid[key] || seen[key]) return;
+            seen[key] = true;
+            out.push(key);
+        });
+        DEFAULT_ORDER.forEach((p) => {
+            if (!seen[p]) out.push(p);
+        });
+        return out;
+    }
+
+    function parseSettingsFromRows(rows) {
+        const row = Array.isArray(rows) ? rows.find((r) => r && r.key === CONFIG_KEY) : null;
+        if (!row || row.value == null || String(row.value).trim() === '') {
+            return {
+                auto_order: DEFAULT_ORDER.slice(),
+                failover_order: DEFAULT_ORDER.slice(),
+                classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+            };
+        }
+        try {
+            const parsed = JSON.parse(row.value);
+            return {
+                auto_order: normalizeOrder(parsed.auto_order),
+                failover_order: normalizeOrder(parsed.failover_order),
+                classifier_provider: normalizeClassifierProvider(parsed.classifier_provider),
+            };
+        } catch (_) {
+            return {
+                auto_order: DEFAULT_ORDER.slice(),
+                failover_order: DEFAULT_ORDER.slice(),
+                classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+            };
+        }
+    }
+
+    function setStatus(msg, isErr) {
+        const el = getEl('hosted-llm-order-status');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.color = isErr ? '#dc3545' : (msg ? '#1a7f37' : 'var(--color-text-muted)');
+    }
+
+    function renderOrderList(listId, orderKey) {
+        const listEl = getEl(listId);
+        if (!listEl || !working) return;
+        const order = working[orderKey] || DEFAULT_ORDER.slice();
+        listEl.innerHTML = '';
+        order.forEach((provider, idx) => {
+            const li = document.createElement('li');
+            li.className = 'hosted-llm-order-item';
+            li.dataset.provider = provider;
+            li.innerHTML = `
+                <span class="hosted-llm-order-rank" aria-hidden="true">${idx + 1}.</span>
+                <span class="hosted-llm-order-label">${PROVIDER_LABELS[provider] || provider}</span>
+                <button type="button" class="modal-btn modal-btn-secondary hosted-llm-order-move-btn" data-move="up" data-order-key="${orderKey}" data-provider="${provider}" aria-label="Move ${PROVIDER_LABELS[provider] || provider} up" ${idx === 0 ? 'disabled' : ''}><i class="fas fa-arrow-up" aria-hidden="true"></i></button>
+                <button type="button" class="modal-btn modal-btn-secondary hosted-llm-order-move-btn" data-move="down" data-order-key="${orderKey}" data-provider="${provider}" aria-label="Move ${PROVIDER_LABELS[provider] || provider} down" ${idx === order.length - 1 ? 'disabled' : ''}><i class="fas fa-arrow-down" aria-hidden="true"></i></button>
+            `;
+            listEl.appendChild(li);
+        });
+    }
+
+    function renderAllLists() {
+        renderOrderList('hosted-llm-auto-order-list', 'auto_order');
+        renderOrderList('hosted-llm-failover-order-list', 'failover_order');
+    }
+
+    function moveProvider(orderKey, provider, direction) {
+        if (!working || !working[orderKey]) return;
+        const order = working[orderKey].slice();
+        const idx = order.indexOf(provider);
+        if (idx < 0) return;
+        const swapWith = direction === 'up' ? idx - 1 : idx + 1;
+        if (swapWith < 0 || swapWith >= order.length) return;
+        const tmp = order[idx];
+        order[idx] = order[swapWith];
+        order[swapWith] = tmp;
+        working[orderKey] = order;
+        renderAllLists();
+    }
+
+    function populateForm(settings) {
+        working = {
+            auto_order: cloneOrder(settings.auto_order),
+            failover_order: cloneOrder(settings.failover_order),
+            classifier_provider: normalizeClassifierProvider(settings.classifier_provider),
+        };
+        const classifierSelect = getEl('hosted-llm-classifier-provider');
+        if (classifierSelect) {
+            classifierSelect.value = working.classifier_provider;
+        }
+        renderAllLists();
+    }
+
+    async function load() {
+        setStatus('Loading…');
+        try {
+            const res = await fetch('/api/configuration', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const rows = await res.json();
+            const settings = parseSettingsFromRows(rows);
+            cached = settings;
+            populateForm(settings);
+            setStatus('');
+        } catch (e) {
+            populateForm(cached);
+            setStatus(`Error loading settings: ${e.message}`, true);
+        }
+    }
+
+    async function ensureLoaded() {
+        try {
+            const res = await fetch('/api/configuration', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const rows = await res.json();
+            cached = parseSettingsFromRows(rows);
+        } catch (_) { /* keep defaults */ }
+    }
+
+    async function save() {
+        if (!working) return;
+        const classifierSelect = getEl('hosted-llm-classifier-provider');
+        if (classifierSelect) {
+            working.classifier_provider = normalizeClassifierProvider(classifierSelect.value);
+        }
+        const payload = {
+            auto_order: normalizeOrder(working.auto_order),
+            failover_order: normalizeOrder(working.failover_order),
+            classifier_provider: normalizeClassifierProvider(working.classifier_provider),
+        };
+        const saveBtn = getEl('hosted-llm-order-save-btn');
+        if (saveBtn) saveBtn.disabled = true;
+        setStatus('Saving…');
+        try {
+            const res = await fetch('/api/configuration', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    key: CONFIG_KEY,
+                    value: JSON.stringify(payload),
+                    description: 'Hosted LLM provider try order for Auto routing and error failover, plus Auto classifier provider',
+                }),
+            });
+            if (!res.ok) {
+                let detail = await res.text();
+                try {
+                    const j = JSON.parse(detail);
+                    if (j.detail) detail = j.detail;
+                } catch (_) { /* keep body */ }
+                throw new Error(detail || `HTTP ${res.status}`);
+            }
+            cached = payload;
+            working = {
+                auto_order: cloneOrder(payload.auto_order),
+                failover_order: cloneOrder(payload.failover_order),
+                classifier_provider: normalizeClassifierProvider(payload.classifier_provider),
+            };
+            renderAllLists();
+            setStatus('Saved.');
+        } catch (e) {
+            setStatus(`Error saving: ${e.message}`, true);
+        } finally {
+            if (saveBtn) saveBtn.disabled = false;
+        }
+    }
+
+    function resetToDefault() {
+        working = {
+            auto_order: DEFAULT_ORDER.slice(),
+            failover_order: DEFAULT_ORDER.slice(),
+            classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+        };
+        const classifierSelect = getEl('hosted-llm-classifier-provider');
+        if (classifierSelect) {
+            classifierSelect.value = DEFAULT_CLASSIFIER_PROVIDER;
+        }
+        renderAllLists();
+        setStatus('Reset to defaults (not saved yet).');
+    }
+
+    function getClassifierProvider() {
+        return normalizeClassifierProvider(cached.classifier_provider);
+    }
+
+    function getAutoOrder() {
+        return cloneOrder(cached.auto_order);
+    }
+
+    function getFailoverOrder() {
+        return cloneOrder(cached.failover_order);
+    }
+
+    function getFailoverCandidates(primary) {
+        const p = String(primary || '').toLowerCase().trim();
+        return getFailoverOrder().filter((name) => name !== p);
+    }
+
+    function init() {
+        const saveBtn = getEl('hosted-llm-order-save-btn');
+        const resetBtn = getEl('hosted-llm-order-reset-btn');
+        const classifierSelect = getEl('hosted-llm-classifier-provider');
+        if (saveBtn) saveBtn.addEventListener('click', () => { void save(); });
+        if (resetBtn) resetBtn.addEventListener('click', resetToDefault);
+        if (classifierSelect) {
+            classifierSelect.addEventListener('change', () => {
+                if (working) {
+                    working.classifier_provider = normalizeClassifierProvider(classifierSelect.value);
+                }
+            });
+        }
+        document.addEventListener('click', (e) => {
+            const btn = e.target && e.target.closest ? e.target.closest('.hosted-llm-order-move-btn') : null;
+            if (!btn) return;
+            const orderKey = btn.getAttribute('data-order-key');
+            const provider = btn.getAttribute('data-provider');
+            const direction = btn.getAttribute('data-move');
+            if (!orderKey || !provider || !direction) return;
+            moveProvider(orderKey, provider, direction);
+        });
+    }
+
+    return {
+        init,
+        load,
+        save,
+        ensureLoaded,
+        getAutoOrder,
+        getFailoverOrder,
+        getFailoverCandidates,
+        getClassifierProvider,
+    };
+})();
+
+
 Modals.LLMToolsAccess = (() => {
     function _status(msg, isErr) {
         const el = document.getElementById('llm-tools-access-status');
@@ -3763,6 +4033,7 @@ Modals.initAll = () => {
         Modals.ManageKeys.init();
         if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.init) Modals.LLMToolsAccess.init();
         if (Modals.InactivityPromptConfig && Modals.InactivityPromptConfig.init) Modals.InactivityPromptConfig.init();
+        if (Modals.HostedLLMOrderConfig && Modals.HostedLLMOrderConfig.init) Modals.HostedLLMOrderConfig.init();
         if (Modals.ToolTest && Modals.ToolTest.init) Modals.ToolTest.init();
         if (Modals.BackgroundJobs && Modals.BackgroundJobs.init) Modals.BackgroundJobs.init();
         Modals.Profiles.init();
@@ -5372,6 +5643,8 @@ Modals.UserLLMSettings = (() => {
         claudeEffective: '',
         deepseekUser: '',
         deepseekEffective: '',
+        openaiUser: '',
+        openaiEffective: '',
     };
 
     const USER_LLM_MODEL_FIELD_INFO =
@@ -5450,6 +5723,8 @@ Modals.UserLLMSettings = (() => {
         'user-llm-info-claude-model',
         'user-llm-info-deepseek-key',
         'user-llm-info-deepseek-model',
+        'user-llm-info-openai-key',
+        'user-llm-info-openai-model',
         'user-llm-info-tavily-key',
         'user-llm-info-runpod-key',
         'user-llm-info-elevenlabs-key',
@@ -5645,6 +5920,7 @@ Modals.UserLLMSettings = (() => {
             const geminiRoute = !!av.gemini_available;
             const claudeRoute = !!av.claude_available;
             const deepseekRoute = !!av.deepseek_available;
+            const openaiRoute = !!av.openai_available;
             const tavilyEnv = !!av.tavily_env_configured;
             const runpodEnv = !!av.runpod_env_configured;
             const runpodEndpointEnv = String(av.runpod_endpoint_id_env || '').trim();
@@ -5653,9 +5929,11 @@ Modals.UserLLMSettings = (() => {
             const serverGeminiModelStr = String(av.server_gemini_model_default || '').trim();
             const serverClaudeModelStr = String(av.server_claude_model_default || '').trim();
             const serverDeepseekModelStr = String(av.server_deepseek_model_default || '').trim();
+            const serverOpenaiModelStr = String(av.server_openai_model_default || '').trim();
             const serverGeminiModel = !!av.server_gemini_model_default_set || serverGeminiModelStr !== '';
             const serverClaudeModel = !!av.server_claude_model_default_set || serverClaudeModelStr !== '';
             const serverDeepseekModel = !!av.server_deepseek_model_default_set || serverDeepseekModelStr !== '';
+            const serverOpenaiModel = !!av.server_openai_model_default_set || serverOpenaiModelStr !== '';
             const llm = data.llm_settings || {};
             sessionScoped = !!llm.session_scoped;
             const intro = getEl('user-llm-intro');
@@ -5673,12 +5951,14 @@ Modals.UserLLMSettings = (() => {
                     if (llm.subject_gemini_api_key_set) parts.push('Gemini API key');
                     if (llm.subject_anthropic_key_set) parts.push('Anthropic API key');
                     if (llm.subject_deepseek_key_set) parts.push('DeepSeek API key');
+                    if (llm.subject_openai_key_set) parts.push('OpenAI API key');
                     if (llm.subject_tavily_key_set) parts.push('Tavily API key');
                     if (llm.subject_runpod_key_set) parts.push('RunPod API key');
                     if (llm.subject_elevenlabs_key_set) parts.push('ElevenLabs API key');
                     if (llm.subject_gemini_model) parts.push('Gemini model "' + llm.subject_gemini_model + '"');
                     if (llm.subject_claude_model) parts.push('Claude model "' + llm.subject_claude_model + '"');
                     if (llm.subject_deepseek_model) parts.push('DeepSeek model "' + llm.subject_deepseek_model + '"');
+                    if (llm.subject_openai_model) parts.push('ChatGPT model "' + llm.subject_openai_model + '"');
                     subEl.textContent = parts.length
                         ? ('When you leave a field blank, the owner’s saved settings apply where available, then server defaults. Owner has: ' + parts.join('; ') + '.')
                         : 'The archive owner has not saved personal API keys or models in Settings — blank fields use server defaults only.';
@@ -5691,30 +5971,37 @@ Modals.UserLLMSettings = (() => {
             setHint('user-llm-gemini-key-hint', !!llm.gemini_api_key_set, sessionScoped);
             setHint('user-llm-anthropic-key-hint', !!llm.anthropic_api_key_set, sessionScoped);
             setHint('user-llm-deepseek-key-hint', !!llm.deepseek_api_key_set, sessionScoped);
+            setHint('user-llm-openai-key-hint', !!llm.openai_api_key_set, sessionScoped);
             setHint('user-llm-tavily-key-hint', !!llm.tavily_api_key_set, sessionScoped);
             setHint('user-llm-runpod-key-hint', !!llm.runpod_api_key_set, sessionScoped);
             setHint('user-llm-elevenlabs-key-hint', !!llm.elevenlabs_api_key_set, sessionScoped);
             const gm = getEl('user-llm-gemini-model');
             const cm = getEl('user-llm-claude-model');
             const dm = getEl('user-llm-deepseek-model');
+            const om = getEl('user-llm-openai-model');
             const geminiStored = String(llm.gemini_model || '').trim();
             const claudeStored = String(llm.claude_model || '').trim();
             const deepseekStored = String(llm.deepseek_model || '').trim();
+            const openaiStored = String(llm.openai_model || '').trim();
             const ownerGeminiModel = sessionScoped ? String(llm.subject_gemini_model || '').trim() : '';
             const ownerClaudeModel = sessionScoped ? String(llm.subject_claude_model || '').trim() : '';
             const ownerDeepseekModel = sessionScoped ? String(llm.subject_deepseek_model || '').trim() : '';
+            const ownerOpenaiModel = sessionScoped ? String(llm.subject_openai_model || '').trim() : '';
             const ownerGeminiKey = !!(sessionScoped && llm.subject_gemini_api_key_set);
             const ownerAnthropicKey = !!(sessionScoped && llm.subject_anthropic_key_set);
             const ownerDeepseekKey = !!(sessionScoped && llm.subject_deepseek_key_set);
+            const ownerOpenaiKey = !!(sessionScoped && llm.subject_openai_key_set);
             const ownerTavilyKey = !!(sessionScoped && llm.subject_tavily_key_set);
             const ownerRunpodKey = !!(sessionScoped && llm.subject_runpod_key_set);
             const ownerElevenlabsKey = !!(sessionScoped && llm.subject_elevenlabs_key_set);
             const geminiEffective = geminiStored || ownerGeminiModel || serverGeminiModelStr;
             const claudeEffective = claudeStored || ownerClaudeModel || serverClaudeModelStr;
             const deepseekEffective = deepseekStored || ownerDeepseekModel || serverDeepseekModelStr;
+            const openaiEffective = openaiStored || ownerOpenaiModel || serverOpenaiModelStr;
             const gemModelPh = geminiEffective ? '' : 'Enter model name';
             const claudeModelPh = claudeEffective ? '' : 'Enter model name';
             const deepseekModelPh = deepseekEffective ? '' : 'Enter model name';
+            const openaiModelPh = openaiEffective ? '' : 'Enter model name';
             userLLMModelSaveCtx = {
                 geminiUser: geminiStored,
                 geminiEffective: geminiEffective,
@@ -5722,22 +6009,27 @@ Modals.UserLLMSettings = (() => {
                 claudeEffective: claudeEffective,
                 deepseekUser: deepseekStored,
                 deepseekEffective: deepseekEffective,
+                openaiUser: openaiStored,
+                openaiEffective: openaiEffective,
             };
             const gemKeyOk = !!(llm.gemini_api_key_set || ownerGeminiKey || geminiRoute);
             const claudeKeyOk = !!(llm.anthropic_api_key_set || ownerAnthropicKey || claudeRoute);
             const deepKeyOk = !!(llm.deepseek_api_key_set || ownerDeepseekKey || deepseekRoute);
+            const openaiKeyOk = !!(llm.openai_api_key_set || ownerOpenaiKey || openaiRoute);
             const tavKeyOk = !!(llm.tavily_api_key_set || ownerTavilyKey || tavilyEnv);
             const runpodKeyOk = !!(llm.runpod_api_key_set || ownerRunpodKey || runpodEnv);
             const elevenlabsKeyOk = !!(llm.elevenlabs_api_key_set || ownerElevenlabsKey || elevenlabsEnv);
             const gk = getEl('user-llm-gemini-key');
             const ak = getEl('user-llm-anthropic-key');
             const dk = getEl('user-llm-deepseek-key');
+            const ok = getEl('user-llm-openai-key');
             const tk = getEl('user-llm-tavily-key');
             const rk = getEl('user-llm-runpod-key');
             const el11 = getEl('user-llm-elevenlabs-key');
             const gemKeyPh = apiKeyPlaceholder(!!llm.gemini_api_key_set, gemKeyOk, 'Google Gemini');
             const anthropicKeyPh = apiKeyPlaceholder(!!llm.anthropic_api_key_set, claudeKeyOk, 'Anthropic Claude');
             const deepseekKeyPh = apiKeyPlaceholder(!!llm.deepseek_api_key_set, deepKeyOk, 'DeepSeek');
+            const openaiKeyPh = apiKeyPlaceholder(!!llm.openai_api_key_set, openaiKeyOk, 'ChatGPT');
             const tavilyKeyPh = apiKeyPlaceholder(!!llm.tavily_api_key_set, tavKeyOk, 'Tavily (web search)');
             const runpodKeyPh = apiKeyPlaceholder(!!llm.runpod_api_key_set, runpodKeyOk, 'RunPod (image AI classification)');
             const elevenlabsKeyPh = apiKeyPlaceholder(!!llm.elevenlabs_api_key_set, elevenlabsKeyOk, 'ElevenLabs (speech / voice)');
@@ -5753,6 +6045,10 @@ Modals.UserLLMSettings = (() => {
                 dm.value = deepseekEffective;
                 dm.placeholder = deepseekModelPh;
             }
+            if (om) {
+                om.value = openaiEffective;
+                om.placeholder = openaiModelPh;
+            }
             if (gk) {
                 gk.value = '';
                 gk.placeholder = gemKeyPh;
@@ -5764,6 +6060,10 @@ Modals.UserLLMSettings = (() => {
             if (dk) {
                 dk.value = '';
                 dk.placeholder = deepseekKeyPh;
+            }
+            if (ok) {
+                ok.value = '';
+                ok.placeholder = openaiKeyPh;
             }
             if (tk) {
                 tk.value = '';
@@ -5799,6 +6099,8 @@ Modals.UserLLMSettings = (() => {
             setLLMInfoButton('user-llm-info-claude-model', 'Claude model name', USER_LLM_MODEL_FIELD_INFO);
             setLLMInfoButton('user-llm-info-deepseek-key', 'DeepSeek API key', deepseekKeyPh);
             setLLMInfoButton('user-llm-info-deepseek-model', 'DeepSeek model name', USER_LLM_MODEL_FIELD_INFO);
+            setLLMInfoButton('user-llm-info-openai-key', 'OpenAI API key', openaiKeyPh);
+            setLLMInfoButton('user-llm-info-openai-model', 'ChatGPT model name', USER_LLM_MODEL_FIELD_INFO);
             setLLMInfoButton('user-llm-info-tavily-key', 'Tavily API key (web search)', tavilyKeyPh);
             setLLMInfoButton('user-llm-info-runpod-key', 'RunPod API key (image AI classification)', runpodKeyPh);
             setLLMInfoButton('user-llm-info-elevenlabs-key', 'ElevenLabs API key (speech / voice)', elevenlabsKeyPh);
@@ -5812,6 +6114,9 @@ Modals.UserLLMSettings = (() => {
             const deepModelOk = !!(deepseekStored || ownerDeepseekModel || serverDeepseekModelStr || serverDeepseekModel);
             applyLLMInputState(dk, deepKeyOk);
             applyLLMInputState(dm, deepModelOk);
+            const openaiModelOk = !!(openaiStored || ownerOpenaiModel || serverOpenaiModelStr || serverOpenaiModel);
+            applyLLMInputState(ok, openaiKeyOk);
+            applyLLMInputState(om, openaiModelOk);
             applyLLMInputState(tk, tavKeyOk);
             applyLLMInputState(rk, runpodKeyOk);
             applyLLMInputState(el11, elevenlabsKeyOk);
@@ -5830,12 +6135,14 @@ Modals.UserLLMSettings = (() => {
         const gk = (getEl('user-llm-gemini-key') && getEl('user-llm-gemini-key').value) || '';
         const ak = (getEl('user-llm-anthropic-key') && getEl('user-llm-anthropic-key').value) || '';
         const dk = (getEl('user-llm-deepseek-key') && getEl('user-llm-deepseek-key').value) || '';
+        const ok = (getEl('user-llm-openai-key') && getEl('user-llm-openai-key').value) || '';
         const tk = (getEl('user-llm-tavily-key') && getEl('user-llm-tavily-key').value) || '';
         const rpK = (getEl('user-llm-runpod-key') && getEl('user-llm-runpod-key').value) || '';
         const elK = (getEl('user-llm-elevenlabs-key') && getEl('user-llm-elevenlabs-key').value) || '';
         if (gk.trim()) body.gemini_api_key = gk.trim();
         if (ak.trim()) body.anthropic_api_key = ak.trim();
         if (dk.trim()) body.deepseek_api_key = dk.trim();
+        if (ok.trim()) body.openai_api_key = ok.trim();
         if (tk.trim()) body.tavily_api_key = tk.trim();
         if (rpK.trim()) body.runpod_api_key = rpK.trim();
         if (elK.trim()) body.elevenlabs_api_key = elK.trim();
@@ -5846,6 +6153,7 @@ Modals.UserLLMSettings = (() => {
         const gmEl = getEl('user-llm-gemini-model');
         const cmEl = getEl('user-llm-claude-model');
         const dmEl = getEl('user-llm-deepseek-model');
+        const omEl = getEl('user-llm-openai-model');
         body.gemini_model = formatModelForSave(
             gmEl && gmEl.value,
             userLLMModelSaveCtx.geminiUser,
@@ -5860,6 +6168,11 @@ Modals.UserLLMSettings = (() => {
             dmEl && dmEl.value,
             userLLMModelSaveCtx.deepseekUser,
             userLLMModelSaveCtx.deepseekEffective
+        );
+        body.openai_model = formatModelForSave(
+            omEl && omEl.value,
+            userLLMModelSaveCtx.openaiUser,
+            userLLMModelSaveCtx.openaiEffective
         );
         try {
             await patchLLM(body);
@@ -5895,6 +6208,8 @@ Modals.UserLLMSettings = (() => {
         if (ca) ca.addEventListener('click', () => void clearLLMPatch({ anthropic_api_key: '', claude_model: '' }));
         const cd = getEl('user-llm-clear-deepseek');
         if (cd) cd.addEventListener('click', () => void clearLLMPatch({ deepseek_api_key: '', deepseek_model: '' }));
+        const co = getEl('user-llm-clear-openai');
+        if (co) co.addEventListener('click', () => void clearLLMPatch({ openai_api_key: '', openai_model: '' }));
         const ct = getEl('user-llm-clear-tavily');
         if (ct) ct.addEventListener('click', () => void clearLLMPatch({ tavily_api_key: '' }));
         const crp = getEl('user-llm-clear-runpod');

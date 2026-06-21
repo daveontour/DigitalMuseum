@@ -321,6 +321,8 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		cfg.AI.ClaudeModelName,
 		cfg.AI.DeepSeekAPIKey,
 		cfg.AI.DeepSeekModelName,
+		cfg.AI.OpenAIAPIKey,
+		cfg.AI.OpenAIModelName,
 		cfg.AI.TavilyAPIKey,
 		cfg.AI.LocalAIBaseURL,
 		cfg.AI.LocalAIAPIKey,
@@ -332,6 +334,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		privateStoreSvc,
 		billingRepo,
 		dashboardSvc,
+		configRepo,
 	)
 	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo, sessionMasterStore)
 	chatHandler.RegisterRoutes(r)

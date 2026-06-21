@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS users (
     user_tavily_api_key    TEXT,
     user_deepseek_api_key  TEXT,
     user_deepseek_model    TEXT,
+    user_openai_api_key    TEXT,
+    user_openai_model      TEXT,
     user_runpod_api_key    TEXT,
     user_elevenlabs_api_key TEXT,
     allow_server_llm_keys  BOOLEAN      NOT NULL DEFAULT TRUE,

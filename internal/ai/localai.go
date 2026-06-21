@@ -27,6 +27,8 @@ type ollamaRequest struct {
 	Messages []map[string]any `json:"messages"`
 	Tools    []map[string]any `json:"tools,omitempty"`
 	Stream   bool             `json:"stream"`
+	Format   any              `json:"format,omitempty"`
+	Think    *bool            `json:"think,omitempty"`
 	Options  map[string]any   `json:"options,omitempty"`
 }
 
@@ -35,6 +37,7 @@ type ollamaResponse struct {
 	Message struct {
 		Role      string `json:"role"`
 		Content   string `json:"content"`
+		Thinking  string `json:"thinking"`
 		ToolCalls []struct {
 			Function struct {
 				Name      string         `json:"name"`
@@ -85,15 +88,64 @@ func (p *LocalAIProvider) SimpleGenerateWithNumCtx(ctx context.Context, prompt s
 	return p.simpleGenerate(ctx, prompt, numCtx)
 }
 
+type simpleGenerateOptions struct {
+	numCtx     int
+	omitNumCtx bool
+	format     map[string]any
+	think      *bool
+}
+
+// SimpleGenerateClassifier sends a structured-output classification prompt to Ollama.
+// preferredNumCtx is attempted first; on failure the call is retried without num_ctx so
+// Ollama uses its server default (some model tags such as gemma4:e2b crash when num_ctx is low).
+func (p *LocalAIProvider) SimpleGenerateClassifier(ctx context.Context, prompt string, preferredNumCtx int, formatSchema map[string]any) (string, *LLMUsage, error) {
+	thinkFalse := false
+	opts := simpleGenerateOptions{numCtx: preferredNumCtx, format: formatSchema, think: &thinkFalse}
+	text, usage, err := p.simpleGenerateAdvanced(ctx, prompt, opts)
+	if err == nil && strings.TrimSpace(text) != "" {
+		return text, usage, nil
+	}
+	if preferredNumCtx > 0 {
+		opts.numCtx = 0
+		opts.omitNumCtx = true
+		text2, usage2, err2 := p.simpleGenerateAdvanced(ctx, prompt, opts)
+		if err2 == nil && strings.TrimSpace(text2) != "" {
+			return text2, usage2, nil
+		}
+		if err != nil {
+			return "", usage2, err2
+		}
+	}
+	if formatSchema != nil {
+		text3, usage3, err3 := p.simpleGenerateAdvanced(ctx, prompt, simpleGenerateOptions{omitNumCtx: true})
+		if err3 == nil && strings.TrimSpace(text3) != "" {
+			return text3, usage3, nil
+		}
+		if err != nil {
+			return "", usage3, err3
+		}
+	}
+	if err != nil {
+		return "", usage, err
+	}
+	return text, usage, fmt.Errorf("localai: empty classifier response")
+}
+
 func (p *LocalAIProvider) simpleGenerate(ctx context.Context, prompt string, numCtxOverride int) (string, *LLMUsage, error) {
+	return p.simpleGenerateAdvanced(ctx, prompt, simpleGenerateOptions{numCtx: numCtxOverride})
+}
+
+func (p *LocalAIProvider) simpleGenerateAdvanced(ctx context.Context, prompt string, opts simpleGenerateOptions) (string, *LLMUsage, error) {
 	if p == nil || p.baseURL == "" {
 		return "", nil, fmt.Errorf("localai: not configured")
 	}
-	opts := map[string]any{"temperature": 0.2}
-	if numCtxOverride > 0 {
-		opts["num_ctx"] = numCtxOverride
-	} else if p.numCtx > 0 {
-		opts["num_ctx"] = p.numCtx
+	options := map[string]any{"temperature": 0.2}
+	if !opts.omitNumCtx {
+		if opts.numCtx > 0 {
+			options["num_ctx"] = opts.numCtx
+		} else if p.numCtx > 0 {
+			options["num_ctx"] = p.numCtx
+		}
 	}
 	req := ollamaRequest{
 		Model:  p.modelName,
@@ -101,7 +153,13 @@ func (p *LocalAIProvider) simpleGenerate(ctx context.Context, prompt string, num
 		Messages: []map[string]any{
 			{"role": "user", "content": prompt},
 		},
-		Options: opts,
+		Options: options,
+	}
+	if len(opts.format) > 0 {
+		req.Format = opts.format
+	}
+	if opts.think != nil {
+		req.Think = opts.think
 	}
 	resp, err := ollamaPost(ctx, p.baseURL, req)
 	if err != nil {
@@ -116,7 +174,11 @@ func (p *LocalAIProvider) simpleGenerate(ctx context.Context, prompt string, num
 			OutputTokens: resp.EvalCount,
 		}
 	}
-	return strings.TrimSpace(resp.Message.Content), usage, nil
+	text := strings.TrimSpace(resp.Message.Content)
+	if text == "" {
+		text = strings.TrimSpace(resp.Message.Thinking)
+	}
+	return text, usage, nil
 }
 
 // GenerateResponse calls the Ollama native API with a tool-calling loop.

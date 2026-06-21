@@ -90,6 +90,7 @@ const CONSTANTS = {
         GEMINI: "{{gemini_configured}}",
         CLAUDE: "{{claude_configured}}",
         DEEPSEEK: "{{deepseek_configured}}",
+        OPENAI: "{{openai_configured}}",
         LOCALAI: "{{localai_configured}}"
     },
     /** True when DEPLOYMENT_NATURE=local — path-based import tiles are shown; otherwise they are hidden. */
@@ -826,6 +827,7 @@ const UI = (() => {
     function autoRouteProviderLabel(name) {
         if (name === 'claude') return 'Claude';
         if (name === 'deepseek') return 'DeepSeek';
+        if (name === 'openai') return 'ChatGPT';
         if (name === 'localai') return 'Local AI';
         if (name === 'gemini') return 'Gemini';
         return name || 'Unknown';
@@ -905,6 +907,7 @@ const UI = (() => {
         const providerLabel = (p) => {
             if (p === 'claude') return 'Claude';
             if (p === 'deepseek') return 'DeepSeek';
+            if (p === 'openai') return 'ChatGPT';
             if (p === 'localai') return 'Local AI';
             return 'Gemini';
         };

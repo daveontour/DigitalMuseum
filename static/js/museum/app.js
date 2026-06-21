@@ -70,26 +70,51 @@ const App = (() => {
     async function getLLMProviderAvailabilityPair() {
         try {
             const res = await fetch('/chat/availability', { credentials: 'same-origin' });
-            if (!res.ok) return { gemini: true, claude: true, deepseek: true, localai: false };
+            if (!res.ok) return { gemini: true, claude: true, deepseek: true, openai: true, localai: false };
             const av = await res.json();
             return {
                 gemini: !!av.gemini_available,
                 claude: !!av.claude_available,
                 deepseek: !!av.deepseek_available,
+                openai: !!av.openai_available,
                 localai: !!av.localai_available
             };
         } catch (e) {
-            return { gemini: true, claude: true, deepseek: true, localai: false };
+            return { gemini: true, claude: true, deepseek: true, openai: true, localai: false };
         }
     }
 
     function otherLLMProvider(p) {
         if (p === 'auto') return 'gemini';
         if (p === 'localai') return 'gemini';
+        const failover = (typeof Modals !== 'undefined'
+            && Modals.HostedLLMOrderConfig
+            && Modals.HostedLLMOrderConfig.getFailoverCandidates)
+            ? Modals.HostedLLMOrderConfig.getFailoverCandidates(p)
+            : [];
+        if (failover.length) return failover[0];
         if (p === 'gemini') return 'claude';
         if (p === 'claude') return 'gemini';
         if (p === 'deepseek') return 'gemini';
+        if (p === 'openai') return 'gemini';
         return 'gemini';
+    }
+
+    function getHostedFailoverCandidates(primary) {
+        if (typeof Modals !== 'undefined'
+            && Modals.HostedLLMOrderConfig
+            && Modals.HostedLLMOrderConfig.getFailoverCandidates) {
+            return Modals.HostedLLMOrderConfig.getFailoverCandidates(primary);
+        }
+        const p = String(primary || '').toLowerCase().trim();
+        return ['gemini', 'claude', 'deepseek', 'openai'].filter((name) => name !== p);
+    }
+
+    function isHostedProviderAvailable(name, av) {
+        if (name === 'claude') return !!av.claude;
+        if (name === 'deepseek') return !!av.deepseek;
+        if (name === 'openai') return !!av.openai;
+        return !!av.gemini;
     }
 
     const LAST_HOSTED_LLM_PROVIDER_KEY = 'dm_last_hosted_llm_provider';
@@ -97,13 +122,13 @@ const App = (() => {
     function getLastManualHostedProvider() {
         try {
             const v = localStorage.getItem(LAST_HOSTED_LLM_PROVIDER_KEY);
-            if (v === 'gemini' || v === 'claude' || v === 'deepseek') return v;
+            if (v === 'gemini' || v === 'claude' || v === 'deepseek' || v === 'openai') return v;
         } catch (_) { /* ignore */ }
         return null;
     }
 
     function saveLastManualHostedProviderIfHosted(value) {
-        if (value === 'gemini' || value === 'claude' || value === 'deepseek') {
+        if (value === 'gemini' || value === 'claude' || value === 'deepseek' || value === 'openai') {
             try {
                 localStorage.setItem(LAST_HOSTED_LLM_PROVIDER_KEY, value);
             } catch (_) { /* ignore */ }
@@ -213,49 +238,47 @@ const App = (() => {
         if (primary === 'localai') {
             return { ok: false, error: first.error || 'Local AI request failed', data: first.data };
         }
-        const alt = otherLLMProvider(primary);
-        // Also never failover TO localai automatically.
-        if (alt === 'localai') {
-            return { ok: false, error: first.error || 'Request failed', data: first.data };
-        }
         const av = await getLLMProviderAvailabilityPair();
         if (signal && signal.aborted) {
             return { ok: false, aborted: true, error: 'Cancelled' };
         }
-        const altAvailable = alt === 'gemini' ? av.gemini : alt === 'claude' ? av.claude : alt === 'deepseek' ? av.deepseek : false;
-        if (!altAvailable) {
-            return { ok: false, error: first.error || 'Request failed', data: first.data };
-        }
-        if (typeof UI !== 'undefined' && UI.setChatProviderFailoverNotice) {
-            UI.setChatProviderFailoverNotice(primary, alt);
-        }
-        if (select) select.value = alt;
-        if (typeof UI !== 'undefined' && UI.syncLoadingIndicatorProvider) {
-            UI.syncLoadingIndicatorProvider();
-        }
-        if (signal && signal.aborted) {
-            if (select) select.value = primary;
-            if (typeof UI !== 'undefined' && UI.clearChatProviderFailoverNotice) {
-                UI.clearChatProviderFailoverNotice();
+        const candidates = getHostedFailoverCandidates(primary);
+        let lastError = first.error || 'Request failed';
+        for (const alt of candidates) {
+            if (alt === 'localai') continue;
+            if (!isHostedProviderAvailable(alt, av)) continue;
+            if (typeof UI !== 'undefined' && UI.setChatProviderFailoverNotice) {
+                UI.setChatProviderFailoverNotice(primary, alt);
             }
-            return { ok: false, aborted: true, error: 'Cancelled' };
-        }
-        const second = await postJsonChatEndpoint(url, buildPayload(alt), signal);
-        if (second.aborted) {
-            if (select) select.value = primary;
-            if (typeof UI !== 'undefined' && UI.clearChatProviderFailoverNotice) {
-                UI.clearChatProviderFailoverNotice();
+            if (select) select.value = alt;
+            if (typeof UI !== 'undefined' && UI.syncLoadingIndicatorProvider) {
+                UI.syncLoadingIndicatorProvider();
             }
-            return { ok: false, aborted: true, error: 'Cancelled' };
-        }
-        if (second.ok) {
-            return { ok: true, data: second.data, switched: true };
+            if (signal && signal.aborted) {
+                if (select) select.value = primary;
+                if (typeof UI !== 'undefined' && UI.clearChatProviderFailoverNotice) {
+                    UI.clearChatProviderFailoverNotice();
+                }
+                return { ok: false, aborted: true, error: 'Cancelled' };
+            }
+            const attempt = await postJsonChatEndpoint(url, buildPayload(alt), signal);
+            if (attempt.aborted) {
+                if (select) select.value = primary;
+                if (typeof UI !== 'undefined' && UI.clearChatProviderFailoverNotice) {
+                    UI.clearChatProviderFailoverNotice();
+                }
+                return { ok: false, aborted: true, error: 'Cancelled' };
+            }
+            if (attempt.ok) {
+                return { ok: true, data: attempt.data, switched: true };
+            }
+            lastError = attempt.error || lastError;
         }
         if (select) select.value = primary;
         if (typeof UI !== 'undefined' && UI.clearChatProviderFailoverNotice) {
             UI.clearChatProviderFailoverNotice();
         }
-        return { ok: false, error: second.error || first.error || 'Request failed', data: second.data };
+        return { ok: false, error: lastError, data: first.data };
     }
 
     async function processFormSubmit(userPrompt, category = null, title = null, supplementary_prompt = null) {
@@ -1079,6 +1102,11 @@ const App = (() => {
                         void Modals.InactivityPromptConfig.load();
                     }
                 }
+                if (targetTab === 'hosted-llm-order') {
+                    if (Modals.HostedLLMOrderConfig && Modals.HostedLLMOrderConfig.load) {
+                        void Modals.HostedLLMOrderConfig.load();
+                    }
+                }
             });
         });
 
@@ -1432,6 +1460,7 @@ const App = (() => {
                 const gOk = !!av.gemini_available;
                 const cOk = !!av.claude_available;
                 const dOk = !!av.deepseek_available;
+                const oOk = !!av.openai_available;
                 const lOk = !!av.localai_available;
                 const gemVal = gOk
                     ? '<strong style="color:#15803d;">Ready</strong>'
@@ -1442,6 +1471,9 @@ const App = (() => {
                 const deepVal = dOk
                     ? '<strong style="color:#15803d;">Ready</strong>'
                     : '<strong style="color:#b91c1c;">Not available</strong> — configure a DeepSeek API key';
+                const openaiVal = oOk
+                    ? '<strong style="color:#15803d;">Ready</strong>'
+                    : '<strong style="color:#b91c1c;">Not available</strong> — configure an OpenAI API key';
                 const localVal = lOk
                     ? '<strong style="color:#15803d;">Ready</strong>'
                     : '<strong style="color:#b91c1c;">Not Available</strong>';
@@ -1449,6 +1481,7 @@ const App = (() => {
                 parts.push(row2('<span style="color:#64748b;">Gemini</span>', `<span>${gemVal}</span>`));
                 parts.push(row2('<span style="color:#64748b;">Claude</span>', `<span>${claVal}</span>`));
                 parts.push(row2('<span style="color:#64748b;">DeepSeek</span>', `<span>${deepVal}</span>`));
+                parts.push(row2('<span style="color:#64748b;">ChatGPT</span>', `<span>${openaiVal}</span>`));
                 parts.push(row2('<span style="color:#64748b;">Local AI</span>', `<span>${localVal}</span>`));
                 if (me && me.llm_settings) {
                     const ls = me.llm_settings;
@@ -1462,6 +1495,9 @@ const App = (() => {
                     }
                     if (ls.deepseek_model) {
                         parts.push(row2(`<span style="color:#64748b;">DeepSeek model${scope}</span>`, `<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:0.85rem;">${esc(ls.deepseek_model)}</code>`));
+                    }
+                    if (ls.openai_model) {
+                        parts.push(row2(`<span style="color:#64748b;">ChatGPT model${scope}</span>`, `<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:0.85rem;">${esc(ls.openai_model)}</code>`));
                     }
                     const tavVal = ls.tavily_api_key_set
                         ? '<strong style="color:#15803d;">Key set</strong> — search tool can use your Tavily key' + (sess ? ' <span style="color:#64748b;font-weight:normal;">(this session)</span>' : '')
@@ -1490,7 +1526,7 @@ const App = (() => {
                 const lbl = document.getElementById('overview-llm-keys-open-btn-label');
                 archiveOverviewMeForKeys = null;
                 if (wrap) {
-                    if (!gOk && !cOk && !dOk && !lOk && me) {
+                    if (!gOk && !cOk && !dOk && !oOk && !lOk && me) {
                         wrap.style.display = 'block';
                         archiveOverviewMeForKeys = me;
                         if (lbl) {
@@ -1533,18 +1569,20 @@ const App = (() => {
                 if (titleEl) titleEl.textContent = sess ? 'API keys for this visit' : 'Add your API keys';
                 if (introEl) {
                     introEl.textContent = sess
-                        ? 'Keys are stored on this browser session only and clear when the session ends. Enter at least one cloud API key (Gemini, Anthropic, or DeepSeek) to use chat.'
-                        : 'Keys are saved to your account. Enter at least one cloud API key (Gemini, Anthropic, or DeepSeek) when no server key is available for you.';
+                        ? 'Keys are stored on this browser session only and clear when the session ends. Enter at least one cloud API key (Gemini, Anthropic, DeepSeek, or ChatGPT) to use chat.'
+                        : 'Keys are saved to your account. Enter at least one cloud API key (Gemini, Anthropic, DeepSeek, or ChatGPT) when no server key is available for you.';
                 }
                 const gk = document.getElementById('overview-llm-gemini-key');
                 const ak = document.getElementById('overview-llm-anthropic-key');
                 const dk = document.getElementById('overview-llm-deepseek-key');
+                const oK = document.getElementById('overview-llm-openai-key');
                 const tk = document.getElementById('overview-llm-tavily-key');
                 const rk = document.getElementById('overview-llm-runpod-key');
                 const elK = document.getElementById('overview-llm-elevenlabs-key');
                 const gm = document.getElementById('overview-llm-gemini-model');
                 const cm = document.getElementById('overview-llm-claude-model');
                 const dsm = document.getElementById('overview-llm-deepseek-model');
+                const osm = document.getElementById('overview-llm-openai-model');
                 if (gk) {
                     gk.value = '';
                     gk.placeholder = sess ? 'Leave blank to use owner or server default' : 'Paste key to save';
@@ -1556,6 +1594,10 @@ const App = (() => {
                 if (dk) {
                     dk.value = '';
                     dk.placeholder = sess ? 'Leave blank to use owner or server default' : 'Paste key to save';
+                }
+                if (oK) {
+                    oK.value = '';
+                    oK.placeholder = sess ? 'Leave blank to use owner or server default' : 'Paste key to save';
                 }
                 if (tk) {
                     tk.value = '';
@@ -1572,6 +1614,7 @@ const App = (() => {
                 if (gm) gm.value = ls.gemini_model || '';
                 if (cm) cm.value = ls.claude_model || '';
                 if (dsm) dsm.value = ls.deepseek_model || '';
+                if (osm) osm.value = ls.openai_model || '';
                 const st = document.getElementById('archive-overview-llm-save-status');
                 if (st) st.textContent = '';
                 modal.style.display = 'flex';
@@ -1589,21 +1632,24 @@ const App = (() => {
                     const gkEl = document.getElementById('overview-llm-gemini-key');
                     const akEl = document.getElementById('overview-llm-anthropic-key');
                     const dkEl = document.getElementById('overview-llm-deepseek-key');
+                    const okEl = document.getElementById('overview-llm-openai-key');
                     const tkEl = document.getElementById('overview-llm-tavily-key');
                     const rkEl = document.getElementById('overview-llm-runpod-key');
                     const elKEl = document.getElementById('overview-llm-elevenlabs-key');
                     const gmEl = document.getElementById('overview-llm-gemini-model');
                     const cmEl = document.getElementById('overview-llm-claude-model');
                     const dsmEl = document.getElementById('overview-llm-deepseek-model');
+                    const osmEl = document.getElementById('overview-llm-openai-model');
                     const gk = (gkEl && gkEl.value.trim()) || '';
                     const ak = (akEl && akEl.value.trim()) || '';
                     const dk = (dkEl && dkEl.value.trim()) || '';
+                    const ok = (okEl && okEl.value.trim()) || '';
                     const tk = (tkEl && tkEl.value.trim()) || '';
                     const rp = (rkEl && rkEl.value.trim()) || '';
                     const elK = (elKEl && elKEl.value.trim()) || '';
-                    if (!gk && !ak && !dk) {
+                    if (!gk && !ak && !dk && !ok) {
                         if (st) {
-                            st.textContent = 'Enter at least one API key: Gemini, Anthropic, or DeepSeek.';
+                            st.textContent = 'Enter at least one API key: Gemini, Anthropic, DeepSeek, or ChatGPT.';
                             st.style.color = '#b91c1c';
                         }
                         return;
@@ -1612,12 +1658,14 @@ const App = (() => {
                     if (gk) body.gemini_api_key = gk;
                     if (ak) body.anthropic_api_key = ak;
                     if (dk) body.deepseek_api_key = dk;
+                    if (ok) body.openai_api_key = ok;
                     if (tk) body.tavily_api_key = tk;
                     if (rp) body.runpod_api_key = rp;
                     if (elK) body.elevenlabs_api_key = elK;
                     body.gemini_model = (gmEl && gmEl.value.trim()) || '';
                     body.claude_model = (cmEl && cmEl.value.trim()) || '';
                     body.deepseek_model = (dsmEl && dsmEl.value.trim()) || '';
+                    body.openai_model = (osmEl && osmEl.value.trim()) || '';
                     saveBtn.disabled = true;
                     if (st) {
                         st.textContent = 'Saving…';
@@ -5106,6 +5154,7 @@ const App = (() => {
                 { value: 'gemini', label: 'Gemini', available: !!availability.gemini_available },
                 { value: 'claude', label: 'Claude', available: !!availability.claude_available },
                 { value: 'deepseek', label: 'DeepSeek', available: !!availability.deepseek_available },
+                { value: 'openai', label: 'ChatGPT', available: !!availability.openai_available },
                 { value: 'localai', label: 'Local AI', available: !!availability.localai_available },
             ];
 
@@ -5123,6 +5172,7 @@ const App = (() => {
                 (current === 'gemini' && !availability.gemini_available) ||
                 (current === 'claude' && !availability.claude_available) ||
                 (current === 'deepseek' && !availability.deepseek_available) ||
+                (current === 'openai' && !availability.openai_available) ||
                 (current === 'localai' && !availability.localai_available);
             if (currentUnavailable) {
                 sel.value = availability.auto_available
@@ -5133,12 +5183,27 @@ const App = (() => {
                             ? 'claude'
                             : (availability.deepseek_available
                                 ? 'deepseek'
-                                : (availability.localai_available ? 'localai' : 'gemini'))));
+                                : (availability.openai_available
+                                    ? 'openai'
+                                    : (availability.localai_available ? 'localai' : 'gemini')))));
             } else {
-                // Prefer Local AI as the startup default while still respecting explicit user changes.
+                // Prefer Auto as the startup default on the main chat selector (respect explicit user changes).
                 const userSelected = sel.dataset.userSelectedProvider === 'true';
-                if (!userSelected && availability.localai_available) {
-                    sel.value = 'localai';
+                const isMainProviderSelect = sel.id === 'llm-provider-select';
+                if (!userSelected && isMainProviderSelect) {
+                    if (availability.auto_available) {
+                        sel.value = 'auto';
+                    } else if (availability.gemini_available) {
+                        sel.value = 'gemini';
+                    } else if (availability.claude_available) {
+                        sel.value = 'claude';
+                    } else if (availability.deepseek_available) {
+                        sel.value = 'deepseek';
+                    } else if (availability.openai_available) {
+                        sel.value = 'openai';
+                    } else if (availability.localai_available) {
+                        sel.value = 'localai';
+                    }
                 }
             }
         }
@@ -5561,16 +5626,18 @@ const App = (() => {
             }
             if (modal) {
                 modal.classList.add('info-box-modal-closed');
+                modal.style.display = '';
                 if (typeof UI !== 'undefined' && UI.setControlsEnabled) UI.setControlsEnabled(true);
             }
             const geminiOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.GEMINI === 'True';
             const claudeOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.CLAUDE === 'True';
             const deepseekOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.DEEPSEEK === 'True';
+            const openaiOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.OPENAI === 'True';
             const localaiOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.LOCALAI === 'True';
-            if (!geminiOk && !claudeOk && !deepseekOk && !localaiOk && Modals.ConfirmationModal) {
+            if (!geminiOk && !claudeOk && !deepseekOk && !openaiOk && !localaiOk && typeof Modals !== 'undefined' && Modals.ConfirmationModal) {
                 Modals.ConfirmationModal.open(
                     'No AI Provider Available',
-                    'No LLM provider is available. AI functions will not be available until at least one API key or local endpoint (Gemini, Anthropic, DeepSeek, or Local AI) is set in the server environment (for example in the .env file).',
+                    'No LLM provider is available. AI functions will not be available until at least one API key or local endpoint (Gemini, Anthropic, DeepSeek, ChatGPT, or Local AI) is set in the server environment (for example in the .env file).',
                     undefined
                 );
             }
@@ -5621,7 +5688,7 @@ const App = (() => {
         if (DOM.llmProviderSelect) {
             DOM.llmProviderSelect.addEventListener('change', () => {
                 const val = DOM.llmProviderSelect.value;
-                if (val === 'gemini' || val === 'claude' || val === 'deepseek') {
+                if (val === 'gemini' || val === 'claude' || val === 'deepseek' || val === 'openai') {
                     saveLastManualHostedProviderIfHosted(val);
                     DOM.llmProviderSelect.dataset.userSelectedProvider = 'true';
                 } else if (val === 'auto' || val === 'localai') {
@@ -5643,6 +5710,9 @@ const App = (() => {
             obs.observe(el, { attributes: true, attributeFilter: ['style'] });
         })();
         loadLLMProviderAvailability();
+        if (Modals.HostedLLMOrderConfig && Modals.HostedLLMOrderConfig.ensureLoaded) {
+            void Modals.HostedLLMOrderConfig.ensureLoaded();
+        }
         if (typeof UI !== 'undefined' && UI.syncChatContextStatusBarVisibility) {
             UI.syncChatContextStatusBarVisibility();
         }

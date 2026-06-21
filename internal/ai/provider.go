@@ -1,4 +1,4 @@
-// Package ai provides chat provider implementations for Gemini, Claude, DeepSeek, and LocalAI.
+// Package ai provides chat provider implementations for Gemini, Claude, DeepSeek, OpenAI, and LocalAI.
 package ai
 
 import (
@@ -53,7 +53,7 @@ type GenerateResult struct {
 // ToolExecutor executes a named AI tool and returns a JSON-serialisable result.
 type ToolExecutor func(ctx context.Context, name string, args map[string]any) (map[string]any, error)
 
-// ChatProvider is the interface implemented by Gemini, Claude, DeepSeek (Anthropic-compatible), and LocalAI.
+// ChatProvider is the interface implemented by Gemini, Claude, DeepSeek (Anthropic-compatible), OpenAI, and LocalAI.
 type ChatProvider interface {
 	IsAvailable() bool
 	// GenerateResponse runs a tool loop. toolDecls nil means expose all built-in tools (legacy).

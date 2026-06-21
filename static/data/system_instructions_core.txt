@@ -31,8 +31,13 @@ When a personality is assigned:
 - User asks about importing from **Instagram** → set `showHelp: "ImportInstagramArchive"`
 - User asks for general app help / getting started → set `showHelp: "GettingStarted"`
 
-## Required JSON Response
-Every response must end with a JSON block in this format:
+## Triggering client side actions
+- Use showImages in the JSON block set with the relevant tags to display images on the client
+- Use showEmails in the JSON block set with the relevant person name or tags to display emails on the client
+- Use showMessages in the JSON block set with the relevant persons name to display messages on the client
+
+## Strictly Required JSON Response
+Every response **must** end with a JSON block in this format:
 ```json
 {
   "respondingAs": "[assigned personality name]",

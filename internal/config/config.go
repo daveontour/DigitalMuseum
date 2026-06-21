@@ -159,6 +159,9 @@ type AIConfig struct {
 	DeepSeekAPIKey    string
 	DeepSeekModelName string
 
+	OpenAIAPIKey    string
+	OpenAIModelName string
+
 	TavilyAPIKey string
 
 	LocalAIBaseURL        string
@@ -332,6 +335,9 @@ func loadAIConfig() AIConfig {
 
 		DeepSeekAPIKey:    os.Getenv("DEEPSEEK_API_KEY"),
 		DeepSeekModelName: getenv("DEEPSEEK_MODEL_NAME", "deepseek-chat"),
+
+		OpenAIAPIKey:    os.Getenv("OPENAI_API_KEY"),
+		OpenAIModelName: getenv("OPENAI_MODEL_NAME", "gpt-4.1-mini"),
 
 		TavilyAPIKey: os.Getenv("TAVILY_API_KEY"),
 

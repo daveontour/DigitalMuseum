@@ -259,23 +259,27 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			"gemini_api_key_set":           vis.GeminiAPIKey != "",
 			"anthropic_api_key_set":        vis.AnthropicAPIKey != "",
 			"deepseek_api_key_set":         vis.DeepSeekAPIKey != "",
+			"openai_api_key_set":           vis.OpenAIAPIKey != "",
 			"tavily_api_key_set":           vis.TavilyAPIKey != "",
 			"runpod_api_key_set":           vis.RunpodAPIKey != "",
 			"elevenlabs_api_key_set":       vis.ElevenLabsAPIKey != "",
 			"gemini_model":                 vis.GeminiModel,
 			"claude_model":                 vis.ClaudeModel,
 			"deepseek_model":               vis.DeepSeekModel,
+			"openai_model":                 vis.OpenAIModel,
 			"runpod_endpoint_id":           vis.RunpodEndpointID,
 			"runpod_workers":               vis.RunpodWorkers,
 			"subject_gemini_api_key_set":   owner.GeminiAPIKey != "",
 			"subject_anthropic_key_set":    owner.AnthropicAPIKey != "",
 			"subject_deepseek_key_set":     owner.DeepSeekAPIKey != "",
+			"subject_openai_key_set":       owner.OpenAIAPIKey != "",
 			"subject_tavily_key_set":       owner.TavilyAPIKey != "",
 			"subject_runpod_key_set":       owner.RunpodAPIKey != "",
 			"subject_elevenlabs_key_set":   owner.ElevenLabsAPIKey != "",
 			"subject_gemini_model":         owner.GeminiModel,
 			"subject_claude_model":         owner.ClaudeModel,
 			"subject_deepseek_model":       owner.DeepSeekModel,
+			"subject_openai_model":         owner.OpenAIModel,
 			"subject_runpod_endpoint_id":   owner.RunpodEndpointID,
 			"subject_runpod_workers":       owner.RunpodWorkers,
 		}
@@ -285,12 +289,14 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			"gemini_api_key_set":     owner.GeminiAPIKey != "",
 			"anthropic_api_key_set":  owner.AnthropicAPIKey != "",
 			"deepseek_api_key_set":   owner.DeepSeekAPIKey != "",
+			"openai_api_key_set":     owner.OpenAIAPIKey != "",
 			"tavily_api_key_set":     owner.TavilyAPIKey != "",
 			"runpod_api_key_set":     owner.RunpodAPIKey != "",
 			"elevenlabs_api_key_set": owner.ElevenLabsAPIKey != "",
 			"gemini_model":           owner.GeminiModel,
 			"claude_model":           owner.ClaudeModel,
 			"deepseek_model":         owner.DeepSeekModel,
+			"openai_model":           owner.OpenAIModel,
 			"runpod_endpoint_id":     owner.RunpodEndpointID,
 			"runpod_workers":         owner.RunpodWorkers,
 		}
@@ -345,6 +351,12 @@ func (h *AuthHandler) PatchLLMSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if ptr, ok := decodeLLMJSONString(raw, "deepseek_model"); ok {
 		patch.DeepSeekModel = ptr
+	}
+	if ptr, ok := decodeLLMJSONString(raw, "openai_api_key"); ok {
+		patch.OpenAIAPIKey = ptr
+	}
+	if ptr, ok := decodeLLMJSONString(raw, "openai_model"); ok {
+		patch.OpenAIModel = ptr
 	}
 	if ptr, ok := decodeLLMJSONString(raw, "runpod_api_key"); ok {
 		patch.RunpodAPIKey = ptr

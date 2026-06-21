@@ -34,7 +34,7 @@ type ChatRequest struct {
 	CompanionMode        bool     `json:"companionMode"`
 	AllowExplicitContent bool     `json:"allowExplicitContent"`
 	EnableSnarkiness     bool     `json:"enableSnarkiness"`
-	Provider                 string  `json:"provider"` // gemini, claude, deepseek, localai, or auto
+	Provider                 string  `json:"provider"` // gemini, claude, deepseek, openai, localai, or auto
 	LastManualHostedProvider *string `json:"last_manual_hosted_provider,omitempty"`
 	WhosAsking           string   `json:"whos_asking"`
 	RepeatQuestion       bool     `json:"repeat_question"`

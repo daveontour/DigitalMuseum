@@ -57,6 +57,12 @@ func (s *ChatService) GenerateHaveAChatTurn(
 			provider = dp
 			providerName = "deepseek"
 		}
+	} else if speakingProviderKey == "openai" {
+		op := s.effectiveOpenAIProvider(ctx, r, "")
+		if op != nil && op.IsAvailable() {
+			provider = op
+			providerName = "openai"
+		}
 	} else if speakingProviderKey == "localai" {
 		lp := s.effectiveLocalAIProvider()
 		if lp != nil && lp.IsAvailable() {

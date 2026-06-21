@@ -512,6 +512,12 @@ func (s *ChatService) pickInterviewProvider(ctx context.Context, r *http.Request
 			return dp, "deepseek"
 		}
 	}
+	if preferred == "openai" {
+		op := s.effectiveOpenAIProvider(ctx, r, "")
+		if op != nil && op.IsAvailable() {
+			return op, "openai"
+		}
+	}
 	if preferred == "localai" {
 		lp := s.effectiveLocalAIProvider()
 		if lp != nil && lp.IsAvailable() {
