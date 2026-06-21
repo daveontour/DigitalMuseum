@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	appai "github.com/daveontour/aimuseum/internal/ai"
 	"github.com/daveontour/aimuseum/internal/appctx"
@@ -87,6 +88,8 @@ type ChatService struct {
 	sessionStore         *keystore.SessionMasterStore
 	privateStore         *PrivateStoreService
 	billing              *repository.BillingRepo
+	dashSvc              *DashboardService
+	archiveInventoryCache sync.Map
 }
 
 // NewChatService creates a ChatService. Server defaults come from cfg/env; authenticated
@@ -108,6 +111,7 @@ func NewChatService(
 	sessionStore *keystore.SessionMasterStore,
 	privateStore *PrivateStoreService,
 	billing *repository.BillingRepo,
+	dashSvc *DashboardService,
 ) *ChatService {
 	return &ChatService{
 		chatRepo:             chatRepo,
@@ -133,6 +137,7 @@ func NewChatService(
 		sessionStore:         sessionStore,
 		privateStore:         privateStore,
 		billing:              billing,
+		dashSvc:              dashSvc,
 	}
 }
 
@@ -506,7 +511,40 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	// Choose provider explicitly so the requested provider is always honoured.
 	var provider appai.ChatProvider
 	providerName := req.Provider
+	var autoRouteMeta map[string]any
+	var autoExecCtx *AutoExecutionContext
 	switch req.Provider {
+	case "auto":
+		toolsCount := 0
+		_, decls := s.buildChatTools(ctx, r, "")
+		if decls != nil {
+			toolsCount = len(*decls)
+		}
+		refDocCount := 0
+		if s.docRepo != nil {
+			if n, err := s.docRepo.CountAvailableForAI(ctx); err == nil {
+				refDocCount = int(n)
+			}
+		}
+		hasSubjectProfile := s.subjectProfileContextAvailable(ctx)
+		lastManual := ""
+		if req.LastManualHostedProvider != nil {
+			lastManual = strings.TrimSpace(*req.LastManualHostedProvider)
+		}
+		classifyPrompt := req.Prompt
+		if req.InactivityNudge {
+			classifyPrompt = "[Inactivity check-in nudge — gently continue or check on the user]"
+		}
+		var resolveErr error
+		var execCtx AutoExecutionContext
+		provider, providerName, autoRouteMeta, execCtx, resolveErr = s.resolveAutoProvider(ctx, r, classifyPrompt, toolsCount, refDocCount, hasSubjectProfile, lastManual)
+		if resolveErr != nil {
+			stub := StubLLMUsage("auto", "")
+			s.applyUsageKeySourceToLLMUsage(ctx, r, "", stub)
+			RecordLLMUsage(ctx, s.billing, s.userRepo, stub, resolveErr)
+			return nil, resolveErr
+		}
+		autoExecCtx = &execCtx
 	case "claude":
 		provider = s.effectiveClaudeProvider(ctx, r, "")
 	case "deepseek":
@@ -594,7 +632,11 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	}
 	systemPrompt = appendExplicitContentPolicy(systemPrompt, req.AllowExplicitContent)
 	systemPrompt = appendSnarkinessPolicy(systemPrompt, req.EnableSnarkiness)
-	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
+	if autoExecCtx != nil {
+		systemPrompt = s.enrichChatSystemPromptWithOptions(ctx, r, systemPrompt, autoExecCtx.IncludeReferenceDocuments, autoExecCtx.IncludeUserProfile)
+	} else {
+		systemPrompt = s.enrichChatSystemPrompt(ctx, r, systemPrompt)
+	}
 
 	userInput := req.Prompt
 	savedUserInput := req.Prompt
@@ -634,7 +676,7 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 		SubjectName:   subjectName,
 		SubjectGender: subjectGender,
 	}
-	if voice == "owner" {
+	if voice == "owner" && (autoExecCtx == nil || autoExecCtx.IncludeUserProfile) {
 		genReq.PsychProfile = psychProfile
 		genReq.WritingStyle = writingStyle
 	}
@@ -672,6 +714,10 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 				}
 			}
 			delete(embeddedJSON, "embedded_json")
+		}
+		if autoRouteMeta != nil {
+			embeddedJSON["auto_route"] = autoRouteMeta
+			embeddedJSON["provider"] = providerName
 		}
 	}
 	return &model.ChatResponse{
@@ -777,7 +823,7 @@ func (s *ChatService) GenerateRandomQuestion(ctx context.Context, r *http.Reques
 		"\n\n**Who is asking:** " + whosAskingText
 	systemPrompt = appendExplicitContentPolicy(systemPrompt, req.AllowExplicitContent)
 	systemPrompt = appendSnarkinessPolicy(systemPrompt, req.EnableSnarkiness)
-	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
+	systemPrompt = s.enrichChatSystemPrompt(ctx, r, systemPrompt)
 
 	// Load conversation history
 	var history []appai.ConvTurn

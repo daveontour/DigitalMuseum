@@ -73,11 +73,26 @@ func (p *LocalAIProvider) IsAvailable() bool { return p != nil }
 
 // SimpleGenerate sends a prompt without tools. Used for summarisation tasks.
 func (p *LocalAIProvider) SimpleGenerate(ctx context.Context, prompt string) (string, *LLMUsage, error) {
+	return p.simpleGenerate(ctx, prompt, 0)
+}
+
+// SimpleGenerateWithNumCtx is like SimpleGenerate but sets options.num_ctx for this request.
+// numCtx must be positive; it overrides the provider default and is always sent.
+func (p *LocalAIProvider) SimpleGenerateWithNumCtx(ctx context.Context, prompt string, numCtx int) (string, *LLMUsage, error) {
+	if numCtx <= 0 {
+		return p.simpleGenerate(ctx, prompt, 0)
+	}
+	return p.simpleGenerate(ctx, prompt, numCtx)
+}
+
+func (p *LocalAIProvider) simpleGenerate(ctx context.Context, prompt string, numCtxOverride int) (string, *LLMUsage, error) {
 	if p == nil || p.baseURL == "" {
 		return "", nil, fmt.Errorf("localai: not configured")
 	}
 	opts := map[string]any{"temperature": 0.2}
-	if p.numCtx > 0 {
+	if numCtxOverride > 0 {
+		opts["num_ctx"] = numCtxOverride
+	} else if p.numCtx > 0 {
 		opts["num_ctx"] = p.numCtx
 	}
 	req := ollamaRequest{

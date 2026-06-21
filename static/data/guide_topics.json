@@ -1297,7 +1297,7 @@
         {
           "text": "Click Upload on the Facebook row and select the exported folder.",
           "position": "top-right",
-          "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"facebook\"]",
+          "glow": "#data-sources-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"facebook\"]",
           "navigate_action": "openDataImportImport",
           "image_url": "/static/images/guide/import-archive.png"
         }
@@ -1328,7 +1328,7 @@
         {
           "text": "Click Upload on the Instagram row and select the exported folder.",
           "position": "bottom-right",
-          "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"instagram\"]",
+          "glow": "#data-sources-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"instagram\"]",
           "navigate_action": "openDataImportImport",
           "image_url": "/static/images/guide/import-archive.png"
         }
@@ -1356,7 +1356,7 @@
         },
         {
           "text": "Find the WhatsApp row in the import list, click Upload, and select the folder containing your exported WhatsApp ZIP files. The import processes each ZIP in turn.",
-          "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"whatsapp\"]",
+          "glow": "#data-sources-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"whatsapp\"]",
           "navigate_action": "openDataImportImport",
           "position": "top-right"
         }
@@ -1381,7 +1381,7 @@
         },
         {
           "text": "Find the iMessage row in the import list and click Upload. Select the folder or ZIP containing your iMessage export. The import extracts messages and attachments.",
-          "glow": "#data-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"imessage\"]",
+          "glow": "#data-sources-import-modal .data-import-row[data-import=\"upload_zip\"][data-zip-archive-type=\"imessage\"]",
           "navigate_action": "openDataImportImport",
           "position": "top-right"
         }

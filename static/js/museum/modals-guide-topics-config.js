@@ -20,6 +20,8 @@ Modals.GuideTopicsConfig = (() => {
         'openArtefacts',
         'openIdentityProfile',
         'openDataImport',
+        'openDataSourcesImport',
+        'openDataMaintenance',
         'openDataImportImport',
         'openDataImportMaintenance',
         'openDataImportBackgroundJobs',

@@ -3847,24 +3847,28 @@ body {
 }
 
 /* Data Import modal: strip borders/outlines on flex + scroll shells (avoids browser dashed focus rings on overflow:auto panes) */
-#data-import-modal .modal-content > div:not(.modal-header),
-#data-import-modal .config-section,
-#data-import-modal .config-section > div {
+#data-import-modal .modal-content > div:not(.modal-header), #data-sources-import-modal .modal-content > div:not(.modal-header),
+#data-import-modal .config-section, #data-sources-import-modal .config-section,
+#data-import-modal .config-section > div, #data-sources-import-modal .config-section > div {
     border: none !important;
     outline: none !important;
     background-color: inherit !important;
 }
-#data-import-modal .modal-content > div:not(.modal-header):focus,
-#data-import-modal .modal-content > div:not(.modal-header):focus-visible,
-#data-import-modal .config-section:focus,
-#data-import-modal .config-section:focus-visible,
-#data-import-modal .config-section > div:focus,
-#data-import-modal .config-section > div:focus-visible {
+#data-import-modal .modal-content > div:not(.modal-header):focus, #data-sources-import-modal .modal-content > div:not(.modal-header):focus,
+#data-import-modal .modal-content > div:not(.modal-header):focus-visible, #data-sources-import-modal .modal-content > div:not(.modal-header):focus-visible,
+#data-import-modal .config-section:focus, #data-sources-import-modal .config-section:focus,
+#data-import-modal .config-section:focus-visible, #data-sources-import-modal .config-section:focus-visible,
+#data-import-modal .config-section > div:focus, #data-sources-import-modal .config-section > div:focus,
+#data-import-modal .config-section > div:focus-visible, #data-sources-import-modal .config-section > div:focus-visible {
     outline: none !important;
 }
 
 /* Data Import modal: scroll card lists; keep job status footer visible */
-#data-import-modal .data-import-modal-body {
+
+#data-sources-import-modal .data-import-sources-panel {
+    display: block;
+}
+#data-import-modal .data-import-modal-body, #data-sources-import-modal .data-import-modal-body {
     padding: 20px;
     flex: 1;
     min-height: 0;
@@ -3872,7 +3876,7 @@ body {
     flex-direction: column;
     overflow: hidden;
 }
-#data-import-modal .data-import-modal-section {
+#data-import-modal .data-import-modal-section, #data-sources-import-modal .data-import-modal-section {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -3882,7 +3886,7 @@ body {
     background: var(--color-bg-surface);
     border-radius: 10px;
 }
-#data-import-modal .data-import-table-scroll-region {
+#data-import-modal .data-import-table-scroll-region, #data-sources-import-modal .data-import-table-scroll-region {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
@@ -3895,7 +3899,7 @@ body {
     background: var(--color-bg-hover);
     box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
 }
-#data-import-modal .data-import-main-column {
+#data-import-modal .data-import-main-column, #data-sources-import-modal .data-import-main-column {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
@@ -3903,36 +3907,53 @@ body {
     flex-direction: column;
     background: var(--color-bg-base);
 }
-#data-import-modal .data-import-panels-wrap {
+#data-import-modal .data-import-panels-wrap, #data-sources-import-modal .data-import-panels-wrap {
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
 }
-#data-import-modal .data-import-modal-loading {
+#data-import-modal .data-import-modal-loading, #data-sources-import-modal .data-import-modal-loading {
     position: absolute;
     inset: 0;
     z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.65rem;
-    background: rgba(15, 23, 42, 0.55);
-    color: var(--color-text-muted);
-    font-size: var(--text-md);
+    background: rgba(8, 12, 22, 0.78);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
-#data-import-modal .data-import-modal-loading[hidden] {
+#data-import-modal .data-import-modal-loading-panel, #data-sources-import-modal .data-import-modal-loading-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    background: rgba(25, 38, 77, 0.97);
+    border: 1px solid rgba(79, 156, 249, 0.45);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    color: #f8fafc;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+#data-import-modal .data-import-modal-loading-panel .fa-spinner, #data-sources-import-modal .data-import-modal-loading-panel .fa-spinner {
+    font-size: var(--text-xl);
+    color: var(--color-navy);
+}
+#data-import-modal .data-import-modal-loading[hidden], #data-sources-import-modal .data-import-modal-loading[hidden] {
     display: none !important;
 }
-#data-import-modal .data-import-panels-scroll {
+#data-import-modal .data-import-panels-scroll, #data-sources-import-modal .data-import-panels-scroll {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
 }
-#data-import-modal .data-import-detail-sidebar {
+#data-import-modal .data-import-detail-sidebar, #data-sources-import-modal .data-import-detail-sidebar {
     flex: 0 0 min(320px, 32vw);
     width: min(320px, 32vw);
     max-width: 100%;
@@ -3943,64 +3964,64 @@ body {
     display: flex;
     flex-direction: column;
 }
-#data-import-modal .data-import-detail-sidebar-inner {
+#data-import-modal .data-import-detail-sidebar-inner, #data-sources-import-modal .data-import-detail-sidebar-inner {
     padding: 14px 16px 18px;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
 }
-#data-import-modal .data-import-detail-placeholder {
+#data-import-modal .data-import-detail-placeholder, #data-sources-import-modal .data-import-detail-placeholder {
     margin: 0;
     font-size: 0.9rem;
     line-height: 1.5;
     color: var(--color-text-muted);
 }
-#data-import-modal .data-import-detail-content:not([hidden]) {
+#data-import-modal .data-import-detail-content:not([hidden]), #data-sources-import-modal .data-import-detail-content:not([hidden]) {
     display: block;
 }
-#data-import-modal .data-import-detail-title {
+#data-import-modal .data-import-detail-title, #data-sources-import-modal .data-import-detail-title {
     margin: 0 0 10px 0;
     font-size: 1rem;
     font-weight: 700;
     color: var(--color-text);
     line-height: 1.35;
 }
-#data-import-modal .data-import-detail-title .fas,
-#data-import-modal .data-import-detail-title .far {
+#data-import-modal .data-import-detail-title .fas, #data-sources-import-modal .data-import-detail-title .fas,
+#data-import-modal .data-import-detail-title .far, #data-sources-import-modal .data-import-detail-title .far {
     margin-right: 6px;
     opacity: 0.9;
 }
-#data-import-modal .data-import-detail-desc {
+#data-import-modal .data-import-detail-desc, #data-sources-import-modal .data-import-detail-desc {
     font-size: 0.88rem;
     line-height: 1.55;
     color: var(--color-text-muted);
     margin-bottom: 14px;
 }
-#data-import-modal .data-import-detail-desc p {
+#data-import-modal .data-import-detail-desc p, #data-sources-import-modal .data-import-detail-desc p {
     margin: 0 0 0.65em 0;
 }
-#data-import-modal .data-import-detail-desc p:last-child {
+#data-import-modal .data-import-detail-desc p:last-child, #data-sources-import-modal .data-import-detail-desc p:last-child {
     margin-bottom: 0;
 }
-#data-import-modal .data-import-detail-stats {
+#data-import-modal .data-import-detail-stats, #data-sources-import-modal .data-import-detail-stats {
     margin: 0;
     padding: 12px 14px;
     border-radius: 8px;
     background: var(--color-bg-surface);
     border: 1px solid var(--color-border);
 }
-#data-import-modal .data-import-detail-stat-row {
+#data-import-modal .data-import-detail-stat-row, #data-sources-import-modal .data-import-detail-stat-row {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 8px 12px;
     align-items: baseline;
 }
-#data-import-modal .data-import-detail-stat-row + .data-import-detail-stat-row {
+#data-import-modal .data-import-detail-stat-row + .data-import-detail-stat-row, #data-sources-import-modal .data-import-detail-stat-row + .data-import-detail-stat-row {
     margin-top: 10px;
     padding-top: 10px;
     border-top: 1px solid #e2e8f0;
 }
-#data-import-modal .data-import-detail-stats dt {
+#data-import-modal .data-import-detail-stats dt, #data-sources-import-modal .data-import-detail-stats dt {
     margin: 0;
     font-size: 0.68rem;
     text-transform: uppercase;
@@ -4008,7 +4029,7 @@ body {
     font-weight: 700;
     color: var(--color-text-muted);
 }
-#data-import-modal .data-import-detail-stats dd {
+#data-import-modal .data-import-detail-stats dd, #data-sources-import-modal .data-import-detail-stats dd {
     margin: 0;
     font-size: 0.92rem;
     font-weight: 600;
@@ -4016,7 +4037,7 @@ body {
     font-variant-numeric: tabular-nums;
     word-break: break-word;
 }
-#data-import-modal .import-controls-footer-grid {
+#data-import-modal .import-controls-footer-grid, #data-sources-import-modal .import-controls-footer-grid {
     flex-shrink: 0;
 }
 
@@ -4600,12 +4621,12 @@ body.deployment-hide-path-import-tiles .import-control-tile[data-import="image_e
     display: none !important;
 }
 
-body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row {
+body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row , #data-sources-import-modal .data-import-path-row {
     display: none !important;
 }
 
 /* Data Import modal: category tabs + card grid */
-#data-import-modal .data-import-category-tabstrip {
+#data-import-modal .data-import-category-tabstrip, #data-sources-import-modal .data-import-category-tabstrip {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -4614,7 +4635,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
 }
-#data-import-modal .data-import-category-tab {
+#data-import-modal .data-import-category-tab, #data-sources-import-modal .data-import-category-tab {
     border: 1px solid var(--color-border);
     background: var(--color-bg-surface);
     color: var(--color-text-muted);
@@ -4625,33 +4646,33 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-#data-import-modal .data-import-category-tab:hover {
+#data-import-modal .data-import-category-tab:hover, #data-sources-import-modal .data-import-category-tab:hover {
     border-color: var(--color-blue, #2563eb);
     color: var(--color-blue, #2563eb);
 }
-#data-import-modal .data-import-category-tab.data-import-category-tab--active {
+#data-import-modal .data-import-category-tab.data-import-category-tab--active, #data-sources-import-modal .data-import-category-tab.data-import-category-tab--active {
     border-color: var(--color-blue, #2563eb);
     background: var(--color-accent-subtle);
     color: var(--color-blue, #1d4ed8);
     font-weight: 600;
 }
-#data-import-modal .data-import-category-panel {
+#data-import-modal .data-import-category-panel, #data-sources-import-modal .data-import-category-panel {
     display: none;
 }
-#data-import-modal .data-import-category-panel--active {
+#data-import-modal .data-import-category-panel--active, #data-sources-import-modal .data-import-category-panel--active {
     display: block;
 }
-#data-import-modal .data-import-background-jobs-panel {
+#data-import-modal .data-import-background-jobs-panel, #data-sources-import-modal .data-import-background-jobs-panel {
     padding: 16px 14px 20px;
     box-sizing: border-box;
 }
-#data-import-modal .data-import-background-jobs-intro {
+#data-import-modal .data-import-background-jobs-intro, #data-sources-import-modal .data-import-background-jobs-intro {
     color: var(--color-text-muted);
     margin: 0 0 12px;
     line-height: 1.45;
     font-size: var(--text-md);
 }
-#data-import-modal .background-jobs-loading {
+#data-import-modal .background-jobs-loading, #data-sources-import-modal .background-jobs-loading {
     padding: 2.5rem 1rem;
     min-height: 8rem;
     display: flex;
@@ -4659,7 +4680,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     justify-content: center;
     gap: 0.65rem;
 }
-#data-import-modal .data-import-table-scroll-region--background-jobs .data-import-detail-sidebar {
+#data-import-modal .data-import-table-scroll-region--background-jobs .data-import-detail-sidebar, #data-sources-import-modal .data-import-table-scroll-region--background-jobs .data-import-detail-sidebar {
     display: none;
 }
 #background-jobs-table td:first-child {
@@ -4678,14 +4699,14 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     overflow-wrap: break-word;
     word-wrap: break-word;
 }
-#data-import-modal .data-import-cards-grid {
+#data-import-modal .data-import-cards-grid, #data-sources-import-modal .data-import-cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 18px;
     padding: 16px 14px 20px;
     box-sizing: border-box;
 }
-#data-import-modal .data-import-card {
+#data-import-modal .data-import-card, #data-sources-import-modal .data-import-card {
     border: 1px solid var(--color-border);
     border-radius: 14px;
     padding: 1.1rem 1.25rem;
@@ -4704,7 +4725,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
         border-color 0.18s ease,
         transform 0.18s ease;
 }
-#data-import-modal .data-import-card:hover {
+#data-import-modal .data-import-card:hover, #data-sources-import-modal .data-import-card:hover {
     border-color: var(--color-border-input);
     box-shadow:
         0 2px 6px rgba(15, 23, 42, 0.05),
@@ -4713,20 +4734,20 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 @media (prefers-reduced-motion: reduce) {
-    #data-import-modal .data-import-card {
+#data-import-modal .data-import-card, #data-sources-import-modal .data-import-card {
         transition: box-shadow 0.18s ease, border-color 0.18s ease;
     }
-    #data-import-modal .data-import-card:hover {
+#data-import-modal .data-import-card:hover, #data-sources-import-modal .data-import-card:hover {
         transform: none;
     }
 }
-#data-import-modal .data-import-card-header {
+#data-import-modal .data-import-card-header, #data-sources-import-modal .data-import-card-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 10px;
 }
-#data-import-modal .data-import-card-title {
+#data-import-modal .data-import-card-title, #data-sources-import-modal .data-import-card-title {
     margin: 0;
     font-size: var(--text-md);
     font-weight: 500;
@@ -4736,76 +4757,76 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     min-width: 0;
 }
 /* Card titles: colored leading icons */
-#data-import-modal .data-import-card-title > i {
+#data-import-modal .data-import-card-title > i, #data-sources-import-modal .data-import-card-title > i {
     margin-right: 0.45em;
     width: 1.15em;
     text-align: center;
 }
-#data-import-modal .data-import-card[data-import="email_processing"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="email_processing"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="email_processing"] .data-import-card-title > i {
     color: #ea4335;
 }
-#data-import-modal .data-import-card[data-import="imap_processing"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="imap_processing"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="imap_processing"] .data-import-card-title > i {
     color: #2563eb;
 }
-#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="whatsapp"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="whatsapp"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="whatsapp"] .data-import-card-title > i {
     color: #25d366;
 }
-#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="instagram"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="instagram"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="instagram"] .data-import-card-title > i {
     color: #e4405f;
 }
-#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="imessage"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="imessage"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="imessage"] .data-import-card-title > i {
     color: #34c759;
 }
-#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="facebook"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="facebook"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="facebook"] .data-import-card-title > i {
     color: #1877f2;
 }
-#data-import-modal .data-import-card[data-import="whatsapp"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="whatsapp"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="whatsapp"] .data-import-card-title > i {
     color: #25d366;
 }
-#data-import-modal .data-import-card[data-import="instagram"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="instagram"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="instagram"] .data-import-card-title > i {
     color: #e4405f;
 }
-#data-import-modal .data-import-card[data-import="imessage"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="imessage"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="imessage"] .data-import-card-title > i {
     color: #0a84ff;
 }
-#data-import-modal .data-import-card[data-import="facebook"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="facebook"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="facebook"] .data-import-card-title > i {
     color: #0084ff;
 }
-#data-import-modal .data-import-card[data-import="facebook_all"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="facebook_all"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="facebook_all"] .data-import-card-title > i {
     color: #1877f2;
 }
-#data-import-modal .data-import-card[data-import="facebook_albums"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="facebook_albums"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="facebook_albums"] .data-import-card-title > i {
     color: #4267b2;
 }
-#data-import-modal .data-import-card[data-import="facebook_posts"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="facebook_posts"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="facebook_posts"] .data-import-card-title > i {
     color: #1877f2;
 }
-#data-import-modal .data-import-card[data-import="facebook_places"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="facebook_places"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="facebook_places"] .data-import-card-title > i {
     color: #e11d48;
 }
-#data-import-modal .data-import-card[data-import="upload_photos"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="upload_photos"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="upload_photos"] .data-import-card-title > i {
     color: #0ea5e9;
 }
-#data-import-modal .data-import-card[data-import="filesystem"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="filesystem"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="filesystem"] .data-import-card-title > i {
     color: #8b5cf6;
 }
-#data-import-modal .data-import-card[data-import="thumbnails"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="thumbnails"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="thumbnails"] .data-import-card-title > i {
     color: #f59e0b;
 }
-#data-import-modal .data-import-card[data-import="reference_modal"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="reference_modal"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="reference_modal"] .data-import-card-title > i {
     color: #b45309;
 }
-#data-import-modal .data-import-card[data-import="contacts"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="contacts"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="contacts"] .data-import-card-title > i {
     color: #6366f1;
 }
-#data-import-modal .data-import-card[data-import="reference_import"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="reference_import"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="reference_import"] .data-import-card-title > i {
     color: #0d9488;
 }
-#data-import-modal .data-import-card[data-import="image_export"] .data-import-card-title > i {
+#data-import-modal .data-import-card[data-import="image_export"] .data-import-card-title > i, #data-sources-import-modal .data-import-card[data-import="image_export"] .data-import-card-title > i {
     color: #7c3aed;
 }
 /* Primary actions: consistent button width (Import / Run — not Clear Data) */
-#data-import-modal .data-import-action-group button.modal-btn {
+#data-import-modal .data-import-action-group button.modal-btn, #data-sources-import-modal .data-import-action-group button.modal-btn {
     width: 120px;
     min-width: 120px;
     max-width: 120px;
@@ -4821,83 +4842,83 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Primary actions inside import cards — softer than global bright blue */
-#data-import-modal .data-import-card .modal-btn-primary,
-#data-import-modal .data-import-card-actions-row > .modal-btn-primary {
+#data-import-modal .data-import-card .modal-btn-primary, #data-sources-import-modal .data-import-card .modal-btn-primary,
+#data-import-modal .data-import-card-actions-row > .modal-btn-primary, #data-sources-import-modal .data-import-card-actions-row > .modal-btn-primary {
     background: linear-gradient(180deg, #94a3b8 0%, #64748b 100%);
     color: #f8fafc;
     border: 1px solid #475569;
     font-weight: 500;
     box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
 }
-#data-import-modal .data-import-card .modal-btn-primary:hover:not(:disabled),
-#data-import-modal .data-import-card-actions-row > .modal-btn-primary:hover:not(:disabled) {
+#data-import-modal .data-import-card .modal-btn-primary:hover:not(:disabled), #data-sources-import-modal .data-import-card .modal-btn-primary:hover:not(:disabled),
+#data-import-modal .data-import-card-actions-row > .modal-btn-primary:hover:not(:disabled), #data-sources-import-modal .data-import-card-actions-row > .modal-btn-primary:hover:not(:disabled) {
     background: linear-gradient(180deg, #64748b 0%, #475569 100%);
     color: #fff;
     border-color: #334155;
 }
 
-#data-import-modal .data-import-actions-td {
+#data-import-modal .data-import-actions-td, #data-sources-import-modal .data-import-actions-td {
     margin-top: auto;
     width: 100%;
     align-self: stretch;
 }
-#data-import-modal .data-import-card-actions-row {
+#data-import-modal .data-import-card-actions-row, #data-sources-import-modal .data-import-card-actions-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 10px;
     width: 100%;
 }
-#data-import-modal .data-import-card-actions-row > .data-import-delete-btn {
+#data-import-modal .data-import-card-actions-row > .data-import-delete-btn, #data-sources-import-modal .data-import-card-actions-row > .data-import-delete-btn {
     margin-left: auto;
 }
-#data-import-modal .data-import-card-actions-row--clear-only {
+#data-import-modal .data-import-card-actions-row--clear-only, #data-sources-import-modal .data-import-card-actions-row--clear-only {
     justify-content: flex-end;
 }
-#data-import-modal .data-import-card-actions-row--clear-only > .data-import-delete-btn {
+#data-import-modal .data-import-card-actions-row--clear-only > .data-import-delete-btn, #data-sources-import-modal .data-import-card-actions-row--clear-only > .data-import-delete-btn {
     margin-left: 0;
 }
 
 /* Data Import — cancel requested, waiting for server/SSE to finish */
-#data-import-modal .data-import-start-btn--cancel-pending,
-#data-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending,
-#data-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending {
+#data-import-modal .data-import-start-btn--cancel-pending, #data-sources-import-modal .data-import-start-btn--cancel-pending,
+#data-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending, #data-sources-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending,
+#data-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending, #data-sources-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending {
     background: #b91c1c !important;
     background: linear-gradient(180deg, #c53030 0%, #991b1b 100%) !important;
     color: #fff !important;
     border-color: #7f1d1d !important;
 }
-#data-import-modal .data-import-start-btn--cancel-pending:hover,
-#data-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending:hover,
-#data-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending:hover {
+#data-import-modal .data-import-start-btn--cancel-pending:hover, #data-sources-import-modal .data-import-start-btn--cancel-pending:hover,
+#data-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending:hover, #data-sources-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending:hover,
+#data-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending:hover, #data-sources-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending:hover {
     background: linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%) !important;
     color: #fff !important;
 }
 
-#data-import-modal button.modal-btn.data-import-start-btn--cancel-pending:disabled,
-#data-import-modal button.modal-btn.data-import-start-btn--cancel-pending[disabled] {
+#data-import-modal button.modal-btn.data-import-start-btn--cancel-pending:disabled, #data-sources-import-modal button.modal-btn.data-import-start-btn--cancel-pending:disabled,
+#data-import-modal button.modal-btn.data-import-start-btn--cancel-pending[disabled], #data-sources-import-modal button.modal-btn.data-import-start-btn--cancel-pending[disabled] {
     opacity: 1;
     filter: none;
     cursor: wait;
 }
 
 /* Data Import — active execution (Processing + spinner) */
-#data-import-modal .data-import-start-btn.data-import-btn--processing,
-#data-import-modal .data-import-zip-start-btn.data-import-btn--processing,
-#data-import-modal .data-import-open-modal-btn.data-import-btn--processing {
+#data-import-modal .data-import-start-btn.data-import-btn--processing, #data-sources-import-modal .data-import-start-btn.data-import-btn--processing,
+#data-import-modal .data-import-zip-start-btn.data-import-btn--processing, #data-sources-import-modal .data-import-zip-start-btn.data-import-btn--processing,
+#data-import-modal .data-import-open-modal-btn.data-import-btn--processing, #data-sources-import-modal .data-import-open-modal-btn.data-import-btn--processing {
     background: linear-gradient(180deg, #d9f99d 0%, #84cc16 45%, #65a30d 100%) !important;
     color: #14532d !important;
     border-color: #4d7c0f !important;
 }
-#data-import-modal button.modal-btn.data-import-btn--processing:disabled,
-#data-import-modal button.modal-btn.data-import-btn--processing[disabled] {
+#data-import-modal button.modal-btn.data-import-btn--processing:disabled, #data-sources-import-modal button.modal-btn.data-import-btn--processing:disabled,
+#data-import-modal button.modal-btn.data-import-btn--processing[disabled], #data-sources-import-modal button.modal-btn.data-import-btn--processing[disabled] {
     opacity: 1;
     filter: none;
     cursor: wait;
 }
 
 /* Clear Data (purge): neutral at rest, clearly destructive on hover */
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn, #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn {
     width: auto;
     min-width: auto;
     max-width: none;
@@ -4911,16 +4932,16 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     border: 1px solid var(--color-border);
     border-radius: 9px;
 }
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:hover:not(:disabled) {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:hover:not(:disabled), #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:hover:not(:disabled) {
     color: var(--color-danger);
     background: rgba(248, 113, 113, 0.15);
     border-color: rgba(248, 113, 113, 0.35);
 }
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:focus {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:focus, #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:focus {
     outline: none;
     box-shadow: 0 0 0 2px var(--color-bg-elevated), 0 0 0 4px rgba(248, 113, 113, 0.35);
 }
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:disabled {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:disabled, #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:disabled {
     opacity: 0.55;
     cursor: not-allowed;
 }
@@ -5013,26 +5034,26 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Data Import modal: job status panel (retro terminal green on black) */
-#data-import-modal .import-controls-status-box {
+#data-import-modal .import-controls-status-box, #data-sources-import-modal .import-controls-status-box {
     background-color: #0a0a0a !important;
     color: #33ff33 !important;
     border: 1px solid #1f6b1f !important;
     font-family: "VT323", "Courier New", Courier, monospace;
     box-shadow: inset 0 0 20px rgba(0, 40, 0, 0.45);
 }
-#data-import-modal .import-controls-status-box .import-controls-status-text {
+#data-import-modal .import-controls-status-box .import-controls-status-text, #data-sources-import-modal .import-controls-status-box .import-controls-status-text {
     color: #39ff14 !important;
     text-shadow: 0 0 4px rgba(57, 255, 20, 0.35);
 }
 
 /* Data Import modal: tabbed job logs */
-#data-import-modal .import-job-tabs-strip {
+#data-import-modal .import-job-tabs-strip, #data-sources-import-modal .import-job-tabs-strip {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
 }
-#data-import-modal .import-job-tab {
+#data-import-modal .import-job-tab, #data-sources-import-modal .import-job-tab {
     padding: 4px 10px;
     border-radius: 2px;
     border: 1px solid #2d6b2d;
@@ -5046,54 +5067,54 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-#data-import-modal .import-job-tab:hover {
+#data-import-modal .import-job-tab:hover, #data-sources-import-modal .import-job-tab:hover {
     background: #152015;
     border-color: #3d9a3d;
     color: #7fff7f;
 }
-#data-import-modal .import-job-tab.import-job-tab--active {
+#data-import-modal .import-job-tab.import-job-tab--active, #data-sources-import-modal .import-job-tab.import-job-tab--active {
     border-color: #39ff14;
     background: #0c1a0c;
     color: #b8ffb8;
     box-shadow: 0 0 8px rgba(57, 255, 20, 0.22);
 }
-#data-import-modal .data-import-action-group {
+#data-import-modal .data-import-action-group, #data-sources-import-modal .data-import-action-group {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
 }
-#data-import-modal .data-import-row-cancel-btn {
+#data-import-modal .data-import-row-cancel-btn, #data-sources-import-modal .data-import-row-cancel-btn {
     font-size: 0.85em;
     padding: 6px 10px;
     white-space: nowrap;
 }
 /* Caution styling when Cancel is shown (job running / stopping) */
-#data-import-modal button.data-import-row-cancel-btn:not([hidden]) {
+#data-import-modal button.data-import-row-cancel-btn:not([hidden]), #data-sources-import-modal button.data-import-row-cancel-btn:not([hidden]) {
     background: linear-gradient(180deg, #fde047 0%, #eab308 85%) !important;
     color: #422006 !important;
     border: 1px solid #ca8a04 !important;
 }
-#data-import-modal button.data-import-row-cancel-btn:not([hidden]):hover:not(:disabled) {
+#data-import-modal button.data-import-row-cancel-btn:not([hidden]):hover:not(:disabled), #data-sources-import-modal button.data-import-row-cancel-btn:not([hidden]):hover:not(:disabled) {
     background: linear-gradient(180deg, #fef08a 0%, #facc15 90%) !important;
     color: #451a03 !important;
     border-color: #a16207 !important;
 }
-#data-import-modal button.data-import-row-cancel-btn:not([hidden]):disabled {
+#data-import-modal button.data-import-row-cancel-btn:not([hidden]):disabled, #data-sources-import-modal button.data-import-row-cancel-btn:not([hidden]):disabled {
     opacity: 0.92;
     cursor: wait;
 }
 
 /* Hide purge while this card’s job is active (Processing / Stopping) */
-#data-import-modal .data-import-card.import-executing .data-import-delete-btn {
+#data-import-modal .data-import-card.import-executing .data-import-delete-btn, #data-sources-import-modal .data-import-card.import-executing .data-import-delete-btn {
     display: none !important;
 }
 
 /* Ensure [hidden] wins over .modal-btn display (otherwise Cancel stays visible). */
-#data-import-modal button.data-import-row-cancel-btn[hidden] {
+#data-import-modal button.data-import-row-cancel-btn[hidden], #data-sources-import-modal button.data-import-row-cancel-btn[hidden] {
     display: none !important;
 }
-#data-import-modal .import-job-log-outer {
+#data-import-modal .import-job-log-outer, #data-sources-import-modal .import-job-log-outer {
     flex: 1 1 auto;
     min-height: 95px;
     max-height: 96px;
@@ -5104,18 +5125,18 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     background: #050505;
     border: 1px solid #1f6b1f;
 }
-#data-import-modal .import-job-log-outer::-webkit-scrollbar {
+#data-import-modal .import-job-log-outer::-webkit-scrollbar, #data-sources-import-modal .import-job-log-outer::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
-#data-import-modal .import-job-log-outer::-webkit-scrollbar-track {
+#data-import-modal .import-job-log-outer::-webkit-scrollbar-track, #data-sources-import-modal .import-job-log-outer::-webkit-scrollbar-track {
     background: #0a0a0a;
 }
-#data-import-modal .import-job-log-outer::-webkit-scrollbar-thumb {
+#data-import-modal .import-job-log-outer::-webkit-scrollbar-thumb, #data-sources-import-modal .import-job-log-outer::-webkit-scrollbar-thumb {
     background: #2a5c2a;
     border-radius: 2px;
 }
-#data-import-modal .import-job-log-display {
+#data-import-modal .import-job-log-display, #data-sources-import-modal .import-job-log-display {
     margin: 0;
     padding: 8px 10px;
     box-sizing: border-box;
@@ -5131,13 +5152,13 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     color: #33ff33 !important;
     text-shadow: 0 0 3px rgba(51, 255, 51, 0.35);
 }
-#data-import-modal .import-job-status-idle-wrap {
+#data-import-modal .import-job-status-idle-wrap, #data-sources-import-modal .import-job-status-idle-wrap {
     font-family: "VT323", "Courier New", Courier, monospace;
     font-size: 1.125rem;
     color: #33ff33;
     padding: 6px 8px;
 }
-#data-import-modal .import-job-status-idle-wrap .import-controls-status-text {
+#data-import-modal .import-job-status-idle-wrap .import-controls-status-text, #data-sources-import-modal .import-job-status-idle-wrap .import-controls-status-text {
     color: #39ff14 !important;
     text-shadow: 0 0 4px rgba(57, 255, 20, 0.35);
 }
@@ -5157,7 +5178,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     color: var(--color-text-muted);
 }
 
-#data-import-modal .import-controls-footer-grid .import-controls-status-label {
+#data-import-modal .import-controls-footer-grid .import-controls-status-label, #data-sources-import-modal .import-controls-footer-grid .import-controls-status-label {
     font-family: "VT323", "Courier New", Courier, monospace;
     font-size: 1.15rem;
     font-weight: 400;
@@ -10496,6 +10517,18 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     max-width: 100%;
 }
 
+.chat-context-auto-routing-wrap {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.chat-context-auto-routing-msg {
+    color: #7dd3fc;
+}
+
 .chat-context-failover-msg {
     color: #7dd3fc;
     font-size: 0.78rem;
@@ -10552,6 +10585,34 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 .chat-tool-calls-log-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.chat-auto-routing-reason-body-wrap {
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chat-auto-routing-reason-route {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.chat-auto-routing-reason-text {
+    margin: 0;
+    font-size: var(--text-md);
+    line-height: var(--line-height-body, 1.5);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--color-text);
+}
+
+.chat-auto-routing-reason-actions {
     display: flex;
     justify-content: flex-end;
 }
@@ -13818,11 +13879,12 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 /* ════════════════════════════════════════════════════════════════════
    Data Import modal — modernised redesign
    These rules override the earlier #data-import-modal blocks above.
+   Same ID-scope specificity, #data-sources-import-modal blocks above.
    Same ID-scope specificity, later position wins.
    ════════════════════════════════════════════════════════════════════ */
 
 /* ── Outer structure ── */
-#data-import-modal .data-import-modal-body {
+#data-import-modal .data-import-modal-body, #data-sources-import-modal .data-import-modal-body {
     padding: 0;
     flex: 1 1 auto;
     min-height: 0;
@@ -13830,7 +13892,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     flex-direction: column;
     overflow: hidden;
 }
-#data-import-modal .data-import-modal-section {
+#data-import-modal .data-import-modal-section, #data-sources-import-modal .data-import-modal-section {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -13841,7 +13903,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     border-radius: 0;
     box-shadow: none;
 }
-#data-import-modal .data-import-table-scroll-region {
+#data-import-modal .data-import-table-scroll-region, #data-sources-import-modal .data-import-table-scroll-region {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -13854,7 +13916,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* ── Left column: tab strip + scrollable item list ── */
-#data-import-modal .data-import-main-column {
+#data-import-modal .data-import-main-column, #data-sources-import-modal .data-import-main-column {
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -13863,7 +13925,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     background: var(--color-bg, #fff);
     border-right: 1px solid var(--color-border, #dee2e6);
 }
-#data-import-modal .data-import-panels-scroll {
+#data-import-modal .data-import-panels-scroll, #data-sources-import-modal .data-import-panels-scroll {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -13873,7 +13935,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* ── Right: detail sidebar ── */
-#data-import-modal .data-import-detail-sidebar {
+#data-import-modal .data-import-detail-sidebar, #data-sources-import-modal .data-import-detail-sidebar {
     flex: 0 0 300px;
     width: 300px;
     min-height: 0;
@@ -13883,13 +13945,13 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     display: flex;
     flex-direction: column;
 }
-#data-import-modal .data-import-detail-sidebar-inner {
+#data-import-modal .data-import-detail-sidebar-inner, #data-sources-import-modal .data-import-detail-sidebar-inner {
     padding: 20px 16px 16px;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
 }
-#data-import-modal .data-import-detail-placeholder {
+#data-import-modal .data-import-detail-placeholder, #data-sources-import-modal .data-import-detail-placeholder {
     margin: 0;
     font-size: var(--text-sm, 0.8125rem);
     line-height: var(--line-height-body, 1.5);
@@ -13898,43 +13960,43 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     padding-top: 3em;
     font-style: italic;
 }
-#data-import-modal .data-import-detail-content:not([hidden]) { display: block; }
-#data-import-modal .data-import-detail-title {
+#data-import-modal .data-import-detail-content:not([hidden]), #data-sources-import-modal .data-import-detail-content:not([hidden]) { display: block; }
+#data-import-modal .data-import-detail-title, #data-sources-import-modal .data-import-detail-title {
     margin: 0 0 10px;
     font-size: var(--text-base, 1rem);
     font-weight: 600;
     color: var(--color-navy, #233366);
     line-height: var(--line-height-snug, 1.35);
 }
-#data-import-modal .data-import-detail-title .fas,
-#data-import-modal .data-import-detail-title .far { margin-right: 6px; opacity: 0.85; }
-#data-import-modal .data-import-detail-desc {
+#data-import-modal .data-import-detail-title .fas, #data-sources-import-modal .data-import-detail-title .fas,
+#data-import-modal .data-import-detail-title .far, #data-sources-import-modal .data-import-detail-title .far { margin-right: 6px; opacity: 0.85; }
+#data-import-modal .data-import-detail-desc, #data-sources-import-modal .data-import-detail-desc {
     font-size: var(--text-sm, 0.8125rem);
     line-height: var(--line-height-body, 1.5);
     color: var(--color-text, #333);
     margin-bottom: 14px;
 }
-#data-import-modal .data-import-detail-desc p { margin: 0 0 0.6em; }
-#data-import-modal .data-import-detail-desc p:last-child { margin-bottom: 0; }
-#data-import-modal .data-import-detail-stats {
+#data-import-modal .data-import-detail-desc p, #data-sources-import-modal .data-import-detail-desc p { margin: 0 0 0.6em; }
+#data-import-modal .data-import-detail-desc p:last-child, #data-sources-import-modal .data-import-detail-desc p:last-child { margin-bottom: 0; }
+#data-import-modal .data-import-detail-stats, #data-sources-import-modal .data-import-detail-stats {
     margin: 0;
     padding: 10px 12px;
     border-radius: var(--radius-md, 6px);
     background: var(--color-bg, #fff);
     border: 1px solid var(--color-border, #dee2e6);
 }
-#data-import-modal .data-import-detail-stat-row {
+#data-import-modal .data-import-detail-stat-row, #data-sources-import-modal .data-import-detail-stat-row {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 6px 10px;
     align-items: baseline;
 }
-#data-import-modal .data-import-detail-stat-row + .data-import-detail-stat-row {
+#data-import-modal .data-import-detail-stat-row + .data-import-detail-stat-row, #data-sources-import-modal .data-import-detail-stat-row + .data-import-detail-stat-row {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--color-border, #dee2e6);
 }
-#data-import-modal .data-import-detail-stats dt {
+#data-import-modal .data-import-detail-stats dt, #data-sources-import-modal .data-import-detail-stats dt {
     margin: 0;
     font-size: var(--text-xs, 0.75rem);
     text-transform: uppercase;
@@ -13942,7 +14004,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     font-weight: 600;
     color: var(--color-text-muted, #666);
 }
-#data-import-modal .data-import-detail-stats dd {
+#data-import-modal .data-import-detail-stats dd, #data-sources-import-modal .data-import-detail-stats dd {
     margin: 0;
     font-size: var(--text-sm, 0.8125rem);
     font-weight: 600;
@@ -13952,7 +14014,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* ── Category tabs: underline style ── */
-#data-import-modal .data-import-category-tabstrip {
+#data-import-modal .data-import-category-tabstrip, #data-sources-import-modal .data-import-category-tabstrip {
     display: flex;
     gap: 0;
     padding: 0 12px;
@@ -13960,7 +14022,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     border-bottom: 1px solid var(--color-border, #dee2e6);
     flex-shrink: 0;
 }
-#data-import-modal .data-import-category-tab {
+#data-import-modal .data-import-category-tab, #data-sources-import-modal .data-import-category-tab {
     border: none;
     background: transparent;
     color: var(--color-text-muted, #666);
@@ -13974,11 +14036,11 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     font-family: var(--font-sans-ui);
     white-space: nowrap;
 }
-#data-import-modal .data-import-category-tab:hover {
+#data-import-modal .data-import-category-tab:hover, #data-sources-import-modal .data-import-category-tab:hover {
     color: var(--color-blue, #4a90e2);
     border-bottom-color: transparent;
 }
-#data-import-modal .data-import-category-tab.data-import-category-tab--active {
+#data-import-modal .data-import-category-tab.data-import-category-tab--active, #data-sources-import-modal .data-import-category-tab.data-import-category-tab--active {
     border-bottom-color: var(--color-blue, #4a90e2);
     color: var(--color-blue, #4a90e2);
     font-weight: 600;
@@ -13986,17 +14048,17 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* ── Item rows: card grid becomes flat list ── */
-#data-import-modal .data-import-category-panel { display: none; }
-#data-import-modal .data-import-category-panel--active { display: block; }
+#data-import-modal .data-import-category-panel, #data-sources-import-modal .data-import-category-panel { display: none; }
+#data-import-modal .data-import-category-panel--active, #data-sources-import-modal .data-import-category-panel--active { display: block; }
 
-#data-import-modal .data-import-cards-grid {
+#data-import-modal .data-import-cards-grid, #data-sources-import-modal .data-import-cards-grid {
     display: flex;
     flex-direction: column;
     gap: 0;
     padding: 6px 8px 10px;
     box-sizing: border-box;
 }
-#data-import-modal .data-import-card {
+#data-import-modal .data-import-card, #data-sources-import-modal .data-import-card {
     flex-direction: row;
     align-items: center;
     gap: 0;
@@ -14009,26 +14071,26 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     transition: background 0.1s ease, border-color 0.1s ease;
     min-height: 48px;
 }
-#data-import-modal .data-import-card:hover {
+#data-import-modal .data-import-card:hover, #data-sources-import-modal .data-import-card:hover {
     background: var(--color-bg-hover, #f0f4f8);
     border-color: var(--color-border, #dee2e6);
     box-shadow: none;
     transform: none;
 }
 @media (prefers-reduced-motion: reduce) {
-    #data-import-modal .data-import-card { transition: none; }
-    #data-import-modal .data-import-card:hover { transform: none; }
+#data-import-modal .data-import-card, #data-sources-import-modal .data-import-card { transition: none; }
+#data-import-modal .data-import-card:hover, #data-sources-import-modal .data-import-card:hover { transform: none; }
 }
-#data-import-modal .data-import-card.import-executing {
+#data-import-modal .data-import-card.import-executing, #data-sources-import-modal .data-import-card.import-executing {
     background: rgba(251, 191, 36, 0.10);
     border-color: rgba(251, 191, 36, 0.35);
 }
-#data-import-modal .data-import-row.data-import-row-zero-count {
+#data-import-modal .data-import-row.data-import-row-zero-count, #data-sources-import-modal .data-import-row.data-import-row-zero-count {
     opacity: 1;
 }
 
 /* Card header: flex 1, contains icon chip + title */
-#data-import-modal .data-import-card-header {
+#data-import-modal .data-import-card-header, #data-sources-import-modal .data-import-card-header {
     flex: 1;
     min-width: 0;
     display: flex;
@@ -14037,7 +14099,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     gap: 0;
     justify-content: flex-start;
 }
-#data-import-modal .data-import-card-title {
+#data-import-modal .data-import-card-title, #data-sources-import-modal .data-import-card-title {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -14054,7 +14116,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Icon chip — coloured background badge */
-#data-import-modal .data-import-card-title > i:first-child {
+#data-import-modal .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card-title > i:first-child {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -14068,27 +14130,79 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Per-source tinted chip backgrounds */
-#data-import-modal .data-import-card[data-import="email_processing"] .data-import-card-title > i:first-child { background: rgba(248, 113, 113, 0.18); }
-#data-import-modal .data-import-card[data-import="imap_processing"] .data-import-card-title > i:first-child { background: rgba(79, 156, 249, 0.18); }
-#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="whatsapp"] .data-import-card-title > i:first-child { background: rgba(37, 211, 102, 0.18); }
-#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="instagram"] .data-import-card-title > i:first-child { background: rgba(225, 48, 108, 0.18); }
-#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="imessage"] .data-import-card-title > i:first-child { background: rgba(52, 211, 153, 0.18); }
-#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="facebook"] .data-import-card-title > i:first-child { background: rgba(24, 119, 242, 0.18); }
-#data-import-modal .data-import-card[data-import="upload_photos"] .data-import-card-title > i:first-child { background: rgba(14, 165, 233, 0.18); }
-#data-import-modal .data-import-card[data-import="filesystem"] .data-import-card-title > i:first-child { background: rgba(139, 92, 246, 0.18); }
-#data-import-modal .data-import-card[data-import="thumbnails"] .data-import-card-title > i:first-child { background: rgba(251, 191, 36, 0.18); }
-#data-import-modal .data-import-card[data-import="reference_modal"] .data-import-card-title > i:first-child { background: rgba(251, 146, 60, 0.18); }
-#data-import-modal .data-import-card[data-import="contacts"] .data-import-card-title > i:first-child { background: rgba(139, 92, 246, 0.18); }
-#data-import-modal .data-import-card[data-import="reference_import"] .data-import-card-title > i:first-child { background: rgba(52, 211, 153, 0.18); }
-#data-import-modal .data-import-card[data-import="image_export"] .data-import-card-title > i:first-child { background: rgba(139, 92, 246, 0.18); }
-#data-import-modal .data-import-card[data-import="message_context_embeddings"] .data-import-card-title > i:first-child { background: rgba(52, 211, 153, 0.18); }
-#data-import-modal .data-import-card[data-import="image_tag_embeddings"] .data-import-card-title > i:first-child { background: rgba(236, 72, 153, 0.18); }
-#data-import-modal .data-import-card[data-import="facebook_post_text_embeddings"] .data-import-card-title > i:first-child { background: rgba(24, 119, 242, 0.18); }
-#data-import-modal .data-import-card[data-import="facebook_album_description_embeddings"] .data-import-card-title > i:first-child { background: rgba(24, 119, 242, 0.18); }
-#data-import-modal .data-import-card[data-import="image_ai_gemma_unclassified"] .data-import-card-title > i:first-child { background: rgba(251, 191, 36, 0.18); }
+#data-import-modal .data-import-card[data-import="email_processing"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="email_processing"] .data-import-card-title > i:first-child { background: rgba(248, 113, 113, 0.18); }
+#data-import-modal .data-import-card[data-import="imap_processing"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="imap_processing"] .data-import-card-title > i:first-child { background: rgba(79, 156, 249, 0.18); }
+#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="whatsapp"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="whatsapp"] .data-import-card-title > i:first-child { background: rgba(37, 211, 102, 0.18); }
+#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="instagram"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="instagram"] .data-import-card-title > i:first-child { background: rgba(225, 48, 108, 0.18); }
+#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="imessage"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="imessage"] .data-import-card-title > i:first-child { background: rgba(52, 211, 153, 0.18); }
+#data-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="facebook"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="upload_zip"][data-zip-archive-type="facebook"] .data-import-card-title > i:first-child { background: rgba(24, 119, 242, 0.18); }
+#data-import-modal .data-import-card[data-import="upload_photos"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="upload_photos"] .data-import-card-title > i:first-child { background: rgba(14, 165, 233, 0.18); }
+#data-import-modal .data-import-card[data-import="filesystem"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="filesystem"] .data-import-card-title > i:first-child { background: rgba(139, 92, 246, 0.18); }
+#data-import-modal .data-import-card[data-import="thumbnails"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="thumbnails"] .data-import-card-title > i:first-child { background: rgba(251, 191, 36, 0.18); }
+#data-import-modal .data-import-card[data-import="reference_modal"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="reference_modal"] .data-import-card-title > i:first-child { background: rgba(251, 146, 60, 0.18); }
+#data-import-modal .data-import-card[data-import="contacts"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="contacts"] .data-import-card-title > i:first-child { background: rgba(139, 92, 246, 0.18); }
+#data-import-modal .data-import-card[data-import="reference_import"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="reference_import"] .data-import-card-title > i:first-child { background: rgba(52, 211, 153, 0.18); }
+#data-import-modal .data-import-card[data-import="image_export"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="image_export"] .data-import-card-title > i:first-child { background: rgba(139, 92, 246, 0.18); }
+#data-import-modal .data-import-card[data-import="message_context_embeddings"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="message_context_embeddings"] .data-import-card-title > i:first-child { background: rgba(52, 211, 153, 0.18); }
+#data-import-modal .data-import-card[data-import="image_tag_embeddings"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="image_tag_embeddings"] .data-import-card-title > i:first-child { background: rgba(236, 72, 153, 0.18); }
+#data-import-modal .data-import-card[data-import="facebook_post_text_embeddings"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="facebook_post_text_embeddings"] .data-import-card-title > i:first-child { background: rgba(24, 119, 242, 0.18); }
+#data-import-modal .data-import-card[data-import="facebook_album_description_embeddings"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="facebook_album_description_embeddings"] .data-import-card-title > i:first-child { background: rgba(24, 119, 242, 0.18); }
+#data-import-modal .data-import-card[data-import="image_ai_gemma_unclassified"] .data-import-card-title > i:first-child, #data-sources-import-modal .data-import-card[data-import="image_ai_gemma_unclassified"] .data-import-card-title > i:first-child { background: rgba(251, 191, 36, 0.18); }
+
+/* ── Entry counts + processing status — between title and action buttons ── */
+#data-import-modal .data-import-card-metrics-source, #data-sources-import-modal .data-import-card-metrics-source {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    flex-shrink: 0;
+    margin-right: 14px;
+    text-align: right;
+    min-width: 70px;
+}
+#data-import-modal .data-import-count, #data-sources-import-modal .data-import-count {
+    font-size: var(--text-sm, 0.8125rem);
+    font-weight: 600;
+    color: var(--color-text, #333);
+    white-space: nowrap;
+}
+#data-import-modal .data-import-row.data-import-row-zero-count .data-import-count, #data-sources-import-modal .data-import-row.data-import-row-zero-count .data-import-count {
+    color: var(--color-text-muted, #888);
+    font-weight: 400;
+}
+#data-import-modal .data-import-progress-line, #data-sources-import-modal .data-import-progress-line {
+    font-size: var(--text-xs, 0.72rem);
+    color: var(--color-text-muted, #6b7280);
+    white-space: nowrap;
+}
+#data-import-modal .data-import-progress-line:empty, #data-sources-import-modal .data-import-progress-line:empty {
+    display: none;
+}
+#data-import-modal .data-import-progress-line[data-progress-state="pending"], #data-sources-import-modal .data-import-progress-line[data-progress-state="pending"] {
+    color: #b45309;
+    font-weight: 500;
+}
+#data-import-modal .data-import-progress-line[data-progress-state="done"], #data-sources-import-modal .data-import-progress-line[data-progress-state="done"] {
+    color: #15803d;
+}
+
+/* "Run" buttons get a warm highlight ring when there's pending content to make searchable */
+#data-import-modal .data-import-nudge-target.data-import-nudge, #data-sources-import-modal .data-import-nudge-target.data-import-nudge {
+    box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.45);
+    animation: data-import-nudge-pulse 2.2s ease-in-out infinite;
+}
+@keyframes data-import-nudge-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.45); }
+    50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+#data-import-modal .data-import-nudge-target.data-import-nudge, #data-sources-import-modal .data-import-nudge-target.data-import-nudge {
+        animation: none;
+    }
+}
 
 /* ── Action buttons — right side of each row ── */
-#data-import-modal .data-import-actions-td {
+#data-import-modal .data-import-actions-td, #data-sources-import-modal .data-import-actions-td {
     flex-shrink: 0;
     align-self: center;
     margin-top: 0;
@@ -14096,7 +14210,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     width: 260px; /* wide enough for [Processing][Cancel] + trash */
     box-sizing: border-box;
 }
-#data-import-modal .data-import-card-actions-row {
+#data-import-modal .data-import-card-actions-row, #data-sources-import-modal .data-import-card-actions-row {
     display: grid;
     grid-template-columns: 1fr 36px; /* action col flexible; trash col fixed */
     gap: 6px;
@@ -14104,7 +14218,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     width: 100%;
 }
 /* Action group always occupies column 1 */
-#data-import-modal .data-import-card-actions-row .data-import-action-group {
+#data-import-modal .data-import-card-actions-row .data-import-action-group, #data-sources-import-modal .data-import-card-actions-row .data-import-action-group {
     grid-column: 1;
     min-width: 0; /* allow shrink if needed */
     display: flex;
@@ -14112,21 +14226,21 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     gap: 6px;
 }
 /* Trash button always occupies column 2 regardless of siblings */
-#data-import-modal .data-import-card-actions-row .data-import-delete-btn {
+#data-import-modal .data-import-card-actions-row .data-import-delete-btn, #data-sources-import-modal .data-import-card-actions-row .data-import-delete-btn {
     grid-column: 2;
     margin-left: 0;
 }
-#data-import-modal .data-import-card-actions-row--clear-only { display: grid; grid-template-columns: 1fr 36px; gap: 6px; }
-#data-import-modal .data-import-card-actions-row--clear-only > .data-import-delete-btn { grid-column: 2; margin-left: 0; }
+#data-import-modal .data-import-card-actions-row--clear-only, #data-sources-import-modal .data-import-card-actions-row--clear-only { display: grid; grid-template-columns: 1fr 36px; gap: 6px; }
+#data-import-modal .data-import-card-actions-row--clear-only > .data-import-delete-btn, #data-sources-import-modal .data-import-card-actions-row--clear-only > .data-import-delete-btn { grid-column: 2; margin-left: 0; }
 
 /* Action group: primary + cancel */
-#data-import-modal .data-import-action-group {
+#data-import-modal .data-import-action-group, #data-sources-import-modal .data-import-action-group {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
     gap: 6px;
 }
-#data-import-modal .data-import-action-group button.modal-btn {
+#data-import-modal .data-import-action-group button.modal-btn, #data-sources-import-modal .data-import-action-group button.modal-btn {
     width: 100px;
     min-width: 100px;
     max-width: 120px; /* allows slight growth for longer labels like "Processing" */
@@ -14141,22 +14255,22 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Primary btn — standard app blue */
-#data-import-modal .data-import-card .modal-btn-primary,
-#data-import-modal .data-import-card-actions-row > .modal-btn-primary {
+#data-import-modal .data-import-card .modal-btn-primary, #data-sources-import-modal .data-import-card .modal-btn-primary,
+#data-import-modal .data-import-card-actions-row > .modal-btn-primary, #data-sources-import-modal .data-import-card-actions-row > .modal-btn-primary {
     background: var(--color-blue, #4a90e2);
     color: #fff;
     border: 1px solid var(--color-blue-dark, #2d6bc4);
     font-weight: 500;
     box-shadow: var(--shadow-sm);
 }
-#data-import-modal .data-import-card .modal-btn-primary:hover:not(:disabled),
-#data-import-modal .data-import-card-actions-row > .modal-btn-primary:hover:not(:disabled) {
+#data-import-modal .data-import-card .modal-btn-primary:hover:not(:disabled), #data-sources-import-modal .data-import-card .modal-btn-primary:hover:not(:disabled),
+#data-import-modal .data-import-card-actions-row > .modal-btn-primary:hover:not(:disabled), #data-sources-import-modal .data-import-card-actions-row > .modal-btn-primary:hover:not(:disabled) {
     background: var(--color-blue-dark, #2d6bc4);
     color: #fff;
 }
 
 /* Clear Data — icon-only, danger on hover */
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn, #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn {
     font-size: 0;
     width: 30px;
     height: 30px;
@@ -14171,26 +14285,26 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     color: var(--color-text-muted, #666);
     box-shadow: none;
 }
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn > i {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn > i, #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn > i {
     font-size: 0.8rem;
     pointer-events: none;
 }
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:hover:not(:disabled) {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:hover:not(:disabled), #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:hover:not(:disabled) {
     background: rgba(220, 53, 69, 0.08);
     border-color: rgba(220, 53, 69, 0.25);
     color: var(--color-danger, #dc3545);
 }
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:focus {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:focus, #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:focus {
     outline: 2px solid rgba(220, 53, 69, 0.35);
     outline-offset: 1px;
 }
-#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:disabled {
+#data-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:disabled, #data-sources-import-modal .data-import-card-actions-row .modal-btn.data-import-delete-btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;
 }
 
 /* Cancel btn: amber warning */
-#data-import-modal .data-import-row-cancel-btn {
+#data-import-modal .data-import-row-cancel-btn, #data-sources-import-modal .data-import-row-cancel-btn {
     font-size: var(--text-xs, 0.75rem);
     padding: 5px 10px;
     white-space: nowrap;
@@ -14198,17 +14312,17 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Processing state: keep existing yellow cancel + blue processing */
-#data-import-modal .data-import-start-btn--cancel-pending,
-#data-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending,
-#data-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending {
+#data-import-modal .data-import-start-btn--cancel-pending, #data-sources-import-modal .data-import-start-btn--cancel-pending,
+#data-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending, #data-sources-import-modal .data-import-zip-start-btn.data-import-start-btn--cancel-pending,
+#data-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending, #data-sources-import-modal .data-import-open-modal-btn.data-import-start-btn--cancel-pending {
     background: linear-gradient(180deg, #fde047 0%, #eab308 85%) !important;
     color: #422006 !important;
     border: 1px solid #ca8a04 !important;
     cursor: wait;
 }
-#data-import-modal .data-import-start-btn.data-import-btn--processing,
-#data-import-modal .data-import-zip-start-btn.data-import-btn--processing,
-#data-import-modal .data-import-open-modal-btn.data-import-btn--processing {
+#data-import-modal .data-import-start-btn.data-import-btn--processing, #data-sources-import-modal .data-import-start-btn.data-import-btn--processing,
+#data-import-modal .data-import-zip-start-btn.data-import-btn--processing, #data-sources-import-modal .data-import-zip-start-btn.data-import-btn--processing,
+#data-import-modal .data-import-open-modal-btn.data-import-btn--processing, #data-sources-import-modal .data-import-open-modal-btn.data-import-btn--processing {
     background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 85%) !important;
     border-color: #2563eb !important;
     color: #fff !important;
@@ -14216,15 +14330,15 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 /* Hide delete btn while job is running */
-#data-import-modal .data-import-card.import-executing .data-import-delete-btn {
+#data-import-modal .data-import-card.import-executing .data-import-delete-btn, #data-sources-import-modal .data-import-card.import-executing .data-import-delete-btn {
     display: none !important;
 }
-#data-import-modal button.data-import-row-cancel-btn[hidden] {
+#data-import-modal button.data-import-row-cancel-btn[hidden], #data-sources-import-modal button.data-import-row-cancel-btn[hidden] {
     display: none !important;
 }
 
 /* ── Footer: terminal job status ── */
-#data-import-modal .import-controls-footer-grid {
+#data-import-modal .import-controls-footer-grid, #data-sources-import-modal .import-controls-footer-grid {
     margin-top: 0;
     flex-shrink: 0;
     padding: 8px 12px;

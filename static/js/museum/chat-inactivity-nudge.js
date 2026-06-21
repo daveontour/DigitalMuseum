@@ -155,6 +155,11 @@ const ChatInactivityNudge = (() => {
     }
 
     function buildNudgePayload(provider, selectedVoice, selectedMood, conversationId, whosAsking) {
+        let lastManual = null;
+        try {
+            const v = localStorage.getItem('dm_last_hosted_llm_provider');
+            if (v === 'gemini' || v === 'claude' || v === 'deepseek') lastManual = v;
+        } catch (_) { /* ignore */ }
         return {
             prompt: '.',
             inactivity_nudge: true,
@@ -167,6 +172,7 @@ const ChatInactivityNudge = (() => {
             temperature: parseFloat(DOM.creativityLevel ? DOM.creativityLevel.value : '0'),
             conversation_id: conversationId,
             provider,
+            last_manual_hosted_provider: lastManual,
             whos_asking: whosAsking,
         };
     }

@@ -342,8 +342,10 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 	return out, nil
 }
 
-// GetImportModalStats collects only the aggregate counts needed by the Import & Manage Data modal.
-func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportModalStatsResponse, error) {
+// GetImportModalStats collects aggregate counts for the import/maintenance modals.
+// When includeEmbeddingProgress is false, embedding/searchable progress queries are skipped
+// (used by the Data Import dialog, which only needs entry counts per type).
+func (r *DashboardRepo) GetImportModalStats(ctx context.Context, includeEmbeddingProgress bool) (*model.ImportModalStatsResponse, error) {
 	uid := uidFromCtx(ctx)
 
 	makeUIDCond := func(baseArgs []any) (string, []any) {
@@ -506,7 +508,122 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportM
 		}
 	}
 
+	if includeEmbeddingProgress {
+	// Embedding progress (how much content still needs an AI embedding to be
+	// searchable). Mirrors the exact "missing embedding" predicates used by the
+	// backfill jobs themselves (see runEmailEmbeddingBackfill / runMessageEmbeddingBackfill
+	// in importer_handler.go, runFacebookPostEmbeddingBackfill / runFacebookAlbumEmbeddingBackfill
+	// and ListMediaItemsForTagEmbeddingBackfill in image_handler.go / image_repo.go).
+	{
+		out.EmbeddingProgress = make(map[string]model.EmbeddingProgressEntry)
+		sources := []struct {
+			key          string
+			totalQuery   string
+			pendingExtra string
+		}{
+			{
+				key:          "message_context_embeddings",
+				totalQuery:   `SELECT COUNT(id) FROM messages WHERE text IS NOT NULL`,
+				pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM message_embeddings me WHERE me.rowid = messages.id)`,
+			},
+			{
+				key:          "email_embeddings",
+				totalQuery:   `SELECT COUNT(id) FROM emails WHERE user_deleted = FALSE`,
+				pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM email_embeddings ee WHERE ee.rowid = emails.id)`,
+			},
+			{
+				key:          "facebook_post_text_embeddings",
+				totalQuery:   `SELECT COUNT(id) FROM facebook_posts WHERE TRIM(COALESCE(post_text, '')) != ''`,
+				pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM facebook_post_text_embeddings e WHERE e.rowid = facebook_posts.id)`,
+			},
+			{
+				key:          "facebook_album_description_embeddings",
+				totalQuery:   `SELECT COUNT(id) FROM facebook_albums WHERE TRIM(COALESCE(description, '')) != ''`,
+				pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM facebook_album_description_embeddings e WHERE e.rowid = facebook_albums.id)`,
+			},
+			{
+				key:          "image_tag_embeddings",
+				totalQuery:   `SELECT COUNT(id) FROM media_items WHERE tags IS NOT NULL AND TRIM(tags) != ''`,
+				pendingExtra: ` AND require_classification = TRUE`,
+			},
+		}
+		for _, s := range sources {
+			var entry model.EmbeddingProgressEntry
+			totalCond, totalArgs := makeUIDCond(nil)
+			if err := r.pool.QueryRowContext(ctx, s.totalQuery+totalCond, totalArgs...).Scan(&entry.Total); err != nil {
+				return nil, fmt.Errorf("%s total: %w", s.key, err)
+			}
+			pendingCond, pendingArgs := makeUIDCond(nil)
+			if err := r.pool.QueryRowContext(ctx, s.totalQuery+pendingCond+s.pendingExtra, pendingArgs...).Scan(&entry.Pending); err != nil {
+				return nil, fmt.Errorf("%s pending: %w", s.key, err)
+			}
+			out.EmbeddingProgress[s.key] = entry
+		}
+	}
+	}
+
 	return out, nil
+}
+
+// GetArchiveDataInventory returns entry counts per archive data type for conversational AI context.
+func (r *DashboardRepo) GetArchiveDataInventory(ctx context.Context) (*model.ArchiveDataInventory, error) {
+	stats, err := r.GetImportModalStats(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+
+	uid := uidFromCtx(ctx)
+	makeUIDCond := func(baseArgs []any) (string, []any) {
+		if uid == 0 {
+			return "", baseArgs
+		}
+		baseArgs = append(baseArgs, uid)
+		return fmt.Sprintf(" AND user_id = ?%d", len(baseArgs)), baseArgs
+	}
+
+	var emailsTotal, places, artefacts int64
+	{
+		uidCond, args := makeUIDCond(nil)
+		scalars := []struct {
+			dest  *int64
+			query string
+			label string
+		}{
+			{&emailsTotal, `SELECT COUNT(id) FROM emails WHERE TRUE` + uidCond, "emails_total"},
+			{&places, `SELECT COUNT(id) FROM places WHERE TRUE` + uidCond, "places"},
+			{&artefacts, `SELECT COUNT(id) FROM artefacts WHERE TRUE` + uidCond, "artefacts"},
+		}
+		for _, s := range scalars {
+			if err := r.pool.QueryRowContext(ctx, s.query, args...).Scan(s.dest); err != nil {
+				return nil, fmt.Errorf("%s count: %w", s.label, err)
+			}
+		}
+	}
+
+	messagesByService := stats.MessageCounts
+	if messagesByService == nil {
+		messagesByService = make(map[string]int64)
+	}
+	emailsBySource := stats.EmailsBySource
+	if emailsBySource == nil {
+		emailsBySource = make(map[string]int64)
+	}
+
+	return &model.ArchiveDataInventory{
+		MessagesByService:  messagesByService,
+		EmailsTotal:        emailsTotal,
+		EmailsBySource:     emailsBySource,
+		ImagesTotal:        stats.TotalImages,
+		ImagesInDatabase:   stats.ImportedImages,
+		ImagesLinkedOnDisk: stats.FilesystemImagesReferencedCount,
+		FacebookAlbums:     stats.FacebookAlbumsCount,
+		FacebookPosts:      stats.FacebookPostsCount,
+		Locations:          stats.LocationsCount,
+		Places:             places,
+		Contacts:           stats.ContactsCount,
+		Artefacts:          artefacts,
+		ReferenceDocuments: stats.ReferenceDocsCount,
+	}, nil
 }
 
 // GetSubjectContactNames returns the names of contacts that should be treated as

@@ -84,11 +84,30 @@ const App = (() => {
     }
 
     function otherLLMProvider(p) {
+        if (p === 'auto') return 'gemini';
         if (p === 'localai') return 'gemini';
         if (p === 'gemini') return 'claude';
         if (p === 'claude') return 'gemini';
         if (p === 'deepseek') return 'gemini';
         return 'gemini';
+    }
+
+    const LAST_HOSTED_LLM_PROVIDER_KEY = 'dm_last_hosted_llm_provider';
+
+    function getLastManualHostedProvider() {
+        try {
+            const v = localStorage.getItem(LAST_HOSTED_LLM_PROVIDER_KEY);
+            if (v === 'gemini' || v === 'claude' || v === 'deepseek') return v;
+        } catch (_) { /* ignore */ }
+        return null;
+    }
+
+    function saveLastManualHostedProviderIfHosted(value) {
+        if (value === 'gemini' || value === 'claude' || value === 'deepseek') {
+            try {
+                localStorage.setItem(LAST_HOSTED_LLM_PROVIDER_KEY, value);
+            } catch (_) { /* ignore */ }
+        }
     }
 
     /** In-flight LLM chat request; Cancel button calls abortCurrentChatRequest(). */
@@ -176,12 +195,19 @@ const App = (() => {
     async function runChatWithProviderFailover(url, buildPayload, signal) {
         const select = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
         const primary = (select && select.value) ? select.value : 'gemini';
+        if (typeof UI !== 'undefined' && UI.clearChatAutoRoutingNotice) {
+            UI.clearChatAutoRoutingNotice();
+        }
         const first = await postJsonChatEndpoint(url, buildPayload(primary), signal);
         if (first.aborted) {
             return { ok: false, aborted: true, error: 'Cancelled' };
         }
         if (first.ok) {
             return { ok: true, data: first.data, switched: false };
+        }
+        // Auto routing is handled server-side; do not client-failover away from Auto.
+        if (primary === 'auto') {
+            return { ok: false, error: first.error || 'Auto routing request failed', data: first.data };
         }
         // Never failover away from an explicitly chosen local provider.
         if (primary === 'localai') {
@@ -274,6 +300,7 @@ const App = (() => {
                     clientId: AppState.clientId,
                     userId: currentUserId,
                     provider,
+                    last_manual_hosted_provider: getLastManualHostedProvider(),
                     whos_asking: whosAsking,
                 }), chatCtrl.signal);
 
@@ -454,9 +481,22 @@ const App = (() => {
 
     /** Sidebar Import button is only shown after refreshDataImportMasterKeyAccessUI confirms owner master unlock. */
     function isDataImportSidebarMasterUnlockVisible() {
-        const btn = document.getElementById('data-import-sidebar-btn');
-        if (!btn) return false;
-        return window.getComputedStyle(btn).display !== 'none';
+        const btns = [
+            document.getElementById('data-sources-import-sidebar-btn'),
+            document.getElementById('data-import-sidebar-btn'),
+        ].filter(Boolean);
+        if (!btns.length) return false;
+        return btns.some((btn) => window.getComputedStyle(btn).display !== 'none');
+    }
+
+    function dataImportModalRoots() {
+        return ['data-import-modal', 'data-sources-import-modal']
+            .map((id) => document.getElementById(id))
+            .filter(Boolean);
+    }
+
+    function hideAllDataImportModals() {
+        dataImportModalRoots().forEach((m) => { m.style.display = 'none'; });
     }
 
     /** True only when the owner master key was used for this session (visitor unlock does not count). */
@@ -521,16 +561,19 @@ const App = (() => {
                 fetchSessionKeyringUnlocked(),
             ]);
             dataImportMasterUnlockedCached = masterOk;
-            const sidebarBtn = document.getElementById('data-import-sidebar-btn');
+            const sidebarBtns = [
+                document.getElementById('data-sources-import-sidebar-btn'),
+                document.getElementById('data-import-sidebar-btn'),
+            ].filter(Boolean);
             const sensitiveSidebarBtn = document.getElementById('sensitive-data-sidebar-btn');
             const tiles = document.querySelectorAll('.import-data-dialog-tile[data-open-modal="data-import-modal"]');
-            if (sidebarBtn) {
+            sidebarBtns.forEach((sidebarBtn) => {
                 sidebarBtn.style.display = masterOk ? '' : 'none';
                 sidebarBtn.disabled = false;
                 sidebarBtn.title = masterOk ? '' : 'Owner master key required — use Unlock with Master Key (visitor key is not enough).';
                 sidebarBtn.style.opacity = '';
                 sidebarBtn.style.cursor = '';
-            }
+            });
             if (sensitiveSidebarBtn) {
                 sensitiveSidebarBtn.style.display = keyringUnlocked ? '' : 'none';
             }
@@ -1043,8 +1086,7 @@ const App = (() => {
             const modal = document.getElementById('reference-documents-manage-modal');
             if (!modal) return;
             modal.style.display = 'flex';
-            const dataImportModalEl = document.getElementById('data-import-modal');
-            if (dataImportModalEl) dataImportModalEl.style.display = 'none';
+            hideAllDataImportModals();
             if (Modals.ReferenceDocuments && Modals.ReferenceDocuments.loadDocuments) {
                 Modals.ReferenceDocuments.loadDocuments();
             }
@@ -1105,6 +1147,9 @@ const App = (() => {
         }
         if (typeof UI !== 'undefined' && UI.initChatToolCallsLogModal) {
             UI.initChatToolCallsLogModal();
+        }
+        if (typeof UI !== 'undefined' && UI.initChatAutoRoutingReasonModal) {
+            UI.initChatAutoRoutingReasonModal();
         }
 
         // Dashboard: load stats and render. prefix e.g. 'stats-' for Dashboard modal (ids: prefix + 'dashboard-stats', …).
@@ -1613,17 +1658,19 @@ const App = (() => {
         let importModalContentLoadGen = 0;
 
         function showDataImportModalLoading(show) {
-            const loadingEl = document.getElementById('data-import-modal-loading');
-            const modal = document.getElementById('data-import-modal');
-            if (loadingEl) {
-                loadingEl.hidden = !show;
-                loadingEl.style.display = show ? 'flex' : 'none';
-            }
-            if (modal) modal.setAttribute('aria-busy', show ? 'true' : 'false');
+            ['data-import-modal-loading', 'data-sources-import-modal-loading'].forEach((id) => {
+                const loadingEl = document.getElementById(id);
+                if (loadingEl) {
+                    loadingEl.hidden = !show;
+                    loadingEl.style.display = show ? 'flex' : 'none';
+                }
+            });
+            dataImportModalRoots().forEach((modal) => {
+                modal.setAttribute('aria-busy', show ? 'true' : 'false');
+            });
         }
 
-        function applyImportModalStats(d) {
-            const modalRoot = document.getElementById('data-import-modal');
+        function applyImportModalCounts(modalRoot, d) {
             if (!modalRoot || !d) return;
             const mc = d.message_counts || {};
             const n = (k) => {
@@ -1679,14 +1726,87 @@ const App = (() => {
             setCell('gps_images', d.gps_images_count != null ? Number(d.gps_images_count) : 0);
         }
 
-        async function loadDataImportModalContent() {
+        function clearEmbeddingProgress(modalRoot) {
+            if (!modalRoot) return;
+            modalRoot.querySelectorAll('[data-progress-key]').forEach((line) => {
+                line.textContent = '';
+                line.removeAttribute('data-progress-state');
+            });
+            modalRoot.querySelectorAll('.data-import-nudge-target[data-import-start]').forEach((btn) => {
+                btn.classList.remove('data-import-nudge');
+            });
+        }
+
+        function applyImportModalStats(d, options) {
+            if (!d) return;
+            const opts = options && typeof options === 'object' ? options : {};
+            const modalId = opts.modalId || null;
+            const includeEmbeddingProgress = opts.includeEmbeddingProgress !== false;
+            const targets = modalId
+                ? [document.getElementById(modalId)].filter(Boolean)
+                : dataImportModalRoots();
+            targets.forEach((modalRoot) => {
+                applyImportModalCounts(modalRoot, d);
+                const isMaintenanceModal = modalRoot.id === 'data-import-modal';
+                if (includeEmbeddingProgress && isMaintenanceModal) {
+                    applyEmbeddingProgress(modalRoot, d);
+                } else if (modalRoot.id === 'data-sources-import-modal') {
+                    clearEmbeddingProgress(modalRoot);
+                }
+            });
+        }
+
+        const EMBEDDING_PROGRESS_LABELS = {
+            message_context_embeddings: 'messages',
+            email_embeddings: 'emails',
+            facebook_post_text_embeddings: 'posts',
+            facebook_album_description_embeddings: 'albums',
+            image_tag_embeddings: 'tagged photos',
+        };
+
+        function applyEmbeddingProgress(modalRoot, d) {
+            const progress = d && d.embedding_progress && typeof d.embedding_progress === 'object' ? d.embedding_progress : {};
+            Object.keys(EMBEDDING_PROGRESS_LABELS).forEach((key) => {
+                const entry = progress[key] || { total: 0, pending: 0 };
+                const total = Number(entry.total) || 0;
+                const pending = Number(entry.pending) || 0;
+                const label = EMBEDDING_PROGRESS_LABELS[key];
+                const lines = modalRoot.querySelectorAll(`[data-progress-key="${key}"]`);
+                lines.forEach((line) => {
+                    if (total === 0) {
+                        line.textContent = '';
+                        line.removeAttribute('data-progress-state');
+                        return;
+                    }
+                    if (pending === 0) {
+                        line.textContent = `Searchable: all ${total} ${label}`;
+                        line.setAttribute('data-progress-state', 'done');
+                    } else {
+                        line.textContent = `Searchable: ${total - pending} of ${total} ${label}`;
+                        line.setAttribute('data-progress-state', 'pending');
+                    }
+                });
+                const nudgeBtn = modalRoot.querySelector(`.data-import-nudge-target[data-import-start="${key}"]`);
+                if (nudgeBtn) {
+                    nudgeBtn.classList.toggle('data-import-nudge', total > 0 && pending > 0);
+                }
+            });
+        }
+
+        async function loadDataImportModalContent(options) {
+            const opts = options && typeof options === 'object' ? options : {};
+            const modalId = opts.modalId || null;
+            const includeEmbeddingProgress = opts.includeEmbeddingProgress !== false;
             const gen = ++importModalContentLoadGen;
             showDataImportModalLoading(true);
             try {
-                const statsRes = await fetch('/api/import-modal-stats', { credentials: 'same-origin' });
+                const url = includeEmbeddingProgress
+                    ? '/api/import-modal-stats'
+                    : '/api/import-modal-stats?embedding_progress=0';
+                const statsRes = await fetch(url, { credentials: 'same-origin' });
                 if (gen !== importModalContentLoadGen) return;
                 if (statsRes.ok) {
-                    applyImportModalStats(await statsRes.json());
+                    applyImportModalStats(await statsRes.json(), { modalId, includeEmbeddingProgress });
                 }
             } catch (e) {
                 console.warn('Failed to load import modal content:', e);
@@ -1695,14 +1815,44 @@ const App = (() => {
             }
         }
 
-        function openDataImportModalUI() {
+        function reloadVisibleImportModalStats() {
+            const sources = document.getElementById('data-sources-import-modal');
+            const maintenance = document.getElementById('data-import-modal');
+            if (sources && sources.style.display !== 'none') {
+                void loadDataImportModalContent({ modalId: 'data-sources-import-modal', includeEmbeddingProgress: false });
+            }
+            if (maintenance && maintenance.style.display !== 'none') {
+                void loadDataImportModalContent({ modalId: 'data-import-modal', includeEmbeddingProgress: true });
+            }
+        }
+
+        function openDataMaintenanceModalUI() {
             const modal = document.getElementById('data-import-modal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            if (typeof loadControlDefaults === 'function') void loadControlDefaults();
+            if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();
+            void loadDataImportModalContent({ modalId: 'data-import-modal', includeEmbeddingProgress: true });
+        }
+
+        function openDataSourcesImportModalUI() {
+            const modal = document.getElementById('data-sources-import-modal');
             if (!modal) return;
             modal.style.display = 'flex';
             if (typeof markOnboardingChecklistStepDone === 'function') markOnboardingChecklistStepDone('import_data');
             if (typeof loadControlDefaults === 'function') void loadControlDefaults();
             if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();
-            void loadDataImportModalContent();
+            void loadDataImportModalContent({ modalId: 'data-sources-import-modal', includeEmbeddingProgress: false });
+        }
+
+        function openDataImportModalUI() {
+            openDataMaintenanceModalUI();
+        }
+
+        async function openDataSourcesImportModalAfterKeyCheck() {
+            if (!(await ensureMasterKeyForDataImport())) return false;
+            openDataSourcesImportModalUI();
+            return true;
         }
 
         async function openDataImportModalAfterKeyCheck() {
@@ -1712,7 +1862,7 @@ const App = (() => {
         }
 
         async function loadDataImportModalCounts() {
-            await loadDataImportModalContent();
+            reloadVisibleImportModalStats();
         }
 
         // Empty Media Tables Button
@@ -2164,17 +2314,22 @@ const App = (() => {
         let sidebarBackgroundJobsRunning = false;
         let sidebarBackgroundJobsPollTimer = null;
 
-        function syncDataImportSidebarJobIndicator() {
-            const btn = document.getElementById('data-import-sidebar-btn');
+        function syncOneDataImportSidebarJobIndicator(btnId, idleIconClass) {
+            const btn = document.getElementById(btnId);
             if (!btn) return;
             const icon = btn.querySelector('.sidebar-data-import-btn-icon');
             const active = runningJobs.size > 0 || sidebarBackgroundJobsRunning;
             btn.classList.toggle('sidebar-jobs-running', active);
             btn.title = active ? 'Import or maintenance jobs running' : '';
             if (!icon) return;
-            icon.classList.toggle('fa-database', !active);
+            icon.classList.toggle(idleIconClass, !active);
             icon.classList.toggle('fa-cog', active);
             icon.classList.toggle('fa-spin', active);
+        }
+
+        function syncDataImportSidebarJobIndicator() {
+            syncOneDataImportSidebarJobIndicator('data-sources-import-sidebar-btn', 'fa-file-import');
+            syncOneDataImportSidebarJobIndicator('data-import-sidebar-btn', 'fa-tools');
         }
 
         async function refreshSidebarBackgroundJobsState() {
@@ -2238,13 +2393,26 @@ const App = (() => {
         }
 
         function dataImportStatusEls() {
-            const modal = document.getElementById('data-import-modal');
+            const modal = document.getElementById('data-import-modal')
+                || document.getElementById('data-sources-import-modal');
             if (!modal) return { tabsStrip: null, logPre: null, idleWrap: null };
             return {
                 tabsStrip: modal.querySelector('.import-job-tabs-strip'),
                 logPre: modal.querySelector('.import-job-log-display'),
                 idleWrap: modal.querySelector('.import-job-status-idle-wrap')
             };
+        }
+
+        function forEachDataImportJobStatusModal(fn) {
+            dataImportModalRoots().forEach((modal) => {
+                fn({
+                    modal,
+                    tabsStrip: modal.querySelector('.import-job-tabs-strip'),
+                    logPre: modal.querySelector('.import-job-log-display'),
+                    idleWrap: modal.querySelector('.import-job-status-idle-wrap'),
+                    logOuter: modal.querySelector('.import-job-log-outer'),
+                });
+            });
         }
 
         function syncLegacyConfigStatusLine() {
@@ -2261,17 +2429,18 @@ const App = (() => {
                 el.textContent = text || 'Idle';
                 el.style.color = isError ? '#ff6b6b' : '';
             });
-            const { logPre, idleWrap, tabsStrip } = dataImportStatusEls();
-            if (logPre) {
-                logPre.hidden = true;
-                logPre.textContent = '';
-                logPre.style.color = '';
-            }
-            if (idleWrap) idleWrap.hidden = false;
-            if (tabsStrip) {
-                tabsStrip.innerHTML = '';
-                tabsStrip.hidden = true;
-            }
+            forEachDataImportJobStatusModal(({ logPre, idleWrap, tabsStrip }) => {
+                if (logPre) {
+                    logPre.hidden = true;
+                    logPre.textContent = '';
+                    logPre.style.color = '';
+                }
+                if (idleWrap) idleWrap.hidden = false;
+                if (tabsStrip) {
+                    tabsStrip.innerHTML = '';
+                    tabsStrip.hidden = true;
+                }
+            });
         }
 
         function appendJobLine(jobKey, text) {
@@ -2289,67 +2458,74 @@ const App = (() => {
         }
 
         function scrollImportJobLogToBottom() {
-            const modal = document.getElementById('data-import-modal');
-            if (!modal) return;
-            const outer = modal.querySelector('.import-job-log-outer');
-            if (!outer) return;
-            requestAnimationFrame(() => {
-                outer.scrollTop = outer.scrollHeight;
+            forEachDataImportJobStatusModal(({ logOuter }) => {
+                if (!logOuter) return;
+                requestAnimationFrame(() => {
+                    logOuter.scrollTop = logOuter.scrollHeight;
+                });
             });
         }
 
         function renderJobLogDisplay() {
-            const { logPre, idleWrap } = dataImportStatusEls();
-            if (!logPre || !idleWrap) return;
             if (runningJobs.size === 0) {
-                logPre.hidden = true;
-                idleWrap.hidden = false;
-                logPre.textContent = '';
+                forEachDataImportJobStatusModal(({ logPre, idleWrap }) => {
+                    if (logPre) {
+                        logPre.hidden = true;
+                        logPre.textContent = '';
+                    }
+                    if (idleWrap) idleWrap.hidden = false;
+                });
                 return;
             }
-            idleWrap.hidden = true;
-            logPre.hidden = false;
-            logPre.style.color = '';
             const job = selectedJobKey && runningJobs.get(selectedJobKey);
-            logPre.textContent = job && job.lines && job.lines.length ? job.lines.join('\n') : '';
+            const logText = job && job.lines && job.lines.length ? job.lines.join('\n') : '';
+            forEachDataImportJobStatusModal(({ logPre, idleWrap }) => {
+                if (!logPre || !idleWrap) return;
+                idleWrap.hidden = true;
+                logPre.hidden = false;
+                logPre.style.color = '';
+                logPre.textContent = logText;
+            });
             scrollImportJobLogToBottom();
         }
 
         function selectJobTab(jobKey) {
             if (!runningJobs.has(jobKey)) return;
             selectedJobKey = jobKey;
-            const { tabsStrip } = dataImportStatusEls();
-            if (tabsStrip) {
+            forEachDataImportJobStatusModal(({ tabsStrip }) => {
+                if (!tabsStrip) return;
                 tabsStrip.querySelectorAll('.import-job-tab').forEach(btn => {
                     const active = btn.getAttribute('data-job-key') === jobKey;
                     btn.classList.toggle('import-job-tab--active', active);
                     btn.setAttribute('aria-selected', active ? 'true' : 'false');
                 });
-            }
+            });
             renderJobLogDisplay();
             syncLegacyConfigStatusLine();
         }
 
         function addJobTab(jobKey, label) {
-            const { tabsStrip } = dataImportStatusEls();
-            if (!tabsStrip) return;
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'import-job-tab';
-            btn.setAttribute('data-job-key', jobKey);
-            btn.setAttribute('role', 'tab');
-            btn.textContent = label;
-            btn.addEventListener('click', () => selectJobTab(jobKey));
-            tabsStrip.appendChild(btn);
-            tabsStrip.hidden = false;
+            forEachDataImportJobStatusModal(({ tabsStrip }) => {
+                if (!tabsStrip) return;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'import-job-tab';
+                btn.setAttribute('data-job-key', jobKey);
+                btn.setAttribute('role', 'tab');
+                btn.textContent = label;
+                btn.addEventListener('click', () => selectJobTab(jobKey));
+                tabsStrip.appendChild(btn);
+                tabsStrip.hidden = false;
+            });
         }
 
         function removeJobTab(jobKey) {
-            const { tabsStrip } = dataImportStatusEls();
-            if (!tabsStrip) return;
-            const btn = tabsStrip.querySelector('[data-job-key="' + String(jobKey).replace(/"/g, '\\"') + '"]');
-            if (btn) btn.remove();
-            if (!tabsStrip.querySelector('.import-job-tab')) tabsStrip.hidden = true;
+            forEachDataImportJobStatusModal(({ tabsStrip }) => {
+                if (!tabsStrip) return;
+                const btn = tabsStrip.querySelector('[data-job-key="' + String(jobKey).replace(/"/g, '\\"') + '"]');
+                if (btn) btn.remove();
+                if (!tabsStrip.querySelector('.import-job-tab')) tabsStrip.hidden = true;
+            });
         }
 
         function registerRunningJob(jobKey, importType, extra, labelText) {
@@ -2679,8 +2855,7 @@ const App = (() => {
 
         /** Drive Data Import table rows (Processing / per-row Cancel) from runningJobs — required for parallel jobs. */
         function syncDataImportModalRowsFromRunningJobs() {
-            const dim = document.getElementById('data-import-modal');
-            if (!dim) return;
+            dataImportModalRoots().forEach((dim) => {
             dim.querySelectorAll('.data-import-row').forEach(row => {
                 const target = rowToJobCancelTarget(row);
                 const job = target ? runningJobs.get(target.jobKey) : null;
@@ -2744,6 +2919,7 @@ const App = (() => {
                         b.disabled = false;
                     }
                 });
+            });
             });
         }
 
@@ -2886,8 +3062,7 @@ const App = (() => {
                 renderJobLogDisplay();
                 syncLegacyConfigStatusLine();
             }
-            const dim = document.getElementById('data-import-modal');
-            if (dim && dim.style.display !== 'none') void loadDataImportModalContent();
+            if (dataImportModalRoots().some((dim) => dim.style.display !== 'none')) reloadVisibleImportModalStats();
 
             void maybeAutoRunContactsExtract(importType || '');
 
@@ -3726,38 +3901,43 @@ const App = (() => {
         })();
 
         (function setupDataImportDetailSidebar() {
-            const modal = document.getElementById('data-import-modal');
-            if (!modal) return;
-            const ph = modal.querySelector('.data-import-detail-placeholder');
-            const content = modal.querySelector('.data-import-detail-content');
-            const titleEl = modal.querySelector('.data-import-detail-title');
-            const descEl = modal.querySelector('.data-import-detail-desc');
-            const entriesEl = modal.querySelector('.data-import-detail-entries');
+            function wireDetailSidebar(modal) {
+                if (!modal) return;
+                const ph = modal.querySelector('.data-import-detail-placeholder');
+                const content = modal.querySelector('.data-import-detail-content');
+                const titleEl = modal.querySelector('.data-import-detail-title');
+                const descEl = modal.querySelector('.data-import-detail-desc');
+                const entriesEl = modal.querySelector('.data-import-detail-entries');
 
-            function resetSidebar() {
-                if (ph) ph.hidden = false;
-                if (content) content.hidden = true;
+                function showCard(card) {
+                    if (!card || !content || !ph || !titleEl || !descEl || !entriesEl) return;
+                    const titleSrc = card.querySelector('.data-import-card-title');
+                    const detailBody = card.querySelector('.data-import-card-detail-body');
+                    const metrics = card.querySelector('.data-import-card-metrics-source');
+                    const cnt = metrics && metrics.querySelector('.data-import-count');
+                    titleEl.innerHTML = titleSrc ? titleSrc.innerHTML : '';
+                    descEl.innerHTML = detailBody ? detailBody.innerHTML : '';
+                    entriesEl.textContent = cnt ? cnt.textContent.trim() : '—';
+                    ph.hidden = true;
+                    content.hidden = false;
+                }
+
+                modal.querySelectorAll('.data-import-card').forEach((card) => {
+                    card.addEventListener('mouseenter', () => showCard(card));
+                    card.addEventListener('focusin', () => showCard(card));
+                });
             }
 
-            resetDataImportDetailSidebar = resetSidebar;
+            resetDataImportDetailSidebar = () => {
+                dataImportModalRoots().forEach((modal) => {
+                    const ph = modal.querySelector('.data-import-detail-placeholder');
+                    const content = modal.querySelector('.data-import-detail-content');
+                    if (ph) ph.hidden = false;
+                    if (content) content.hidden = true;
+                });
+            };
 
-            function showCard(card) {
-                if (!card || !content || !ph || !titleEl || !descEl || !entriesEl) return;
-                const titleSrc = card.querySelector('.data-import-card-title');
-                const detailBody = card.querySelector('.data-import-card-detail-body');
-                const metrics = card.querySelector('.data-import-card-metrics-source');
-                const cnt = metrics && metrics.querySelector('.data-import-count');
-                titleEl.innerHTML = titleSrc ? titleSrc.innerHTML : '';
-                descEl.innerHTML = detailBody ? detailBody.innerHTML : '';
-                entriesEl.textContent = cnt ? cnt.textContent.trim() : '—';
-                ph.hidden = true;
-                content.hidden = false;
-            }
-
-            modal.querySelectorAll('.data-import-card').forEach((card) => {
-                card.addEventListener('mouseenter', () => showCard(card));
-                card.addEventListener('focusin', () => showCard(card));
-            });
+            dataImportModalRoots().forEach(wireDetailSidebar);
         })();
 
         document.querySelectorAll('.import-control-tile').forEach(tile => {
@@ -3771,12 +3951,18 @@ const App = (() => {
                         })();
                         return;
                     }
+                    if (openModal === 'data-sources-import-modal') {
+                        void (async () => {
+                            if (DOM.configPage) DOM.configPage.style.display = 'none';
+                            await openDataSourcesImportModalAfterKeyCheck();
+                        })();
+                        return;
+                    }
                     const modal = document.getElementById(openModal);
                     if (modal) {
                         modal.style.display = 'flex';
                         if (openModal === 'reference-documents-manage-modal') {
-                            const dim = document.getElementById('data-import-modal');
-                            if (dim) dim.style.display = 'none';
+                            hideAllDataImportModals();
                             if (Modals.ReferenceDocuments && Modals.ReferenceDocuments.loadDocuments) {
                                 Modals.ReferenceDocuments.loadDocuments();
                             }
@@ -3786,8 +3972,7 @@ const App = (() => {
                 }
                 const openTab = tile.getAttribute('data-open-tab');
                 if (openTab) {
-                    const dataImportModal = document.getElementById('data-import-modal');
-                    if (dataImportModal) dataImportModal.style.display = 'none';
+                    hideAllDataImportModals();
                     if (DOM.configPage) {
                         DOM.configPage.style.display = 'flex';
                         loadControlDefaults();
@@ -3850,8 +4035,7 @@ const App = (() => {
                             if (m) {
                                 m.style.display = 'flex';
                                 if (mid === 'reference-documents-manage-modal' && hideDataImportWhenOpeningRefModal) {
-                                    const dim = document.getElementById('data-import-modal');
-                                    if (dim) dim.style.display = 'none';
+                                    hideAllDataImportModals();
                                     if (Modals.ReferenceDocuments && Modals.ReferenceDocuments.loadDocuments) {
                                         Modals.ReferenceDocuments.loadDocuments();
                                     }
@@ -3891,7 +4075,7 @@ const App = (() => {
                                 if (!res.ok) {
                                     throw new Error(body.detail || body.error || `HTTP ${res.status}`);
                                 }
-                                void loadDataImportModalContent();
+                                reloadVisibleImportModalStats();
                             } catch (err) {
                                 console.error('Purge failed:', err);
                                 if (typeof UI !== 'undefined' && UI.displayError) UI.displayError(err.message || 'Delete failed');
@@ -3902,6 +4086,7 @@ const App = (() => {
                 }, true);
             }
             bindDataImportTableClicks(document.getElementById('data-import-modal'), { hideDataImportWhenOpeningRefModal: true });
+            bindDataImportTableClicks(document.getElementById('data-sources-import-modal'), { hideDataImportWhenOpeningRefModal: true });
         })();
 
         async function checkInitialImportStatus() {
@@ -4738,6 +4923,31 @@ const App = (() => {
             });
         }
 
+        const dataSourcesImportSidebarBtn = document.getElementById('data-sources-import-sidebar-btn');
+        const dataSourcesImportModal = document.getElementById('data-sources-import-modal');
+        const closeDataSourcesImportModalBtn = document.getElementById('close-data-sources-import-modal');
+        if (dataSourcesImportSidebarBtn && dataSourcesImportModal) {
+            dataSourcesImportSidebarBtn.addEventListener('click', () => {
+                if (isDataImportSidebarMasterUnlockVisible()) {
+                    dataImportMasterUnlockedCached = true;
+                    openDataSourcesImportModalUI();
+                    return;
+                }
+                void openDataSourcesImportModalAfterKeyCheck();
+            });
+        }
+        const closeDataSourcesImportModal = () => {
+            if (dataSourcesImportModal) dataSourcesImportModal.style.display = 'none';
+        };
+        if (closeDataSourcesImportModalBtn && dataSourcesImportModal) {
+            closeDataSourcesImportModalBtn.addEventListener('click', closeDataSourcesImportModal);
+        }
+        if (dataSourcesImportModal) {
+            dataSourcesImportModal.addEventListener('click', (e) => {
+                if (e.target === dataSourcesImportModal) closeDataSourcesImportModal();
+            });
+        }
+
         const dataImportSidebarBtn = document.getElementById('data-import-sidebar-btn');
         const dataImportModal = document.getElementById('data-import-modal');
         const closeDataImportModalBtn = document.getElementById('close-data-import-modal');
@@ -4892,6 +5102,7 @@ const App = (() => {
         function applyProviderAvailabilityToSelect(sel, availability) {
             if (!sel) return;
             const providers = [
+                { value: 'auto', label: 'Auto', available: !!availability.auto_available },
                 { value: 'gemini', label: 'Gemini', available: !!availability.gemini_available },
                 { value: 'claude', label: 'Claude', available: !!availability.claude_available },
                 { value: 'deepseek', label: 'DeepSeek', available: !!availability.deepseek_available },
@@ -4908,18 +5119,21 @@ const App = (() => {
 
             const current = sel.value;
             const currentUnavailable =
+                (current === 'auto' && !availability.auto_available) ||
                 (current === 'gemini' && !availability.gemini_available) ||
                 (current === 'claude' && !availability.claude_available) ||
                 (current === 'deepseek' && !availability.deepseek_available) ||
                 (current === 'localai' && !availability.localai_available);
             if (currentUnavailable) {
-                sel.value = availability.gemini_available
-                    ? 'gemini'
-                    : (availability.claude_available
-                        ? 'claude'
-                        : (availability.deepseek_available
-                            ? 'deepseek'
-                            : (availability.localai_available ? 'localai' : 'gemini')));
+                sel.value = availability.auto_available
+                    ? 'auto'
+                    : (availability.gemini_available
+                        ? 'gemini'
+                        : (availability.claude_available
+                            ? 'claude'
+                            : (availability.deepseek_available
+                                ? 'deepseek'
+                                : (availability.localai_available ? 'localai' : 'gemini'))));
             } else {
                 // Prefer Local AI as the startup default while still respecting explicit user changes.
                 const userSelected = sel.dataset.userSelectedProvider === 'true';
@@ -5173,7 +5387,7 @@ const App = (() => {
         if (importBtn && !importBtn.dataset.onboardingWired) {
             importBtn.dataset.onboardingWired = '1';
             importBtn.addEventListener('click', () => {
-                const dataImportBtn = document.getElementById('data-import-sidebar-btn');
+                const dataImportBtn = document.getElementById('data-sources-import-sidebar-btn');
                 if (dataImportBtn) dataImportBtn.click();
             });
         }
@@ -5406,7 +5620,13 @@ const App = (() => {
         }
         if (DOM.llmProviderSelect) {
             DOM.llmProviderSelect.addEventListener('change', () => {
-                DOM.llmProviderSelect.dataset.userSelectedProvider = 'true';
+                const val = DOM.llmProviderSelect.value;
+                if (val === 'gemini' || val === 'claude' || val === 'deepseek') {
+                    saveLastManualHostedProviderIfHosted(val);
+                    DOM.llmProviderSelect.dataset.userSelectedProvider = 'true';
+                } else if (val === 'auto' || val === 'localai') {
+                    DOM.llmProviderSelect.dataset.userSelectedProvider = 'true';
+                }
             });
         }
         void applyVisitorFeatureGatingFromSession();

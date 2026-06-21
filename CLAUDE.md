@@ -10,7 +10,6 @@ Gemini, and a local Ollama/Gemma4 model can access the data via a tool-calling l
 and answer questions, adopt personas, and explore the archive conversationally.
 
 Additional features beyond the core chat interface include:
-- **Pam Bot** — dementia companion chat mode with a restricted, focussed tool set
 - **Have-a-Chat** — two-voice conversation sessions (two AI personas talking to each other)
 - **Interviews** — structured Q&A sessions driven by AI, saved for review
 - **Identity Profile Wizard** — AI-guided wizard that builds a textual profile of the archive subject

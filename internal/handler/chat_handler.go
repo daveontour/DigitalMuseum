@@ -63,6 +63,7 @@ func (h *ChatHandler) GetAvailability(w http.ResponseWriter, r *http.Request) {
 		"claude_available":                    h.svc.ClaudeAvailable(r.Context(), r),
 		"deepseek_available":                  h.svc.DeepSeekAvailable(r.Context(), r),
 		"localai_available":                   h.svc.LocalAIAvailable(),
+		"auto_available":                      h.svc.AutoAvailable(r.Context(), r),
 		"tavily_env_configured":               h.svc.ServerTavilyKeyConfigured(),
 		"runpod_env_configured":               h.svc.ServerRunpodKeyConfigured(),
 		"runpod_endpoint_id_env":              h.svc.ServerRunpodEndpointID(),

@@ -48,20 +48,45 @@ type ContactCount struct {
 // ImportModalStatsResponse is the shape returned by GET /api/import-modal-stats.
 // Subset of dashboard counts used by the Import & Manage Data modal.
 type ImportModalStatsResponse struct {
-	MessageCounts                   map[string]int64 `json:"message_counts"`
-	TotalImages                     int64            `json:"total_images"`
-	FilesystemImagesEmbeddedCount   int64            `json:"filesystem_images_embedded_count"`
-	FilesystemImagesReferencedCount int64            `json:"filesystem_images_referenced_count"`
-	ImportedImages                  int64            `json:"imported_images"`
-	ReferenceImages                 int64            `json:"reference_images"`
-	ThumbnailCount                  int64            `json:"thumbnail_count"`
-	FacebookAlbumsCount             int64            `json:"facebook_albums_count"`
-	FacebookPostsCount              int64            `json:"facebook_posts_count"`
-	LocationsCount                  int64            `json:"locations_count"`
-	ContactsCount                   int64            `json:"contacts_count"`
-	EmailsBySource                  map[string]int64 `json:"emails_by_source"`
-	ReferenceDocsCount              int64            `json:"reference_docs_count"`
-	GpsImagesCount                  int64            `json:"gps_images_count"`
+	MessageCounts                   map[string]int64                  `json:"message_counts"`
+	TotalImages                     int64                             `json:"total_images"`
+	FilesystemImagesEmbeddedCount   int64                             `json:"filesystem_images_embedded_count"`
+	FilesystemImagesReferencedCount int64                             `json:"filesystem_images_referenced_count"`
+	ImportedImages                  int64                             `json:"imported_images"`
+	ReferenceImages                 int64                             `json:"reference_images"`
+	ThumbnailCount                  int64                             `json:"thumbnail_count"`
+	FacebookAlbumsCount             int64                             `json:"facebook_albums_count"`
+	FacebookPostsCount              int64                             `json:"facebook_posts_count"`
+	LocationsCount                  int64                             `json:"locations_count"`
+	ContactsCount                   int64                             `json:"contacts_count"`
+	EmailsBySource                  map[string]int64                  `json:"emails_by_source"`
+	ReferenceDocsCount              int64                             `json:"reference_docs_count"`
+	GpsImagesCount                  int64                             `json:"gps_images_count"`
+	EmbeddingProgress               map[string]EmbeddingProgressEntry `json:"embedding_progress"`
+}
+
+// EmbeddingProgressEntry reports how much of a source's content still needs an
+// AI embedding generated before it is searchable (Total includes Pending).
+type EmbeddingProgressEntry struct {
+	Total   int64 `json:"total"`
+	Pending int64 `json:"pending"`
+}
+
+// ArchiveDataInventory is a compact count snapshot appended to conversational AI system prompts.
+type ArchiveDataInventory struct {
+	MessagesByService  map[string]int64 `json:"messages_by_service"`
+	EmailsTotal        int64            `json:"emails_total"`
+	EmailsBySource     map[string]int64 `json:"emails_by_source"`
+	ImagesTotal        int64            `json:"images_total"`
+	ImagesInDatabase   int64            `json:"images_in_database"`
+	ImagesLinkedOnDisk int64            `json:"images_linked_on_disk"`
+	FacebookAlbums     int64            `json:"facebook_albums"`
+	FacebookPosts      int64            `json:"facebook_posts"`
+	Locations          int64            `json:"locations"`
+	Places             int64            `json:"places"`
+	Contacts           int64            `json:"contacts"`
+	Artefacts          int64            `json:"artefacts"`
+	ReferenceDocuments int64            `json:"reference_documents"`
 }
 
 // OwnerContactSuggestion is a short contact row for linking the archive owner.

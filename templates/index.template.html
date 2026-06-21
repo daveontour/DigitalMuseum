@@ -42,6 +42,7 @@
                 <div class="top-bar-llm" style="margin-left: 25px;">
                     <label for="llm-provider-select" class="top-bar-label" style="margin-right: 10px;align-content: center;">AI Provider:</label>
                     <select id="llm-provider-select">
+                        <option value="auto">Auto</option>
                         <option value="gemini" selected>Gemini</option>
                         <option value="claude">Claude</option>
                         <option value="deepseek">DeepSeek</option>
@@ -202,8 +203,11 @@
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="identity-profile-wizard-btn" title="Create or edit your identity profile" style="margin-top:4px;">
                         <i class="fas fa-id-card"></i> Profile
                     </button>
+                    <button type="button" class="more-options-btn sidebar-settings-btn" id="data-sources-import-sidebar-btn">
+                        <i class="fas fa-file-import sidebar-data-import-btn-icon" aria-hidden="true"></i> Data Import
+                    </button>
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="data-import-sidebar-btn">
-                        <i class="fas fa-database sidebar-data-import-btn-icon" aria-hidden="true"></i> Import &amp; Manage Data
+                        <i class="fas fa-tools sidebar-data-import-btn-icon" aria-hidden="true"></i> Data Maintenance
                     </button>
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="settings-data-import-sidebar-btn">
                         <i class="fas fa-cog"></i> Configuration
@@ -329,6 +333,10 @@
                         <i id="chat-context-status-warn-refs" class="fas fa-exclamation-triangle chat-context-status-warn" style="display:none;" title="No reference documents enabled for the AI"></i>
                     </span>
                     <span class="chat-context-status-sep" aria-hidden="true">|</span>
+                    <span id="chat-context-auto-routing-wrap" class="chat-context-auto-routing-wrap" style="display:none" role="status">
+                        <span id="chat-context-auto-routing-msg" class="chat-context-status-seg chat-context-status-clickable chat-context-auto-routing-msg" role="button" tabindex="0" title="View Auto routing reason"></span>
+                        <span class="chat-context-status-sep chat-context-auto-routing-sep" aria-hidden="true">|</span>
+                    </span>
                     <span id="chat-context-failover-wrap" class="chat-context-failover-wrap" style="display:none" role="status">
                         <span id="chat-context-failover-msg" class="chat-context-status-seg chat-context-failover-msg"></span>
                         <span class="chat-context-status-sep chat-context-failover-sep" aria-hidden="true">|</span>
@@ -565,6 +573,22 @@
             </div>
         </div>
 
+        <!-- Auto routing reason (last request) -->
+        <div id="chat-auto-routing-reason-modal" class="modal" style="display:none;">
+            <div class="modal-content chat-auto-routing-reason-content" style="max-width:640px; width:92vw;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-route"></i> Auto routing</h2>
+                    <button type="button" class="modal-close-btn" id="close-chat-auto-routing-reason-modal">&times;</button>
+                </div>
+                <div class="modal-body chat-auto-routing-reason-body-wrap">
+                    <p id="chat-auto-routing-reason-route" class="chat-auto-routing-reason-route"></p>
+                    <p id="chat-auto-routing-reason-text" class="chat-auto-routing-reason-text"></p>
+                    <div class="chat-auto-routing-reason-actions">
+                        <button type="button" class="modal-btn modal-btn-secondary" id="chat-auto-routing-reason-close-btn">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Interview Setup Modal -->
         <div id="interview-setup-modal" class="modal" style="display:none;">
@@ -1594,38 +1618,34 @@
             </div>
         </div>
 
-        <!-- Data Import Modal -->
-        <div id="data-import-modal" class="modal" style="display: none; position: fixed; z-index: 4000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+        <!-- Data Import (sources) Modal -->
+        <div id="data-sources-import-modal" class="modal" style="display: none; position: fixed; z-index: 4000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
             <div class="modal-content" style="max-width: 85vw; width: 85vw; height: 85vh; max-height: 85vh; padding: 0; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
                 <div class="modal-header">
-                    <h2><i class="fas fa-database"></i> Import  &amp; Manage Data</h2>
-                    <button class="modal-close-btn" id="close-data-import-modal">&times;</button>
+                    <h2><i class="fas fa-file-import"></i> Data Import</h2>
+                    <button class="modal-close-btn" id="close-data-sources-import-modal">&times;</button>
                 </div>
                 <div class="data-import-modal-body">
-                    <!-- <section class="section-config">
-                        <h1 style="font-size: var(--text-3xl);">Data Import</h1>
-                    </section> -->
                     <section class="config-section data-import-modal-section">
                         <div class="data-import-table-scroll-region">
                             <div class="data-import-main-column">
-                            <div class="data-import-category-tabstrip" role="tablist" aria-label="Import and maintenance">
-                                <button type="button" role="tab" class="data-import-category-tab data-import-category-tab--active" id="data-import-tab-import" data-import-category-tab="import" aria-selected="true" aria-controls="data-import-panel-import">Data Import</button>
-                                <button type="button" role="tab" class="data-import-category-tab" id="data-import-tab-maintenance" data-import-category-tab="maintenance" aria-selected="false" aria-controls="data-import-panel-maintenance">Data Maintenance</button>
-                                <button type="button" role="tab" class="data-import-category-tab" id="data-import-tab-background-jobs" data-import-category-tab="background-jobs" aria-selected="false" aria-controls="data-import-panel-background-jobs"><i class="fas fa-tasks" aria-hidden="true"></i> Scheduled  Data Maintenance Jobs</button>
-                            </div>
                             <div class="data-import-panels-wrap">
-                            <div id="data-import-modal-loading" class="data-import-modal-loading" hidden aria-live="polite">
-                                <i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading import data&hellip;
+                            <div id="data-sources-import-modal-loading" class="data-import-modal-loading" hidden aria-live="polite">
+                                <div class="data-import-modal-loading-panel">
+                                    <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                                    <span>Loading import data&hellip;</span>
+                                </div>
                             </div>
                             <div class="data-import-panels-scroll">
-                            <div id="data-import-panel-import" role="tabpanel" class="data-import-category-panel data-import-category-panel--active" data-import-category-panel="import" aria-labelledby="data-import-tab-import">
+                            <div id="data-import-panel-import" role="region" class="data-import-sources-panel" data-import-sources-panel="import" aria-label="Data import sources">
                                 <div class="data-import-cards-grid">
                                 <article class="data-import-card data-import-row" data-import="email_processing">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-envelope"></i> Import Mail from Gmail (Oauth2 Authentication)</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="email_processing">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="email_embeddings"></div>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Sign in with Google (OAuth) and import Gmail into this archive. <br/><br/> <strong>Clear Data</strong> only removes mail imported via Gmail, not other email sources.</p></div>
                                     <div class="data-import-actions-td">
@@ -1642,8 +1662,9 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-inbox"></i> Imort Mail from an IMAP server (Basic Authentication)</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="imap_processing">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="email_embeddings"></div>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import from any IMAP mailbox using server credentials and folder selection.  <br/><br/> <strong>Clear Data</strong> removes IMAP imported mail.</p></div>
                                     <div class="data-import-actions-td">
@@ -1660,8 +1681,9 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-file-archive"></i> Import Messages from a WhatsApp Archive</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="zip_whatsapp">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="message_context_embeddings"></div>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import a WhatsApp export. <br/><br/>Use a tool like iMazing to export the WhatsApp archive from your phone. <br/><br/> Chats and media are parsed and saved in the archive. <br/><br/> Use <strong>Clear Data</strong> to remove only WhatsApp-imported content.</p></div>
                                     <div class="data-import-actions-td">
@@ -1678,8 +1700,9 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-file-archive"></i> Import Messages from an Instagram Archive</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="zip_instagram">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="message_context_embeddings"></div>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import a Meta Instagram data export. Posts and related metadata are imported and saved in the archive.</p><p><strong>Downloading via Instagram (Desktop)</strong> — use a computer browser, especially if your archive will be large.</p><ol><li>Log in to Instagram on a computer web browser (or log in to Facebook if your Instagram is linked there).</li><li><strong>Open Settings:</strong> on Instagram, click <strong>More</strong> (☰) → <strong>Settings</strong>. On Facebook, click your profile picture (top right) → <strong>Settings &amp; privacy</strong> → <strong>Settings</strong>.</li><li><strong>Go to Accounts Center:</strong> open <strong>Accounts Center</strong> (Meta accounts hub).</li><li><strong>Find your information:</strong> click <strong>Your information and permissions</strong>.</li><li><strong>Start export:</strong> click <strong>Download your information</strong> (or <strong>Export your information</strong>), then <strong>Download or transfer information</strong> or <strong>Create export</strong>.</li><li><strong>Select your account:</strong> choose your <strong>Instagram</strong> profile to export.</li><li><strong>Choose information to export:</strong> pick <strong>Some of your information</strong> for specific categories (posts, messages, etc.) or <strong>All of your information</strong> for a complete archive.</li><li><strong>Set destination:</strong> choose <strong>Download to device</strong> (or <strong>Export to device</strong>).</li><li><strong>Configure archive options:</strong><ul><li><strong>Format:</strong> select <strong>JSON</strong> (best for import into Digital Museum; HTML is easier to browse manually).</li><li><strong>Date range:</strong> choose the timeframe (e.g. Last 3 months, All time).</li><li><strong>Media quality:</strong> High, Medium, or Low — Medium can speed up the download while keeping file sizes manageable.</li></ul></li><li><strong>Generate the file:</strong> click <strong>Create files</strong> (or <strong>Start export</strong>). You may need to enter your password to confirm. When the export is ready, download the ZIP and use <strong>Import</strong> above.</li></ol><p><strong>Clear Data</strong> removes Instagram-imported material from this archive.</p></div>
                                     <div class="data-import-actions-td">
@@ -1696,8 +1719,9 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-file-archive"></i> Import an iMessage &amp; SMS Archive</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="zip_imessage">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="message_context_embeddings"></div>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import an Apple iMessage/SMS export. <br/><br/>Use a tool like iMazing to export the iMessage/SMS archive from your phone. <br/><br/> Message threads are imported and saved into the archive. <br/><br/> <strong>Clear Data</strong> removes iMessage/SMS imported material.</p></div>
                                     <div class="data-import-actions-td">
@@ -1714,8 +1738,10 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-file-archive"></i> Import a Facebook Archive (messages, albums, posts, and places)</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="zip_facebook">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="facebook_post_text_embeddings"></div>
+                                        <div class="data-import-progress-line" data-progress-key="facebook_album_description_embeddings"></div>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Import a Facebook data export. Messenger, albums, posts, and places are imported and saved into the archive.</p><p><strong>Downloading via Facebook (Desktop)</strong> — use a computer browser, especially if your archive will be large.</p><ol><li>Log in to Facebook on a computer web browser.</li><li><strong>Open Settings:</strong> click your profile picture (top right) → <strong>Settings &amp; privacy</strong> → <strong>Settings</strong>.</li><li><strong>Go to Accounts Center:</strong> in the left sidebar, click the <strong>Accounts Center</strong> tile.</li><li><strong>Find your information:</strong> click <strong>Your information and permissions</strong>.</li><li><strong>Start export:</strong> click <strong>Download your information</strong> (or <strong>Export your information</strong>), then <strong>Download or transfer information</strong> or <strong>Create export</strong>.</li><li><strong>Select your account:</strong> choose the Facebook profile to export.</li><li><strong>Choose information to export:</strong> pick <strong>Some of your information</strong> for specific categories (posts, messages, etc.) or <strong>All of your information</strong> for a complete archive.</li><li><strong>Set destination:</strong> choose <strong>Download to device</strong> (or <strong>Export to device</strong>).</li><li><strong>Configure archive options:</strong><ul><li><strong>Format:</strong> select <strong>JSON</strong> (best for import into Digital Museum; HTML is easier to browse manually).</li><li><strong>Date range:</strong> choose the timeframe (e.g. Last 3 months, All time).</li><li><strong>Media quality:</strong> High, Medium, or Low — Medium can speed up the download while keeping file sizes manageable.</li></ul></li><li><strong>Generate the file:</strong> click <strong>Create files</strong> (or <strong>Start export</strong>). You may need to enter your Facebook password to confirm. When the export is ready, download the ZIP and use <strong>Import</strong> above.</li></ol><p><strong>Clear Data</strong> removes Facebook-imported material from this archive.</p></div>
                                     <div class="data-import-actions-td">
@@ -1732,8 +1758,9 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-link"></i> Link to Images on Disk</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="filesystem">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="image_tag_embeddings"></div>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Scan folders on this machine and register image paths as referenced media (local Electron deployments only).<br/><br/>Thumbnails are generated and stored in the database for quick access.  <br/><br/> Optonally, you can select to import the images into the database as part of the process or run the import process at a later stage. <br/><br/> <strong>Clear Data</strong> removes filesystem-linked rows.</p></div>
                                     <div class="data-import-actions-td">
@@ -1750,7 +1777,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-book"></i> Import and Manage Reference Documents</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="reference_docs">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Open the reference documents manager to add PDFs, Word files, text, CSV, or JSON for AI context. Entries counts stored reference docs.</p></div>
@@ -1768,7 +1795,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-question-circle"></i> Other Data Sources</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="reference_docs">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Contact daveontour57@gmail.com to discuss other data sources you may have.</p></div>
@@ -1784,13 +1811,187 @@
                                 </article>
                                 </div>
                             </div>
-                            <div id="data-import-panel-maintenance" role="tabpanel" class="data-import-category-panel" data-import-category-panel="maintenance" aria-labelledby="data-import-tab-maintenance">
+                            </div>
+                            </div>
+                            </div>
+                            <aside class="data-import-detail-sidebar" aria-label="Import option details">
+                                <div class="data-import-detail-sidebar-inner">
+                                    <p class="data-import-detail-placeholder">Hover an option for a description and entry counts.</p>
+                                    <div class="data-import-detail-content" hidden>
+                                        <h4 class="data-import-detail-title"></h4>
+                                        <div class="data-import-detail-desc"></div>
+                                        <dl class="data-import-detail-stats">
+                                            <div class="data-import-detail-stat-row"><dt>Entries</dt><dd class="data-import-detail-entries">—</dd></div>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </aside>
+                        </div>
+                        <div class="import-controls-footer-grid">
+                            <div class="import-controls-status-box import-controls-status-box--jobs" style="padding: 8px 10px; border-radius: 4px; font-size: var(--text-lead); line-height: 1.45; min-height: 6em; max-height: 14em; display: flex; flex-direction: column; gap: 6px;">
+                                <div style="display:flex; flex-direction: row; gap: 10px;">
+                                    <span class="import-controls-status-label">Job Status:</span>
+                                    <div class="import-job-tabs-strip" role="tablist" aria-label="Running import jobs" hidden></div>
+                                </div>
+                                <div class="import-job-log-outer">
+                                    <pre class="import-job-log-display" hidden></pre>
+                                    <div class="import-job-status-idle-wrap">
+                                        <span class="import-controls-status-text">Idle</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Maintenance Modal -->
+        <div id="data-import-modal" class="modal" style="display: none; position: fixed; z-index: 4000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+            <div class="modal-content" style="max-width: 85vw; width: 85vw; height: 85vh; max-height: 85vh; padding: 0; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-tools"></i> Data Maintenance</h2>
+                    <button class="modal-close-btn" id="close-data-import-modal">&times;</button>
+                </div>
+                <div class="data-import-modal-body">
+                    <!-- <section class="section-config">
+                        <h1 style="font-size: var(--text-3xl);">Data Import</h1>
+                    </section> -->
+                    <section class="config-section data-import-modal-section">
+                        <div class="data-import-table-scroll-region">
+                            <div class="data-import-main-column">
+                            <div class="data-import-category-tabstrip" role="tablist" aria-label="Maintenance and scheduled jobs">
+                                <button type="button" role="tab" class="data-import-category-tab data-import-category-tab--active" id="data-import-tab-maintenance" data-import-category-tab="maintenance" aria-selected="true" aria-controls="data-import-panel-maintenance">Data Maintenance</button>
+                                <button type="button" role="tab" class="data-import-category-tab" id="data-import-tab-background-jobs" data-import-category-tab="background-jobs" aria-selected="false" aria-controls="data-import-panel-background-jobs"><i class="fas fa-tasks" aria-hidden="true"></i> Scheduled  Data Maintenance Jobs</button>
+                            </div>
+                            <div class="data-import-panels-wrap">
+                            <div id="data-import-modal-loading" class="data-import-modal-loading" hidden aria-live="polite">
+                                <div class="data-import-modal-loading-panel">
+                                    <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                                    <span>Loading import data&hellip;</span>
+                                </div>
+                            </div>
+                            <div class="data-import-panels-scroll">
+                            <div id="data-import-panel-maintenance" role="tabpanel" class="data-import-category-panel data-import-category-panel--active" data-import-category-panel="maintenance" aria-labelledby="data-import-tab-maintenance">
                                 <div class="data-import-cards-grid">
+                                <article class="data-import-card data-import-row" data-import="message_context_embeddings">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-vector-square"></i> Optimise Message and Conversation for Searching</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source">
+                                        <span class="data-import-count">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="message_context_embeddings"></div>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Turns your messages and conversations into a format the app can search through quickly.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-message-context-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn data-import-nudge-target" data-import-start="message_context_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-14" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button id="data-import-clear-message-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="message_embeddings" title="Deletes all message embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
+                                <article class="data-import-card data-import-row" data-import="email_embeddings">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-envelope"></i> Optimise Emails for Searching</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source">
+                                        <span class="data-import-count">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="email_embeddings"></div>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed email bodies for semantic similarity search. Only emails missing vectors are processed.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-email-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn data-import-nudge-target" data-import-start="email_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-15" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button id="data-import-clear-email-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="email_embeddings" title="Deletes all email embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
+                                <article class="data-import-card data-import-row" data-import="facebook_post_text_embeddings">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-file-alt"></i> Optimise Facebook Post Text for Searching</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source">
+                                        <span class="data-import-count">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="facebook_post_text_embeddings"></div>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed Facebook post text for semantic similarity search. You can reprocess all posts or only fill missing vectors.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-facebook-post-text-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn data-import-nudge-target" data-import-start="facebook_post_text_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-16" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button id="data-import-clear-facebook-post-text-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_post_text_embeddings" title="Deletes all Facebook post text embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
+                                <article class="data-import-card data-import-row" data-import="facebook_album_description_embeddings">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-images"></i> Optimise Facebook Album Descriptions for Searching</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source">
+                                        <span class="data-import-count">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="facebook_album_description_embeddings"></div>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed Facebook album descriptions for semantic similarity search. You can reprocess all albums or only fill missing vectors.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-facebook-album-description-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn data-import-nudge-target" data-import-start="facebook_album_description_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-17" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button id="data-import-clear-facebook-album-description-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_album_description_embeddings" title="Deletes all Facebook album description embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
+                                <article class="data-import-card data-import-row" data-import="image_tag_embeddings">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-tags"></i> Optimise the Tags on Images for Searching</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source">
+                                        <span class="data-import-count">—</span>
+                                        <div class="data-import-progress-line" data-progress-key="image_tag_embeddings"></div>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed image tags for similarity search. Embeddings create a "vector" for the image tags that can be used to search for similar images. You can reprocess all embeddings or skip unchanged tags when prompted.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-image-tag-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn data-import-nudge-target" data-import-start="image_tag_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-19" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button id="data-import-clear-media-tag-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="media_tag_embeddings" title="Deletes all image tag embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
+                                <article class="data-import-card data-import-row" data-import="artefact_embeddings">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-gem"></i> Optimise Artefacts for Searching</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source">
+                                        <span class="data-import-count">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed artefact name, description, tags, and story for similarity search. You can reprocess all embeddings or fill only missing vectors when prompted.</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                            <button id="data-import-start-artefact-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="artefact_embeddings"><i class="fas fa-play"></i> Run</button>
+                                            <button id="data-import-cancel-btn-20" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
+                                            </div>
+                                            <button id="data-import-clear-artefact-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="artefact_embeddings" title="Deletes all artefact embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
+                                        </div>
+                                    </div>
+                                </article>
                                 <article class="data-import-card data-import-row" data-import="reference_import">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-file-import"></i> Import Linked Images to Database</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="reference_import_entries">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Copy linked (referenced-on-disk) images into the database blobs so they travel with the archive. Entries shows reference-linked images. Runs as a background job.</p></div>
@@ -1807,7 +2008,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-file-export"></i> Export Images to Filesystem</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="image_export_entries">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Write images from the database to a folder you choose on disk (local deployment). Entries is the total image count eligible for export.</p></div>
@@ -1824,7 +2025,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-cloud-upload-alt"></i> Remove images stored in the database</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="imported_images">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Remove images that have been imported into the database. This function only offers <strong>Clear Data</strong> to remove filesystem-sourced library images; counts reflect embedded images for this archive.</p></div>
@@ -1838,7 +2039,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-image"></i> Thumbnails Creation &amp; Location Extraction</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="thumbnails">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Generate thumbnails and read GPS/metadata from images. May run as an interactive prompt flow or async jobs.</p></div>
@@ -1856,7 +2057,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-globe-americas"></i> Recalculate Image Regions</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="gps_images">—</span>
                                     </div>
 
@@ -1874,7 +2075,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-tags"></i> Use AI to Classify Image Contents and Add tags</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="imported_images">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Use local AI (e.g. Gemma via Ollama) and optionally cloud hosted services to tag images with the contents of the image for ones that are not yet classified</p></div>
@@ -1891,7 +2092,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-clipboard-check"></i> QA Check Image Classification Tags</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="imported_images">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Review images marked as classified (<code>require_classification = false</code>). Items with fewer than five comma-separated tags are re-queued for AI classification.</p></div>
@@ -1908,7 +2109,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-map-marker-alt"></i> Spread Duplicate GPS Coordinates</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Finds images sharing the exact same latitude and longitude, then spreads each group evenly on a circle (100&nbsp;m for up to 20 images, 150&nbsp;m for larger groups).</p></div>
@@ -1925,7 +2126,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-file-code"></i> Export Image Metadata JSON</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="imported_images">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Writes a JSON file listing every image (ordered by id) with id, source, source reference, GPS fields, and tags.</p></div>
@@ -1942,7 +2143,7 @@
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-address-book"></i> Reprocess Contacts Data</h3>
                                     </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
+                                    <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="contacts">—</span>
                                     </div>
                                     <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Rebuild the contacts store from existing messages and related sources. Useful after large imports or if you have updated your contacts classification, emails matches or email exclusions</p></div>
@@ -1954,125 +2155,16 @@
                                             </div>
                                         </div>
                                     </div>
-                                </article>
-
-                                <article class="data-import-card data-import-row" data-import="message_context_embeddings">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-vector-square"></i> Optimise Message and Conversation for Searching</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Turns your messages and conversations into a format the app can search through quickly.</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                            <button id="data-import-start-message-context-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="message_context_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button id="data-import-cancel-btn-14" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
-                                            <button id="data-import-clear-message-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="message_embeddings" title="Deletes all message embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
-                                        </div>
-                                    </div>
-                                </article>
-                                <article class="data-import-card data-import-row" data-import="email_embeddings">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-envelope"></i> Optimise Emails for Searching</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed email bodies for semantic similarity search. Only emails missing vectors are processed.</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                            <button id="data-import-start-email-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="email_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button id="data-import-cancel-btn-15" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
-                                            <button id="data-import-clear-email-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="email_embeddings" title="Deletes all email embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
-                                        </div>
-                                    </div>
-                                </article>
-                                <article class="data-import-card data-import-row" data-import="facebook_post_text_embeddings">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-file-alt"></i> Optimise Facebook Post Text for Searching</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed Facebook post text for semantic similarity search. You can reprocess all posts or only fill missing vectors.</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                            <button id="data-import-start-facebook-post-text-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="facebook_post_text_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button id="data-import-cancel-btn-16" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
-                                            <button id="data-import-clear-facebook-post-text-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_post_text_embeddings" title="Deletes all Facebook post text embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
-                                        </div>
-                                    </div>
-                                </article>
-                                <article class="data-import-card data-import-row" data-import="facebook_album_description_embeddings">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-images"></i> Optimise Facebook Album Descriptions for Searching</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed Facebook album descriptions for semantic similarity search. You can reprocess all albums or only fill missing vectors.</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                            <button id="data-import-start-facebook-album-description-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="facebook_album_description_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button id="data-import-cancel-btn-17" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
-                                            <button id="data-import-clear-facebook-album-description-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="facebook_album_description_embeddings" title="Deletes all Facebook album description embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
-                                        </div>
-                                    </div>
-                                </article>
-                                <article class="data-import-card data-import-row" data-import="image_tag_embeddings">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-tags"></i> Optimise the Tags on Images for Searching</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed image tags for similarity search. Embeddings create a "vector" for the image tags that can be used to search for similar images. You can reprocess all embeddings or skip unchanged tags when prompted.</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                            <button id="data-import-start-image-tag-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="image_tag_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button id="data-import-cancel-btn-19" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
-                                            <button id="data-import-clear-media-tag-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="media_tag_embeddings" title="Deletes all image tag embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
-                                        </div>
-                                    </div>
-                                </article>
-                                <article class="data-import-card data-import-row" data-import="artefact_embeddings">
-                                    <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-gem"></i> Optimise Artefacts for Searching</h3>
-                                    </div>
-                                    <div class="data-import-card-metrics-source" hidden aria-hidden="true">
-                                        <span class="data-import-count">—</span>
-                                    </div>
-                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Embed artefact name, description, tags, and story for similarity search. You can reprocess all embeddings or fill only missing vectors when prompted.</p></div>
-                                    <div class="data-import-actions-td">
-                                        <div class="data-import-card-actions-row">
-                                            <div class="data-import-action-group">
-                                            <button id="data-import-start-artefact-embeddings-btn" type="button" class="modal-btn modal-btn-primary data-import-start-btn" data-import-start="artefact_embeddings"><i class="fas fa-play"></i> Run</button>
-                                            <button id="data-import-cancel-btn-20" type="button" class="modal-btn modal-btn-secondary data-import-row-cancel-btn" hidden title="Cancel this job"><i class="fas fa-stop"></i> Cancel</button>
-                                            </div>
-                                            <button id="data-import-clear-artefact-embeddings-btn" type="button" class="modal-btn modal-btn-secondary data-import-delete-btn" aria-label="Clear data" data-import-purge-kind="artefact_embeddings" title="Deletes all artefact embedding vectors for this archive"><i class="fas fa-trash-alt" aria-hidden="true"></i> Clear Data</button>
-                                        </div>
-                                    </div>
-                                </article>
-                                </div>
+                                </article></div>
                             </div>
                             <div id="data-import-panel-background-jobs" role="tabpanel" class="data-import-category-panel" data-import-category-panel="background-jobs" aria-labelledby="data-import-tab-background-jobs">
                                 <div class="data-import-background-jobs-panel">
                                     <p class="data-import-background-jobs-intro">
-                                        Schedule maintenance jobs that keep your archive's thumbnails, embeddings, and AI tags up to date.
-                                        <strong>Auto-start at boot</strong> runs the job once when the server starts.
-                                        <strong>Restart on complete</strong> re-runs it after each completion.
-                                        <strong>Interval</strong> is the wait between completion and next run.
+                                        These are the same jobs as the "Run" buttons on the Data Maintenance tab — schedule them here so your
+                                        archive keeps itself up to date automatically as you add new content.
+                                        <strong>Run automatically when the app starts</strong> runs the job once each time the server starts.
+                                        <strong>Repeat after finishing</strong> immediately starts it again once it completes.
+                                        <strong>How often to re-check</strong> is how long to wait after a run before checking again.
                                     </p>
                                     <div id="background-jobs-status" style="display:none; margin-bottom:10px; padding:8px 12px; border-radius:4px;"></div>
                                     <div id="background-jobs-loading" class="loading-state background-jobs-loading" aria-live="polite">
@@ -2083,9 +2175,9 @@
                                             <thead>
                                                 <tr>
                                                     <th style="text-align:left;">Job</th>
-                                                    <th style="text-align:center;" title="Run automatically when the server starts">Auto-start at boot</th>
-                                                    <th style="text-align:center;" title="Re-run after each completion">Restart on complete</th>
-                                                    <th style="text-align:center;" title="Wait between completion and next run">Interval (s)</th>
+                                                    <th style="text-align:center;" title="Run automatically when the server starts">Run automatically when the app starts</th>
+                                                    <th style="text-align:center;" title="Immediately start again once it finishes">Repeat after finishing</th>
+                                                    <th style="text-align:center;" title="How long to wait after a run before checking again">How often to re-check (seconds)</th>
                                                     <th style="text-align:left;">Last run</th>
                                                     <th style="text-align:left;">Status</th>
                                                     <th style="text-align:center; width:140px;">Actions</th>

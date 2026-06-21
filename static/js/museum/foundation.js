@@ -804,6 +804,100 @@ const UI = (() => {
         syncChatContextStatusBarVisibility();
     }
 
+    let chatAutoRoutingNoticeTimer = null;
+    let lastAutoRoute = null;
+
+    function clearChatAutoRoutingNotice() {
+        const wrap = document.getElementById('chat-context-auto-routing-wrap');
+        const el = document.getElementById('chat-context-auto-routing-msg');
+        if (el) {
+            el.textContent = '';
+            el.title = '';
+        }
+        if (wrap) wrap.style.display = 'none';
+        lastAutoRoute = null;
+        if (chatAutoRoutingNoticeTimer) {
+            clearTimeout(chatAutoRoutingNoticeTimer);
+            chatAutoRoutingNoticeTimer = null;
+        }
+        syncChatContextStatusBarVisibility();
+    }
+
+    function autoRouteProviderLabel(name) {
+        if (name === 'claude') return 'Claude';
+        if (name === 'deepseek') return 'DeepSeek';
+        if (name === 'localai') return 'Local AI';
+        if (name === 'gemini') return 'Gemini';
+        return name || 'Unknown';
+    }
+
+    function setChatAutoRoutingNotice(autoRoute) {
+        const wrap = document.getElementById('chat-context-auto-routing-wrap');
+        const el = document.getElementById('chat-context-auto-routing-msg');
+        if (!el || !wrap || !autoRoute || typeof autoRoute !== 'object') return;
+        lastAutoRoute = autoRoute;
+        const routed = autoRoute.routed_provider ? String(autoRoute.routed_provider) : '';
+        const reason = autoRoute.reason ? String(autoRoute.reason).trim() : '';
+        const routedLabel = autoRouteProviderLabel(routed);
+        el.textContent = routed ? `Auto \u2192 ${routedLabel}` : 'Auto routing';
+        el.title = reason ? 'Click to view routing reason' : 'Auto routing';
+        wrap.style.display = 'inline-flex';
+        syncChatContextStatusBarVisibility();
+        if (chatAutoRoutingNoticeTimer) clearTimeout(chatAutoRoutingNoticeTimer);
+        chatAutoRoutingNoticeTimer = setTimeout(() => clearChatAutoRoutingNotice(), 120000);
+    }
+
+    function openChatAutoRoutingReasonModal() {
+        if (!lastAutoRoute) return;
+        const modal = document.getElementById('chat-auto-routing-reason-modal');
+        const routeEl = document.getElementById('chat-auto-routing-reason-route');
+        const textEl = document.getElementById('chat-auto-routing-reason-text');
+        if (!modal || !routeEl || !textEl) return;
+        const routed = lastAutoRoute.routed_provider ? String(lastAutoRoute.routed_provider) : '';
+        const routedLabel = autoRouteProviderLabel(routed);
+        routeEl.textContent = routed ? `Auto \u2192 ${routedLabel}` : 'Auto routing';
+        let reason = lastAutoRoute.reason ? String(lastAutoRoute.reason).trim() : '';
+        if (!reason) reason = 'No reason recorded.';
+        const notes = [];
+        if (lastAutoRoute.classifier_fallback) notes.push('Classifier fallback was used.');
+        if (lastAutoRoute.execution_fallback) notes.push('Execution provider fallback was used.');
+        if (lastAutoRoute.needs_reference_documents === false) notes.push('Reference documents were omitted from the request.');
+        if (lastAutoRoute.needs_user_profile === false) notes.push('User profile context was omitted from the request.');
+        textEl.textContent = notes.length ? `${reason}\n\n${notes.join(' ')}` : reason;
+        modal.style.display = 'flex';
+    }
+
+    function closeChatAutoRoutingReasonModal() {
+        const modal = document.getElementById('chat-auto-routing-reason-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function initChatAutoRoutingReasonModal() {
+        const seg = document.getElementById('chat-context-auto-routing-msg');
+        const modal = document.getElementById('chat-auto-routing-reason-modal');
+        const closeBtn = document.getElementById('close-chat-auto-routing-reason-modal');
+        const closeBtn2 = document.getElementById('chat-auto-routing-reason-close-btn');
+        if (seg) {
+            seg.addEventListener('click', (e) => {
+                e.preventDefault();
+                openChatAutoRoutingReasonModal();
+            });
+            seg.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openChatAutoRoutingReasonModal();
+                }
+            });
+        }
+        if (closeBtn) closeBtn.addEventListener('click', closeChatAutoRoutingReasonModal);
+        if (closeBtn2) closeBtn2.addEventListener('click', closeChatAutoRoutingReasonModal);
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeChatAutoRoutingReasonModal();
+            });
+        }
+    }
+
     function setChatProviderFailoverNotice(fromProvider, toProvider) {
         const wrap = document.getElementById('chat-context-failover-wrap');
         const el = document.getElementById('chat-context-failover-msg');
@@ -827,6 +921,7 @@ const UI = (() => {
         DOM.errorDisplay.textContent = '';
         DOM.errorDisplay.style.display = 'none';
         clearChatProviderFailoverNotice();
+        clearChatAutoRoutingNotice();
     }
 
     function displayError(message) {
@@ -835,6 +930,7 @@ const UI = (() => {
         DOM.errorDisplay.style.display = 'block';
         DOM.loadingIndicator.style.display = 'none'; // Hide loading indicator on error
         clearChatProviderFailoverNotice();
+        clearChatAutoRoutingNotice();
     }
 
     function scrollToBottom() {
@@ -996,6 +1092,11 @@ const UI = (() => {
         if (inEl) inEl.textContent = inT != null ? String(inT) : DASH;
         if (outEl) outEl.textContent = outT != null ? String(outT) : DASH;
         if (fcEl) fcEl.textContent = nFc != null ? String(nFc) : DASH;
+        if (em && em.auto_route) {
+            setChatAutoRoutingNotice(em.auto_route);
+        } else {
+            clearChatAutoRoutingNotice();
+        }
         syncChatContextStatusBarVisibility();
     }
 
@@ -1007,6 +1108,9 @@ const UI = (() => {
         setChatLastRequestStatsFromEmbedded,
         setChatProviderFailoverNotice,
         clearChatProviderFailoverNotice,
+        setChatAutoRoutingNotice,
+        clearChatAutoRoutingNotice,
+        initChatAutoRoutingReasonModal,
         initChatToolCallsLogModal,
     };
 })();

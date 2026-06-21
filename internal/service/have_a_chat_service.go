@@ -180,7 +180,7 @@ Your goal is to:
 		sysInstructions,
 	)
 	systemPrompt = appendExplicitContentPolicy(systemPrompt, req.AllowExplicitContent)
-	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
+	systemPrompt = s.enrichChatSystemPrompt(ctx, r, systemPrompt)
 
 	// ── User prompt: history as narrative ────────────────────────────────────
 	var sb strings.Builder

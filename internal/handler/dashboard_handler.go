@@ -47,8 +47,13 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 }
 
 // GetImportModalStats handles GET /api/import-modal-stats.
+// Query param embedding_progress=0 omits searchable/embedding progress (counts only).
 func (h *DashboardHandler) GetImportModalStats(w http.ResponseWriter, r *http.Request) {
-	resp, err := h.dashSvc.GetImportModalStats(r.Context())
+	includeEmbeddingProgress := true
+	if v := strings.TrimSpace(r.URL.Query().Get("embedding_progress")); v == "0" || strings.EqualFold(v, "false") {
+		includeEmbeddingProgress = false
+	}
+	resp, err := h.dashSvc.GetImportModalStats(r.Context(), includeEmbeddingProgress)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving import modal stats: %s", err))
 		return

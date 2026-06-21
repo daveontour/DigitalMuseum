@@ -331,6 +331,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		sessionMasterStore,
 		privateStoreSvc,
 		billingRepo,
+		dashboardSvc,
 	)
 	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo, sessionMasterStore)
 	chatHandler.RegisterRoutes(r)

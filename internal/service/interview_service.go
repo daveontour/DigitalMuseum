@@ -121,7 +121,7 @@ func (s *ChatService) StartInterview(
 	}
 
 	systemPrompt := s.buildInterviewSystemPrompt(ctx, req.Style, req.Purpose, req.PurposeDetail, subjectName, subjectGender)
-	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
+	systemPrompt = s.enrichChatSystemPrompt(ctx, r, systemPrompt)
 	userPrompt := s.buildInterviewStartPrompt(subjectName, req.PurposeDetail)
 
 	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
@@ -201,7 +201,7 @@ func (s *ChatService) GenerateInterviewTurn(
 	}
 
 	systemPrompt := s.buildInterviewSystemPrompt(ctx, iv.Style, iv.Purpose, iv.PurposeDetail, subjectName, subjectGender)
-	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
+	systemPrompt = s.enrichChatSystemPrompt(ctx, r, systemPrompt)
 
 	history := buildInterviewHistory(turns)
 
@@ -301,7 +301,7 @@ func (s *ChatService) ResumeInterview(
 	}
 
 	systemPrompt := s.buildInterviewSystemPrompt(ctx, iv.Style, iv.Purpose, iv.PurposeDetail, subjectName, subjectGender)
-	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
+	systemPrompt = s.enrichChatSystemPrompt(ctx, r, systemPrompt)
 	history := buildInterviewHistory(turns)
 
 	userPrompt := "The interview was paused and is now being resumed. Welcome the interviewee back warmly, briefly summarize where you left off, and continue with your next interview question."
@@ -385,7 +385,7 @@ func (s *ChatService) EndInterview(
 			"Organise the material logically with clear sections. The subject's name is %s.",
 		writeupTypeLabel(iv.Purpose), subjectName,
 	)
-	systemPrompt = s.appendInlinedReferenceDocumentsToSystemPrompt(ctx, r, systemPrompt)
+	systemPrompt = s.enrichChatSystemPrompt(ctx, r, systemPrompt)
 
 	genReq := appai.GenerateRequest{
 		UserInput:     writeupPrompt,
