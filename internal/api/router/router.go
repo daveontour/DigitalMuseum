@@ -64,6 +64,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 
 		templateHandler := handler.NewTemplateHandler(nil, nil, nil, cfg)
 		r.Get("/login", templateHandler.GetLogin)
+		r.Get("/api/local-ai/status", handler.LocalAIStatusFromConfig(cfg.AI))
 		// Desktop shell and browsers open "/"; send them to the login / first-run flow.
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/login", http.StatusFound)
@@ -97,8 +98,8 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 
 	sessionMasterStore := keystore.NewSessionMasterStore(cfg.Server.SessionCookieSecure)
 
-	localAIProvider := appai.NewLocalAIProvider(cfg.AI.LocalAIBaseURL, cfg.AI.LocalAIAPIKey, cfg.AI.LocalAIModelName, cfg.AI.LocalAINumCtx)
-	embeddingSvc := service.NewEmbeddingService(localAIProvider, cfg.AI.LocalAIEmbeddingModel)
+	embeddingProvider := appai.NewLocalAIProvider(cfg.AI.LocalAIEmbeddingBaseURL, cfg.AI.LocalAIAPIKey, cfg.AI.LocalAIModelName, 0)
+	embeddingSvc := service.NewEmbeddingService(embeddingProvider, cfg.AI.LocalAIEmbeddingModel)
 
 	// ── Emails ─────────────────────────────────────────────────────────────────
 	emailRepo := repository.NewEmailRepo(pool)
@@ -325,8 +326,10 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		cfg.AI.OpenAIModelName,
 		cfg.AI.TavilyAPIKey,
 		cfg.AI.LocalAIBaseURL,
+		cfg.AI.LocalAIEmbeddingBaseURL,
 		cfg.AI.LocalAIAPIKey,
 		cfg.AI.LocalAIModelName,
+		cfg.AI.LocalAIEmbeddingModel,
 		cfg.AI.LocalAINumCtx,
 		cfg.App.AssetStaticDir,
 		cfg.Crypto.KeyringPepper,
@@ -338,6 +341,8 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	)
 	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo, sessionMasterStore)
 	chatHandler.RegisterRoutes(r)
+	localAISettingsHandler := handler.NewLocalAISettingsHandler(chatSvc, cfg.AI.LocalAIBaseURL)
+	localAISettingsHandler.RegisterRoutes(r)
 
 	haveAChatSessionRepo := repository.NewHaveAChatSessionRepo(pool)
 	haveAChatHandler := handler.NewHaveAChatHandler(chatSvc, sessionMasterStore, haveAChatSessionRepo)

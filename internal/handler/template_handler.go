@@ -127,11 +127,17 @@ func (h *TemplateHandler) GetLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	showLoginAdvanced := h.deploymentNatureLocal || loginHostShowsAdvancedPanel(r.Host)
-	content = renderJinja(content, map[string]string{}, map[string]string{
+	loginExtras := map[string]string{
 		"has_registered_user": fmt.Sprintf("%t", hasRegisteredUser),
 		"has_visitor_keys":    fmt.Sprintf("%t", hasVisitorKeys),
 		"show_login_advanced": fmt.Sprintf("%t", showLoginAdvanced),
-	})
+	}
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "local-ai-setup.js")); err == nil {
+		loginExtras["static_local_ai_setup_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		loginExtras["static_local_ai_setup_js_cache_bust"] = "0"
+	}
+	content = renderJinja(content, map[string]string{}, loginExtras)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(content))
 }
@@ -182,6 +188,11 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 		extras["static_modals_settings_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
 	} else {
 		extras["static_modals_settings_js_cache_bust"] = "0"
+	}
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "local-ai-setup.js")); err == nil {
+		extras["static_local_ai_setup_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		extras["static_local_ai_setup_js_cache_bust"] = "0"
 	}
 	// Bust cache for modals-comms.js (Locations map, SMS, etc.).
 	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "modals-comms.js")); err == nil {

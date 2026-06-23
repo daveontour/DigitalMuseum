@@ -125,7 +125,7 @@ const HaveAChat = (() => {
             const res = await fetch('/chat/availability', { credentials: 'same-origin' });
             if (!res.ok) return { localai: false };
             const av = await res.json();
-            return { localai: !!av.localai_available };
+            return { localai: !!(av.localai_available && av.localai_use_enabled !== false) };
         } catch (_) {
             return { localai: false };
         }

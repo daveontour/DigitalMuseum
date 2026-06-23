@@ -102,7 +102,8 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 | `OPENAI_MODEL_NAME` | No | Default: `gpt-4.1-mini` |
 | `GEMINI_API_KEY` | At least one AI key | Gemini API |
 | `GEMINI_MODEL_NAME` | No | Default: `gemini-2.5-flash` |
-| `LOCALAI_BASE_URL` | No | Ollama base URL, e.g. `http://localhost:11434` |
+| `LOCALAI_BASE_URL` | No | Ollama chat base URL, e.g. `http://localhost:11434` |
+| `LOCALAI_EMBEDDING_BASE_URL` | No | Ollama embedding base URL (default `http://127.0.0.1:11435`); separate daemon from chat |
 | `LOCALAI_MODEL_NAME` | No | Default: `local-model` (use `gemma4` for Ollama) |
 | `LOCALAI_API_KEY` | No | Not required by Ollama; kept for compatibility |
 | `LOCALAI_EMBEDDING_MODEL` | No | Falls back to `LOCALAI_MODEL_NAME` if empty |
@@ -212,21 +213,34 @@ server (via the `select-db` IPC channel). The Electron `get-profiles` / `create-
 `internal/ai/localai.go` implements `ChatProvider` using the **native Ollama API**:
 
 - Chat: `POST {LOCALAI_BASE_URL}/api/chat` with `stream: false`
-- Embeddings: `POST {LOCALAI_BASE_URL}/api/embed`
+- Embeddings: `POST {LOCALAI_EMBEDDING_BASE_URL}/api/embed` (separate Ollama daemon; default port 11435)
 - Tool arguments arrive as `map[string]any` (not a JSON string — unlike OpenAI compat)
 - Token counts read from `prompt_eval_count` / `eval_count` (not `usage.prompt_tokens`)
 - No `Authorization` header required
 - Model options (temperature, num_ctx) sent under `"options"` key
 
+**Dual Ollama servers (Electron desktop):**
+
+Digital Museum runs **two** Ollama `serve` processes when using the bundled desktop app:
+
+| Daemon | Env URL | Default port | Model | Notes |
+|--------|---------|--------------|-------|-------|
+| Chat | `LOCALAI_BASE_URL` | 11434 | `LOCALAI_MODEL_NAME` (UI-selectable) | `OLLAMA_NUM_CTX=32768`; `CUDA_VISIBLE_DEVICES=-1` when CPU-only checkbox is set |
+| Embedding | `LOCALAI_EMBEDDING_BASE_URL` | 11435 | `LOCALAI_EMBEDDING_MODEL` | GPU allowed; no `CUDA_VISIBLE_DEVICES` override from the UI |
+
+Both daemons are started with `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_MAX_LOADED_MODELS=1`, and preload their configured model at startup (`POST /api/generate` for chat, `POST /api/embed` for embedding). Apply in **AI & Setup** restarts both servers.
+
 **Context size (`num_ctx`):**
 
-- The Ollama daemon spawned by Electron is started with `OLLAMA_NUM_CTX=32768` (configured in
-  the `start-ollama` IPC handler in `electron/main.js`). This becomes the **server-side default**
-  for any request that omits `num_ctx`.
-- The Go provider also sends `num_ctx` per-request when `LOCALAI_NUM_CTX` is set to a positive
-  integer. When unset / 0, the field is omitted and Ollama applies the server-side default.
-- Note: the env-var default only applies to the daemon Electron starts. If users connect to a
-  pre-existing Ollama daemon they started themselves, that daemon's own configuration wins.
+- The **chat** Ollama daemon spawned by Electron is started with `OLLAMA_NUM_CTX=32768`. The embedding daemon does not set `OLLAMA_NUM_CTX`.
+- The Go provider also sends `num_ctx` per-request when `LOCALAI_NUM_CTX` is set to a positive integer. When unset / 0, the field is omitted and Ollama applies its server-side default.
+- Note: the env-var default only applies to the daemon Electron starts. If users connect to a pre-existing Ollama daemon they started themselves, that daemon's own configuration wins.
+
+**Local AI status API and chat toggle:**
+
+- `GET /api/local-ai/status` — auth-exempt; probes chat and embedding Ollama URLs separately for reachability and configured models. Works on the login page before sign-in (infrastructure fields only). When authenticated, also returns `use_enabled_for_chat` and `chat_available`. Includes `embedding_base_url`, `embedding_server_reachable`, and `embedding_server_error`.
+- Per-archive **`local_ai_use_enabled_v1`** in `app_configuration` (via `POST /api/configuration`) controls whether Local AI appears in provider menus and Auto routing; default enabled when unset. See `internal/service/local_ai_use.go`.
+- Configuration → **AI & Setup** and the login **Local AI Setup** panel use [`static/js/museum/local-ai-setup.js`](static/js/museum/local-ai-setup.js) and the status API. Browser mode shows server Ollama status; Electron additionally offers start/download via IPC.
 
 ## DeepSeek Provider
 

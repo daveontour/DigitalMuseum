@@ -64,8 +64,8 @@ func (s *ChatService) GenerateHaveAChatTurn(
 			providerName = "openai"
 		}
 	} else if speakingProviderKey == "localai" {
-		lp := s.effectiveLocalAIProvider()
-		if lp != nil && lp.IsAvailable() {
+		lp := s.localAIProviderForChat(ctx)
+		if lp != nil {
 			provider = lp
 			providerName = "localai"
 		}

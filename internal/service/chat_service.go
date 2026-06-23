@@ -14,6 +14,7 @@ import (
 
 	appai "github.com/daveontour/aimuseum/internal/ai"
 	"github.com/daveontour/aimuseum/internal/appctx"
+	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/keystore"
 	"github.com/daveontour/aimuseum/internal/model"
 	"github.com/daveontour/aimuseum/internal/repository"
@@ -81,9 +82,11 @@ type ChatService struct {
 	defaultOpenAIKey     string
 	defaultOpenAIModel   string
 	defaultTavilyKey     string
-	defaultLocalAIURL    string
-	defaultLocalAIKey    string
+	defaultLocalAIURL           string
+	defaultLocalAIEmbeddingURL  string
+	defaultLocalAIKey           string
 	defaultLocalAIModel  string
+	defaultLocalAIEmbeddingModel string
 	defaultLocalAINumCtx int
 	pythonStaticDir      string
 	pepper               string
@@ -92,6 +95,7 @@ type ChatService struct {
 	billing              *repository.BillingRepo
 	dashSvc              *DashboardService
 	configRepo           *repository.ConfigRepo
+	localAIProbeCache    sync.Map
 	archiveInventoryCache sync.Map
 }
 
@@ -107,7 +111,7 @@ func NewChatService(
 	userRepo *repository.UserRepo,
 	defaultGeminiKey, defaultGeminiModel, defaultAnthropicKey, defaultClaudeModel string,
 	defaultDeepSeekKey, defaultDeepSeekModel, defaultOpenAIKey, defaultOpenAIModel, defaultTavilyKey string,
-	defaultLocalAIURL, defaultLocalAIKey, defaultLocalAIModel string,
+	defaultLocalAIURL, defaultLocalAIEmbeddingURL, defaultLocalAIKey, defaultLocalAIModel, defaultLocalAIEmbeddingModel string,
 	defaultLocalAINumCtx int,
 	pythonStaticDir string,
 	pepper string,
@@ -134,9 +138,11 @@ func NewChatService(
 		defaultOpenAIKey:     defaultOpenAIKey,
 		defaultOpenAIModel:   defaultOpenAIModel,
 		defaultTavilyKey:     defaultTavilyKey,
-		defaultLocalAIURL:    defaultLocalAIURL,
-		defaultLocalAIKey:    defaultLocalAIKey,
+		defaultLocalAIURL:           defaultLocalAIURL,
+		defaultLocalAIEmbeddingURL:  defaultLocalAIEmbeddingURL,
+		defaultLocalAIKey:           defaultLocalAIKey,
 		defaultLocalAIModel:  defaultLocalAIModel,
+		defaultLocalAIEmbeddingModel: defaultLocalAIEmbeddingModel,
 		defaultLocalAINumCtx: defaultLocalAINumCtx,
 		pythonStaticDir:      pythonStaticDir,
 		pepper:               pepper,
@@ -366,16 +372,36 @@ func (s *ChatService) effectiveOpenAIProvider(ctx context.Context, r *http.Reque
 	return appai.NewOpenAIProvider(k, m)
 }
 
+// effectiveLocalAIChatModel returns the hot-reloadable chat model (runtime overrides startup default).
+func (s *ChatService) effectiveLocalAIChatModel() string {
+	if m := strings.TrimSpace(config.LocalAIRuntimeStore().ChatModel()); m != "" {
+		return m
+	}
+	return s.defaultLocalAIModel
+}
+
+// LocalAIBaseURL returns the configured Ollama chat base URL.
+func (s *ChatService) LocalAIBaseURL() string {
+	return strings.TrimSpace(s.defaultLocalAIURL)
+}
+
+// LocalAIEmbeddingBaseURL returns the configured Ollama embedding base URL.
+func (s *ChatService) LocalAIEmbeddingBaseURL() string {
+	return strings.TrimSpace(s.defaultLocalAIEmbeddingURL)
+}
+
 // effectiveLocalAIProvider returns a LocalAIProvider using the server-level config.
 // LocalAI does not support per-user API key overrides — it always uses the server default.
 func (s *ChatService) effectiveLocalAIProvider() appai.ChatProvider {
-	return appai.NewLocalAIProvider(s.defaultLocalAIURL, s.defaultLocalAIKey, s.defaultLocalAIModel, s.defaultLocalAINumCtx)
+	return appai.NewLocalAIProvider(s.defaultLocalAIURL, s.defaultLocalAIKey, s.effectiveLocalAIChatModel(), s.defaultLocalAINumCtx)
 }
 
-// LocalAIAvailable reports whether the LocalAI provider is configured.
-func (s *ChatService) LocalAIAvailable() bool {
-	p := s.effectiveLocalAIProvider()
-	return p != nil && p.IsAvailable()
+// LocalAIAvailable reports whether Local AI can be used for chat (enabled by user and infrastructure up).
+func (s *ChatService) LocalAIAvailable(ctx context.Context) bool {
+	if !s.LocalAIUseEnabled(ctx) {
+		return false
+	}
+	return s.LocalAIInfrastructureAvailable(ctx)
 }
 
 func (s *ChatService) perRequestGetRAM(r *http.Request) appai.RAMMasterGetter {
@@ -607,7 +633,7 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	case "openai":
 		provider = s.effectiveOpenAIProvider(ctx, r, "")
 	case "localai":
-		provider = s.effectiveLocalAIProvider()
+		provider = s.localAIProviderForChat(ctx)
 	default:
 		providerName = "gemini"
 		provider = s.effectiveGeminiProvider(ctx, r, "")
@@ -618,6 +644,11 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 		s.applyUsageKeySourceToLLMUsage(ctx, r, "", stub)
 		RecordLLMUsage(ctx, s.billing, s.userRepo, stub, err)
 		return nil, err
+	}
+
+	// Request Only: bypass system prompt, history, and tools entirely — send just the raw prompt.
+	if req.RequestOnly {
+		return s.generateRequestOnlyResponse(ctx, r, req, provider, providerName)
 	}
 
 	voice := "expert"
@@ -784,6 +815,55 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	}, nil
 }
 
+// generateRequestOnlyResponse sends just the raw prompt to the provider — no system prompt,
+// no conversation history, and no tools. Used when the client sets request_only on the chat request.
+func (s *ChatService) generateRequestOnlyResponse(ctx context.Context, r *http.Request, req model.ChatRequest, provider appai.ChatProvider, providerName string) (*model.ChatResponse, error) {
+	voice := "expert"
+	if req.Voice != nil && *req.Voice != "" {
+		voice = *req.Voice
+	}
+	genReq := appai.GenerateRequest{UserInput: req.Prompt}
+	noTools := []map[string]any{}
+	result, err := provider.GenerateResponse(ctx, genReq, "", nil, nil, &noTools)
+	if err != nil {
+		stub := result.Usage
+		if stub == nil {
+			stub = StubLLMUsage(providerName, "")
+		}
+		s.applyUsageKeySourceToLLMUsage(ctx, r, "", stub)
+		RecordLLMUsage(ctx, s.billing, s.userRepo, stub, err)
+		return nil, err
+	}
+	s.applyUsageKeySourceToLLMUsage(ctx, r, "", result.Usage)
+	RecordLLMUsage(ctx, s.billing, s.userRepo, result.Usage, nil)
+
+	if req.ConversationID != nil {
+		_ = s.chatRepo.SaveTurn(ctx, *req.ConversationID, req.Prompt, result.PlainText, voice, 0)
+	}
+
+	var embeddedJSON map[string]any
+	if err := json.Unmarshal([]byte(result.MetadataJSON), &embeddedJSON); err == nil {
+		embeddedJSON["temperature"] = 0
+		embeddedJSON["prompt"] = req.Prompt
+		embeddedJSON["voice"] = voice
+		embeddedJSON["response_text"] = result.PlainText
+		embeddedJSON["request_only"] = true
+		if arr, ok := embeddedJSON["embedded_json"].([]any); ok && len(arr) > 0 {
+			if first, ok := arr[0].(map[string]any); ok {
+				for k, v := range first {
+					embeddedJSON[k] = v
+				}
+			}
+			delete(embeddedJSON, "embedded_json")
+		}
+	}
+	return &model.ChatResponse{
+		Response:     result.PlainText,
+		Voice:        voice,
+		EmbeddedJSON: embeddedJSON,
+	}, nil
+}
+
 func formatInactivityDuration(seconds int) string {
 	if seconds < 60 {
 		return fmt.Sprintf("%d seconds", seconds)
@@ -815,7 +895,7 @@ func (s *ChatService) GenerateRandomQuestion(ctx context.Context, r *http.Reques
 	case "openai":
 		provider = s.effectiveOpenAIProvider(ctx, r, "")
 	case "localai":
-		provider = s.effectiveLocalAIProvider()
+		provider = s.localAIProviderForChat(ctx)
 	default:
 		providerName = "gemini"
 		provider = s.effectiveGeminiProvider(ctx, r, "")
@@ -1150,7 +1230,7 @@ func (s *ChatService) ExtractIdentityProfile(ctx context.Context, r *http.Reques
 	case tryProvider("gemini", s.effectiveGeminiProvider(ctx, r, "")):
 	case tryProvider("deepseek", s.effectiveDeepSeekProvider(ctx, r, "")):
 	case tryProvider("openai", s.effectiveOpenAIProvider(ctx, r, "")):
-	case tryProvider("localai", s.effectiveLocalAIProvider()):
+	case tryProvider("localai", s.localAIProviderForChat(ctx)):
 	default:
 		return make(map[string]any), fmt.Errorf("no AI provider available for extraction")
 	}
@@ -1288,7 +1368,7 @@ func (s *ChatService) GenerateCompleteProfile(ctx context.Context, name string, 
 	claudeP := s.effectiveClaudeProvider(ctx, nil, authSessionID)
 	deepseekP := s.effectiveDeepSeekProvider(ctx, nil, authSessionID)
 	geminiP := s.effectiveGeminiProvider(ctx, nil, authSessionID)
-	localaiP := s.effectiveLocalAIProvider()
+	localaiP := s.localAIProviderForChat(ctx)
 	openaiP := s.effectiveOpenAIProvider(ctx, nil, authSessionID)
 	if provider == "openai" && (openaiP == nil || !openaiP.IsAvailable()) {
 		provider = "gemini"

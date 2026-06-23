@@ -257,35 +257,39 @@
 
         <!-- AI & Setup panel -->
         <div id="panel-advanced" style="display:none; margin-bottom:16px; padding:14px; background:#0d1117; border:1px solid #3d5278; border-radius:8px;">
-            <div id="adv-no-electron-msg" style="display:none; color:#8fa4c8; font-size:0.82rem;">
-                Advanced setup is only available in the Digital Museum desktop app.
+            <div id="adv-no-electron-msg" hidden style="color:#8fa4c8; font-size:0.82rem; margin-bottom:10px;">
+                Status reflects the Ollama instance configured on the server (<code>LOCALAI_BASE_URL</code>).
+                Model download and Ollama startup require the Digital Museum desktop app.
             </div>
             <!-- Local AI -->
             <div id="adv-ollama-block">
                 <div style="color:#cdd6e8; font-size:0.88rem; font-weight:600; margin-bottom:4px;">Local AI</div>
                 <div style="color:#8fa4c8; font-size:0.82rem; margin-bottom:10px;">
-                    Runs privately on your computer. The app starts the Ollama server when you open Digital Museum. The Ollama server makes the Local AI available to the app.
-                    Downloads of the required models may take several minutes.
+                    Local AI runs via Ollama at the address configured on the server. In the desktop app, Digital Museum can start Ollama and download models on this computer.
                 </div>
                 <div id="adv-local-ai-rows" style="margin-top:4px;">
                     <div class="adv-status-row">
-                        <span class="adv-status-label">Ollama server</span>
+                        <span class="adv-status-label">Chat Ollama server</span>
                         <span id="adv-ollama-server-value" class="adv-status-value" style="color:#6b7c99;">…</span>
+                    </div>
+                    <div class="adv-status-row">
+                        <span class="adv-status-label">Embedding Ollama server</span>
+                        <span id="adv-ollama-embed-server-value" class="adv-status-value" style="color:#6b7c99;">…</span>
                     </div>
                     <div class="adv-status-row">
                         <span class="adv-status-label">Chat and Image Classification (gemma4)</span>
                         <span id="adv-model-gemma-value" class="adv-status-value" style="color:#6b7c99;">—</span>
                     </div>
                     <div class="adv-status-row">
-                        <span class="adv-status-label">Vectorisation for Similarity Searches (embeddingemma)</span>
+                        <span class="adv-status-label">Embedding model</span>
                         <span id="adv-model-embed-value" class="adv-status-value" style="color:#6b7c99;">—</span>
                     </div>
                 </div>
-                <button type="button" id="adv-download-models-btn" class="adv-btn adv-btn-primary adv-btn-sm" style="margin-top:12px;display:none;white-space:nowrap;">
+                <button type="button" id="adv-download-models-btn" class="adv-btn adv-btn-primary adv-btn-sm" data-local-ai-electron-only style="margin-top:12px;display:none;white-space:nowrap;">
                     <i class="fas fa-download" style="margin-right:5px;"></i>Download required models
                 </button>
                 <div id="adv-ollama-msg" style="display:none; font-size:0.82rem; margin-top:8px; padding:6px 8px; border-radius:4px; color:#8fa4c8;"></div>
-                <div id="adv-ollama-progress-bar-wrap">
+                <div id="adv-ollama-progress-bar-wrap" data-local-ai-electron-only style="display:none;">
                     <progress id="adv-ollama-progress-bar" value="0" max="100"></progress>
                     <div id="adv-ollama-progress-label">
                         <span id="adv-ollama-progress-status">Preparing…</span>
@@ -442,6 +446,7 @@
         </div>
     </div><!-- .login-card -->
 
+    <script src="/static/js/museum/local-ai-setup.js?v={{ static_local_ai_setup_js_cache_bust }}"></script>
     <script>
         const HAS_REGISTERED_USER = {{ has_registered_user }};
         const HAS_VISITOR_KEYS    = {{ has_visitor_keys }};
@@ -515,7 +520,7 @@
 
                 const startRes = await window.electronAPI.startOllama();
                 const check = await window.electronAPI.checkOllamaModel();
-                const hasIssue = !startRes?.ok || !check?.ok || !check?.hasGemma4 || !check?.hasEmbeddingModel;
+                const hasIssue = !startRes?.ok || !check?.ok || !check?.hasChatModel || !check?.hasEmbeddingModel;
                 if (!hasIssue) return true;
 
                 if (window.electronAPI.confirmContinueWithoutAI) {
@@ -1016,15 +1021,18 @@
             const loginCard   = document.querySelector('.login-card');
             const noElectronMsg = document.getElementById('adv-no-electron-msg');
             const ollamaBlock = document.getElementById('adv-ollama-block');
-            let refreshLocalAiStatus;
             let lastPrimaryTab = 'login';
-            if (!hasElectron && !SHOW_LOGIN_ADVANCED) { advBtn.style.display = 'none'; return; }
+            if (!SHOW_LOGIN_ADVANCED) { advBtn.style.display = 'none'; return; }
 
-            function syncAiSetupTriggerAlert(startRes, check) {
-                const serverBad = !startRes || !startRes.ok;
-                const modelsBad = !check || !check.ok || !check.hasGemma4 || !check.hasEmbeddingModel;
-                const bad = serverBad || modelsBad;
-                advBtn.classList.toggle('advanced-btn-needs-attention', bad);
+            if (typeof LocalAiSetup !== 'undefined' && LocalAiSetup.wireLoginDownloadButton) {
+                LocalAiSetup.wireLoginDownloadButton();
+            }
+
+            function syncAiSetupTriggerAlertFromStatus() {
+                const bad = typeof LocalAiSetup !== 'undefined'
+                    && LocalAiSetup.loginStatusNeedsAttention
+                    && LocalAiSetup.loginStatusNeedsAttention();
+                advBtn.classList.toggle('advanced-btn-needs-attention', !!bad);
                 advBtn.classList.toggle('advanced-btn-ready', !bad);
                 advBtn.title = bad
                     ? 'Local AI needs attention — open for server status and model downloads'
@@ -1032,11 +1040,20 @@
             }
 
             function hideLoginFields(hidden) {
-                // When advanced is open, collapse all tab panels
                 ['panel-login','panel-register','panel-visitor'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.style.display = hidden ? 'none' : '';
                 });
+            }
+
+            async function refreshLocalAiStatus() {
+                if (typeof LocalAiSetup === 'undefined' || !LocalAiSetup.refreshLoginAdvanced) return null;
+                const status = await LocalAiSetup.refreshLoginAdvanced();
+                syncAiSetupTriggerAlertFromStatus();
+                if (status && status.infrastructure_available && typeof setStep === 'function') {
+                    setStep(3);
+                }
+                return status;
             }
 
             async function openSetupPanel() {
@@ -1054,14 +1071,9 @@
                 loginCard.style.maxWidth = '840px';
                 statusEl.style.display = 'none';
 
-                if (!hasElectron) {
-                    if (ollamaBlock) ollamaBlock.style.display = 'none';
-                    if (noElectronMsg) noElectronMsg.style.display = 'block';
-                    return;
-                }
-                if (noElectronMsg) noElectronMsg.style.display = 'none';
+                if (noElectronMsg) noElectronMsg.hidden = !!hasElectron;
                 if (ollamaBlock) ollamaBlock.style.display = '';
-                if (typeof refreshLocalAiStatus === 'function') await refreshLocalAiStatus();
+                await refreshLocalAiStatus();
             }
 
             window.openSetupPanel = openSetupPanel;
@@ -1083,109 +1095,9 @@
                 await openSetupPanel();
             });
 
-            // ── Local AI ──────────────────────────────────────────────────────
-            const ollamaMsg       = document.getElementById('adv-ollama-msg');
-            const progressWrap    = document.getElementById('adv-ollama-progress-bar-wrap');
-            const progressBar     = document.getElementById('adv-ollama-progress-bar');
-            const progressStatus  = document.getElementById('adv-ollama-progress-status');
-            const progressSize    = document.getElementById('adv-ollama-progress-size');
-            const downloadModelsBtn = document.getElementById('adv-download-models-btn');
-            const serverValueEl = document.getElementById('adv-ollama-server-value');
-            const gemmaValueEl  = document.getElementById('adv-model-gemma-value');
-            const embedValueEl  = document.getElementById('adv-model-embed-value');
-
-            function ollamaSetMsg(text, color) {
-                ollamaMsg.textContent = text;
-                ollamaMsg.style.color = color || '#8fa4c8';
-                ollamaMsg.style.display = text ? 'block' : 'none';
-            }
-
-            if (hasElectron) {
-                window.electronAPI.onOllamaPullProgress((evt) => {
-                    const label = evt.model ? evt.model + ': ' : '';
-                    if (evt.type === 'progress') {
-                        progressWrap.style.display = 'block';
-                        progressBar.value = evt.percent;
-                        progressStatus.textContent = label + (evt.status || 'Downloading…');
-                        progressSize.textContent   = evt.downloaded + ' / ' + evt.total;
-                    } else if (evt.type === 'status') {
-                        progressWrap.style.display = 'block';
-                        progressBar.value = 0;
-                        progressStatus.textContent = evt.status;
-                        progressSize.textContent   = '';
-                    } else if (evt.type === 'done') {
-                        progressBar.value = 100;
-                        progressStatus.textContent = 'All models downloaded';
-                        progressSize.textContent   = '';
-                    }
-                });
-
-                refreshLocalAiStatus = async function refreshLocalAiStatus() {
-                    ollamaMsg.style.display = 'none';
-                    serverValueEl.textContent = 'Checking…';
-                    serverValueEl.style.color = '#8fa4c8';
-                    gemmaValueEl.textContent = '…';
-                    gemmaValueEl.style.color = '#8fa4c8';
-                    embedValueEl.textContent = '…';
-                    embedValueEl.style.color = '#8fa4c8';
-                    downloadModelsBtn.style.display = 'none';
-
-                    const startRes = await window.electronAPI.startOllama();
-                    if (startRes.ok) {
-                        serverValueEl.textContent = 'Running';
-                        serverValueEl.style.color = '#4ade80';
-                    } else {
-                        serverValueEl.textContent = 'Not running';
-                        serverValueEl.style.color = '#f87171';
-                        ollamaSetMsg('Ollama: ' + (startRes.error || 'failed to start'), '#f87171');
-                    }
-
-                    const check = await window.electronAPI.checkOllamaModel();
-                    if (!check.ok) {
-                        gemmaValueEl.textContent = '—';
-                        embedValueEl.textContent = '—';
-                        ollamaSetMsg(check.error, '#f87171');
-                        syncAiSetupTriggerAlert(startRes, check);
-                        return;
-                    }
-
-                    gemmaValueEl.textContent = check.hasGemma4 ? 'Available' : 'Not installed';
-                    gemmaValueEl.style.color = check.hasGemma4 ? '#4ade80' : '#fbbf24';
-                    embedValueEl.textContent = check.hasEmbeddingModel ? 'Available' : 'Not installed';
-                    embedValueEl.style.color = check.hasEmbeddingModel ? '#4ade80' : '#fbbf24';
-
-                    const needDownload = !check.hasGemma4 || !check.hasEmbeddingModel;
-                    downloadModelsBtn.style.display = needDownload ? 'inline-flex' : 'none';
-
-                    syncAiSetupTriggerAlert(startRes, check);
-                    if (check.hasModel && startRes.ok) setStep(3);
-                };
-
-                downloadModelsBtn.addEventListener('click', async () => {
-                    downloadModelsBtn.disabled = true;
-                    progressWrap.style.display = 'block';
-                    progressBar.value = 0;
-                    progressStatus.textContent = 'Preparing…';
-                    progressSize.textContent = '';
-                    ollamaSetMsg('Downloading AI models — this may take several minutes…', '#8fa4c8');
-                    const res = await window.electronAPI.pullOllamaModel();
-                    progressWrap.style.display = 'none';
-                    downloadModelsBtn.disabled = false;
-                    if (!res.ok) {
-                        ollamaSetMsg('Download failed: ' + (res.error || 'unknown'), '#f87171');
-                        await refreshLocalAiStatus();
-                        return;
-                    }
-                    ollamaSetMsg('Models installed.', '#4ade80');
-                    await refreshLocalAiStatus();
-                });
-            }
-
-            // First-run: open Local AI Setup only if something needs attention. If Local AI is all OK, stay on Sign In.
             (async function() {
-                if (!hasElectron) return;
                 await refreshLocalAiStatus();
-                if (!HAS_REGISTERED_USER && !advBtn.classList.contains('advanced-btn-ready')) {
+                if (!HAS_REGISTERED_USER && advBtn.classList.contains('advanced-btn-needs-attention')) {
                     await openSetupPanel();
                 }
             })();

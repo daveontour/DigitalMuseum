@@ -38,6 +38,7 @@ var exemptExact = map[string]bool{
 	"/login":                         true,
 	"/profiles":                      true,
 	"/api/resolved-main-sqlite-path": true,
+	"/api/local-ai/status":           true,
 }
 
 // NewAuthMiddleware returns a middleware that authenticates every request via
@@ -49,6 +50,7 @@ var exemptExact = map[string]bool{
 //   - GET /health
 //   - GET /favicon.ico
 //   - GET /static/*
+//   - GET /api/local-ai/status
 //   - POST /auth/login
 //   - POST /auth/register
 //   - Paths under /share/, /s/, /visitor/, /admin (see isExempt)

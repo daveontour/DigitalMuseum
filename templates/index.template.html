@@ -346,6 +346,11 @@
                         Last request: <span id="chat-context-last-in">—</span> in / <span id="chat-context-last-out">—</span> out tokens
                         · <span id="chat-context-last-toolcalls-seg" class="chat-context-status-clickable" role="button" tabindex="0" title="View tool call log for last request"><span id="chat-context-last-toolcalls">—</span> tool calls</span>
                     </span>
+                    <span class="chat-context-status-sep" id="chat-request-only-sep" aria-hidden="true" style="display:none">|</span>
+                    <label class="chat-context-status-seg chat-context-request-only-seg" id="chat-request-only-label" for="chat-request-only-checkbox" style="display:none" title="When checked, Send submits only the text in the input box — no system prompt, history, or tools are sent to the LLM">
+                        <input type="checkbox" id="chat-request-only-checkbox">
+                        Request Only
+                    </label>
                 </span>
             </div>
             </div><!-- /.chat-main-bottom-stack -->
@@ -756,7 +761,7 @@
                             <i class="fas fa-plug"></i> API Keys
                         </button>
                         <button id="config-tab-btn-ai-setup-config" type="button" class="config-tab-button" data-tab="ai-setup-config">
-                            <i class="fas fa-microchip"></i> AI &amp; Setup
+                            <i class="fas fa-microchip"></i> Local AI Setup
                         </button>
                         <button id="config-tab-btn-hosted-llm-order" type="button" class="config-tab-button" data-tab="hosted-llm-order">
                             <i class="fas fa-sort-amount-down"></i> Hosted LLM Order
@@ -801,6 +806,12 @@
                             <label for="message-font-size">Message Font Size</label>
                             <input type="range" id="message-font-size" min="12" max="24" value="16">
                             <span class="value-display">16px</span>
+                        </div>
+                        <div class="setting-group">
+                            <label title="Shows a &quot;Request Only&quot; checkbox in the chat status bar; when checked, Send submits only the prompt text with no system prompt, history, or tools">
+                                <input type="checkbox" id="show-request-only-checkbox">
+                                Show &quot;Request Only&quot; toggle in chat status bar
+                            </label>
                         </div>
                     </section>
                     <section class="config-section">
@@ -1018,40 +1029,76 @@
                 </div>
                 <div class="config-tab-content" id="ai-setup-config-tab">
                     <section class="section-config">
-                        <h1>AI &amp; Setup</h1>
-                        <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body);">
-                            Check Local AI (Ollama) status and download required models for chat, image classification, and similarity search on this computer.
+                        <h1>Local AI Setup</h1>
+                        <p id="ai-setup-config-intro" class="config-tab-lead" style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body); max-width: none;">
+                            Check Local AI (Ollama) status on the server and control whether Local AI appears in chat provider menus.
                         </p>
                     </section>
                     <section class="config-section local-ai-setup-panel" id="ai-setup-config-root">
                         <div class="local-ai-setup-no-electron" data-local-ai-no-electron hidden>
-                            Advanced setup is only available in the Digital Museum desktop app.
+                            Status reflects the Ollama instance configured on the server (<code>LOCALAI_BASE_URL</code>).
+                            Model download and Ollama startup require the Digital Museum desktop app.
                         </div>
                         <div class="local-ai-setup-ollama-block" data-local-ai-ollama-block>
                             <h3 class="local-ai-setup-heading">Local AI</h3>
-                            <p class="local-ai-setup-lead">
-                                Runs privately on your computer. The app starts the Ollama server when you open Digital Museum. The Ollama server makes the Local AI available to the app.
-                                Downloads of the required models may take several minutes.
+                            <p class="local-ai-setup-lead" data-local-ai-lead>
+                                Local AI runs via Ollama at the address configured on the server. In the desktop app, Digital Museum can start Ollama and download models on this computer.
                             </p>
+                            <div class="local-ai-setup-use-toggle setting-group">
+                                <label class="local-ai-setup-use-label" for="local-ai-use-enabled-checkbox">
+                                    <input type="checkbox" id="local-ai-use-enabled-checkbox" checked>
+                                    <span>Use Local AI for chat and related features</span>
+                                </label>
+                                <p class="local-ai-setup-use-hint">
+                                    When unchecked, Local AI is hidden from provider menus and Auto routing will not use it, even when Ollama is running. Similarity search embeddings are not affected.
+                                </p>
+                                <span id="local-ai-use-enabled-status" class="local-ai-setup-use-status" role="status" aria-live="polite"></span>
+                            </div>
+                            <div class="local-ai-setup-model-settings setting-group">
+                                <label for="local-ai-chat-model-select">Chat model</label>
+                                <select id="local-ai-chat-model-select" class="form-control" aria-describedby="local-ai-chat-model-hint">
+                                    <option value="">Loading models…</option>
+                                </select>
+                                <p id="local-ai-chat-model-hint" class="local-ai-setup-use-hint">
+                                    Used for chat, Auto routing classifier, and image classification. Embedding model stays configured via <code>LOCALAI_EMBEDDING_MODEL</code> in .env.
+                                </p>
+                                <label class="local-ai-setup-use-label" for="local-ai-cuda-cpu-only-checkbox">
+                                    <input type="checkbox" id="local-ai-cuda-cpu-only-checkbox">
+                                    <span>Force CPU-only for Ollama (<code>CUDA_VISIBLE_DEVICES=-1</code>)</span>
+                                </label>
+                                <p class="local-ai-setup-use-hint">
+                                    When enabled, the chat Ollama server runs without GPU access. Requires Apply to restart both servers.
+                                </p>
+                                <div class="local-ai-setup-apply-row">
+                                    <button id="local-ai-settings-apply-btn" type="button" class="modal-btn modal-btn-primary" disabled>
+                                        Apply
+                                    </button>
+                                    <span id="local-ai-settings-apply-status" class="local-ai-setup-use-status" role="status" aria-live="polite"></span>
+                                </div>
+                            </div>
                             <div class="local-ai-setup-status-rows">
                                 <div class="local-ai-setup-status-row">
-                                    <span class="local-ai-setup-status-label">Ollama server</span>
+                                    <span class="local-ai-setup-status-label">Chat Ollama server</span>
                                     <span class="local-ai-setup-status-value" data-local-ai-server-value>…</span>
                                 </div>
                                 <div class="local-ai-setup-status-row">
-                                    <span class="local-ai-setup-status-label">Chat and Image Classification (gemma4)</span>
+                                    <span class="local-ai-setup-status-label">Embedding Ollama server</span>
+                                    <span class="local-ai-setup-status-value" data-local-ai-embed-server-value>…</span>
+                                </div>
+                                <div class="local-ai-setup-status-row">
+                                    <span class="local-ai-setup-status-label" data-local-ai-chat-label>Chat model</span>
                                     <span class="local-ai-setup-status-value" data-local-ai-gemma-value>—</span>
                                 </div>
                                 <div class="local-ai-setup-status-row">
-                                    <span class="local-ai-setup-status-label">Vectorisation for Similarity Searches (embeddinggemma)</span>
+                                    <span class="local-ai-setup-status-label" data-local-ai-embed-label>Embedding model</span>
                                     <span class="local-ai-setup-status-value" data-local-ai-embed-value>—</span>
                                 </div>
                             </div>
-                            <button id="local-ai-setup-download-btn" type="button" class="modal-btn modal-btn-primary local-ai-setup-download-btn" data-local-ai-download style="display:none;">
+                            <button id="local-ai-setup-download-btn" type="button" class="modal-btn modal-btn-primary local-ai-setup-download-btn" data-local-ai-download data-local-ai-electron-only style="display:none;">
                                 <i class="fas fa-download" aria-hidden="true"></i> Download required models
                             </button>
                             <div class="local-ai-setup-msg" data-local-ai-msg style="display:none;"></div>
-                            <div class="local-ai-setup-progress-wrap" data-local-ai-progress-wrap style="display:none;">
+                            <div class="local-ai-setup-progress-wrap" data-local-ai-progress-wrap data-local-ai-electron-only style="display:none;">
                                 <progress class="local-ai-setup-progress-bar" data-local-ai-progress-bar value="0" max="100"></progress>
                                 <div class="local-ai-setup-progress-label">
                                     <span data-local-ai-progress-status>Preparing…</span>
@@ -1072,39 +1119,47 @@
                         </p>
                     </section>
                     <section class="config-section">
-                        <h3>Request classification (Auto)</h3>
+                        <h3>Request Classification</h3>
                         <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
-                            When Auto is selected, this provider classifies each request as local or hosted before the main chat runs.
+                            When Auto is selected as the AI Provider, this provider classifies each request to deterimie if it can be handled by the Local AI or wheter it needs to be routed to the on of the hosted systems.
+                            It also determines whether user profile and context information is required to answer the request. This optimises cost saving by avoiding unnecessary use of the hosted systems.
                             If the chosen provider is unavailable, Local AI is used as a fallback when possible.
                         </p>
-                        <div class="setting-group">
-                            <label for="hosted-llm-classifier-provider">Classifier AI provider</label>
-                            <select id="hosted-llm-classifier-provider" class="form-control" aria-describedby="hosted-llm-classifier-provider-hint">
+                        <div class="setting-group hosted-llm-classifier-row">
+                            <label for="hosted-llm-classifier-provider">Classifier AI Provider:</label>
+                            <select id="hosted-llm-classifier-provider" class="form-control" aria-describedby="hosted-llm-classifier-provider-hint" style="width:200px;">
                                 <option value="localai">Local AI</option>
                                 <option value="gemini">Gemini</option>
                                 <option value="claude">Claude</option>
                                 <option value="deepseek">DeepSeek</option>
                                 <option value="openai">ChatGPT</option>
                             </select>
-                            <p id="hosted-llm-classifier-provider-hint" class="config-tab-lead" style="margin: 0.5rem 0 0 0; color: var(--color-text-muted);">
-                                Default: Local AI. Hosted classifiers use a single JSON prompt (no tools).
-                            </p>
                         </div>
                     </section>
-                    <section class="config-section">
-                        <h3>Auto routing (hosted)</h3>
+                    <div class="hosted-llm-order-panels-row">
+                    <section class="config-section hosted-llm-order-panel">
+                        <h3>Auto Routing Order of Hosted Providers</h3>
                         <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
                             After your last manually selected hosted provider (if available), try the providers below in this order.
                         </p>
                         <ol id="hosted-llm-auto-order-list" class="hosted-llm-order-list" aria-label="Auto routing provider order"></ol>
                     </section>
-                    <section class="config-section">
-                        <h3>Error failover</h3>
+                    <section class="config-section hosted-llm-order-panel">
+                        <h3>Error Failover Order of Hosted Providers</h3>
                         <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
                             When the selected hosted provider fails, try the remaining providers in this order.
                         </p>
+                        <div class="setting-group">
+                            <label for="hosted-llm-failover-enabled-checkbox" title="When unchecked, a hosted provider error is shown instead of trying other providers">
+                                <input type="checkbox" id="hosted-llm-failover-enabled-checkbox" checked>
+                                Enable error failover
+                            </label>
+                        </div>
                         <ol id="hosted-llm-failover-order-list" class="hosted-llm-order-list" aria-label="Failover provider order"></ol>
-                        <div class="setting-group" style="margin-top: 1rem;">
+                    </section>
+                    </div>
+                    <section class="config-section">
+                        <div class="setting-group" style="margin-top: 0;">
                             <button type="button" id="hosted-llm-order-save-btn" class="modal-btn modal-btn-primary">Save</button>
                             <button type="button" id="hosted-llm-order-reset-btn" class="modal-btn modal-btn-secondary" style="margin-left: 0.5rem;">Reset to default</button>
                             <span id="hosted-llm-order-status" class="config-tab-lead" style="margin-left: 1rem; color: var(--color-text-muted);"></span>
@@ -4719,7 +4774,7 @@
     <script src="/static/js/museum/modals-artefacts.js?v={{ static_modals_artefacts_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-sensitive.js" defer></script>
     <script src="/static/js/museum/modals-settings.js?v={{ static_modals_settings_js_cache_bust }}" defer></script>
-    <script src="/static/js/museum/local-ai-setup.js" defer></script>
+    <script src="/static/js/museum/local-ai-setup.js?v={{ static_local_ai_setup_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-regions.js" defer></script>
     <script src="/static/js/museum/modals-suggestions-config.js" defer></script>
     <script src="/static/js/museum/modals-guide-topics-config.js" defer></script>

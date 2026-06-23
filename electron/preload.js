@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkOllamaModel:    ()       => ipcRenderer.invoke('check-ollama-model'),
   pullOllamaModel:     ()       => ipcRenderer.invoke('pull-ollama-model'),
   startOllama:         ()       => ipcRenderer.invoke('start-ollama'),
+  restartOllama:       ()       => ipcRenderer.invoke('restart-ollama'),
   getAutoStartLocalAI: ()       => ipcRenderer.invoke('get-auto-start-local-ai'),
   setAutoStartLocalAI: (enabled)=> ipcRenderer.invoke('set-auto-start-local-ai', !!enabled),
   onOllamaPullProgress:(cb)     => ipcRenderer.on('ollama-pull-progress', (_e, msg) => cb(msg)),

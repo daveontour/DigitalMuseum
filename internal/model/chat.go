@@ -26,20 +26,21 @@ type ChatTurn struct {
 
 // ChatRequest is the JSON body for POST /chat/generate.
 type ChatRequest struct {
-	Prompt               string   `json:"prompt"`
-	Voice                *string  `json:"voice"`
-	Temperature          *float64 `json:"temperature"`
-	ConversationID       *int64   `json:"conversation_id"`
-	Mood                 *string  `json:"mood"`
-	CompanionMode        bool     `json:"companionMode"`
-	AllowExplicitContent bool     `json:"allowExplicitContent"`
-	EnableSnarkiness     bool     `json:"enableSnarkiness"`
-	Provider                 string  `json:"provider"` // gemini, claude, deepseek, openai, localai, or auto
-	LastManualHostedProvider *string `json:"last_manual_hosted_provider,omitempty"`
-	WhosAsking           string   `json:"whos_asking"`
-	RepeatQuestion       bool     `json:"repeat_question"`
-	InactivityNudge      bool     `json:"inactivity_nudge"`
-	InactivitySeconds    int      `json:"inactivity_seconds"`
+	Prompt                   string   `json:"prompt"`
+	Voice                    *string  `json:"voice"`
+	Temperature              *float64 `json:"temperature"`
+	ConversationID           *int64   `json:"conversation_id"`
+	Mood                     *string  `json:"mood"`
+	CompanionMode            bool     `json:"companionMode"`
+	AllowExplicitContent     bool     `json:"allowExplicitContent"`
+	EnableSnarkiness         bool     `json:"enableSnarkiness"`
+	Provider                 string   `json:"provider"` // gemini, claude, deepseek, openai, localai, or auto
+	LastManualHostedProvider *string  `json:"last_manual_hosted_provider,omitempty"`
+	WhosAsking               string   `json:"whos_asking"`
+	RepeatQuestion           bool     `json:"repeat_question"`
+	InactivityNudge          bool     `json:"inactivity_nudge"`
+	InactivitySeconds        int      `json:"inactivity_seconds"`
+	RequestOnly              bool     `json:"request_only"`
 }
 
 // ChatResponse is the JSON response for POST /chat/generate.

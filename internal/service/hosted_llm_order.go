@@ -20,12 +20,14 @@ type HostedLLMProviderOrderConfig struct {
 	AutoOrder          []string
 	FailoverOrder      []string
 	ClassifierProvider string
+	FailoverEnabled    bool
 }
 
 type hostedLLMProviderOrderConfig struct {
 	AutoOrder          []string `json:"auto_order"`
 	FailoverOrder      []string `json:"failover_order"`
 	ClassifierProvider string   `json:"classifier_provider"`
+	FailoverEnabled    *bool    `json:"failover_enabled"`
 }
 
 func isValidClassifierProviderName(name string) bool {
@@ -99,6 +101,7 @@ func parseHostedLLMProviderOrderJSON(raw string) HostedLLMProviderOrderConfig {
 		AutoOrder:          append([]string(nil), DefaultHostedLLMProviderOrder...),
 		FailoverOrder:      append([]string(nil), DefaultHostedLLMProviderOrder...),
 		ClassifierProvider: DefaultClassifierProvider,
+		FailoverEnabled:    true,
 	}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -115,6 +118,9 @@ func parseHostedLLMProviderOrderJSON(raw string) HostedLLMProviderOrderConfig {
 		out.FailoverOrder = normalizeHostedProviderOrder(cfg.FailoverOrder)
 	}
 	out.ClassifierProvider = normalizeClassifierProvider(cfg.ClassifierProvider)
+	if cfg.FailoverEnabled != nil {
+		out.FailoverEnabled = *cfg.FailoverEnabled
+	}
 	return out
 }
 
@@ -123,6 +129,7 @@ func (s *ChatService) loadHostedLLMProviderOrderConfig(ctx context.Context) Host
 		AutoOrder:          append([]string(nil), DefaultHostedLLMProviderOrder...),
 		FailoverOrder:      append([]string(nil), DefaultHostedLLMProviderOrder...),
 		ClassifierProvider: DefaultClassifierProvider,
+		FailoverEnabled:    true,
 	}
 	if s.configRepo == nil {
 		return out

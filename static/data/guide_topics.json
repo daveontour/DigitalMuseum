@@ -673,7 +673,7 @@
           "position": "top-right"
         },
         {
-          "text": "Local AI (Ollama/Gemma4) requires Ollama to be running and the required models downloaded. Use Configuration → AI & Setup to check status.",
+          "text": "Local AI (Ollama/Gemma4) requires Ollama to be running and the required models downloaded. Use Configuration → Local AI Setup to check status.",
           "position": "middle-center"
         },
         {
@@ -1639,10 +1639,10 @@
           "text": "If Local AI is unavailable, verify Ollama is running and both models are installed."
         },
         {
-          "text": "Re-open AI & Setup and refresh statuses after model downloads complete."
+          "text": "Re-open Local AI Setup and refresh statuses after model downloads complete."
         },
         {
-          "text": "If issues persist, use a cloud provider temporarily and retry Local AI later from AI & Setup."
+          "text": "If issues persist, use a cloud provider temporarily and retry Local AI later from Local AI Setup."
         }
       ]
     },

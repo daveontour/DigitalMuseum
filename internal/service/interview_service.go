@@ -519,8 +519,8 @@ func (s *ChatService) pickInterviewProvider(ctx context.Context, r *http.Request
 		}
 	}
 	if preferred == "localai" {
-		lp := s.effectiveLocalAIProvider()
-		if lp != nil && lp.IsAvailable() {
+		lp := s.localAIProviderForChat(ctx)
+		if lp != nil {
 			return lp, "localai"
 		}
 	}

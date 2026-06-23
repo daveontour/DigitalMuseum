@@ -2,6 +2,8 @@
 package middleware
 
 import (
+	"bytes"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -45,15 +47,41 @@ func Logger(next http.Handler) http.Handler {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 
+		var chatGenerateBody string
+		if r.Method == http.MethodPost && r.URL.Path == "/chat/generate" && r.Body != nil {
+			body, err := io.ReadAll(r.Body)
+			_ = r.Body.Close()
+			if err == nil {
+				chatGenerateBody = string(body)
+				r.Body = io.NopCloser(bytes.NewReader(body))
+			}
+		}
+
 		next.ServeHTTP(rw, r)
 
-		slog.Info("request",
-			"method", r.Method,
-			"path", r.URL.Path,
-			"status", rw.status,
-			"bytes", rw.bytes,
-			"duration_ms", time.Since(start).Milliseconds(),
-			"remote_addr", r.RemoteAddr,
-		)
+		if r.URL.Path == "/api/background-jobs" {
+			// slog.Debug("request",
+			// 	"method", r.Method,
+			// 	"path", r.URL.Path,
+			// 	"status", rw.status,
+			// 	"bytes", rw.bytes,
+			// 	"duration_ms", time.Since(start).Milliseconds(),
+			// 	"remote_addr", r.RemoteAddr,
+			// )
+			return
+		} else {
+			attrs := []any{
+				"method", r.Method,
+				"path", r.URL.Path,
+				"status", rw.status,
+				"bytes", rw.bytes,
+				"duration_ms", time.Since(start).Milliseconds(),
+				"remote_addr", r.RemoteAddr,
+			}
+			if chatGenerateBody != "" {
+				attrs = append(attrs, "body", chatGenerateBody)
+			}
+			slog.Info("request", attrs...)
+		}
 	})
 }

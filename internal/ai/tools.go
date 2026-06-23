@@ -218,7 +218,11 @@ func toolEmbedText(ctx context.Context, text string) ([]float32, error) {
 	if text == "" {
 		return nil, fmt.Errorf("text is required")
 	}
-	baseURL := strings.TrimSpace(os.Getenv("LOCALAI_BASE_URL"))
+	chatBaseURL := strings.TrimSpace(os.Getenv("LOCALAI_BASE_URL"))
+	embedBaseURL := strings.TrimSpace(os.Getenv("LOCALAI_EMBEDDING_BASE_URL"))
+	if embedBaseURL == "" {
+		embedBaseURL = chatBaseURL
+	}
 	apiKey := strings.TrimSpace(os.Getenv("LOCALAI_API_KEY"))
 	model := strings.TrimSpace(os.Getenv("LOCALAI_MODEL_NAME"))
 	embeddingModel := strings.TrimSpace(os.Getenv("LOCALAI_EMBEDDING_MODEL"))
@@ -226,9 +230,9 @@ func toolEmbedText(ctx context.Context, text string) ([]float32, error) {
 		embeddingModel = model
 	}
 	// num_ctx is irrelevant for the embed endpoint, so pass 0 here.
-	provider := NewLocalAIProvider(baseURL, apiKey, model, 0)
+	provider := NewLocalAIProvider(embedBaseURL, apiKey, model, 0)
 	if provider == nil || !provider.IsAvailable() {
-		return nil, fmt.Errorf("embedding service unavailable: set LOCALAI_BASE_URL and LOCALAI_EMBEDDING_MODEL")
+		return nil, fmt.Errorf("embedding service unavailable: set LOCALAI_EMBEDDING_BASE_URL (or LOCALAI_BASE_URL) and LOCALAI_EMBEDDING_MODEL")
 	}
 	return provider.Embed(ctx, text, embeddingModel)
 }

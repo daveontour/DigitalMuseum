@@ -103,7 +103,8 @@ The server reads `.env` from the executable directory or working directory. In E
 | `DEEPSEEK_MODEL_NAME` | Model override (default `deepseek-chat`) |
 | `OPENAI_API_KEY` | OpenAI API key (ChatGPT) |
 | `OPENAI_MODEL_NAME` | Model override (default `gpt-4.1-mini`) |
-| `LOCALAI_BASE_URL` | Ollama base URL, e.g. `http://localhost:11434` |
+| `LOCALAI_BASE_URL` | Ollama chat base URL, e.g. `http://localhost:11434` |
+| `LOCALAI_EMBEDDING_BASE_URL` | Ollama embedding base URL (default `http://127.0.0.1:11435`) |
 | `LOCALAI_MODEL_NAME` | Ollama model name (default `local-model`; use `gemma4`) |
 | `LOCALAI_API_KEY` | Not required by Ollama; kept for compatibility |
 | `LOCALAI_EMBEDDING_MODEL` | Embedding model (falls back to `LOCALAI_MODEL_NAME`) |

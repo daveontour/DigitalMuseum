@@ -267,6 +267,10 @@ const DOM = {
     showJsonTags: document.getElementById('show-json-tags'),
     autoVoiceShortResponses: document.getElementById('auto-voice-short-responses'),
     autoOpenSuggestions: document.getElementById('auto-open-suggestions'),
+    showRequestOnlyCheckbox: document.getElementById('show-request-only-checkbox'),
+    requestOnlyCheckbox: document.getElementById('chat-request-only-checkbox'),
+    requestOnlyLabel: document.getElementById('chat-request-only-label'),
+    requestOnlySep: document.getElementById('chat-request-only-sep'),
     companionModeCheckbox: document.getElementById('companion-mode'),
     allowExplicitContentCheckbox: document.getElementById('allow-explicit-content'),
     enableSnarkinessCheckbox: document.getElementById('enable-snarkiness'),
@@ -1132,6 +1136,13 @@ const Config = (() => {
             document.body.classList.toggle('hide-audio-tags', !DOM.showAudioTags.checked);
         }
 
+        // Request Only status bar toggle (hidden by default)
+        const showRequestOnly = DOM.showRequestOnlyCheckbox && DOM.showRequestOnlyCheckbox.checked;
+        const requestOnlyDisplay = showRequestOnly ? '' : 'none';
+        if (DOM.requestOnlyLabel) DOM.requestOnlyLabel.style.display = requestOnlyDisplay;
+        if (DOM.requestOnlySep) DOM.requestOnlySep.style.display = requestOnlyDisplay;
+        if (!showRequestOnly && DOM.requestOnlyCheckbox) DOM.requestOnlyCheckbox.checked = false;
+
         // Apply creativity level text
         if (DOM.creativityLevel && DOM.creativityLevel.nextElementSibling) {
             DOM.creativityLevel.nextElementSibling.textContent = DOM.creativityLevel.value;
@@ -1147,6 +1158,7 @@ const Config = (() => {
         if (settings.showJsonTags !== undefined && DOM.showJsonTags) DOM.showJsonTags.checked = settings.showJsonTags;
         if (settings.autoVoiceShortResponses !== undefined && DOM.autoVoiceShortResponses) DOM.autoVoiceShortResponses.checked = settings.autoVoiceShortResponses;
         if (settings.autoOpenSuggestions !== undefined && DOM.autoOpenSuggestions) DOM.autoOpenSuggestions.checked = settings.autoOpenSuggestions;
+        if (settings.showRequestOnlyCheckbox && DOM.showRequestOnlyCheckbox) DOM.showRequestOnlyCheckbox.checked = settings.showRequestOnlyCheckbox;
         if (settings.allowExplicitContent !== undefined && DOM.allowExplicitContentCheckbox) {
             DOM.allowExplicitContentCheckbox.checked = settings.allowExplicitContent;
         }
@@ -1166,6 +1178,7 @@ const Config = (() => {
             showJsonTags: DOM.showJsonTags ? DOM.showJsonTags.checked : false,
             autoVoiceShortResponses: DOM.autoVoiceShortResponses ? DOM.autoVoiceShortResponses.checked : false,
             autoOpenSuggestions: DOM.autoOpenSuggestions ? DOM.autoOpenSuggestions.checked : true,
+            showRequestOnlyCheckbox: DOM.showRequestOnlyCheckbox ? DOM.showRequestOnlyCheckbox.checked : false,
             allowExplicitContent: DOM.allowExplicitContentCheckbox ? DOM.allowExplicitContentCheckbox.checked : false,
             enableSnarkiness: DOM.enableSnarkinessCheckbox ? DOM.enableSnarkinessCheckbox.checked : false,
         };
@@ -1175,7 +1188,7 @@ const Config = (() => {
 
     function init() {
         loadSettings();
-        [DOM.messageFontSize, DOM.creativityLevel, DOM.showAudioTags, DOM.showImageTags, DOM.showJsonTags, DOM.companionModeCheckbox, DOM.allowExplicitContentCheckbox, DOM.enableSnarkinessCheckbox, DOM.autoVoiceShortResponses, DOM.autoOpenSuggestions].forEach(el => {
+        [DOM.messageFontSize, DOM.creativityLevel, DOM.showAudioTags, DOM.showImageTags, DOM.showJsonTags, DOM.companionModeCheckbox, DOM.allowExplicitContentCheckbox, DOM.enableSnarkinessCheckbox, DOM.autoVoiceShortResponses, DOM.autoOpenSuggestions, DOM.showRequestOnlyCheckbox].forEach(el => {
             if (el && el.type === 'checkbox') {
                 el.addEventListener('change', saveSettings);
             } else if (el) {

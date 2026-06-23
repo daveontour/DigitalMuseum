@@ -3332,6 +3332,7 @@ Modals.HostedLLMOrderConfig = (() => {
         auto_order: DEFAULT_ORDER.slice(),
         failover_order: DEFAULT_ORDER.slice(),
         classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+        failover_enabled: true,
     };
     let working = null;
 
@@ -3341,9 +3342,29 @@ Modals.HostedLLMOrderConfig = (() => {
         return Array.isArray(order) ? order.slice() : DEFAULT_ORDER.slice();
     }
 
+    function isLocalAIAllowedForChat() {
+        if (typeof App !== 'undefined' && typeof App.isLocalAIUseEnabledForChat === 'function') {
+            return App.isLocalAIUseEnabledForChat({});
+        }
+        const checkbox = document.getElementById('local-ai-use-enabled-checkbox');
+        if (checkbox) return !!checkbox.checked;
+        if (typeof LocalAiSetup !== 'undefined'
+            && typeof LocalAiSetup.isUseEnabledForChat === 'function') {
+            return LocalAiSetup.isUseEnabledForChat();
+        }
+        return true;
+    }
+
+    function defaultClassifierProvider() {
+        return isLocalAIAllowedForChat() ? DEFAULT_CLASSIFIER_PROVIDER : 'gemini';
+    }
+
     function normalizeClassifierProvider(value) {
         const key = String(value || '').toLowerCase().trim();
-        return PROVIDER_LABELS[key] ? key : DEFAULT_CLASSIFIER_PROVIDER;
+        if (key === 'localai' && !isLocalAIAllowedForChat()) {
+            return 'gemini';
+        }
+        return PROVIDER_LABELS[key] ? key : defaultClassifierProvider();
     }
 
     function normalizeOrder(order) {
@@ -3369,6 +3390,7 @@ Modals.HostedLLMOrderConfig = (() => {
                 auto_order: DEFAULT_ORDER.slice(),
                 failover_order: DEFAULT_ORDER.slice(),
                 classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+                failover_enabled: true,
             };
         }
         try {
@@ -3377,12 +3399,14 @@ Modals.HostedLLMOrderConfig = (() => {
                 auto_order: normalizeOrder(parsed.auto_order),
                 failover_order: normalizeOrder(parsed.failover_order),
                 classifier_provider: normalizeClassifierProvider(parsed.classifier_provider),
+                failover_enabled: parsed.failover_enabled !== false,
             };
         } catch (_) {
             return {
                 auto_order: DEFAULT_ORDER.slice(),
                 failover_order: DEFAULT_ORDER.slice(),
                 classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+                failover_enabled: true,
             };
         }
     }
@@ -3413,9 +3437,23 @@ Modals.HostedLLMOrderConfig = (() => {
         });
     }
 
+    function syncFailoverOrderListState() {
+        const enabled = working ? working.failover_enabled !== false : cached.failover_enabled !== false;
+        const checkbox = getEl('hosted-llm-failover-enabled-checkbox');
+        if (checkbox) checkbox.checked = enabled;
+        const listEl = getEl('hosted-llm-failover-order-list');
+        if (listEl) listEl.style.opacity = enabled ? '' : '0.5';
+        if (listEl) {
+            listEl.querySelectorAll('.hosted-llm-order-move-btn').forEach((btn) => {
+                btn.disabled = !enabled;
+            });
+        }
+    }
+
     function renderAllLists() {
         renderOrderList('hosted-llm-auto-order-list', 'auto_order');
         renderOrderList('hosted-llm-failover-order-list', 'failover_order');
+        syncFailoverOrderListState();
     }
 
     function moveProvider(orderKey, provider, direction) {
@@ -3437,6 +3475,7 @@ Modals.HostedLLMOrderConfig = (() => {
             auto_order: cloneOrder(settings.auto_order),
             failover_order: cloneOrder(settings.failover_order),
             classifier_provider: normalizeClassifierProvider(settings.classifier_provider),
+            failover_enabled: settings.failover_enabled !== false,
         };
         const classifierSelect = getEl('hosted-llm-classifier-provider');
         if (classifierSelect) {
@@ -3476,10 +3515,15 @@ Modals.HostedLLMOrderConfig = (() => {
         if (classifierSelect) {
             working.classifier_provider = normalizeClassifierProvider(classifierSelect.value);
         }
+        const failoverCheckbox = getEl('hosted-llm-failover-enabled-checkbox');
+        if (failoverCheckbox) {
+            working.failover_enabled = !!failoverCheckbox.checked;
+        }
         const payload = {
             auto_order: normalizeOrder(working.auto_order),
             failover_order: normalizeOrder(working.failover_order),
             classifier_provider: normalizeClassifierProvider(working.classifier_provider),
+            failover_enabled: working.failover_enabled !== false,
         };
         const saveBtn = getEl('hosted-llm-order-save-btn');
         if (saveBtn) saveBtn.disabled = true;
@@ -3508,6 +3552,7 @@ Modals.HostedLLMOrderConfig = (() => {
                 auto_order: cloneOrder(payload.auto_order),
                 failover_order: cloneOrder(payload.failover_order),
                 classifier_provider: normalizeClassifierProvider(payload.classifier_provider),
+                failover_enabled: payload.failover_enabled !== false,
             };
             renderAllLists();
             setStatus('Saved.');
@@ -3523,6 +3568,7 @@ Modals.HostedLLMOrderConfig = (() => {
             auto_order: DEFAULT_ORDER.slice(),
             failover_order: DEFAULT_ORDER.slice(),
             classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+            failover_enabled: true,
         };
         const classifierSelect = getEl('hosted-llm-classifier-provider');
         if (classifierSelect) {
@@ -3536,6 +3582,19 @@ Modals.HostedLLMOrderConfig = (() => {
         return normalizeClassifierProvider(cached.classifier_provider);
     }
 
+    function reconcileClassifierProvider() {
+        const classifierSelect = getEl('hosted-llm-classifier-provider');
+        if (!classifierSelect) return;
+        const resolved = normalizeClassifierProvider(
+            (working && working.classifier_provider) || cached.classifier_provider || classifierSelect.value
+        );
+        if (working) working.classifier_provider = resolved;
+        cached.classifier_provider = resolved;
+        if (classifierSelect.querySelector(`option[value="${resolved}"]`)) {
+            classifierSelect.value = resolved;
+        }
+    }
+
     function getAutoOrder() {
         return cloneOrder(cached.auto_order);
     }
@@ -3545,16 +3604,28 @@ Modals.HostedLLMOrderConfig = (() => {
     }
 
     function getFailoverCandidates(primary) {
+        if (!isFailoverEnabled()) return [];
         const p = String(primary || '').toLowerCase().trim();
         return getFailoverOrder().filter((name) => name !== p);
+    }
+
+    function isFailoverEnabled() {
+        return cached.failover_enabled !== false;
     }
 
     function init() {
         const saveBtn = getEl('hosted-llm-order-save-btn');
         const resetBtn = getEl('hosted-llm-order-reset-btn');
         const classifierSelect = getEl('hosted-llm-classifier-provider');
+        const failoverCheckbox = getEl('hosted-llm-failover-enabled-checkbox');
         if (saveBtn) saveBtn.addEventListener('click', () => { void save(); });
         if (resetBtn) resetBtn.addEventListener('click', resetToDefault);
+        if (failoverCheckbox) {
+            failoverCheckbox.addEventListener('change', () => {
+                if (working) working.failover_enabled = !!failoverCheckbox.checked;
+                syncFailoverOrderListState();
+            });
+        }
         if (classifierSelect) {
             classifierSelect.addEventListener('change', () => {
                 if (working) {
@@ -3581,7 +3652,9 @@ Modals.HostedLLMOrderConfig = (() => {
         getAutoOrder,
         getFailoverOrder,
         getFailoverCandidates,
+        isFailoverEnabled,
         getClassifierProvider,
+        reconcileClassifierProvider,
     };
 })();
 
@@ -4045,6 +4118,7 @@ Modals.initAll = () => {
         if (Modals.PreviousResponses && Modals.PreviousResponses.init) Modals.PreviousResponses.init();
         if (Modals.SaveResponseTitle && Modals.SaveResponseTitle.init) Modals.SaveResponseTitle.init();
         if (Modals.UserLLMSettings && Modals.UserLLMSettings.init) Modals.UserLLMSettings.init();
+        if (typeof LocalAiSetup !== 'undefined' && LocalAiSetup.init) void LocalAiSetup.init();
         if (typeof HaveAChat !== 'undefined' && HaveAChat.init) HaveAChat.init();
         if (Modals.IdentityProfileWizard && Modals.IdentityProfileWizard.init) Modals.IdentityProfileWizard.init();
 };

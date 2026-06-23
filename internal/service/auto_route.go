@@ -228,7 +228,7 @@ func (s *ChatService) effectiveProviderByName(ctx context.Context, r *http.Reque
 	case "openai":
 		return s.effectiveOpenAIProvider(ctx, r, ""), "openai"
 	case "localai":
-		return s.effectiveLocalAIProvider(), "localai"
+		return s.localAIProviderForChat(ctx), "localai"
 	default:
 		return s.effectiveGeminiProvider(ctx, r, ""), "gemini"
 	}
@@ -258,9 +258,58 @@ func (s *ChatService) runClassifierGenerate(ctx context.Context, providerName st
 	}
 }
 
+func (s *ChatService) EffectiveClassifierProvider(ctx context.Context, r *http.Request, configured string) string {
+	name := normalizeClassifierProvider(configured)
+	if name != DefaultClassifierProvider {
+		return name
+	}
+	if s.LocalAIAvailable(ctx) {
+		return DefaultClassifierProvider
+	}
+	return s.firstAvailableHostedClassifierProvider(ctx, r)
+}
+
+func (s *ChatService) firstAvailableHostedClassifierProvider(ctx context.Context, r *http.Request) string {
+	autoOrder, _ := s.loadHostedLLMProviderOrder(ctx)
+	for _, p := range autoOrder {
+		prov, pname := s.effectiveProviderByName(ctx, r, p)
+		if prov != nil && prov.IsAvailable() {
+			return pname
+		}
+	}
+	for _, p := range DefaultHostedLLMProviderOrder {
+		prov, pname := s.effectiveProviderByName(ctx, r, p)
+		if prov != nil && prov.IsAvailable() {
+			return pname
+		}
+	}
+	return "gemini"
+}
+
+func (s *ChatService) hostedClassifierFallbackCandidates(ctx context.Context, r *http.Request, exclude string) []string {
+	exclude = strings.ToLower(strings.TrimSpace(exclude))
+	var out []string
+	if s.LocalAIAvailable(ctx) && exclude != DefaultClassifierProvider {
+		out = append(out, DefaultClassifierProvider)
+	}
+	autoOrder, _ := s.loadHostedLLMProviderOrder(ctx)
+	seen := map[string]bool{exclude: true}
+	for _, p := range autoOrder {
+		if seen[p] {
+			continue
+		}
+		seen[p] = true
+		prov, _ := s.effectiveProviderByName(ctx, r, p)
+		if prov != nil && prov.IsAvailable() {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func (s *ChatService) classifyAutoRoute(ctx context.Context, r *http.Request, prompt string, toolsCount, refDocCount int, hasSubjectProfile bool) AutoRouteDecision {
 	orderCfg := s.loadHostedLLMProviderOrderConfig(ctx)
-	configuredClassifier := orderCfg.ClassifierProvider
+	configuredClassifier := s.EffectiveClassifierProvider(ctx, r, orderCfg.ClassifierProvider)
 
 	logAttrs := []any{
 		"user_id", appctx.UserIDFromCtx(ctx),
@@ -279,10 +328,13 @@ func (s *ChatService) classifyAutoRoute(ctx context.Context, r *http.Request, pr
 	classifierProviderUsed := providerName
 	raw, usage, err := s.runClassifierGenerate(ctx, providerName, provider, classifierPrompt)
 
-	if err != nil && normalizeClassifierProvider(configuredClassifier) != DefaultClassifierProvider {
-		fallbackProvider := s.effectiveLocalAIProvider()
-		raw2, usage2, err2 := s.runClassifierGenerate(ctx, DefaultClassifierProvider, fallbackProvider, classifierPrompt)
-		if err2 == nil {
+	if err != nil {
+		for _, alt := range s.hostedClassifierFallbackCandidates(ctx, r, providerName) {
+			altProv, altName := s.effectiveProviderByName(ctx, r, alt)
+			raw2, usage2, err2 := s.runClassifierGenerate(ctx, altName, altProv, classifierPrompt)
+			if err2 != nil {
+				continue
+			}
 			if usage != nil && usage2 != nil {
 				usage.InputTokens += usage2.InputTokens
 				usage.OutputTokens += usage2.OutputTokens
@@ -290,7 +342,8 @@ func (s *ChatService) classifyAutoRoute(ctx context.Context, r *http.Request, pr
 				usage = usage2
 			}
 			raw, err = raw2, nil
-			classifierProviderUsed = DefaultClassifierProvider
+			classifierProviderUsed = altName
+			break
 		}
 	}
 
@@ -387,7 +440,7 @@ func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, 
 	executionFallback := false
 
 	if decision.Decision == "local" {
-		provider = s.effectiveLocalAIProvider()
+		provider = s.localAIProviderForChat(ctx)
 		providerName = "localai"
 		if provider == nil || !provider.IsAvailable() {
 			providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted, autoOrder)
@@ -396,7 +449,7 @@ func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, 
 	} else {
 		providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted, autoOrder)
 		if provider == nil || !provider.IsAvailable() {
-			provider = s.effectiveLocalAIProvider()
+			provider = s.localAIProviderForChat(ctx)
 			providerName = "localai"
 			executionFallback = true
 		}
@@ -417,7 +470,7 @@ func (s *ChatService) AutoAvailable(ctx context.Context, r *http.Request) bool {
 	if !s.classifierAvailable(ctx, r, cfg.ClassifierProvider) {
 		return false
 	}
-	return s.LocalAIAvailable() ||
+	return s.LocalAIAvailable(ctx) ||
 		s.GeminiAvailable(ctx, r) ||
 		s.ClaudeAvailable(ctx, r) ||
 		s.DeepSeekAvailable(ctx, r) ||
@@ -425,16 +478,16 @@ func (s *ChatService) AutoAvailable(ctx context.Context, r *http.Request) bool {
 }
 
 func (s *ChatService) classifierAvailable(ctx context.Context, r *http.Request, configured string) bool {
-	p, _ := s.effectiveProviderByName(ctx, r, configured)
+	effective := s.EffectiveClassifierProvider(ctx, r, configured)
+	p, _ := s.effectiveProviderByName(ctx, r, effective)
 	if p != nil && p.IsAvailable() {
 		return true
 	}
-	if normalizeClassifierProvider(configured) != DefaultClassifierProvider {
-		lp := s.effectiveLocalAIProvider()
-		return lp != nil && lp.IsAvailable()
+	for _, alt := range s.hostedClassifierFallbackCandidates(ctx, r, effective) {
+		altProv, _ := s.effectiveProviderByName(ctx, r, alt)
+		if altProv != nil && altProv.IsAvailable() {
+			return true
+		}
 	}
-	return s.GeminiAvailable(ctx, r) ||
-		s.ClaudeAvailable(ctx, r) ||
-		s.DeepSeekAvailable(ctx, r) ||
-		s.OpenAIAvailable(ctx, r)
+	return false
 }

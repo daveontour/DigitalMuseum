@@ -67,6 +67,80 @@ window.customObject = AppActions; // Expose for Suggestions.json if it relies on
 
 
 const App = (() => {
+    const LOCAL_AI_USE_CONFIG_KEY = 'local_ai_use_enabled_v1';
+
+    function parseLocalAIUseEnabledValue(raw) {
+        if (raw == null) return true;
+        const v = String(raw).trim().toLowerCase();
+        return !(v === 'false' || v === '0' || v === 'no' || v === 'off');
+    }
+
+    async function fetchLocalAIUseEnabledFromServer() {
+        try {
+            const res = await fetch('/api/configuration', { credentials: 'same-origin' });
+            if (!res.ok) return true;
+            const rows = await res.json();
+            const row = Array.isArray(rows)
+                ? rows.find((r) => r && r.key === LOCAL_AI_USE_CONFIG_KEY)
+                : null;
+            if (!row || row.value == null) return true;
+            return parseLocalAIUseEnabledValue(row.value);
+        } catch (_) {
+            return true;
+        }
+    }
+
+    function resolveLocalAIUseEnabled(serverValue) {
+        const checkbox = document.getElementById('local-ai-use-enabled-checkbox');
+        if (checkbox) return !!checkbox.checked;
+        if (typeof LocalAiSetup !== 'undefined'
+            && typeof LocalAiSetup.isUseEnabledForChat === 'function') {
+            return LocalAiSetup.isUseEnabledForChat();
+        }
+        return parseLocalAIUseEnabledValue(serverValue);
+    }
+
+    function isLocalAIUseEnabledForChat(availability) {
+        return resolveLocalAIUseEnabled(availability && availability.localai_use_enabled);
+    }
+
+    function effectiveLocalAIAvailable(availability) {
+        if (!availability) return false;
+        if (!isLocalAIUseEnabledForChat(availability)) return false;
+        if (availability.localai_infrastructure_available === false) return false;
+        return !!(availability.localai_infrastructure_available || availability.localai_available);
+    }
+
+    function buildProviderAvailabilityMap(availability) {
+        return {
+            auto: !!availability.auto_available,
+            gemini: !!availability.gemini_available,
+            claude: !!availability.claude_available,
+            deepseek: !!availability.deepseek_available,
+            openai: !!availability.openai_available,
+            localai: effectiveLocalAIAvailable(availability),
+        };
+    }
+
+    const LLM_PROVIDER_SELECT_IDS = [
+        'llm-provider-select',
+        'profiles-llm-provider-select',
+        'interview-provider',
+        'have-a-chat-provider-a',
+        'have-a-chat-provider-b',
+        'hosted-llm-classifier-provider',
+    ];
+
+    function firstAvailableProvider(availMap, preferAuto) {
+        if (preferAuto && availMap.auto) return 'auto';
+        if (availMap.gemini) return 'gemini';
+        if (availMap.claude) return 'claude';
+        if (availMap.deepseek) return 'deepseek';
+        if (availMap.openai) return 'openai';
+        if (availMap.localai) return 'localai';
+        return preferAuto ? 'auto' : 'gemini';
+    }
+
     async function getLLMProviderAvailabilityPair() {
         try {
             const res = await fetch('/chat/availability', { credentials: 'same-origin' });
@@ -77,7 +151,7 @@ const App = (() => {
                 claude: !!av.claude_available,
                 deepseek: !!av.deepseek_available,
                 openai: !!av.openai_available,
-                localai: !!av.localai_available
+                localai: effectiveLocalAIAvailable(av),
             };
         } catch (e) {
             return { gemini: true, claude: true, deepseek: true, openai: true, localai: false };
@@ -238,6 +312,14 @@ const App = (() => {
         if (primary === 'localai') {
             return { ok: false, error: first.error || 'Local AI request failed', data: first.data };
         }
+        const failoverEnabled = (typeof Modals !== 'undefined'
+            && Modals.HostedLLMOrderConfig
+            && Modals.HostedLLMOrderConfig.isFailoverEnabled)
+            ? Modals.HostedLLMOrderConfig.isFailoverEnabled()
+            : true;
+        if (!failoverEnabled) {
+            return { ok: false, error: first.error || 'Request failed', data: first.data };
+        }
         const av = await getLLMProviderAvailabilityPair();
         if (signal && signal.aborted) {
             return { ok: false, aborted: true, error: 'Cancelled' };
@@ -325,6 +407,7 @@ const App = (() => {
                     provider,
                     last_manual_hosted_provider: getLastManualHostedProvider(),
                     whos_asking: whosAsking,
+                    request_only: DOM.requestOnlyCheckbox ? DOM.requestOnlyCheckbox.checked : false,
                 }), chatCtrl.signal);
 
                 if (!result.ok) {
@@ -1461,7 +1544,7 @@ const App = (() => {
                 const cOk = !!av.claude_available;
                 const dOk = !!av.deepseek_available;
                 const oOk = !!av.openai_available;
-                const lOk = !!av.localai_available;
+                const lOk = effectiveLocalAIAvailable(av);
                 const gemVal = gOk
                     ? '<strong style="color:#15803d;">Ready</strong>'
                     : '<strong style="color:#b91c1c;">Not available</strong> — configure a Gemini API key';
@@ -5144,75 +5227,73 @@ const App = (() => {
     }
 
     async function loadLLMProviderAvailability() {
-        const select = DOM.llmProviderSelect;
-        const profileSelect = DOM.profilesLlmProviderSelect;
-        if (!select && !profileSelect) return;
-        function applyProviderAvailabilityToSelect(sel, availability) {
+        const selects = LLM_PROVIDER_SELECT_IDS
+            .map((id) => document.getElementById(id))
+            .filter(Boolean);
+        if (!selects.length) return;
+
+        function applyProviderAvailabilityToSelect(sel, availMap) {
             if (!sel) return;
+            const includeAuto = sel.querySelector('option[value="auto"]') != null;
             const providers = [
-                { value: 'auto', label: 'Auto', available: !!availability.auto_available },
-                { value: 'gemini', label: 'Gemini', available: !!availability.gemini_available },
-                { value: 'claude', label: 'Claude', available: !!availability.claude_available },
-                { value: 'deepseek', label: 'DeepSeek', available: !!availability.deepseek_available },
-                { value: 'openai', label: 'ChatGPT', available: !!availability.openai_available },
-                { value: 'localai', label: 'Local AI', available: !!availability.localai_available },
+                ...(includeAuto ? [{ value: 'auto', label: 'Auto' }] : []),
+                { value: 'gemini', label: 'Gemini' },
+                { value: 'claude', label: 'Claude' },
+                { value: 'deepseek', label: 'DeepSeek' },
+                { value: 'openai', label: 'ChatGPT' },
+                { value: 'localai', label: 'Local AI' },
             ];
 
+            const previous = sel.value;
+            const userSelected = sel.dataset.userSelectedProvider === 'true';
+
+            while (sel.options.length > 0) {
+                sel.remove(0);
+            }
+
             providers.forEach((p) => {
-                const opt = sel.querySelector(`option[value="${p.value}"]`);
-                if (!opt) return;
-                opt.disabled = !p.available;
-                // Native <option> cannot contain styled HTML; emoji renders as green tick / red cross on most UIs.
-                opt.textContent = `${p.label} ${p.available ? '\u2705' : '\u274C'}`;
+                if (!availMap[p.value]) return;
+                const opt = document.createElement('option');
+                opt.value = p.value;
+                opt.textContent = `${p.label} \u2705`;
+                sel.appendChild(opt);
             });
 
-            const current = sel.value;
-            const currentUnavailable =
-                (current === 'auto' && !availability.auto_available) ||
-                (current === 'gemini' && !availability.gemini_available) ||
-                (current === 'claude' && !availability.claude_available) ||
-                (current === 'deepseek' && !availability.deepseek_available) ||
-                (current === 'openai' && !availability.openai_available) ||
-                (current === 'localai' && !availability.localai_available);
-            if (currentUnavailable) {
-                sel.value = availability.auto_available
-                    ? 'auto'
-                    : (availability.gemini_available
-                        ? 'gemini'
-                        : (availability.claude_available
-                            ? 'claude'
-                            : (availability.deepseek_available
-                                ? 'deepseek'
-                                : (availability.openai_available
-                                    ? 'openai'
-                                    : (availability.localai_available ? 'localai' : 'gemini')))));
-            } else {
-                // Prefer Auto as the startup default on the main chat selector (respect explicit user changes).
-                const userSelected = sel.dataset.userSelectedProvider === 'true';
-                const isMainProviderSelect = sel.id === 'llm-provider-select';
-                if (!userSelected && isMainProviderSelect) {
-                    if (availability.auto_available) {
-                        sel.value = 'auto';
-                    } else if (availability.gemini_available) {
-                        sel.value = 'gemini';
-                    } else if (availability.claude_available) {
-                        sel.value = 'claude';
-                    } else if (availability.deepseek_available) {
-                        sel.value = 'deepseek';
-                    } else if (availability.openai_available) {
-                        sel.value = 'openai';
-                    } else if (availability.localai_available) {
-                        sel.value = 'localai';
-                    }
-                }
+            if (sel.options.length === 0) {
+                const fallback = document.createElement('option');
+                fallback.value = 'gemini';
+                fallback.textContent = 'Gemini';
+                sel.appendChild(fallback);
+            }
+
+            let next = previous;
+            if (!availMap[previous]) {
+                next = firstAvailableProvider(availMap, includeAuto);
+            } else if (!userSelected && sel.id === 'llm-provider-select') {
+                next = firstAvailableProvider(availMap, true);
+            }
+            if (availMap[next]) {
+                sel.value = next;
+            } else if (sel.options.length > 0) {
+                sel.selectedIndex = 0;
             }
         }
+
         try {
-            const res = await fetch('/chat/availability', { credentials: 'same-origin' });
-            if (!res.ok) return;
-            const av = await res.json();
-            applyProviderAvailabilityToSelect(select, av);
-            applyProviderAvailabilityToSelect(profileSelect, av);
+            const [avRes, useEnabled] = await Promise.all([
+                fetch('/chat/availability', { credentials: 'same-origin' }),
+                fetchLocalAIUseEnabledFromServer(),
+            ]);
+            if (!avRes.ok) return;
+            const av = await avRes.json();
+            av.localai_use_enabled = resolveLocalAIUseEnabled(useEnabled);
+            const availMap = buildProviderAvailabilityMap(av);
+            selects.forEach((sel) => applyProviderAvailabilityToSelect(sel, availMap));
+            if (typeof Modals !== 'undefined'
+                && Modals.HostedLLMOrderConfig
+                && Modals.HostedLLMOrderConfig.reconcileClassifierProvider) {
+                Modals.HostedLLMOrderConfig.reconcileClassifierProvider();
+            }
             if (typeof UI !== 'undefined' && UI.updateChatContextStatusBarFromAvailability) {
                 UI.updateChatContextStatusBarFromAvailability(av);
             }
@@ -5709,7 +5790,12 @@ const App = (() => {
             const obs = new MutationObserver(run);
             obs.observe(el, { attributes: true, attributeFilter: ['style'] });
         })();
-        loadLLMProviderAvailability();
+        void (async () => {
+            if (typeof LocalAiSetup !== 'undefined' && LocalAiSetup.init) {
+                await LocalAiSetup.init();
+            }
+            await loadLLMProviderAvailability();
+        })();
         if (Modals.HostedLLMOrderConfig && Modals.HostedLLMOrderConfig.ensureLoaded) {
             void Modals.HostedLLMOrderConfig.ensureLoaded();
         }
@@ -5862,6 +5948,10 @@ const App = (() => {
         processQuestionSubmit,
         processAnswerSubmit,
         refreshChatAvailability: loadLLMProviderAvailability,
+        effectiveLocalAIAvailable,
+        isLocalAIUseEnabledForChat,
+        resolveLocalAIUseEnabled,
+        buildProviderAvailabilityMap,
         abortCurrentChatRequest,
         runChatWithProviderFailover,
         isChatRequestInFlight,

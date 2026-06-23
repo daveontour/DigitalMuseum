@@ -33,6 +33,7 @@ func NewChatHandler(svc *service.ChatService, cpRepo *repository.CompleteProfile
 // RegisterRoutes mounts the chat endpoints on r.
 func (h *ChatHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/chat/availability", h.GetAvailability)
+	r.Get("/api/local-ai/status", h.GetLocalAIStatus)
 	r.Post("/chat/generate", h.Generate)
 	r.Post("/chat/generate-random-question", h.GenerateRandomQuestion)
 	r.Post("/chat/conversations", h.CreateConversation)
@@ -63,7 +64,9 @@ func (h *ChatHandler) GetAvailability(w http.ResponseWriter, r *http.Request) {
 		"claude_available":                    h.svc.ClaudeAvailable(r.Context(), r),
 		"deepseek_available":                  h.svc.DeepSeekAvailable(r.Context(), r),
 		"openai_available":                    h.svc.OpenAIAvailable(r.Context(), r),
-		"localai_available":                   h.svc.LocalAIAvailable(),
+		"localai_available":                   h.svc.LocalAIAvailable(r.Context()),
+		"localai_infrastructure_available":    h.svc.LocalAIInfrastructureAvailable(r.Context()),
+		"localai_use_enabled":                 h.svc.LocalAIUseEnabled(r.Context()),
 		"auto_available":                      h.svc.AutoAvailable(r.Context(), r),
 		"tavily_env_configured":               h.svc.ServerTavilyKeyConfigured(),
 		"runpod_env_configured":               h.svc.ServerRunpodKeyConfigured(),
@@ -81,6 +84,11 @@ func (h *ChatHandler) GetAvailability(w http.ResponseWriter, r *http.Request) {
 		"llm_tools_count":                     tools,
 		"reference_documents_available_count": refDocs,
 	})
+}
+
+// GET /api/local-ai/status — auth-exempt; infrastructure probe works before sign-in.
+func (h *ChatHandler) GetLocalAIStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, h.svc.LocalAIStatus(r.Context()))
 }
 
 // POST /chat/generate

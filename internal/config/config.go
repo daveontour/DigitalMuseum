@@ -164,8 +164,9 @@ type AIConfig struct {
 
 	TavilyAPIKey string
 
-	LocalAIBaseURL        string
-	LocalAIAPIKey         string
+	LocalAIBaseURL          string
+	LocalAIEmbeddingBaseURL string
+	LocalAIAPIKey           string
 	LocalAIModelName      string
 	LocalAIEmbeddingModel string
 	// LocalAINumCtx is the per-request `num_ctx` sent to Ollama. Zero means
@@ -214,6 +215,7 @@ type UploadConfig struct {
 // Returns an error if any required variable is missing or invalid.
 func Load() (*Config, error) {
 	loadDotEnv()
+	InitLocalAIRuntime()
 
 	db, err := loadDatabaseConfig()
 	if err != nil {
@@ -341,8 +343,9 @@ func loadAIConfig() AIConfig {
 
 		TavilyAPIKey: os.Getenv("TAVILY_API_KEY"),
 
-		LocalAIBaseURL:        os.Getenv("LOCALAI_BASE_URL"),
-		LocalAIAPIKey:         os.Getenv("LOCALAI_API_KEY"),
+		LocalAIBaseURL:          os.Getenv("LOCALAI_BASE_URL"),
+		LocalAIEmbeddingBaseURL: getenv("LOCALAI_EMBEDDING_BASE_URL", "http://127.0.0.1:11435"),
+		LocalAIAPIKey:           os.Getenv("LOCALAI_API_KEY"),
 		LocalAIModelName:      getenv("LOCALAI_MODEL_NAME", "local-model"),
 		LocalAIEmbeddingModel: getenv("LOCALAI_EMBEDDING_MODEL", ""),
 		LocalAINumCtx:         parseNumCtxEnv(),

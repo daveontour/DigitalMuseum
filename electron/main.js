@@ -16,7 +16,8 @@ let goProcess = null;
 let isQuitting = false;
 let appPort = null;
 let activeDotenv = null;
-let ollamaProcess = null;
+let ollamaChatProcess = null;
+let ollamaEmbedProcess = null;
 let activeProfileId = null;
 
 // ---------------------------------------------------------------------------
@@ -255,49 +256,209 @@ function getOllamaExe() {
   return path.join(getResourcesDir(), 'bin', 'Ollama', 'ollama.exe');
 }
 
-async function waitForOllama(maxMs = 30000) {
-  const deadline = Date.now() + maxMs;
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch('http://127.0.0.1:11434/');
-      if (res.ok || res.status < 500) return;
-    } catch (_) { /* not ready */ }
-    await new Promise(r => setTimeout(r, 500));
+function parseOllamaPortFromEnv(urlStr, defaultPort) {
+  try {
+    const u = new URL(String(urlStr || '').trim() || `http://127.0.0.1:${defaultPort}`);
+    if (u.port) return parseInt(u.port, 10);
+    return defaultPort;
+  } catch (_) {
+    return defaultPort;
   }
-  throw new Error(`Ollama did not start within ${maxMs / 1000}s`);
 }
 
-async function ensureOllamaRunning() {
+function resolveOllamaPorts(dotenv) {
+  const env = dotenv || getEffectiveDotenv();
+  return {
+    chatPort: parseOllamaPortFromEnv(env.LOCALAI_BASE_URL, 11434),
+    embedPort: parseOllamaPortFromEnv(env.LOCALAI_EMBEDDING_BASE_URL, 11435),
+  };
+}
+
+function ollamaBaseURL(port) {
+  return `http://127.0.0.1:${port}`;
+}
+
+async function isOllamaReachable(port) {
+  try {
+    const res = await fetch(`${ollamaBaseURL(port)}/`);
+    return res.ok || res.status < 500;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function waitForOllamaStopped(ports, maxMs = 15000) {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    let anyUp = false;
+    for (const port of ports) {
+      if (await isOllamaReachable(port)) {
+        anyUp = true;
+        break;
+      }
+    }
+    if (!anyUp) return true;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return false;
+}
+
+function forceKillOllamaProcesses() {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      execFile('taskkill', ['/F', '/IM', 'ollama.exe', '/T'], { windowsHide: true }, () => resolve());
+      return;
+    }
+    execFile('pkill', ['-f', 'ollama serve'], { windowsHide: true }, () => resolve());
+  });
+}
+
+async function stopManagedOllamaProcess(proc) {
+  if (!proc || proc.killed) return;
+  try {
+    proc.kill('SIGTERM');
+  } catch (_) { /* ignore */ }
+  await new Promise((resolve) => {
+    const t = setTimeout(() => {
+      try {
+        if (proc && !proc.killed) proc.kill('SIGKILL');
+      } catch (_) { /* ignore */ }
+      resolve();
+    }, 3000);
+    proc.once('exit', () => { clearTimeout(t); resolve(); });
+  });
+}
+
+/** Stop both Ollama servers (chat + embedding). */
+async function stopOllamaServer() {
+  log('Stopping Ollama servers…');
+  const { chatPort, embedPort } = resolveOllamaPorts(getEffectiveDotenv());
+  await stopManagedOllamaProcess(ollamaChatProcess);
+  await stopManagedOllamaProcess(ollamaEmbedProcess);
+  ollamaChatProcess = null;
+  ollamaEmbedProcess = null;
+
+  const ports = [chatPort, embedPort];
+  const anyUp = (await isOllamaReachable(chatPort)) || (await isOllamaReachable(embedPort));
+  if (anyUp) {
+    await forceKillOllamaProcesses();
+    const stopped = await waitForOllamaStopped(ports, 15000);
+    if (!stopped) {
+      log(`Ollama still reachable on :${chatPort} or :${embedPort} after stop attempt`);
+      return { ok: false, error: `Could not stop Ollama on ports ${chatPort} and ${embedPort}.` };
+    }
+  }
+  log('Ollama servers stopped');
+  return { ok: true };
+}
+
+async function waitForOllama(maxMs, port) {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    if (await isOllamaReachable(port)) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`Ollama did not start on port ${port} within ${maxMs / 1000}s`);
+}
+
+async function preloadOllamaChatModel(port, model) {
+  const name = String(model || '').trim();
+  if (!name) return;
+  try {
+    const res = await fetch(`${ollamaBaseURL(port)}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: name, prompt: '', stream: false, keep_alive: -1 }),
+    });
+    if (!res.ok) log(`Chat model preload warning (${name}): HTTP ${res.status}`);
+    else log(`Preloaded chat model ${name} on :${port}`);
+  } catch (e) {
+    log(`Chat model preload warning: ${e.message}`);
+  }
+}
+
+async function preloadOllamaEmbedModel(port, model) {
+  const name = String(model || '').trim();
+  if (!name) return;
+  try {
+    const res = await fetch(`${ollamaBaseURL(port)}/api/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: name, input: 'preload', keep_alive: -1 }),
+    });
+    if (!res.ok) log(`Embedding model preload warning (${name}): HTTP ${res.status}`);
+    else log(`Preloaded embedding model ${name} on :${port}`);
+  } catch (e) {
+    log(`Embedding model preload warning: ${e.message}`);
+  }
+}
+
+async function spawnOllamaServer(role, port, logFd) {
+  const ollamaExe = getOllamaExe();
+  const env = buildOllamaSpawnEnv(role, port);
+  if (role === 'chat' && env.CUDA_VISIBLE_DEVICES === '-1') {
+    log(`Starting chat Ollama on :${port} with CUDA_VISIBLE_DEVICES=-1 (CPU-only)`);
+  } else {
+    log(`Starting ${role} Ollama on :${port}`);
+  }
+  const proc = spawn(ollamaExe, ['serve'], {
+    windowsHide: true,
+    stdio: ['ignore', logFd ?? 'ignore', logFd ?? 'ignore'],
+    env,
+  });
+  proc.on('exit', (code) => log(`Ollama ${role} exited (code=${code})`));
+  proc.on('error', (err) => log(`Ollama ${role} error: ${err.message}`));
+  await waitForOllama(30000, port);
+  return proc;
+}
+
+async function ensureBothOllamaServers(forceSpawn = false) {
   const ollamaExe = getOllamaExe();
   if (!fs.existsSync(ollamaExe)) {
     return { ok: false, error: 'Ollama executable not found' };
   }
-  try {
-    const r = await fetch('http://127.0.0.1:11434/');
-    if (r.ok || r.status < 500) {
-      log('Ollama already running');
+
+  const { chatPort, embedPort } = resolveOllamaPorts(getEffectiveDotenv());
+  const { chatModel, embeddingModel } = resolveLocalAIModels(getEffectiveDotenv());
+
+  if (!forceSpawn) {
+    const chatUp = await isOllamaReachable(chatPort);
+    const embedUp = await isOllamaReachable(embedPort);
+    if (chatUp && embedUp) {
+      log(`Ollama chat (:${chatPort}) and embedding (:${embedPort}) already running`);
       return { ok: true };
     }
-  } catch (_) { /* not running yet */ }
+  } else if (await isOllamaReachable(chatPort) || await isOllamaReachable(embedPort)) {
+    return {
+      ok: false,
+      error: `Ollama still running on :${chatPort} or :${embedPort}; stop it before starting new instances.`,
+    };
+  }
+
   const paths = getPaths();
   let logFd;
   const logFile = getAppLogFile(paths, activeDotenv || {});
   try { logFd = fs.openSync(logFile, 'a'); } catch (_) { /* ignore */ }
-  ollamaProcess = spawn(ollamaExe, ['serve'], {
-    windowsHide: true,
-    stdio: ['ignore', logFd ?? 'ignore', logFd ?? 'ignore'],
-    env: { ...process.env, OLLAMA_NUM_CTX: '32768' },
-  });
-  ollamaProcess.on('exit', (code) => log(`Ollama exited (code=${code})`));
-  ollamaProcess.on('error', (err) => log(`Ollama error: ${err.message}`));
+
   try {
-    await waitForOllama(30000);
-    log('Ollama server ready');
+    if (forceSpawn || !(await isOllamaReachable(chatPort))) {
+      ollamaChatProcess = await spawnOllamaServer('chat', chatPort, logFd);
+      await preloadOllamaChatModel(chatPort, chatModel);
+    }
+    if (forceSpawn || !(await isOllamaReachable(embedPort))) {
+      ollamaEmbedProcess = await spawnOllamaServer('embed', embedPort, logFd);
+      await preloadOllamaEmbedModel(embedPort, embeddingModel);
+    }
+    log(`Ollama servers ready (chat :${chatPort}, embedding :${embedPort})`);
     return { ok: true };
   } catch (err) {
     log(`start-ollama: ${err.message}`);
     return { ok: false, error: err.message };
   }
+}
+
+async function ensureOllamaRunning(forceSpawn = false) {
+  return ensureBothOllamaServers(forceSpawn);
 }
 
 // ---------------------------------------------------------------------------
@@ -686,9 +847,7 @@ async function shutdown() {
   }
   await forceKillDigitalMuseumWindows();
 
-  if (ollamaProcess && !ollamaProcess.killed) {
-    ollamaProcess.kill('SIGTERM');
-  }
+  await stopOllamaServer();
 
   log('Shutdown complete');
 }
@@ -807,7 +966,7 @@ ipcMain.handle('confirm-continue-without-ai', async () => {
     type: 'warning',
     title: 'Local AI Setup Incomplete',
     message: 'Local AI setup is incomplete.',
-    detail: 'Some features may not be available until Ollama is running and both required models are installed (gemma4 and embeddinggemma). Do you want to continue signing in?',
+    detail: 'Some features may not be available until Ollama is running and both required Local AI models are installed. Do you want to continue signing in?',
     buttons: ['Continue Sign In', 'Go to AI Setup'],
     defaultId: 1,
     cancelId: 1,
@@ -945,11 +1104,67 @@ ipcMain.handle('suggest-archive-db-path', (_event, name) => {
 
 // ── Ollama local AI ───────────────────────────────────────────────────────────
 
+/** Merged dotenv: defaults < userData .env < project .env (dev) < activeDotenv. */
+function reloadActiveDotenvFromFiles() {
+  const paths = getPaths();
+  activeDotenv = {
+    ...loadDotEnv(paths.dotEnvDefaults),
+    ...loadDotEnv(paths.dotEnvPath),
+    ...(app.isPackaged ? {} : loadDotEnv(path.join(__dirname, '..', '.env'))),
+  };
+  return activeDotenv;
+}
+
+function getEffectiveDotenv() {
+  const paths = getPaths();
+  return {
+    ...loadDotEnv(paths.dotEnvDefaults),
+    ...loadDotEnv(paths.dotEnvPath),
+    ...(app.isPackaged ? {} : loadDotEnv(path.join(__dirname, '..', '.env'))),
+    ...(activeDotenv || {}),
+  };
+}
+
+/** Base model name before tag (e.g. gemma4 from gemma4:latest) — mirrors Go OllamaModelBaseName. */
+function ollamaModelBaseName(name) {
+  const n = String(name || '').trim().toLowerCase();
+  const i = n.indexOf(':');
+  return i >= 0 ? n.slice(0, i) : n;
+}
+
+/** Chat and embedding model names from LOCALAI_* env (same rules as Go ResolveEmbeddingModelName). */
+function resolveLocalAIModels(dotenv) {
+  const env = dotenv || {};
+  const chatModel = String(env.LOCALAI_MODEL_NAME || 'local-model').trim();
+  const embeddingRaw = String(env.LOCALAI_EMBEDDING_MODEL || '').trim();
+  const embeddingModel = embeddingRaw || chatModel;
+  return { chatModel, embeddingModel };
+}
+
+/** Environment for Ollama child processes (serve / pull). role: chat | embed */
+function buildOllamaSpawnEnv(role, port) {
+  const env = {
+    ...process.env,
+    OLLAMA_HOST: `127.0.0.1:${port}`,
+    OLLAMA_KEEP_ALIVE: '-1',
+    OLLAMA_MAX_LOADED_MODELS: '1',
+  };
+  if (role === 'chat') {
+    env.OLLAMA_NUM_CTX = '32768';
+    const cuda = String(getEffectiveDotenv().CUDA_VISIBLE_DEVICES || '').trim();
+    if (cuda === '-1') {
+      env.CUDA_VISIBLE_DEVICES = '-1';
+    }
+  }
+  return env;
+}
+
 ipcMain.handle('check-ollama-model', () => {
   const ollamaExe = getOllamaExe();
   if (!fs.existsSync(ollamaExe)) {
     return { ok: false, error: 'Ollama executable not found at ' + ollamaExe };
   }
+  const { chatModel, embeddingModel } = resolveLocalAIModels(getEffectiveDotenv());
   // Check manifest directories — avoids spawning the CLI which needs a running daemon.
   const libDir = path.join(
     require('os').homedir(),
@@ -959,9 +1174,18 @@ ipcMain.handle('check-ollama-model', () => {
     const d = path.join(libDir, name);
     return fs.existsSync(d) && fs.readdirSync(d).length > 0;
   };
-  const hasGemma4         = hasDir('gemma4');
-  const hasEmbeddingModel = hasDir('embeddinggemma');
-  return { ok: true, hasModel: hasGemma4 && hasEmbeddingModel, hasGemma4, hasEmbeddingModel };
+  const hasChatModel = hasDir(ollamaModelBaseName(chatModel));
+  const hasEmbeddingModel = hasDir(ollamaModelBaseName(embeddingModel));
+  return {
+    ok: true,
+    hasModel: hasChatModel && hasEmbeddingModel,
+    hasChatModel,
+    hasEmbeddingModel,
+    chatModel,
+    embeddingModel,
+    // Legacy field names used by older login.html checks.
+    hasGemma4: hasChatModel,
+  };
 });
 
 // Pull a single Ollama model and stream progress events.
@@ -969,7 +1193,7 @@ ipcMain.handle('check-ollama-model', () => {
 // Does NOT send a 'done' event — the caller sends it after all models finish.
 function pullOllamaModel(ollamaExe, modelName, send) {
   return new Promise((resolve) => {
-    const proc = spawn(ollamaExe, ['pull', modelName], { windowsHide: true });
+    const proc = spawn(ollamaExe, ['pull', modelName], { windowsHide: true, env: buildOllamaSpawnEnv('chat', resolveOllamaPorts().chatPort) });
     const fmtGB = (bytes) => (bytes / 1e9).toFixed(2) + ' GB';
     const parseLine = (line) => {
       const t = line.trim();
@@ -1005,26 +1229,38 @@ function pullOllamaModel(ollamaExe, modelName, send) {
 
 ipcMain.handle('pull-ollama-model', async () => {
   const ollamaExe = getOllamaExe();
+  const { chatModel, embeddingModel } = resolveLocalAIModels(getEffectiveDotenv());
   const send = (evt) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('ollama-pull-progress', evt);
     }
   };
 
-  send({ type: 'status', status: 'Downloading chat model (gemma4:latest)…' });
-  const r1 = await pullOllamaModel(ollamaExe, 'gemma4:latest', send);
-  if (!r1.ok) return r1;
+  const modelsToPull = [chatModel];
+  if (ollamaModelBaseName(embeddingModel) !== ollamaModelBaseName(chatModel)) {
+    modelsToPull.push(embeddingModel);
+  }
 
-  send({ type: 'status', status: 'Downloading embedding model (embeddinggemma:latest)…' });
-  const r2 = await pullOllamaModel(ollamaExe, 'embeddinggemma:latest', send);
-  if (!r2.ok) return r2;
+  for (const modelName of modelsToPull) {
+    send({ type: 'status', status: `Downloading model (${modelName})…` });
+    const result = await pullOllamaModel(ollamaExe, modelName, send);
+    if (!result.ok) return result;
+  }
 
   send({ type: 'done', ok: true });
   return { ok: true };
 });
 
 ipcMain.handle('start-ollama', async () => {
-  return ensureOllamaRunning();
+  return ensureOllamaRunning(false);
+});
+
+ipcMain.handle('restart-ollama', async () => {
+  reloadActiveDotenvFromFiles();
+  const stop = await stopOllamaServer();
+  if (!stop.ok) return stop;
+  await new Promise((r) => setTimeout(r, 400));
+  return ensureBothOllamaServers(true);
 });
 
 ipcMain.handle('get-auto-start-local-ai', () => {

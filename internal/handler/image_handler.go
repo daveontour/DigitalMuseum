@@ -24,6 +24,7 @@ import (
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/daveontour/aimuseum/internal/appctx"
+	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/importer"
 	"github.com/daveontour/aimuseum/internal/keystore"
@@ -2434,7 +2435,7 @@ func classifyImageKeywordsWithOllama(ctx context.Context, encodedImageB64 string
 		baseURL = "http://localhost:11434"
 	}
 	reqBody := ollamaImageChatRequest{
-		Model:  "gemma4:latest",
+		Model:  config.LocalAIRuntimeStore().ChatModel(),
 		Stream: false,
 		Messages: []ollamaImageMessage{
 			{

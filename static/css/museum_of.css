@@ -3324,7 +3324,7 @@ body {
     color: var(--color-text-muted);
 }
 
-/* Configuration → AI & Setup (Local AI / Ollama — mirrors login advanced panel) */
+/* Configuration → Local AI Setup (Ollama — mirrors login advanced panel) */
 .local-ai-setup-panel {
     padding: 20px;
 }
@@ -3348,6 +3348,48 @@ body {
     font-size: var(--text-md);
     line-height: var(--line-height-body);
     max-width: none;
+}
+
+.local-ai-setup-use-toggle {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-deep);
+    border: 1px solid var(--color-border-subtle);
+}
+
+.local-ai-setup-use-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-weight: 600;
+    color: var(--color-text);
+    cursor: pointer;
+    margin: 0;
+}
+
+.local-ai-setup-use-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--color-blue);
+}
+
+.local-ai-setup-use-hint {
+    margin: 8px 0 0 28px;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--line-height-body);
+}
+
+.local-ai-setup-use-status {
+    display: block;
+    margin: 8px 0 0 28px;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    min-height: 1.2em;
 }
 
 .local-ai-setup-status-rows {
@@ -3412,6 +3454,25 @@ body {
     color: var(--color-text-muted);
     font-size: var(--text-sm);
     margin-top: 4px;
+}
+
+.local-ai-setup-model-settings {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.local-ai-setup-model-settings .form-control {
+    max-width: 28rem;
+    margin-top: 0.35rem;
+}
+
+.local-ai-setup-apply-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
 }
 
 .local-ai-setup-footer-hint {
@@ -10545,6 +10606,18 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     transition: background 0.15s ease, color 0.15s ease;
 }
 
+.chat-context-request-only-seg {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.chat-context-request-only-seg input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: #4a90e2;
+}
+
 .chat-context-status-clickable:hover {
     background: rgba(255, 255, 255, 0.08);
     color: #e8eef8;
@@ -10615,6 +10688,42 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 .chat-auto-routing-reason-actions {
     display: flex;
     justify-content: flex-end;
+}
+
+.hosted-llm-order-panels-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.hosted-llm-classifier-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+}
+
+.hosted-llm-classifier-row label {
+    display: inline;
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+.hosted-llm-classifier-row select {
+    width: 120px;
+    flex: 1 1 12rem;
+}
+
+.hosted-llm-order-panels-row .hosted-llm-order-panel {
+    flex: 1 1 280px;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.hosted-llm-order-panels-row .hosted-llm-order-list {
+    max-width: none;
+    width: 100%;
 }
 
 .hosted-llm-order-list {

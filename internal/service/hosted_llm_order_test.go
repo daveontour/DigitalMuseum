@@ -56,6 +56,13 @@ func TestParseHostedLLMProviderOrderJSON(t *testing.T) {
 	if cfg.ClassifierProvider != "gemini" {
 		t.Fatalf("classifier=%q want gemini", cfg.ClassifierProvider)
 	}
+	if !cfg.FailoverEnabled {
+		t.Fatalf("failover_enabled default true, got false")
+	}
+	cfgDisabled := parseHostedLLMProviderOrderJSON(`{"failover_enabled":false}`)
+	if cfgDisabled.FailoverEnabled {
+		t.Fatalf("failover_enabled=false not parsed")
+	}
 	cfgDefault := parseHostedLLMProviderOrderJSON("")
 	if len(cfgDefault.FailoverOrder) != 4 || cfgDefault.FailoverOrder[0] != "gemini" {
 		t.Fatalf("default failover=%v", cfgDefault.FailoverOrder)
