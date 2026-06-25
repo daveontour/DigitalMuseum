@@ -32,33 +32,10 @@ function installVisitorFeatureGateCapture() {
 }
 
 const AppActions = {
-    // [CONSTANTS.FUNCTION_NAMES.FirstFunction]: async () => { // getFacebookChatters
-    //     UI.clearError();
-    //     DOM.infoBox.classList.add('hidden');
-    //     UI.setControlsEnabled(false);
-    //     UI.showLoadingIndicator();
-    //     try {
-    //         const data = await ApiService.fetchFacebookChatters();
-    //         let markdownText = '# Facebook Chat Statistics\n\n|Participant|Number of Messages|\n|-----|---|\n';
-    //         for (const message of Object.values(data)) { // Iterate over values if data is an object
-    //             markdownText += `| ${message.participant[0].name} |${message.number_of_messages}|\n`;
-    //         }
-    //         Chat.addMessage('assistant', markdownText, true);
-    //     } catch (error) {
-    //         console.error('Error in getFacebookChatters:', error);
-    //         UI.displayError("Failed to get FB chatters: " + error.message);
-    //     } finally {
-    //         UI.setControlsEnabled(true);
-    //         UI.hideLoadingIndicator();
-    //     }
-    // },
     ["showFBAlbumsOptions"]: () => Modals.FBAlbums.open(),    // showFBAlbumsOptions
     ["openGeoModal"]: () => { void Modals.Locations.open(); }, // showGeoMetadataOptions
     ["showEmailGallery"]: () => Modals.EmailGallery.open(), // showEmailGalleryOptions
-    //[CONSTANTS.FUNCTION_NAMES.FifthFunction]: () => SSE.browserFunctions.showLocationInfo(), // showTileAlbumOptions
     ["showImageGallery"]: () => Modals.ImageGallery.open(),
-    //[CONSTANTS.FUNCTION_NAMES.SeventhFunction]: () => SSE.browserFunctions.testEmail(), // showImageGalleryOptions
- // showEmailGalleryOptions
     ["listContacts"]: () => Modals.Contacts.open(),
     ["openIdentityWizard"]: () => Modals.IdentityProfileWizard && Modals.IdentityProfileWizard.open(),
 
@@ -1594,13 +1571,6 @@ const App = (() => {
                         ? '<strong style="color:#15803d;">Key set</strong> — ElevenLabs integrations can use your API key' + (sess ? ' <span style="color:#64748b;font-weight:normal;">(this session)</span>' : '')
                         : '<span style="color:#64748b;">No personal ElevenLabs key in Settings — server default or none</span>';
                     parts.push(row2('<span style="color:#64748b;">ElevenLabs</span>', `<span>${elVal}</span>`));
-                    // const deepKeyVal = ls.deepseek_api_key_set
-                    //     ? '<strong style="color:#15803d;">Key set</strong> — DeepSeek can use your API key' + (sess ? ' <span style="color:#64748b;font-weight:normal;">(this session)</span>' : '')
-                    //     : '<span style="color:#64748b;">No personal DeepSeek key in Settings — server default or none</span>';
-                    // parts.push(row2('<span style="color:#64748b;">DeepSeek (API key)</span>', `<span>${deepKeyVal}</span>`));
-                    // if (sess) {
-                    //     parts.push('<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:0.85rem;color:#64748b;">Visitor session: keys you leave blank use the archive owner’s saved keys when available, then server defaults.</div>');
-                    // }
                 } else if (meRes.status === 401 || !meRes.ok) {
                     parts.push('<p style="margin:12px 0 0;font-size:0.85rem;color:#64748b;">Sign in to save personal API keys under <strong>Settings → Your API keys &amp; models</strong>.</p>');
                 }
@@ -2304,9 +2274,6 @@ const App = (() => {
                 case 'heartbeat':
                     // Keep connection alive - no UI update needed
                     break;
-
-                default:
-                    console.log('Unknown event type:', type);
             }
         }
 
@@ -4394,12 +4361,6 @@ const App = (() => {
                 Modals.FBPosts.open();
             });
         }
-
-        // if (DOM.imageGallerySidebarBtn) {
-        //     DOM.imageGallerySidebarBtn.addEventListener('click', () => {
-        //         Modals.ImageGallery.open();
-        //     });
-        // }
 
         if (DOM.locationsSidebarBtn) {
             DOM.locationsSidebarBtn.addEventListener('click', () => {

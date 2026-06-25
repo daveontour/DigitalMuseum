@@ -18,7 +18,7 @@ func ClearFacebookAllDataForUser(ctx context.Context, pool *sql.DB, userID int64
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Messenger: delete attachment media_items and their blobs.
 	if _, err = sqlutil.DeleteMediaItemsByUserAndSourceTx(ctx, tx, userID, "Facebook"); err != nil {

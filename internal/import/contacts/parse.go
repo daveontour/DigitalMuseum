@@ -52,7 +52,7 @@ func ParseEmailEntry(entry string) (email, name string) {
 	emailMatch := emailRegex.FindString(entry)
 	if emailMatch != "" {
 		email = emailMatch
-		name = strings.TrimSpace(strings.Replace(entry, emailMatch, "", -1))
+		name = strings.TrimSpace(strings.ReplaceAll(entry, emailMatch, ""))
 		name = strings.Trim(name, " ()")
 		email = strings.ReplaceAll(email, `"`, "")
 		name = strings.ReplaceAll(name, `"`, "")

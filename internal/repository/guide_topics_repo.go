@@ -35,9 +35,9 @@ func scanGuideTopicRow(row interface{ Scan(...any) error }) (*model.GuideTopicRo
 func (r *GuideTopicsRepo) ListAll(ctx context.Context) ([]*model.GuideTopicRow, error) {
 	rows, err := r.pool.QueryContext(ctx, `SELECT id, key, text FROM guide_topics ORDER BY id`)
 	if err != nil {
-		return nil, fmt.Errorf("ListAll guide_topics: %w", err)
+		return nil, fmt.Errorf("listAll guide_topics: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.GuideTopicRow
 	for rows.Next() {
 		row, err := scanGuideTopicRow(rows)
@@ -80,7 +80,7 @@ func (r *GuideTopicsRepo) KeyExists(ctx context.Context, key string) (bool, erro
 	var n int
 	err := r.pool.QueryRowContext(ctx, `SELECT COUNT(1) FROM guide_topics WHERE key = ?`, key).Scan(&n)
 	if err != nil {
-		return false, fmt.Errorf("KeyExists guide_topics: %w", err)
+		return false, fmt.Errorf("keyExists guide_topics: %w", err)
 	}
 	return n > 0, nil
 }
@@ -91,7 +91,7 @@ func (r *GuideTopicsRepo) KeyExistsExcluding(ctx context.Context, key string, ex
 	err := r.pool.QueryRowContext(ctx,
 		`SELECT COUNT(1) FROM guide_topics WHERE key = ? AND id != ?`, key, excludeID).Scan(&n)
 	if err != nil {
-		return false, fmt.Errorf("KeyExistsExcluding guide_topics: %w", err)
+		return false, fmt.Errorf("keyExistsExcluding guide_topics: %w", err)
 	}
 	return n > 0, nil
 }
@@ -100,11 +100,11 @@ func (r *GuideTopicsRepo) KeyExistsExcluding(ctx context.Context, key string, ex
 func (r *GuideTopicsRepo) Create(ctx context.Context, key, text string) (*model.GuideTopicRow, error) {
 	res, err := r.pool.ExecContext(ctx, `INSERT INTO guide_topics (key, text) VALUES (?, ?)`, key, text)
 	if err != nil {
-		return nil, fmt.Errorf("Create guide_topic: %w", err)
+		return nil, fmt.Errorf("create guide_topic: %w", err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("Create guide_topic last insert id: %w", err)
+		return nil, fmt.Errorf("create guide_topic last insert id: %w", err)
 	}
 	return r.GetByID(ctx, id)
 }
@@ -113,7 +113,7 @@ func (r *GuideTopicsRepo) Create(ctx context.Context, key, text string) (*model.
 func (r *GuideTopicsRepo) Update(ctx context.Context, id int64, key, text string) (*model.GuideTopicRow, error) {
 	res, err := r.pool.ExecContext(ctx, `UPDATE guide_topics SET key = ?, text = ? WHERE id = ?`, key, text, id)
 	if err != nil {
-		return nil, fmt.Errorf("Update guide_topic: %w", err)
+		return nil, fmt.Errorf("update guide_topic: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
@@ -129,7 +129,7 @@ func (r *GuideTopicsRepo) Update(ctx context.Context, id int64, key, text string
 func (r *GuideTopicsRepo) Delete(ctx context.Context, id int64) (bool, error) {
 	res, err := r.pool.ExecContext(ctx, `DELETE FROM guide_topics WHERE id = ?`, id)
 	if err != nil {
-		return false, fmt.Errorf("Delete guide_topic: %w", err)
+		return false, fmt.Errorf("delete guide_topic: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
@@ -142,7 +142,7 @@ func (r *GuideTopicsRepo) Delete(ctx context.Context, id int64) (bool, error) {
 func (r *GuideTopicsRepo) DeleteAll(ctx context.Context) (int64, error) {
 	res, err := r.pool.ExecContext(ctx, `DELETE FROM guide_topics`)
 	if err != nil {
-		return 0, fmt.Errorf("DeleteAll guide_topics: %w", err)
+		return 0, fmt.Errorf("deleteAll guide_topics: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {

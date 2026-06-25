@@ -293,13 +293,13 @@ func (p *DeepSeekProvider) post(ctx context.Context, body map[string]any) (map[s
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("DeepSeek API %d: %s", resp.StatusCode, string(data))
+		return nil, fmt.Errorf("deepSeek API %d: %s", resp.StatusCode, string(data))
 	}
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {

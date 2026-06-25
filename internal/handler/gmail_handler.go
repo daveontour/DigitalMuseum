@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"sort"
@@ -479,7 +480,7 @@ func (h *GmailHandler) runGmailImport(ctx context.Context, tok *oauth2.Token, la
 			`SELECT uid FROM emails WHERE user_id = ?1 OR (?1 IS NULL AND user_id IS NULL)`,
 			uidArg)
 		if err == nil {
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 			for rows.Next() {
 				var u string
 				if rows.Scan(&u) == nil {
@@ -575,7 +576,7 @@ func (h *GmailHandler) importLabel(
 			break
 		}
 		if err := h.storeGmailEmail(ctx, msg); err != nil {
-			fmt.Printf("[Gmail] warning storing email %s: %s\n", msg.UID, err)
+			slog.Warn("[Gmail] warning storing email %s: %s\n", msg.UID, err)
 			continue
 		}
 		count++
@@ -636,7 +637,7 @@ func (h *GmailHandler) storeGmailEmail(ctx context.Context, msg *appgmail.Messag
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var emailID int64
 	err = tx.QueryRowContext(ctx, `

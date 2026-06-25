@@ -31,7 +31,7 @@ func (r *InterviewRepo) CreateInterview(ctx context.Context, title, style, purpo
 	).Scan(&iv.ID, &iv.Title, &iv.Style, &iv.Purpose, &iv.PurposeDetail,
 		&iv.State, &iv.Provider, &iv.CreatedAt, &iv.UpdatedAt, &iv.LastTurnAt)
 	if err != nil {
-		return nil, fmt.Errorf("CreateInterview: %w", err)
+		return nil, fmt.Errorf("createInterview: %w", err)
 	}
 	return &iv, nil
 }
@@ -55,7 +55,7 @@ func (r *InterviewRepo) GetInterview(ctx context.Context, id int64) (*model.Inte
 		if err.Error() == "no rows in result set" {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetInterview %d: %w", id, err)
+		return nil, fmt.Errorf("getInterview %d: %w", id, err)
 	}
 	iv.SetHasWriteupFromWriteup()
 	return &iv, nil
@@ -79,9 +79,9 @@ func (r *InterviewRepo) ListInterviews(ctx context.Context, stateFilter string) 
 	q += " ORDER BY COALESCE(i.last_turn_at, i.created_at) DESC"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListInterviews: %w", err)
+		return nil, fmt.Errorf("listInterviews: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.Interview
 	for rows.Next() {
 		var iv model.Interview
@@ -110,7 +110,7 @@ func (r *InterviewRepo) SaveWriteup(ctx context.Context, id int64, writeup strin
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("SaveWriteup: interview %d not found or not accessible", id)
+		return fmt.Errorf("saveWriteup: interview %d not found or not accessible", id)
 	}
 	return nil
 }
@@ -131,7 +131,7 @@ func (r *InterviewRepo) SaveTurn(ctx context.Context, interviewID int64, questio
 	uid := uidFromCtx(ctx)
 	tx, err := r.pool.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("SaveTurn begin tx: %w", err)
+		return nil, fmt.Errorf("saveTurn begin tx: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
@@ -145,17 +145,17 @@ func (r *InterviewRepo) SaveTurn(ctx context.Context, interviewID int64, questio
 		interviewID, question, uidVal(uid),
 	).Scan(&t.ID, &t.InterviewID, &t.Question, &t.Answer, &t.TurnNumber, &t.CreatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("SaveTurn insert: %w", err)
+		return nil, fmt.Errorf("saveTurn insert: %w", err)
 	}
 
 	_, err = tx.ExecContext(ctx,
 		`UPDATE interviews SET last_turn_at = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2`,
 		time.Now(), interviewID)
 	if err != nil {
-		return nil, fmt.Errorf("SaveTurn update interview: %w", err)
+		return nil, fmt.Errorf("saveTurn update interview: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("SaveTurn commit: %w", err)
+		return nil, fmt.Errorf("saveTurn commit: %w", err)
 	}
 	return &t, nil
 }
@@ -189,9 +189,9 @@ func (r *InterviewRepo) GetTurns(ctx context.Context, interviewID int64) ([]*mod
 		 ORDER BY turn_number ASC`,
 		interviewID)
 	if err != nil {
-		return nil, fmt.Errorf("GetTurns: %w", err)
+		return nil, fmt.Errorf("getTurns: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.InterviewTurn
 	for rows.Next() {
 		var t model.InterviewTurn
@@ -216,7 +216,7 @@ func (r *InterviewRepo) GetLastTurn(ctx context.Context, interviewID int64) (*mo
 		if err.Error() == "no rows in result set" {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetLastTurn: %w", err)
+		return nil, fmt.Errorf("getLastTurn: %w", err)
 	}
 	return &t, nil
 }

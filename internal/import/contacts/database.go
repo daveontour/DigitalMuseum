@@ -72,7 +72,7 @@ func ReadFromDatabase(ctx context.Context, db *sql.DB, query string, args ...any
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var records []InputRecord
 	emailMap := make(map[string][]string)
@@ -117,7 +117,7 @@ func ReadRelationshipsFromDatabase(ctx context.Context, db *sql.DB, query string
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var relationships []RelationshipRecord
 	for rows.Next() {
@@ -170,7 +170,7 @@ func WriteContactsToDatabase(ctx context.Context, db *sql.DB, records []Formatte
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	fmt.Fprintf(os.Stderr, "Contacts transaction begun\n")
 
 	var subjectIds SubjectIdentifiers
@@ -398,103 +398,4 @@ func resetSQLiteContactsSequence(ctx context.Context, tx *sql.Tx) error {
 	}
 	_, err := tx.ExecContext(ctx, "INSERT INTO sqlite_sequence (name, seq) VALUES ('contacts', ?)", n)
 	return err
-}
-
-// LoadSubjectIdentifiers loads the subject's (id=0) identifiers from the contacts table.
-func LoadSubjectIdentifiers(ctx context.Context, db *sql.DB) (*SubjectIdentifiers, error) {
-	var ids SubjectIdentifiers
-	err := db.QueryRowContext(ctx, "SELECT whatsappid, imessageid, smsid, facebookid, instagramid FROM contacts WHERE id = 0").Scan(
-		&ids.WhatsAppID, &ids.IMessageID, &ids.SMSID, &ids.FacebookID, &ids.InstagramID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("load subject identifiers: %w", err)
-	}
-	return &ids, nil
-}
-
-// normalizeForMatch normalizes an identifier for matching (strip spaces, +, leading zeros).
-func normalizeForMatch(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.ReplaceAll(s, " ", "")
-	s = strings.ReplaceAll(s, "+", "")
-	s = strings.ReplaceAll(s, "-", "")
-	for len(s) > 1 && s[0] == '0' {
-		s = s[1:]
-	}
-	return strings.ToLower(s)
-}
-
-// DirectionalCounts holds message counts by direction for a (chat_session, service) pair.
-type DirectionalCounts struct {
-	FromSubject int64
-	FromContact int64
-}
-
-// GetDirectionalMessageCounts returns message counts by direction for the given chat_session and service.
-// subjectIdentifiers: comma-separated values for the subject's identifier(s) for this service.
-func GetDirectionalMessageCounts(ctx context.Context, db *sql.DB, chatSession, service string, subjectID *string) (DirectionalCounts, error) {
-	serviceVal := service
-	switch service {
-	case "whatsapp":
-		serviceVal = "WhatsApp"
-	case "imessage":
-		serviceVal = "iMessage"
-	case "facebook":
-		serviceVal = "Facebook Messenger"
-	case "sms":
-		serviceVal = "SMS"
-	case "instagram":
-		serviceVal = "Instagram"
-	default:
-		return DirectionalCounts{}, fmt.Errorf("unknown service: %s", service)
-	}
-
-	rows, err := db.QueryContext(ctx,
-		`SELECT sender_id FROM messages WHERE chat_session = ?1 AND service = ?2`,
-		chatSession, serviceVal)
-	if err != nil {
-		return DirectionalCounts{}, fmt.Errorf("query messages: %w", err)
-	}
-	defer rows.Close()
-
-	var subjectNormSet map[string]struct{}
-	if subjectID != nil && *subjectID != "" {
-		for _, part := range strings.Split(*subjectID, ",") {
-			norm := normalizeForMatch(strings.TrimSpace(part))
-			if norm != "" {
-				if subjectNormSet == nil {
-					subjectNormSet = make(map[string]struct{})
-				}
-				subjectNormSet[norm] = struct{}{}
-			}
-		}
-	}
-
-	var fromSubject, fromContact int64
-	for rows.Next() {
-		var senderID *string
-		if err := rows.Scan(&senderID); err != nil {
-			return DirectionalCounts{}, fmt.Errorf("scan sender_id: %w", err)
-		}
-		if senderID == nil || *senderID == "" {
-			continue
-		}
-		senderNorm := normalizeForMatch(*senderID)
-		if subjectNormSet != nil {
-			if _, ok := subjectNormSet[senderNorm]; ok {
-				fromSubject++
-				continue
-			}
-		}
-		fromContact++
-	}
-	if err := rows.Err(); err != nil {
-		return DirectionalCounts{}, fmt.Errorf("iterate rows: %w", err)
-	}
-	// When no subject identifiers, split total evenly as fallback
-	if len(subjectNormSet) == 0 {
-		total := fromSubject + fromContact
-		fromSubject = total / 2
-		fromContact = total - fromSubject
-	}
-	return DirectionalCounts{FromSubject: fromSubject, FromContact: fromContact}, nil
 }

@@ -98,7 +98,7 @@ func (s *ArchiveProvisionService) CreateArchiveWithFirstUser(
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(time.Hour)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pingCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()

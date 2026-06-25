@@ -57,7 +57,7 @@ func New(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	db.SetConnMaxLifetime(time.Hour)
 
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 	return &DB{Std: db}, nil
@@ -82,7 +82,7 @@ func NewBilling(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	db.SetMaxOpenConns(1)
 	db.SetConnMaxLifetime(time.Hour)
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("ping billing sqlite: %w", err)
 	}
 	return &DB{Std: db}, nil

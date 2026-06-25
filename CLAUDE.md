@@ -72,10 +72,11 @@ make run                          # go run ./cmd/server
 # Build binaries
 make build-exe                    # bin/digitalmuseum.exe
 # Do not use bare `go build ./...` — CGO needs -I./cgo-compat (see Makefile); plain go build fails on sqlite3.h
+# Fix: `make build-exe`, `source scripts/cgo-env.sh`, or `./scripts/build-exe.sh` (see .cursor/rules/build-cgo.mdc)
 
 # Tests / lint
 make test
-make lint                         # requires golangci-lint
+make lint                         # golangci-lint v2.4+ (Go 1.25): go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 make tidy                         # go mod tidy
 ```
 

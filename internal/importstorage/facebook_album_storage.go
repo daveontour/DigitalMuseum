@@ -102,7 +102,7 @@ func (s *FacebookAlbumStorage) SaveAlbumImagesBatch(ctx context.Context, items [
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if !sqlutil.IsSQLite(ctx, s.pool) {
 		if _, err = tx.ExecContext(ctx, "SET LOCAL synchronous_commit = off"); err != nil {

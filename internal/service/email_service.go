@@ -132,12 +132,12 @@ func (s *EmailService) emailThreadTranscript(ctx context.Context, participant st
 		if e.Date.Valid {
 			dateStr = e.Date.Time.Format(time.RFC1123)
 		}
-		sb.WriteString(fmt.Sprintf("From: %s\nTo: %s\nDate: %s\nSubject: %s\n",
+		fmt.Fprintf(&sb, "From: %s\nTo: %s\nDate: %s\nSubject: %s\n",
 			ptrStr(e.FromAddress),
 			ptrStr(e.ToAddresses),
 			dateStr,
 			ptrStr(e.Subject),
-		))
+		)
 		if e.PlainText != nil && *e.PlainText != "" {
 			body := *e.PlainText
 			if len(body) > 2000 {
@@ -156,7 +156,7 @@ const emailThreadLLMSystemPrompt = "You are a helpful assistant that summarises 
 // produce a concise summary. Returns an error if Gemini is unavailable.
 func (s *EmailService) SummarizeThread(ctx context.Context, participant string) (string, error) {
 	if s.gemini == nil {
-		return "", fmt.Errorf("Gemini provider not configured")
+		return "", fmt.Errorf("gemini provider not configured")
 	}
 
 	transcript, n, err := s.emailThreadTranscript(ctx, participant)
@@ -182,7 +182,7 @@ func (s *EmailService) SummarizeThread(ctx context.Context, participant string) 
 		}
 		MarkUsageServerKey(stub, true)
 		RecordLLMUsage(ctx, s.billing, s.users, stub, err)
-		return "", fmt.Errorf("Gemini summarize: %w", err)
+		return "", fmt.Errorf("gemini summarize: %w", err)
 	}
 	MarkUsageServerKey(result.Usage, true)
 	RecordLLMUsage(ctx, s.billing, s.users, result.Usage, nil)
@@ -192,7 +192,7 @@ func (s *EmailService) SummarizeThread(ctx context.Context, participant string) 
 // RunEmailThreadPrompt sends the thread transcript to Gemini with a caller-supplied instruction.
 func (s *EmailService) RunEmailThreadPrompt(ctx context.Context, participant, instruction string) (string, error) {
 	if s.gemini == nil {
-		return "", fmt.Errorf("Gemini provider not configured")
+		return "", fmt.Errorf("gemini provider not configured")
 	}
 	transcript, n, err := s.emailThreadTranscript(ctx, participant)
 	if err != nil {
@@ -216,7 +216,7 @@ func (s *EmailService) RunEmailThreadPrompt(ctx context.Context, participant, in
 		}
 		MarkUsageServerKey(stub, true)
 		RecordLLMUsage(ctx, s.billing, s.users, stub, err)
-		return "", fmt.Errorf("Gemini email thread prompt: %w", err)
+		return "", fmt.Errorf("gemini email thread prompt: %w", err)
 	}
 	MarkUsageServerKey(result.Usage, true)
 	RecordLLMUsage(ctx, s.billing, s.users, result.Usage, nil)

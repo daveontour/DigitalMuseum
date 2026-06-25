@@ -154,27 +154,27 @@ func (h *HaveAChatHandler) ExportMarkdown(w http.ResponseWriter, r *http.Request
 func buildHaveAChatSessionMarkdown(d *model.HaveAChatSessionDetail) string {
 	var b strings.Builder
 	b.WriteString("# Have a Chat — saved transcript\n\n")
-	b.WriteString(fmt.Sprintf("- **Session id:** %d\n", d.ID))
+	fmt.Fprintf(&b, "- **Session id:** %d\n", d.ID)
 	if d.StoppedAt != "" {
-		b.WriteString(fmt.Sprintf("- **Stopped at:** %s\n", d.StoppedAt))
+		fmt.Fprintf(&b, "- **Stopped at:** %s\n", d.StoppedAt)
 	}
 	if d.CreatedAt != "" {
-		b.WriteString(fmt.Sprintf("- **Created at:** %s\n", d.CreatedAt))
+		fmt.Fprintf(&b, "- **Created at:** %s\n", d.CreatedAt)
 	}
 	if strings.TrimSpace(d.Topic) != "" {
-		b.WriteString(fmt.Sprintf("- **Topic:** %s\n", strings.TrimSpace(d.Topic)))
+		fmt.Fprintf(&b, "- **Topic:** %s\n", strings.TrimSpace(d.Topic))
 	}
-	b.WriteString(fmt.Sprintf("- **Voice A:** %s (%s)\n", d.VoiceA, d.ProviderA))
-	b.WriteString(fmt.Sprintf("- **Voice B:** %s (%s)\n", d.VoiceB, d.ProviderB))
-	b.WriteString(fmt.Sprintf("- **Banter mode:** %v\n", d.BanterMode))
-	b.WriteString(fmt.Sprintf("- **Temperature:** %g\n", d.Temperature))
-	b.WriteString(fmt.Sprintf("- **Allow explicit:** %v\n", d.AllowExplicit))
-	b.WriteString(fmt.Sprintf("- **Turns recorded:** %d\n\n", len(d.History)))
+	fmt.Fprintf(&b, "- **Voice A:** %s (%s)\n", d.VoiceA, d.ProviderA)
+	fmt.Fprintf(&b, "- **Voice B:** %s (%s)\n", d.VoiceB, d.ProviderB)
+	fmt.Fprintf(&b, "- **Banter mode:** %v\n", d.BanterMode)
+	fmt.Fprintf(&b, "- **Temperature:** %g\n", d.Temperature)
+	fmt.Fprintf(&b, "- **Allow explicit:** %v\n", d.AllowExplicit)
+	fmt.Fprintf(&b, "- **Turns recorded:** %d\n\n", len(d.History))
 
 	b.WriteString("## Transcript\n\n")
 	for i, t := range d.History {
 		label := speakerLabelHaveAChat(t.Speaker)
-		b.WriteString(fmt.Sprintf("### %d — %s\n\n", i+1, label))
+		fmt.Fprintf(&b, "### %d — %s\n\n", i+1, label)
 		b.WriteString(wrapMarkdownParagraph(strings.TrimSpace(t.Text)))
 		b.WriteString("\n\n")
 	}

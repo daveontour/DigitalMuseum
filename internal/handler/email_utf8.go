@@ -71,14 +71,6 @@ func ensureUTF8String(s string) string {
 	return bytesToUTF8([]byte(s), "")
 }
 
-func ptrEnsureUTF8(p *string) *string {
-	if p == nil {
-		return nil
-	}
-	v := ensureUTF8String(*p)
-	return &v
-}
-
 // truncateUTF8Runes shortens s to at most maxRunes runes without splitting UTF-8 sequences.
 func truncateUTF8Runes(s string, maxRunes int) string {
 	if maxRunes <= 0 {

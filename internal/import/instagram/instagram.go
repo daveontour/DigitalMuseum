@@ -39,10 +39,28 @@ type ImportStats struct {
 	mu                             sync.Mutex
 }
 
-func (s *ImportStats) copyStats() ImportStats {
+// ImportStatsSnapshot is a mutex-free progress snapshot for callbacks.
+type ImportStatsSnapshot struct {
+	ConversationsProcessed         int
+	TotalConversations             int
+	MessagesImported               int
+	MessagesUpdated                int
+	MessagesCreated                int
+	Errors                         int
+	AttachmentsFound               int
+	AttachmentsMissing             int
+	AttachmentErrorsBlobInsert     int
+	AttachmentErrorsMetadataInsert int
+	AttachmentErrorsJunctionInsert int
+	MissingAttachmentFilenames     []string
+	AttachmentErrors               []string
+	CurrentConversation            string
+}
+
+func (s *ImportStats) copyStats() ImportStatsSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return ImportStats{
+	return ImportStatsSnapshot{
 		ConversationsProcessed:         s.ConversationsProcessed,
 		TotalConversations:             s.TotalConversations,
 		MessagesImported:               s.MessagesImported,
@@ -61,7 +79,7 @@ func (s *ImportStats) copyStats() ImportStats {
 }
 
 // ProgressCallback is called after each conversation is processed
-type ProgressCallback func(ImportStats)
+type ProgressCallback func(ImportStatsSnapshot)
 
 // CancelledCheck returns true if the import should be cancelled
 type CancelledCheck func() bool

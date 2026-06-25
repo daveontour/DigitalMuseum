@@ -610,10 +610,10 @@ func convertHeicToJpeg(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("create temp heic file: %w", err)
 	}
 	tmpInPath := tmpIn.Name()
-	defer os.Remove(tmpInPath)
+	defer func() { _ = os.Remove(tmpInPath) }()
 
 	if _, err := tmpIn.Write(data); err != nil {
-		tmpIn.Close()
+		_ = tmpIn.Close()
 		return nil, fmt.Errorf("write temp heic file: %w", err)
 	}
 	if err := tmpIn.Close(); err != nil {
@@ -625,8 +625,8 @@ func convertHeicToJpeg(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("create temp jpg file: %w", err)
 	}
 	tmpOutPath := tmpOut.Name()
-	tmpOut.Close()
-	defer os.Remove(tmpOutPath)
+	_ = tmpOut.Close()
+	defer func() { _ = os.Remove(tmpOutPath) }()
 
 	// Linux distributions often ship ImageMagick 6 with the "convert" entrypoint;
 	// elsewhere ImageMagick 7's unified "magick" CLI is typical.

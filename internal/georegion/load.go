@@ -56,7 +56,7 @@ func ReloadFromDB(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("query regions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	cfg := Config{}
 	for rows.Next() {

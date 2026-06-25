@@ -65,9 +65,9 @@ func (r *ArtefactRepo) ListSummaries(ctx context.Context, search, tags string) (
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListSummaries: %w", err)
+		return nil, fmt.Errorf("listSummaries: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []*model.ArtefactSummary
 	for rows.Next() {
@@ -100,7 +100,7 @@ func (r *ArtefactRepo) GetByID(ctx context.Context, id int64) (*model.Artefact, 
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetArtefactByID %d: %w", id, err)
+		return nil, fmt.Errorf("getArtefactByID %d: %w", id, err)
 	}
 	return &a, nil
 }
@@ -129,9 +129,9 @@ func (r *ArtefactRepo) ListForEmbeddingBackfill(ctx context.Context, onlyMissing
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListForEmbeddingBackfill: %w", err)
+		return nil, fmt.Errorf("listForEmbeddingBackfill: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []*ArtefactEmbeddingRow
 	for rows.Next() {
@@ -155,9 +155,9 @@ func (r *ArtefactRepo) GetMediaItems(ctx context.Context, artefactID int64) ([]*
 		 WHERE am.artefact_id = ?1
 		 ORDER BY am.sort_order`, artefactID)
 	if err != nil {
-		return nil, fmt.Errorf("GetMediaItems %d: %w", artefactID, err)
+		return nil, fmt.Errorf("getMediaItems %d: %w", artefactID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []*model.ArtefactMediaItem
 	for rows.Next() {
@@ -197,7 +197,7 @@ func (r *ArtefactRepo) Create(ctx context.Context, name string, description, tag
 		name, description, tags, story, uidVal(uid),
 	).Scan(&a.ID, &a.Name, &a.Description, &a.Tags, &a.Story, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("CreateArtefact: %w", err)
+		return nil, fmt.Errorf("createArtefact: %w", err)
 	}
 	return &a, nil
 }
@@ -222,7 +222,7 @@ func (r *ArtefactRepo) Update(ctx context.Context, id int64, name *string, descr
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("UpdateArtefact %d: %w", id, err)
+		return nil, fmt.Errorf("updateArtefact %d: %w", id, err)
 	}
 	return &a, nil
 }
@@ -305,7 +305,7 @@ func (r *ArtefactRepo) InsertMediaBlob(ctx context.Context, imageData, thumbnail
 		imageData, thumbnailData,
 	).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("InsertMediaBlob: %w", err)
+		return 0, fmt.Errorf("insertMediaBlob: %w", err)
 	}
 	return id, nil
 }
@@ -320,7 +320,7 @@ func (r *ArtefactRepo) InsertMediaItem(ctx context.Context, blobID int64, title,
 		blobID, title, mediaType, source, sourceRef, uidVal(uid),
 	).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("InsertMediaItem: %w", err)
+		return 0, fmt.Errorf("insertMediaItem: %w", err)
 	}
 	return id, nil
 }
@@ -395,7 +395,7 @@ func (r *ArtefactRepo) GetPrimaryBlob(ctx context.Context, artefactID int64) ([]
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetPrimaryBlob: %w", err)
+		return nil, fmt.Errorf("getPrimaryBlob: %w", err)
 	}
 	if len(thumb) > 0 {
 		return thumb, nil
@@ -431,7 +431,7 @@ func (r *ArtefactRepo) ExportAll(ctx context.Context) ([]*ArtefactExportRow, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []*ArtefactExportRow
 	for rows.Next() {
@@ -461,12 +461,12 @@ func (r *ArtefactRepo) ExportAll(ctx context.Context) ([]*ArtefactExportRow, err
 		for mrRows.Next() {
 			var ref ArtefactMediaRef
 			if err := mrRows.Scan(&ref.SortOrder, &ref.MediaType, &ref.Title, &ref.Source, &ref.SourceReference); err != nil {
-				mrRows.Close()
+				_ = mrRows.Close()
 				return nil, err
 			}
 			row.MediaRefs = append(row.MediaRefs, ref)
 		}
-		mrRows.Close()
+		_ = mrRows.Close()
 		if err := mrRows.Err(); err != nil {
 			return nil, err
 		}
@@ -509,7 +509,7 @@ func (r *ArtefactRepo) GetOrphanArtefactMediaIDs(ctx context.Context, artefactID
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids []int64
 	for rows.Next() {
 		var id int64

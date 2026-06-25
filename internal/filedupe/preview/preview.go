@@ -131,7 +131,7 @@ func magickExecutable() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("ImageMagick not found in bin/ImageMagick")
+	return "", fmt.Errorf("imageMagick not found in bin/ImageMagick")
 }
 
 func heicCachePath(sourcePath string) (string, error) {

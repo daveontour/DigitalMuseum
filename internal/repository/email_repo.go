@@ -159,7 +159,7 @@ func (r *EmailRepo) Search(ctx context.Context, p model.EmailSearchParams) ([]*m
 	if err != nil {
 		return nil, fmt.Errorf("email Search: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanEmails(rows)
 }
 
@@ -202,7 +202,7 @@ func (r *EmailRepo) GetByLabels(ctx context.Context, labels []string) ([]*model.
 	if err != nil {
 		return nil, fmt.Errorf("email GetByLabels: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanEmails(rows)
 }
 
@@ -230,9 +230,9 @@ func (r *EmailRepo) GetAttachmentIDsForEmails(ctx context.Context, emailIDs []in
 		ORDER BY id`, inCond)
 	rows, err := r.pool.QueryContext(ctx, q, inArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("GetAttachmentIDsForEmails: %w", err)
+		return nil, fmt.Errorf("getAttachmentIDsForEmails: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var ref string
@@ -309,7 +309,7 @@ func (r *EmailRepo) SoftDelete(ctx context.Context, id int64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("email SoftDelete %d: %w", id, err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	q := `
 		UPDATE emails
@@ -350,7 +350,7 @@ func (r *EmailRepo) BulkSoftDelete(ctx context.Context, ids []int64) (int64, err
 	if err != nil {
 		return 0, fmt.Errorf("email BulkSoftDelete: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	idCond, idArgs, nextArg := sqlutil.Int64IN("id", ids, 1)
 	q := fmt.Sprintf(`
@@ -402,9 +402,9 @@ func (r *EmailRepo) GetThreadEmails(ctx context.Context, participant string) ([]
 	q += " ORDER BY date ASC"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetThreadEmails: %w", err)
+		return nil, fmt.Errorf("getThreadEmails: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanEmails(rows)
 }
 
@@ -420,9 +420,9 @@ func (r *EmailRepo) ListFolders(ctx context.Context) ([]string, error) {
 		q, args = addUIDFilter(q, args, uid)
 		rows, err := r.pool.QueryContext(ctx, q, args...)
 		if err != nil {
-			return nil, fmt.Errorf("ListFolders: %w", err)
+			return nil, fmt.Errorf("listFolders: %w", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		seen := make(map[string]struct{})
 		var folders []string
 		for rows.Next() {
@@ -457,9 +457,9 @@ func (r *EmailRepo) ListFolders(ctx context.Context) ([]string, error) {
 	q += " ORDER BY f"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListFolders: %w", err)
+		return nil, fmt.Errorf("listFolders: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var folders []string
 	for rows.Next() {
 		var f string

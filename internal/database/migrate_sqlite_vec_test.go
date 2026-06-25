@@ -19,7 +19,7 @@ func TestEnsureSQLiteVecEmbeddingTables_CreatesAndIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite memory db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 	if err := ensureSQLiteVecEmbeddingTables(ctx, db); err != nil {

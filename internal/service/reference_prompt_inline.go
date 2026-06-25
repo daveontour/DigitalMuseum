@@ -47,22 +47,22 @@ func (s *ChatService) appendInlinedReferenceDocumentsToSystemPrompt(ctx context.
 		data := row.Data
 		if row.IsEncrypted {
 			if !haveMaster || masterPassword == "" {
-				sb.WriteString(fmt.Sprintf("### %s\n\n[Encrypted reference document — master key not unlocked in this browser session.]\n\n", title))
+				fmt.Fprintf(&sb, "### %s\n\n[Encrypted reference document — master key not unlocked in this browser session.]\n\n", title)
 				continue
 			}
 			plain, err := appcrypto.DecryptDocumentData(ctx, s.pool, masterPassword, data, s.pepper)
 			if err != nil || len(plain) == 0 {
-				sb.WriteString(fmt.Sprintf("### %s\n\n[Encrypted reference document — decryption failed.]\n\n", title))
+				fmt.Fprintf(&sb, "### %s\n\n[Encrypted reference document — decryption failed.]\n\n", title)
 				continue
 			}
 			data = plain
 		}
 		ct := strings.TrimSpace(row.ContentType)
 		if ct == "application/pdf" {
-			sb.WriteString(fmt.Sprintf("### %s\n\n[PDF document — not renderable as text.]\n\n", title))
+			fmt.Fprintf(&sb, "### %s\n\n[PDF document — not renderable as text.]\n\n", title)
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("### %s\n\n%s\n\n", title, string(data)))
+		fmt.Fprintf(&sb, "### %s\n\n%s\n\n", title, string(data))
 	}
 	return sb.String()
 }

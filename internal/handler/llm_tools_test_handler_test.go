@@ -88,7 +88,7 @@ func masterUnlockedRequest(t *testing.T, store *keystore.SessionMasterStore, met
 func TestLLMToolsTestHandler_TestTools_rejectsUnknownTool(t *testing.T) {
 	store := keystore.NewSessionMasterStore(false)
 	pool := testSQLitePool(t)
-	defer pool.Close()
+	defer func() { _ = pool.Close() }()
 	h := NewLLMToolsTestHandler(pool, store, nil, "", "", nil)
 
 	body := bytes.NewBufferString(`{"tools":[{"name":"totally_fake_tool","arguments":{}}]}`)
@@ -104,7 +104,7 @@ func TestLLMToolsTestHandler_TestTools_rejectsUnknownTool(t *testing.T) {
 func TestLLMToolsTestHandler_TestTools_getCurrentTime(t *testing.T) {
 	store := keystore.NewSessionMasterStore(false)
 	pool := testSQLitePool(t)
-	defer pool.Close()
+	defer func() { _ = pool.Close() }()
 	h := NewLLMToolsTestHandler(pool, store, nil, "", "", nil)
 
 	body := bytes.NewBufferString(`{"tools":[{"name":"get_current_time","arguments":{}}]}`)

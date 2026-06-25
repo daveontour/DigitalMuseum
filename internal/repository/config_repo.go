@@ -69,9 +69,9 @@ func (r *ConfigRepo) List(ctx context.Context) ([]*model.AppConfiguration, error
 	q += " ORDER BY key"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListConfig: %w", err)
+		return nil, fmt.Errorf("listConfig: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.AppConfiguration
 	for rows.Next() {
 		c, err := scanConfig(rows)
@@ -95,7 +95,7 @@ func (r *ConfigRepo) GetValueByKey(ctx context.Context, key string) (*string, er
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("GetValueByKey %s: %w", key, err)
+		return nil, fmt.Errorf("getValueByKey %s: %w", key, err)
 	}
 	if !val.Valid || strings.TrimSpace(val.String) == "" {
 		return nil, nil
@@ -149,7 +149,7 @@ func (r *ConfigRepo) Upsert(ctx context.Context, key string, value *string, isMa
 		key, value, isMandatory, description, uidVal(uid),
 	))
 	if err != nil {
-		return nil, fmt.Errorf("UpsertConfig %s: %w", key, err)
+		return nil, fmt.Errorf("upsertConfig %s: %w", key, err)
 	}
 	return c, nil
 }
@@ -185,12 +185,12 @@ func (r *ConfigRepo) SeedFromEnv(ctx context.Context) (int, error) {
 		var k string
 		var desc *string
 		if err := rows.Scan(&k, &desc); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return 0, err
 		}
 		have[k] = existing{desc}
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil {
 		return 0, err
 	}
@@ -228,7 +228,7 @@ func (r *ConfigRepo) SeedFromEnv(ctx context.Context) (int, error) {
 			 `+doNothing,
 			kk.Key, value, kk.IsMandatory, desc, uidVal(uid))
 		if err != nil {
-			return inserted, fmt.Errorf("SeedFromEnv %s: %w", kk.Key, err)
+			return inserted, fmt.Errorf("seedFromEnv %s: %w", kk.Key, err)
 		}
 		inserted++
 	}

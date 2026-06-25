@@ -25,7 +25,7 @@ func (r *HaveAChatSessionRepo) Create(ctx context.Context, in model.HaveAChatSes
 	uid := uidFromCtx(ctx)
 	histJSON, err := json.Marshal(in.History)
 	if err != nil {
-		return 0, fmt.Errorf("HaveAChatSessionRepo.Create marshal history: %w", err)
+		return 0, fmt.Errorf("haveAChatSessionRepo.Create marshal history: %w", err)
 	}
 	stopped := time.Now().UTC()
 	var id int64
@@ -46,7 +46,7 @@ func (r *HaveAChatSessionRepo) Create(ctx context.Context, in model.HaveAChatSes
 		string(histJSON),
 	).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("HaveAChatSessionRepo.Create: %w", err)
+		return 0, fmt.Errorf("haveAChatSessionRepo.Create: %w", err)
 	}
 	return id, nil
 }
@@ -65,9 +65,9 @@ func (r *HaveAChatSessionRepo) ListRecent(ctx context.Context, limit int) ([]mod
 	args = append(args, limit)
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("HaveAChatSessionRepo.ListRecent: %w", err)
+		return nil, fmt.Errorf("haveAChatSessionRepo.ListRecent: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []model.HaveAChatSessionListItem
 	for rows.Next() {
 		var it model.HaveAChatSessionListItem
@@ -107,14 +107,14 @@ func (r *HaveAChatSessionRepo) GetByID(ctx context.Context, id int64) (*model.Ha
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("HaveAChatSessionRepo.GetByID: %w", err)
+		return nil, fmt.Errorf("haveAChatSessionRepo.GetByID: %w", err)
 	}
 	d.CreatedAt = createdAt.String
 	if stoppedAt.Valid {
 		d.StoppedAt = stoppedAt.String
 	}
 	if err := json.Unmarshal([]byte(histJSON), &d.History); err != nil {
-		return nil, fmt.Errorf("HaveAChatSessionRepo.GetByID decode history: %w", err)
+		return nil, fmt.Errorf("haveAChatSessionRepo.GetByID decode history: %w", err)
 	}
 	if d.History == nil {
 		d.History = []model.HaveAChatTurn{}

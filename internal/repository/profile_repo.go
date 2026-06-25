@@ -38,7 +38,7 @@ func (r *ProfileRepo) ListAll(ctx context.Context) ([]ArchiveProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanProfiles(rows)
 }
 
@@ -50,7 +50,7 @@ func (r *ProfileRepo) ListEnabled(ctx context.Context) ([]ArchiveProfile, error)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanProfiles(rows)
 }
 

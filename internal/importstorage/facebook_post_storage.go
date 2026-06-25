@@ -94,7 +94,7 @@ func (s *FacebookPostStorage) SavePostImagesBatch(ctx context.Context, items []B
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	imported := 0
 	for _, item := range items {

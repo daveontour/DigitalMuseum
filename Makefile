@@ -1,4 +1,4 @@
-.PHONY: check-go build build-exe build-exe-electron build-linux build-launcher test generate lint run clean tidy sqlitevec-demo sqlitevec-demo-seed message-search-cli image-tag-sync
+.PHONY: check-go check-golangci-lint build build-exe build-exe-electron build-linux build-launcher test generate lint run clean tidy sqlitevec-demo sqlitevec-demo-seed message-search-cli image-tag-sync
 
 MODULE := github.com/daveontour/aimuseum
 BINARY := digitalmuseum
@@ -73,7 +73,20 @@ test-verbose: check-go
 generate:
 	sqlc generate
 
-lint:
+# golangci-lint v2.4+ (built with Go >= 1.25) is required for go.mod 1.25 export data.
+check-golangci-lint:
+	@command -v golangci-lint >/dev/null 2>&1 || { \
+		echo >&2 "golangci-lint not found. Install:"; \
+		echo >&2 "  go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
+		exit 1; \
+	}
+	@if golangci-lint version 2>&1 | grep -qE 'has version 1\.'; then \
+		echo >&2 "golangci-lint v1.x cannot lint this project (Go 1.25). Upgrade:"; \
+		echo >&2 "  go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
+		exit 1; \
+	fi
+
+lint: check-go check-golangci-lint
 	golangci-lint run ./...
 
 tidy: check-go

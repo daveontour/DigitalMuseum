@@ -178,7 +178,7 @@ func (p *Processor) CreateThumbAndGetExif(
 		cmd.Stderr = &stderr
 
 		if err := cmd.Run(); err != nil {
-			return nil, nil, fmt.Errorf("ImageMagick Error: %v, Stderr: %s", err, stderr.String())
+			return nil, nil, fmt.Errorf("imageMagick Error: %v, Stderr: %s", err, stderr.String())
 		}
 
 		var exif ExifData

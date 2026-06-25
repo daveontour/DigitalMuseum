@@ -889,7 +889,6 @@ Modals.ConversationManager = (() => {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
-                console.log('Fetched conversations:', data);
                 return data;
             } catch (error) {
                 console.error('Error fetching conversations:', error);
@@ -969,7 +968,6 @@ Modals.ConversationManager = (() => {
                 return;
             }
 
-            console.log('Rendering conversations:', conversations);
             DOM.conversationListContainer.innerHTML = '';
 
             if (!conversations || conversations.length === 0) {

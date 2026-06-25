@@ -37,9 +37,9 @@ func (r *SavedResponseRepo) List(ctx context.Context) ([]*model.SavedResponse, e
 	q += " ORDER BY created_at DESC"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListSavedResponses: %w", err)
+		return nil, fmt.Errorf("listSavedResponses: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.SavedResponse
 	for rows.Next() {
 		s, err := scanSavedResponse(rows)
@@ -78,7 +78,7 @@ func (r *SavedResponseRepo) Create(ctx context.Context, title, content string, v
 		title, content, voice, llmProvider, uidVal(uid),
 	))
 	if err != nil {
-		return nil, fmt.Errorf("CreateSavedResponse: %w", err)
+		return nil, fmt.Errorf("createSavedResponse: %w", err)
 	}
 	return s, nil
 }
@@ -100,7 +100,7 @@ func (r *SavedResponseRepo) Update(ctx context.Context, id int64, title, content
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("UpdateSavedResponse %d: %w", id, err)
+		return nil, fmt.Errorf("updateSavedResponse %d: %w", id, err)
 	}
 	return s, nil
 }

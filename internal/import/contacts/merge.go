@@ -136,7 +136,7 @@ func fuzzySimilarity(a, b string) float64 {
 	at := strings.Fields(a)
 	bt := strings.Fields(b)
 	if len(at) >= 2 && len(bt) >= 2 {
-		if strings.ToLower(at[len(at)-1]) != strings.ToLower(bt[len(bt)-1]) {
+		if !strings.EqualFold(at[len(at)-1], bt[len(bt)-1]) {
 			return 0.0
 		}
 	}

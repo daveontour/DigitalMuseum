@@ -32,17 +32,7 @@ const CONSTANTS = {
         'owner_sm': '{{owner_image_small}}', 'irish_sm': 'irish_sm.png', 'haiku_sm': 'haiku_sm.png',
         'insult_sm': 'insult_sm.png', 'earthchild_sm': 'earthchild_sm.png',
     },
-    // FUNCTION_NAMES are no longer used, but kept for backwards compatibility. USe the function names in the suggestions.json file instead to avoid confusion.
-    // FUNCTION_NAMES: Object.freeze({
-    //     FirstFunction: "testFunction",
-    //     SecondFunction: "showFBMessengerOptions",
-    //     ThirdFunction: "showFBAlbumsOptions",
-    //     FourthFunction: "openGeoModal",
-    //     FifthFunction: "showLocationInfo",
-    //     SixthFunction: "showImageGallery",
-    //     SeventhFunction: "testEmail",
-    //     EighthFunction: "showEmailGallery"
-    // }),
+
     VOICE_DESCRIPTIONS: {
         'expert': 'a knowledgeable expert who provides accurate, factual information',
         'psychologist': 'a compassionate therapist offering psychological insights',

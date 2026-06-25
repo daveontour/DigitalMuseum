@@ -151,7 +151,7 @@ func InitSensitiveKeyring(ctx context.Context, db *sql.DB, masterPassword, peppe
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if err := deleteKeyringRowsForUser(ctx, tx, uid); err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func unlockArchiveDEK(ctx context.Context, db *sql.DB, password, pepper string) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var enc []byte
 		if err := rows.Scan(&enc); err != nil {
@@ -279,7 +279,7 @@ func FindVisitorKeyringIDForPassword(ctx context.Context, db *sql.DB, password, 
 	if err != nil {
 		return 0, false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var id int64
 		var enc []byte
@@ -339,7 +339,7 @@ func AddSensitiveKeyringSeat(ctx context.Context, db *sql.DB, userPassword, mast
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	id, err := AddSensitiveKeyringSeatTx(ctx, tx, db, userPassword, masterPassword, pepper)
 	if err != nil {
 		return 0, err

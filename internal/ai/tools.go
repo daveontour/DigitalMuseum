@@ -13,7 +13,6 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -237,23 +236,6 @@ func toolEmbedText(ctx context.Context, text string) ([]float32, error) {
 	return provider.Embed(ctx, text, embeddingModel)
 }
 
-func toolVectorLiteral(values []float32) string {
-	if len(values) == 0 {
-		return "[]"
-	}
-	var b strings.Builder
-	b.Grow(len(values) * 10)
-	b.WriteByte('[')
-	for i, v := range values {
-		if i > 0 {
-			b.WriteByte(',')
-		}
-		b.WriteString(strconv.FormatFloat(float64(v), 'g', -1, 32))
-	}
-	b.WriteByte(']')
-	return b.String()
-}
-
 func searchMessagesBySimilarity(ctx context.Context, pool *sql.DB, text string) (map[string]any, error) {
 	queryText := strings.TrimSpace(text)
 	if queryText == "" {
@@ -282,7 +264,7 @@ func searchMessagesBySimilarity(ctx context.Context, pool *sql.DB, text string) 
 	if err != nil {
 		return map[string]any{"error": fmt.Sprintf("vector search failed: %v", err), "messages": []any{}}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	combinedIDs := make([]int64, 0, topN*11)
 	seen := make(map[int64]struct{}, topN*11)
@@ -342,7 +324,7 @@ func searchMessagesBySimilarity(ctx context.Context, pool *sql.DB, text string) 
 	if err != nil {
 		return map[string]any{"error": fmt.Sprintf("load unique messages failed: %v", err), "messages": []any{}}, nil
 	}
-	defer msgRows.Close()
+	defer func() { _ = msgRows.Close() }()
 
 	byID := make(map[int64]map[string]any, len(combinedIDs))
 	for msgRows.Next() {
@@ -477,7 +459,7 @@ func searchEmailsBySimilarity(ctx context.Context, pool *sql.DB, text string) (m
 	if err != nil {
 		return map[string]any{"error": fmt.Sprintf("load emails failed: %v", err), "emails": []any{}}, nil
 	}
-	defer emailRows.Close()
+	defer func() { _ = emailRows.Close() }()
 
 	byID := make(map[int64]map[string]any, len(combinedIDs))
 	for emailRows.Next() {
@@ -558,7 +540,7 @@ func getAvailableReferenceDocuments(ctx context.Context, pool *sql.DB) (map[stri
 	if err != nil {
 		return map[string]any{"error": err.Error(), "documents": []any{}}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var documents []map[string]any
 
 	for rows.Next() {
@@ -622,7 +604,7 @@ func getMessagesByChatSession(ctx context.Context, pool *sql.DB, chatSession str
 	if err != nil {
 		return map[string]any{"error": err.Error(), "chat_session": chatSession, "message_count": 0, "messages": []any{}}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	msgs, scanErr := scanStandardMessageRows(rows)
 	if scanErr != nil {
 		return map[string]any{"error": scanErr.Error(), "chat_session": chatSession, "message_count": 0, "messages": []any{}}, nil
@@ -704,7 +686,7 @@ func GetMessagesForContactProfile(ctx context.Context, pool *sql.DB, name string
 	if err != nil {
 		return map[string]any{"error": err.Error(), "contact_name": name, "message_count": 0, "messages": []any{}}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	msgs, scanErr := scanStandardMessageRows(rows)
 	if scanErr != nil {
 		return map[string]any{"error": scanErr.Error(), "contact_name": name, "message_count": 0, "messages": []any{}}, nil
@@ -767,7 +749,7 @@ func getMessagesAroundInChat(ctx context.Context, pool *sql.DB, chatSession stri
 			"messages":      []any{},
 		}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var msgs []map[string]any
 	var anchorRN *int64
 	for rows.Next() {
@@ -840,7 +822,7 @@ func getEmailsByContact(ctx context.Context, pool *sql.DB, name string) (map[str
 	if err != nil {
 		return map[string]any{"error": err.Error(), "contact_name": name, "email_count": 0, "emails": []any{}}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var emails []map[string]any
 	for rows.Next() {
 		var id int64
@@ -889,7 +871,7 @@ func getSubjectWritingExamples(ctx context.Context, pool *sql.DB, subjectName st
 	if err != nil {
 		return map[string]any{"error": err.Error()}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var msgs []map[string]any
 	for rows.Next() {
 		var id int64
@@ -935,7 +917,7 @@ func getUniqueTagsCount(ctx context.Context, pool *sql.DB) (map[string]any, erro
 	q, args := toolsUIDFilter(ctx, `SELECT tags FROM media_items WHERE tags IS NOT NULL AND tags != ''`, nil)
 	rows, err := pool.QueryContext(ctx, q, args...)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var raw string
 			if err := rows.Scan(&raw); err != nil {
@@ -956,7 +938,7 @@ func getUniqueTagsCount(ctx context.Context, pool *sql.DB) (map[string]any, erro
 	q2, args2 := toolsUIDFilter(ctx, `SELECT tags FROM artefacts WHERE tags IS NOT NULL AND tags != ''`, nil)
 	rows2, err := pool.QueryContext(ctx, q2, args2...)
 	if err == nil {
-		defer rows2.Close()
+		defer func() { _ = rows2.Close() }()
 		for rows2.Next() {
 			var raw string
 			if err := rows2.Scan(&raw); err != nil {
@@ -1000,7 +982,7 @@ func searchFacebookAlbums(ctx context.Context, pool *sql.DB, keyword string) (ma
 	if err != nil {
 		return map[string]any{"error": err.Error(), "albums": []any{}, "count": 0}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var albums []map[string]any
 	for rows.Next() {
 		var id int64
@@ -1044,7 +1026,7 @@ func getAlbumImagesTool(ctx context.Context, pool *sql.DB, albumID int64) (map[s
 	if err != nil {
 		return map[string]any{"error": err.Error(), "images": []any{}, "count": 0}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var images []map[string]any
 	for rows.Next() {
 		var id int64
@@ -1080,7 +1062,7 @@ func searchFacebookPosts(ctx context.Context, pool *sql.DB, description string) 
 	if err != nil {
 		return map[string]any{"error": err.Error(), "posts": []any{}, "count": 0}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var posts []map[string]any
 	for rows.Next() {
 		var id int64
@@ -1108,7 +1090,7 @@ func getAllFacebookPosts(ctx context.Context, pool *sql.DB) (map[string]any, err
 	if err != nil {
 		return map[string]any{"error": err.Error(), "posts": []any{}, "count": 0}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var posts []map[string]any
 	for rows.Next() {
 		var id int64
@@ -1142,7 +1124,7 @@ func getUserInterests(ctx context.Context, pool *sql.DB) (map[string]any, error)
 	if err != nil {
 		return map[string]any{"error": err.Error(), "interests": []any{}}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var interests []string
 	for rows.Next() {
 		var name string
@@ -1176,7 +1158,7 @@ func listAvailableChatSessions(ctx context.Context, pool *sql.DB) (map[string]an
 	if err != nil {
 		return map[string]any{"error": err.Error(), "chat_sessions": []any{}}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var sessions []map[string]any
 	for rows.Next() {
 		var chatSession string
@@ -1236,7 +1218,7 @@ func execChatMessageKeywordSearch(ctx context.Context, pool *sql.DB, q string, a
 		}
 		return out, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var matches []map[string]any
 	for rows.Next() {
 		var id int64
@@ -1356,7 +1338,7 @@ func getAvailableSensitiveReferenceDocuments(ctx context.Context, pool *sql.DB) 
 	if err != nil {
 		return map[string]any{"error": err.Error(), "documents": []any{}}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var documents []map[string]any
 	for rows.Next() {
 		var id int64
@@ -1459,7 +1441,7 @@ func searchTavily(tavilyKey, query string) (map[string]any, error) {
 	if err != nil {
 		return map[string]any{"error": err.Error(), "query": query}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
 	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {
@@ -1508,7 +1490,7 @@ func listInterviewsTool(ctx context.Context, pool *sql.DB, stateFilter string) (
 	if err != nil {
 		return map[string]any{"error": err.Error()}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var interviews []map[string]any
 	for rows.Next() {
@@ -1591,7 +1573,7 @@ func getInterviewTool(ctx context.Context, pool *sql.DB, interviewID int64) (map
 		interview["turns_error"] = err.Error()
 		return interview, nil
 	}
-	defer trows.Close()
+	defer func() { _ = trows.Close() }()
 
 	var turns []map[string]any
 	for trows.Next() {
@@ -1631,7 +1613,7 @@ func listCompleteProfilesTool(ctx context.Context, pool *sql.DB) (map[string]any
 	if err != nil {
 		return map[string]any{"error": err.Error()}, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var profiles []map[string]any
 	for rows.Next() {
 		var name string

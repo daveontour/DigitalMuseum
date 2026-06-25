@@ -47,9 +47,9 @@ func (r *BackgroundJobRepo) List(ctx context.Context) ([]*model.BackgroundJob, e
 	q += ` ORDER BY job_name ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListBackgroundJobs: %w", err)
+		return nil, fmt.Errorf("listBackgroundJobs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.BackgroundJob
 	for rows.Next() {
 		j, err := scanBackgroundJob(rows)
@@ -100,7 +100,7 @@ func (r *BackgroundJobRepo) Upsert(ctx context.Context, jobName string, autoStar
 		jobName, autoStart, restartOnComplete, intervalSeconds, uidVal(uid),
 	))
 	if err != nil {
-		return nil, fmt.Errorf("UpsertBackgroundJob %s: %w", jobName, err)
+		return nil, fmt.Errorf("upsertBackgroundJob %s: %w", jobName, err)
 	}
 	return j, nil
 }
@@ -129,7 +129,7 @@ func (r *BackgroundJobRepo) EnsureRow(ctx context.Context, jobName string, defau
 		 `+doNothing,
 		jobName, false, false, defaultIntervalSeconds, uidVal(uid),
 	); err != nil {
-		return nil, fmt.Errorf("EnsureBackgroundJob %s: %w", jobName, err)
+		return nil, fmt.Errorf("ensureBackgroundJob %s: %w", jobName, err)
 	}
 	return r.GetByName(ctx, jobName)
 }
@@ -144,7 +144,7 @@ func (r *BackgroundJobRepo) SetAutoStart(ctx context.Context, jobName string, au
 	q, args = addUIDFilterDollar(q, args, uid)
 	_, err := r.pool.ExecContext(ctx, q, args...)
 	if err != nil {
-		return fmt.Errorf("SetBackgroundJobAutoStart %s: %w", jobName, err)
+		return fmt.Errorf("setBackgroundJobAutoStart %s: %w", jobName, err)
 	}
 	return nil
 }
@@ -165,7 +165,7 @@ func (r *BackgroundJobRepo) MarkRunning(ctx context.Context, userID int64, jobNa
 		jobName, userID,
 	)
 	if err != nil {
-		return fmt.Errorf("MarkBackgroundJobRunning %s: %w", jobName, err)
+		return fmt.Errorf("markBackgroundJobRunning %s: %w", jobName, err)
 	}
 	return nil
 }
@@ -190,7 +190,7 @@ func (r *BackgroundJobRepo) MarkCompleted(ctx context.Context, userID int64, job
 		result, message, due, jobName, userID,
 	)
 	if err != nil {
-		return fmt.Errorf("MarkBackgroundJobCompleted %s: %w", jobName, err)
+		return fmt.Errorf("markBackgroundJobCompleted %s: %w", jobName, err)
 	}
 	return nil
 }
@@ -203,9 +203,9 @@ func (r *BackgroundJobRepo) AllRows(ctx context.Context) ([]*model.BackgroundJob
 		`SELECT `+backgroundJobCols+` FROM background_jobs`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("AllBackgroundJobs: %w", err)
+		return nil, fmt.Errorf("allBackgroundJobs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.BackgroundJob
 	for rows.Next() {
 		j, err := scanBackgroundJob(rows)

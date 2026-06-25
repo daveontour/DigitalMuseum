@@ -194,7 +194,7 @@ func (h *ArtefactHandler) SimilarArtefactsByText(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("vector search failed: %v", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	results := make([]map[string]any, 0, req.N)
 	for rows.Next() {
 		var id int64

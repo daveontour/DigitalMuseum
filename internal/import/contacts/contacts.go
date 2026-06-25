@@ -39,7 +39,7 @@ func RunContactsNormalise(ctx context.Context, opts RunOptions) error {
 	var err error
 
 	if opts.ContactsDB == nil {
-		return fmt.Errorf("Database required for CONTACTS_QUERY mode")
+		return fmt.Errorf("database required for CONTACTS_QUERY mode")
 	}
 	progress("Reading contacts from database")
 	emailUnionQ, emailUnionArgs := activeEmailsUnionQuery(ctx)
@@ -188,90 +188,6 @@ func TruncateContactsTable(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// createSocialMediaRelationships creates directional relationships for each contact with non-zero social media counts.
-func createSocialMediaRelationships(ctx context.Context, db *sql.DB, formattedOutput []FormattedOutputRecord, socialMediaRecords []SocialMediaRecord) error {
-	subjectIds, err := LoadSubjectIdentifiers(ctx, db)
-	if err != nil {
-		return fmt.Errorf("load subject identifiers: %w", err)
-	}
-
-	// Aggregate by (fromID, toID, type) since one contact can have multiple chat_sessions per service
-	type key struct {
-		fromID int
-		toID   int
-		typ    string
-	}
-	agg := make(map[key]int)
-
-	for _, r := range socialMediaRecords {
-		if r.ChatSession == nil {
-			continue
-		}
-		csNorm := strings.TrimSpace(strings.ToLower(*r.ChatSession))
-		var contactID *int
-		for _, f := range formattedOutput {
-			if strings.TrimSpace(strings.ToLower(f.PrimaryName)) == csNorm {
-				contactID = &f.ID
-				break
-			}
-			for _, email := range strings.Split(f.Emails, ",") {
-				if strings.TrimSpace(strings.ToLower(email)) == csNorm {
-					contactID = &f.ID
-					break
-				}
-			}
-			if contactID != nil {
-				break
-			}
-		}
-		if contactID == nil {
-			continue
-		}
-		cid := *contactID
-
-		services := []struct {
-			name string
-			subj *string
-			cnt  int64
-		}{
-			{"whatsapp", subjectIds.WhatsAppID, r.NumWhatsApp},
-			{"imessage", subjectIds.IMessageID, r.NumIMessage},
-			{"facebook", subjectIds.FacebookID, r.NumFacebook},
-			{"sms", subjectIds.SMSID, r.NumSMS},
-			{"instagram", subjectIds.InstagramID, r.NumInstagram},
-		}
-		for _, svc := range services {
-			if svc.cnt <= 0 {
-				continue
-			}
-			dc, err := GetDirectionalMessageCounts(ctx, db, *r.ChatSession, svc.name, svc.subj)
-			if err != nil {
-				return fmt.Errorf("directional counts %s %q: %w", svc.name, *r.ChatSession, err)
-			}
-			if dc.FromSubject > 0 {
-				k := key{0, cid, svc.name}
-				agg[k] += int(dc.FromSubject)
-			}
-			if dc.FromContact > 0 {
-				k := key{cid, 0, svc.name}
-				agg[k] += int(dc.FromContact)
-			}
-		}
-	}
-
-	var items []relationshipItem
-	for k, count := range agg {
-		items = append(items, relationshipItem{FromID: k.fromID, ToID: k.toID, Count: count, Type: k.typ})
-	}
-	if len(items) > 0 {
-		if err := writeSocialMediaRelationshipsToDatabase(ctx, db, items); err != nil {
-			return err
-		}
-		fmt.Fprintf(os.Stderr, "Wrote %d social media relationships\n", len(items))
-	}
-	return nil
-}
-
 // computeEmailMessageCounts populates records[i].NumEmails with the count of email
 // messages (rows in the `emails` table) that match any email address for that contact.
 //
@@ -328,7 +244,7 @@ func computeEmailMessageCounts(ctx context.Context, db *sql.DB, records []Format
 	if err != nil {
 		return fmt.Errorf("query emails for counts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var fromAddr sql.NullString
 	var toAddrs sql.NullString
@@ -399,7 +315,7 @@ func runSocialMediaQuery(ctx context.Context, db *sql.DB) ([]SocialMediaRecord, 
 	if err != nil {
 		return nil, fmt.Errorf("execute query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var records []SocialMediaRecord
 	for rows.Next() {
@@ -617,7 +533,7 @@ func findRelationships(ctx context.Context, emailMap map[string]int, query strin
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading contacts table: %v\n", err)
 		} else {
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 			for rows.Next() {
 				var id int
 				var name, emails string
@@ -677,73 +593,6 @@ func findRelationships(ctx context.Context, emailMap map[string]int, query strin
 	}
 
 	fmt.Fprintf(os.Stderr, "Found %d unique relationship combinations\n", len(uniqueCombinations))
-}
-
-// relationshipItem holds source/target IDs and count for DB insert
-type relationshipItem struct {
-	FromID int
-	ToID   int
-	Count  int
-	Type   string // empty means "email" for backward compatibility
-}
-
-const relationshipBatchSize = 1000
-
-// writeSocialMediaRelationshipsToDatabase inserts social media relationships with type per service.
-// Deletes existing relationships of the given types for (source_id, target_id) pairs before inserting to avoid duplicates.
-func writeSocialMediaRelationshipsToDatabase(ctx context.Context, db *sql.DB, items []relationshipItem) error {
-	if len(items) == 0 {
-		return nil
-	}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-	// Delete existing social media relationships for the (source_id, target_id, type) combinations we're about to insert
-	seen := make(map[string]struct{})
-	for _, item := range items {
-		if item.Type == "" {
-			continue
-		}
-		key := fmt.Sprintf("%d|%d|%s", item.FromID, item.ToID, item.Type)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		_, err := tx.ExecContext(ctx, `DELETE FROM relationships WHERE source_id = ?1 AND target_id = ?2 AND type = ?3`,
-			item.FromID, item.ToID, item.Type)
-		if err != nil {
-			return fmt.Errorf("delete existing relationship: %w", err)
-		}
-	}
-	for i := 0; i < len(items); i += relationshipBatchSize {
-		end := i + relationshipBatchSize
-		if end > len(items) {
-			end = len(items)
-		}
-		batch := items[i:end]
-		var placeholders []string
-		var args []interface{}
-		pos := 1
-		for _, item := range batch {
-			if item.Type == "" || item.Count <= 0 {
-				continue
-			}
-			placeholders = append(placeholders, fmt.Sprintf("(?%d, ?%d, ?%d, ?%d, ?%d, ?%d, ?%d)", pos, pos+1, pos+2, pos+3, pos+4, pos+5, pos+6))
-			args = append(args, item.FromID, item.ToID, item.Type, item.Count, true, false, false)
-			pos += 7
-		}
-		if len(placeholders) == 0 {
-			continue
-		}
-		query := "INSERT INTO relationships (source_id, target_id, type, strength, is_active, is_personal, is_deleted) VALUES " + strings.Join(placeholders, ", ")
-		_, err := tx.ExecContext(ctx, query, args...)
-		if err != nil {
-			return fmt.Errorf("batch insert social media relationships: %w", err)
-		}
-	}
-	return tx.Commit()
 }
 
 // FindRelationshipsFromDB finds relationships from database and prints to stderr

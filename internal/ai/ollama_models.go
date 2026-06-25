@@ -17,7 +17,7 @@ const ollamaListModelsTimeout = 5 * time.Second
 func ListOllamaModels(ctx context.Context, baseURL string) ([]string, error) {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if baseURL == "" {
-		return nil, fmt.Errorf("LOCALAI_BASE_URL is not configured")
+		return nil, fmt.Errorf("lOCALAI_BASE_URL is not configured")
 	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, ollamaListModelsTimeout)
@@ -31,10 +31,10 @@ func ListOllamaModels(ctx context.Context, baseURL string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("hTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	var tags ollamaTagsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {

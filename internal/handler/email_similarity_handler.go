@@ -76,7 +76,7 @@ func (h *EmailHandler) SimilarEmailsByText(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("vector search failed: %v", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	results := make([]map[string]any, 0, req.N)
 	for rows.Next() {

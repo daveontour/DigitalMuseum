@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -21,8 +22,9 @@ func TestToolsUIDFilter_withNewlineBeforeWhere(t *testing.T) {
 	if len(args) != 1 || args[0] != int64(42) {
 		t.Fatalf("args = %v; want [42]", args)
 	}
-	if strings.Count(strings.ToLower(out), " where ") != 1 {
-		t.Fatalf("expected single WHERE clause, got:\n%s", out)
+	whereCount := len(regexp.MustCompile(`(?i)\bwhere\b`).FindAllString(out, -1))
+	if whereCount != 1 {
+		t.Fatalf("expected single WHERE clause, got %d in:\n%s", whereCount, out)
 	}
 	if !strings.Contains(out, "AND user_id = ?") {
 		t.Fatalf("expected AND user_id filter, got:\n%s", out)

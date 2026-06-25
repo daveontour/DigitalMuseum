@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strconv"
 
@@ -161,11 +160,6 @@ var (
 	})
 
 	emailEmbeddingBackfillJob = importer.NewImportJob("Email embedding backfill", map[string]any{
-		"status": "idle", "status_line": nil, "error_message": nil,
-		"total": 0, "processed": 0, "embedded": 0, "skipped": 0, "errors": 0,
-	})
-
-	messageEmbeddingBackfillJob = importer.NewImportJob("Message embedding backfill", map[string]any{
 		"status": "idle", "status_line": nil, "error_message": nil,
 		"total": 0, "processed": 0, "embedded": 0, "skipped": 0, "errors": 0,
 	})
@@ -454,7 +448,7 @@ func runFilesystemInProcess(pool *sql.DB, job *importer.ImportJob, directories [
 
 	storage := importstorage.NewImageStorage(pool)
 
-	progressCallback := func(stats filesystemimport.ImportStats) {
+	progressCallback := func(stats filesystemimport.ImportStatsSnapshot) {
 		statusLine := fmt.Sprintf("Processing file %d of %d: %s | Imported: %d, Referenced: %d, Updated: %d, Errors: %d",
 			stats.FilesProcessed, stats.TotalFiles, stats.CurrentFile,
 			stats.ImagesImported, stats.ImagesReferenced, stats.ImagesUpdated, stats.Errors)
@@ -591,7 +585,7 @@ func runThumbnailsInProcess(pool *sql.DB, job *importer.ImportJob, reprocess boo
 	_ = georegion.UpdateLocationRegions(ctx, pool)
 	_ = georegion.UpdateMediaItemRegions(ctx, pool)
 
-	progressCallback := func(stats thumbnailsimport.ImportStats) {
+	progressCallback := func(stats thumbnailsimport.ImportStatsSnapshot) {
 		statusLine := fmt.Sprintf("Processing: %d/%d items (%.1f%%) | Processed: %d | Errors: %d",
 			int(stats.Processed), stats.TotalItems,
 			float64(stats.Processed)/float64(max(1, stats.TotalItems))*100,
@@ -1853,7 +1847,7 @@ func runWhatsAppInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfigRep
 
 	storage := importstorage.NewMessageStorage(ctx, pool, subjectRepo)
 
-	progressCallback := func(stats whatsappimport.ImportStats, justCompleted string) {
+	progressCallback := func(stats whatsappimport.ImportStatsSnapshot, justCompleted string) {
 		// statusLine := fmt.Sprintf("Processing conversation %d of %d: %s | Total Messages: %d (%d created, %d updated) | Attachments: %d found, %d missing | Errors: %d",
 		// 	stats.ConversationsProcessed, stats.TotalConversations, justCompleted,
 		// 	stats.MessagesImported, stats.MessagesCreated, stats.MessagesUpdated,
@@ -1972,7 +1966,7 @@ func runIMessageInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfigRep
 
 	storage := importstorage.NewMessageStorage(ctx, pool, subjectRepo)
 
-	progressCallback := func(stats imessageimport.ImportStats) {
+	progressCallback := func(stats imessageimport.ImportStatsSnapshot) {
 		statusLine := ""
 		if stats.TotalConversations > 0 {
 			// statusLine = fmt.Sprintf("Processing conversation %d of %d: %s | Messages: %d (%d created, %d updated) | Attachments: %d found, %d missing | Placeholders: %d, orphan imports: %d | Errors: %d",
@@ -2109,7 +2103,7 @@ func runInstagramInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfigRe
 
 	storage := importstorage.NewMessageStorage(ctx, pool, subjectRepo)
 
-	progressCallback := func(stats instagramimport.ImportStats) {
+	progressCallback := func(stats instagramimport.ImportStatsSnapshot) {
 		statusLine := ""
 		if stats.TotalConversations > 0 {
 			// statusLine = fmt.Sprintf("Processing conversation %d of %d: %s | Messages: %d (%d created, %d updated) | Attachments: %d found, %d missing | Errors: %d",
@@ -2318,7 +2312,7 @@ func runFacebookAllInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfig
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		progressCallback := func(stats facebookimport.ImportStats) {
+		progressCallback := func(stats facebookimport.ImportStatsSnapshot) {
 			job.UpdateState(map[string]any{
 				"conversations":     stats.ConversationsProcessed,
 				"messages_imported": stats.MessagesImported,
@@ -2339,7 +2333,7 @@ func runFacebookAllInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfig
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		progressCallback := func(stats facebookalbumsimport.ImportStats) {
+		progressCallback := func(stats facebookalbumsimport.ImportStatsSnapshot) {
 			job.UpdateState(map[string]any{
 				"albums_processed":      stats.AlbumsProcessed,
 				"albums_imported":       stats.AlbumsImported,
@@ -2376,7 +2370,7 @@ func runFacebookAllInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfig
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		progressCallback := func(stats facebookpostsimport.ImportStats) {
+		progressCallback := func(stats facebookpostsimport.ImportStatsSnapshot) {
 			job.UpdateState(map[string]any{
 				"posts_processed": stats.PostsProcessed,
 				"posts_imported":  stats.PostsImported,
@@ -2564,7 +2558,7 @@ func runEmailEmbeddingBackfill(pool *sql.DB, embeddingSvc *service.EmbeddingServ
 		job.Broadcast("error", job.GetState())
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type candidate struct {
 		id          int64
@@ -2829,244 +2823,6 @@ func (h *ImporterHandler) EmailEmbeddingBackfillStatus(w http.ResponseWriter, r 
 	writeJSON(w, emailEmbeddingBackfillJob.Status())
 }
 
-// func (h *ImporterHandler) MessageEmbeddingBackfillStart(w http.ResponseWriter, r *http.Request) {
-// 	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
-// 		return
-// 	}
-// 	if err := messageEmbeddingBackfillJob.AssertNotRunning(); err != nil {
-// 		writeError(w, http.StatusBadRequest, err.Error())
-// 		return
-// 	}
-// 	if h.pool == nil {
-// 		writeError(w, http.StatusServiceUnavailable, "message embedding backfill not configured")
-// 		return
-// 	}
-// 	if h.embeddingSvc == nil || !h.embeddingSvc.IsAvailable() {
-// 		writeError(w, http.StatusServiceUnavailable, "embedding service not available — set LOCALAI_BASE_URL and LOCALAI_EMBEDDING_MODEL")
-// 		return
-// 	}
-
-// 	messageEmbeddingBackfillJob.Start()
-// 	messageEmbeddingBackfillJob.UpdateState(map[string]any{
-// 		"status": "in_progress", "status_line": "Starting message embedding backfill...",
-// 		"total": 0, "processed": 0, "embedded": 0, "skipped": 0, "errors": 0, "error_message": nil,
-// 	})
-// 	messageEmbeddingBackfillJob.Broadcast("status", map[string]any{"status_line": "Starting message embedding backfill..."})
-
-// 	uid := appctx.UserIDFromCtx(r.Context())
-// 	go runMessageEmbeddingBackfill(h.pool, h.embeddingSvc, messageEmbeddingBackfillJob, uid)
-
-// 	writeJSON(w, map[string]any{"message": "Message embedding backfill started", "status": "started"})
-// }
-
-func runMessageEmbeddingBackfill(pool *sql.DB, embeddingSvc *service.EmbeddingService, job *importer.ImportJob, uid int64) {
-	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
-	defer job.Finish()
-
-	rows, err := pool.QueryContext(ctx, `
-		SELECT id, COALESCE(chat_session, ''), COALESCE(text, '')
-		FROM messages
-		WHERE embedding_vector IS NULL
-		  AND COALESCE(user_id, 0) = ?1
-		  AND text IS NOT NULL
-		ORDER BY id ASC
-	`, uid)
-	if err != nil {
-		msg := fmt.Sprintf("failed to query messages: %v", err)
-		job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
-		job.Broadcast("error", job.GetState())
-		return
-	}
-	defer rows.Close()
-
-	type candidate struct {
-		id          int64
-		chatSession string
-		text        string
-	}
-	candidates := make([]candidate, 0, 256)
-	for rows.Next() {
-		var c candidate
-		if err := rows.Scan(&c.id, &c.chatSession, &c.text); err != nil {
-			msg := fmt.Sprintf("failed to scan message row: %v", err)
-			job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
-			job.Broadcast("error", job.GetState())
-			return
-		}
-		candidates = append(candidates, c)
-	}
-	if err := rows.Err(); err != nil {
-		msg := fmt.Sprintf("message query cursor failed: %v", err)
-		job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
-		job.Broadcast("error", job.GetState())
-		return
-	}
-
-	total := len(candidates)
-	job.UpdateState(map[string]any{
-		"total":       total,
-		"status_line": fmt.Sprintf("Found %d messages with missing embedding vectors", total),
-	})
-	job.Broadcast("progress", job.GetState())
-
-	embedded, skipped, errorsCount := 0, 0, 0
-	for i, c := range candidates {
-		if job.IsCancelled() {
-			job.UpdateState(map[string]any{
-				"status":      "cancelled",
-				"status_line": "Message embedding backfill cancelled.",
-				"processed":   i,
-				"embedded":    embedded,
-				"skipped":     skipped,
-				"errors":      errorsCount,
-			})
-			job.Broadcast("cancelled", job.GetState())
-			return
-		}
-
-		var (
-			vec     []float32
-			err     error
-			lastCap = 0
-		)
-		for _, capChars := range []int{6000, 3000, 1500, 900} {
-			candidate := buildMessageEmbeddingInput(c.chatSession, c.text, capChars)
-			if candidate == "" {
-				break
-			}
-			lastCap = capChars
-			vec, err = embeddingSvc.EmbedText(ctx, candidate)
-			if err == nil {
-				break
-			}
-			if !strings.Contains(strings.ToLower(err.Error()), "too large") {
-				break
-			}
-		}
-		if err != nil {
-			errorsCount++
-			job.UpdateState(map[string]any{
-				"processed":     i + 1,
-				"embedded":      embedded,
-				"skipped":       skipped,
-				"errors":        errorsCount,
-				"status_line":   fmt.Sprintf("Embedding failed for message %d (max payload chars tried: %d): %v", c.id, lastCap, err),
-				"error_message": fmt.Sprintf("Embedding failed for message %d (max payload chars tried: %d): %v", c.id, lastCap, err),
-			})
-			job.Broadcast("progress", job.GetState())
-			continue
-		}
-		if vec == nil {
-			skipped++
-			job.UpdateState(map[string]any{
-				"processed":   i + 1,
-				"embedded":    embedded,
-				"skipped":     skipped,
-				"errors":      errorsCount,
-				"status_line": fmt.Sprintf("Processed %d/%d messages (%d embedded, %d skipped, %d errors)", i+1, total, embedded, skipped, errorsCount),
-			})
-			job.Broadcast("progress", job.GetState())
-			continue
-		}
-
-		vectorLiteral := float32SliceToVectorLiteral(vec)
-		msgEmbedSQL := `UPDATE messages SET embedding_vector = $1::vector, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND COALESCE(user_id, 0) = $3`
-		if sqlutil.IsSQLite(ctx, pool) {
-			msgEmbedSQL = `UPDATE messages SET embedding_vector = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND COALESCE(user_id, 0) = ?3`
-		}
-		if _, err := pool.ExecContext(ctx, msgEmbedSQL, vectorLiteral, c.id, uid); err != nil {
-			errorsCount++
-			job.UpdateState(map[string]any{
-				"processed":     i + 1,
-				"embedded":      embedded,
-				"skipped":       skipped,
-				"errors":        errorsCount,
-				"status_line":   fmt.Sprintf("Failed updating embedding for message %d: %v", c.id, err),
-				"error_message": fmt.Sprintf("Failed updating embedding for message %d: %v", c.id, err),
-			})
-			job.Broadcast("progress", job.GetState())
-			continue
-		}
-
-		embedded++
-		job.UpdateState(map[string]any{
-			"processed":   i + 1,
-			"embedded":    embedded,
-			"skipped":     skipped,
-			"errors":      errorsCount,
-			"status_line": fmt.Sprintf("Processed %d/%d messages (%d embedded, %d skipped, %d errors)", i+1, total, embedded, skipped, errorsCount),
-		})
-		job.Broadcast("progress", job.GetState())
-	}
-
-	job.UpdateState(map[string]any{
-		"status":      "completed",
-		"status_line": fmt.Sprintf("Message embedding backfill complete: %d embedded, %d skipped, %d errors", embedded, skipped, errorsCount),
-		"processed":   total,
-		"embedded":    embedded,
-		"skipped":     skipped,
-		"errors":      errorsCount,
-	})
-	job.Broadcast("completed", job.GetState())
-}
-
-func buildMessageEmbeddingInput(chatSession, text string, maxChars int) string {
-	chatSession = strings.TrimSpace(chatSession)
-	text = strings.TrimSpace(text)
-	if maxChars <= 0 {
-		maxChars = 900
-	}
-	parts := make([]string, 0, 2)
-	if chatSession != "" {
-		parts = append(parts, "Chat Session: "+chatSession)
-	}
-	if text != "" {
-		parts = append(parts, "Text: "+text)
-	}
-	payload := strings.TrimSpace(strings.Join(parts, "\n"))
-	if payload == "" {
-		return ""
-	}
-	if len(payload) <= maxChars {
-		return payload
-	}
-
-	prefix := ""
-	if chatSession != "" {
-		prefix = "Chat Session: " + chatSession
-	}
-	if prefix == "" {
-		return strings.TrimSpace(payload[:maxChars])
-	}
-	remaining := maxChars - len(prefix) - 1
-	if remaining <= 0 {
-		if maxChars > len(prefix) {
-			return prefix
-		}
-		return strings.TrimSpace(prefix[:maxChars])
-	}
-	body := text
-	if len(body) > remaining {
-		body = body[:remaining]
-	}
-	return strings.TrimSpace(prefix + "\n" + body)
-}
-
-// func (h *ImporterHandler) MessageEmbeddingBackfillStream(w http.ResponseWriter, r *http.Request) {
-// 	messageEmbeddingBackfillJob.ServeSSE(w, r)
-// }
-
-// func (h *ImporterHandler) MessageEmbeddingBackfillCancel(w http.ResponseWriter, r *http.Request) {
-// 	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
-// 		return
-// 	}
-// 	writeJSON(w, messageEmbeddingBackfillJob.Cancel())
-// }
-
-// func (h *ImporterHandler) MessageEmbeddingBackfillStatus(w http.ResponseWriter, r *http.Request) {
-// 	writeJSON(w, messageEmbeddingBackfillJob.Status())
-// }
-
 func (h *ImporterHandler) MessageContextEmbeddingBackfillStart(w http.ResponseWriter, r *http.Request) {
 	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
 		return
@@ -3129,7 +2885,7 @@ func runMessageContextEmbeddingBackfill(pool *sql.DB, embeddingSvc *service.Embe
 		job.Broadcast("error", job.GetState())
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	all := make([]messageContextCandidate, 0, 512)
 	for rows.Next() {
@@ -3437,176 +3193,3 @@ func (h *ImporterHandler) MessageContextEmbeddingBackfillCancel(w http.ResponseW
 func (h *ImporterHandler) MessageContextEmbeddingBackfillStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, messageContextEmbeddingBackfillJob.Status())
 }
-
-// ── stdout parsers ────────────────────────────────────────────────────────────
-
-var reInt = regexp.MustCompile(`\d+`)
-
-// // parseMessageStdout parses the shared stdout format used by whatsapp, imessage,
-// // and instagram import commands. Pass includeAttachments=true for whatsapp/imessage.
-// func parseMessageStdout(s string, includeAttachments bool) map[string]any {
-// 	reConvs := regexp.MustCompile(`Processed (\d+) conversation`)
-// 	reImported := regexp.MustCompile(`Imported (\d+) message.*\((\d+) created, (\d+) updated\)`)
-// 	reAttach := regexp.MustCompile(`Found (\d+) attachment.*?, (\d+) missing`)
-// 	reSkipped := regexp.MustCompile(`Skipped invalid messages.*?:\s*(\d+)`)
-
-// 	stats := map[string]any{
-// 		"conversations":     0,
-// 		"messages_imported": 0,
-// 		"messages_created":  0,
-// 		"messages_updated":  0,
-// 		"errors":            0,
-// 	}
-// 	if includeAttachments {
-// 		stats["attachments_found"] = 0
-// 		stats["attachments_missing"] = 0
-// 		stats["missing_attachment_filenames"] = []string{}
-// 	}
-
-// 	var missingFiles []string
-// 	inMissing := false
-// 	for _, line := range strings.Split(s, "\n") {
-// 		if m := reConvs.FindStringSubmatch(line); len(m) > 1 {
-// 			n, _ := strconv.Atoi(m[1])
-// 			stats["conversations"] = n
-// 		} else if m := reImported.FindStringSubmatch(line); len(m) > 3 {
-// 			total, _ := strconv.Atoi(m[1])
-// 			created, _ := strconv.Atoi(m[2])
-// 			updated, _ := strconv.Atoi(m[3])
-// 			stats["messages_imported"] = total
-// 			stats["messages_created"] = created
-// 			stats["messages_updated"] = updated
-// 		} else if includeAttachments {
-// 			if m := reAttach.FindStringSubmatch(line); len(m) > 2 {
-// 				found, _ := strconv.Atoi(m[1])
-// 				missing, _ := strconv.Atoi(m[2])
-// 				stats["attachments_found"] = found
-// 				stats["attachments_missing"] = missing
-// 			}
-// 			if strings.TrimSpace(line) == "Missing attachment files:" {
-// 				inMissing = true
-// 				continue
-// 			}
-// 			if inMissing && strings.HasPrefix(line, "  - ") {
-// 				missingFiles = append(missingFiles, strings.TrimPrefix(line, "  - "))
-// 			} else if inMissing && !strings.HasPrefix(line, "  ") {
-// 				inMissing = false
-// 			}
-// 		}
-// 		if m := reSkipped.FindStringSubmatch(line); len(m) > 1 {
-// 			n, _ := strconv.Atoi(m[1])
-// 			stats["errors"] = n
-// 		}
-// 	}
-// 	if includeAttachments && missingFiles != nil {
-// 		stats["missing_attachment_filenames"] = missingFiles
-// 	}
-// 	return stats
-// }
-
-// func parseInt(s string) int {
-// 	m := reInt.FindString(s)
-// 	if m == "" {
-// 		return 0
-// 	}
-// 	n, _ := strconv.Atoi(m)
-// 	return n
-// }
-
-// func parseFacebookAlbumsStdout(s string) (albumsProcessed, albumsImported, imagesImported, imagesFound, imagesMissing, errs int, missing []string, msg string) {
-// 	reAlbums := regexp.MustCompile(`Processed (\d+) album\(s\)`)
-// 	reAlbumsImported := regexp.MustCompile(`Albums imported: (\d+)`)
-// 	reImages := regexp.MustCompile(`Images imported: (\d+) \(found: (\d+), missing: (\d+)\)`)
-// 	reErrors := regexp.MustCompile(`Errors: (\d+)`)
-
-// 	if m := reAlbums.FindStringSubmatch(s); len(m) > 1 {
-// 		albumsProcessed, _ = strconv.Atoi(m[1])
-// 	}
-// 	if m := reAlbumsImported.FindStringSubmatch(s); len(m) > 1 {
-// 		albumsImported, _ = strconv.Atoi(m[1])
-// 	}
-// 	if m := reImages.FindStringSubmatch(s); len(m) > 3 {
-// 		imagesImported, _ = strconv.Atoi(m[1])
-// 		imagesFound, _ = strconv.Atoi(m[2])
-// 		imagesMissing, _ = strconv.Atoi(m[3])
-// 	}
-// 	if m := reErrors.FindStringSubmatch(s); len(m) > 1 {
-// 		errs, _ = strconv.Atoi(m[1])
-// 	}
-// 	inMissing := false
-// 	for _, line := range strings.Split(s, "\n") {
-// 		if strings.TrimSpace(line) == "Missing image files:" {
-// 			inMissing = true
-// 			continue
-// 		}
-// 		if inMissing && strings.HasPrefix(line, "  - ") {
-// 			missing = append(missing, strings.TrimPrefix(line, "  - "))
-// 		}
-// 	}
-
-// 	parts := []string{"Import completed"}
-// 	if albumsProcessed > 0 {
-// 		parts = append(parts, fmt.Sprintf("Processed %d album(s)", albumsProcessed))
-// 	}
-// 	if albumsImported > 0 {
-// 		parts = append(parts, fmt.Sprintf("Imported %d album(s) with %d image(s)", albumsImported, imagesImported))
-// 	}
-// 	msg = strings.Join(parts, ". ")
-// 	return
-// }
-
-// func parseFacebookPostsStdout(s string) map[string]any {
-// 	stats := map[string]any{}
-// 	for _, line := range strings.Split(s, "\n") {
-// 		if strings.HasPrefix(line, "POSTS_COMPLETE: ") {
-// 			for _, part := range strings.Fields(line[len("POSTS_COMPLETE: "):]) {
-// 				kv := strings.SplitN(part, "=", 2)
-// 				if len(kv) == 2 {
-// 					n, _ := strconv.Atoi(kv[1])
-// 					switch kv[0] {
-// 					case "posts":
-// 						stats["posts_processed"] = n
-// 					case "new":
-// 						stats["posts_imported"] = n
-// 					case "updated":
-// 						stats["posts_updated"] = n
-// 					case "with_media":
-// 						stats["with_media"] = n
-// 					case "images":
-// 						stats["images_imported"] = n
-// 					case "found":
-// 						stats["images_found"] = n
-// 					case "missing":
-// 						stats["images_missing"] = n
-// 					case "errors":
-// 						stats["errors"] = n
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return stats
-// }
-
-// func parseFacebookPlacesStdout(s string) map[string]any {
-// 	stats := map[string]any{}
-// 	for _, line := range strings.Split(s, "\n") {
-// 		if strings.HasPrefix(line, "PLACES_COMPLETE: ") {
-// 			for _, part := range strings.Fields(line[len("PLACES_COMPLETE: "):]) {
-// 				kv := strings.SplitN(part, "=", 2)
-// 				if len(kv) == 2 {
-// 					n, _ := strconv.Atoi(kv[1])
-// 					switch kv[0] {
-// 					case "places":
-// 						stats["places_imported"] = n
-// 					case "created":
-// 						stats["places_created"] = n
-// 					case "updated":
-// 						stats["places_updated"] = n
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return stats
-// }

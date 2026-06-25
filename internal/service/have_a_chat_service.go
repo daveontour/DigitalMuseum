@@ -45,25 +45,26 @@ func (s *ChatService) GenerateHaveAChatTurn(
 	// ── Pick the actual AI provider ──────────────────────────────────────────
 	var provider appai.ChatProvider
 	providerName := "gemini"
-	if speakingProviderKey == "claude" {
+	switch speakingProviderKey {
+	case "claude":
 		cp := s.effectiveClaudeProvider(ctx, r, "")
-		if cp != nil && cp.IsAvailable() {
+		if cp.IsAvailable() {
 			provider = cp
 			providerName = "claude"
 		}
-	} else if speakingProviderKey == "deepseek" {
+	case "deepseek":
 		dp := s.effectiveDeepSeekProvider(ctx, r, "")
-		if dp != nil && dp.IsAvailable() {
+		if dp.IsAvailable() {
 			provider = dp
 			providerName = "deepseek"
 		}
-	} else if speakingProviderKey == "openai" {
+	case "openai":
 		op := s.effectiveOpenAIProvider(ctx, r, "")
-		if op != nil && op.IsAvailable() {
+		if op.IsAvailable() {
 			provider = op
 			providerName = "openai"
 		}
-	} else if speakingProviderKey == "localai" {
+	case "localai":
 		lp := s.localAIProviderForChat(ctx)
 		if lp != nil {
 			provider = lp
@@ -192,29 +193,29 @@ Your goal is to:
 	var sb strings.Builder
 	topic := strings.TrimSpace(req.Topic)
 	if topic != "" {
-		sb.WriteString(fmt.Sprintf("**Topic for this conversation:** %s\n\n", topic))
+		fmt.Fprintf(&sb, "**Topic for this conversation:** %s\n\n", topic)
 	}
 
 	if len(req.History) == 0 {
 		if topic != "" {
-			sb.WriteString(fmt.Sprintf("This is the start of the conversation. Begin by introducing an interesting angle you'd like to explore about %s's life related to the topic above. Use the tools to find something concrete to talk about.", subjectName))
+			fmt.Fprintf(&sb, "This is the start of the conversation. Begin by introducing an interesting angle you'd like to explore about %s's life related to the topic above. Use the tools to find something concrete to talk about.", subjectName)
 		} else {
-			sb.WriteString(fmt.Sprintf("This is the start of the conversation. Begin by introducing an interesting angle you'd like to explore about %s's life. Use the tools to find something concrete to start with — a pattern in their messages, an interesting email thread, or a Facebook memory.", subjectName))
+			fmt.Fprintf(&sb, "This is the start of the conversation. Begin by introducing an interesting angle you'd like to explore about %s's life. Use the tools to find something concrete to start with — a pattern in their messages, an interesting email thread, or a Facebook memory.", subjectName)
 		}
 	} else {
 		sb.WriteString("**The conversation so far:**\n")
 		for _, turn := range req.History {
 			switch turn.Speaker {
 			case "a":
-				sb.WriteString(fmt.Sprintf("[%s]: %s\n\n", req.VoiceA, turn.Text))
+				fmt.Fprintf(&sb, "[%s]: %s\n\n", req.VoiceA, turn.Text)
 			case "b":
-				sb.WriteString(fmt.Sprintf("[%s]: %s\n\n", req.VoiceB, turn.Text))
+				fmt.Fprintf(&sb, "[%s]: %s\n\n", req.VoiceB, turn.Text)
 			case "user":
-				sb.WriteString(fmt.Sprintf("[User interjected]: %s\n\n", turn.Text))
+				fmt.Fprintf(&sb, "[User interjected]: %s\n\n", turn.Text)
 			}
 		}
 		_ = listeningProviderKey // referenced only for same-LLM detection above
-		sb.WriteString(fmt.Sprintf("\nNow it's your turn as %s. Respond to what was just said. You can use the available tools to look up real data from the archive to support or challenge a point.", speakingName))
+		fmt.Fprintf(&sb, "\nNow it's your turn as %s. Respond to what was just said. You can use the available tools to look up real data from the archive to support or challenge a point.", speakingName)
 	}
 
 	userPrompt := sb.String()

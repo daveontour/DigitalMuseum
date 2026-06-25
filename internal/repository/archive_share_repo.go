@@ -75,7 +75,7 @@ func (r *ArchiveShareRepo) ListByUser(ctx context.Context, userID int64) ([]*mod
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.ArchiveShare
 	for rows.Next() {
 		var share model.ArchiveShare

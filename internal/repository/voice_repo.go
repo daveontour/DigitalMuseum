@@ -39,9 +39,9 @@ func (r *VoiceRepo) List(ctx context.Context) ([]*model.CustomVoice, error) {
 	q += " ORDER BY name"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListVoices: %w", err)
+		return nil, fmt.Errorf("listVoices: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.CustomVoice
 	for rows.Next() {
 		v, err := scanVoice(rows)
@@ -105,7 +105,7 @@ func (r *VoiceRepo) Create(ctx context.Context, key, name string, description *s
 		key, name, description, instructions, creativity, uidVal(uid),
 	))
 	if err != nil {
-		return nil, fmt.Errorf("CreateVoice: %w", err)
+		return nil, fmt.Errorf("createVoice: %w", err)
 	}
 	return v, nil
 }
@@ -129,7 +129,7 @@ func (r *VoiceRepo) Update(ctx context.Context, id int64, key, name *string, des
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("UpdateVoice %d: %w", id, err)
+		return nil, fmt.Errorf("updateVoice %d: %w", id, err)
 	}
 	return v, nil
 }

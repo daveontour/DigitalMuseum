@@ -13,7 +13,7 @@ import (
 func TestSeedGuideTopicsFromFileIfMissingInsertOnly(t *testing.T) {
 	ctx := context.Background()
 	db := openGuideTopicsTestDB(t, ctx)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "guide_topics.json")
@@ -53,7 +53,7 @@ func TestSeedGuideTopicsFromFileIfMissingInsertOnly(t *testing.T) {
 func TestReloadGuideTopicsFromFileReplacesAll(t *testing.T) {
 	ctx := context.Background()
 	db := openGuideTopicsTestDB(t, ctx)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "guide_topics.json")

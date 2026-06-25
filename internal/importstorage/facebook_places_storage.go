@@ -28,7 +28,7 @@ func (s *FacebookPlacesStorage) SaveOrUpdateLocation(ctx context.Context, name, 
 	if err != nil {
 		return false, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var existingID int64
 

@@ -470,9 +470,9 @@ func buildWriteupPrompt(purpose, purposeDetail, subjectName string, turns []*mod
 
 	sb.WriteString("## Interview Transcript\n\n")
 	for _, t := range turns {
-		sb.WriteString(fmt.Sprintf("**Q%d:** %s\n\n", t.TurnNumber, t.Question))
+		fmt.Fprintf(&sb, "**Q%d:** %s\n\n", t.TurnNumber, t.Question)
 		if t.Answer != nil && *t.Answer != "" {
-			sb.WriteString(fmt.Sprintf("**A%d:** %s\n\n", t.TurnNumber, *t.Answer))
+			fmt.Fprintf(&sb, "**A%d:** %s\n\n", t.TurnNumber, *t.Answer)
 		}
 	}
 
@@ -502,19 +502,19 @@ func (s *ChatService) GetInterviewTurns(
 func (s *ChatService) pickInterviewProvider(ctx context.Context, r *http.Request, preferred string) (appai.ChatProvider, string) {
 	if preferred == "claude" {
 		cp := s.effectiveClaudeProvider(ctx, r, "")
-		if cp != nil && cp.IsAvailable() {
+		if cp.IsAvailable() {
 			return cp, "claude"
 		}
 	}
 	if preferred == "deepseek" {
 		dp := s.effectiveDeepSeekProvider(ctx, r, "")
-		if dp != nil && dp.IsAvailable() {
+		if dp.IsAvailable() {
 			return dp, "deepseek"
 		}
 	}
 	if preferred == "openai" {
 		op := s.effectiveOpenAIProvider(ctx, r, "")
-		if op != nil && op.IsAvailable() {
+		if op.IsAvailable() {
 			return op, "openai"
 		}
 	}
@@ -525,7 +525,7 @@ func (s *ChatService) pickInterviewProvider(ctx context.Context, r *http.Request
 		}
 	}
 	gp := s.effectiveGeminiProvider(ctx, r, "")
-	if gp != nil && gp.IsAvailable() {
+	if gp.IsAvailable() {
 		return gp, "gemini"
 	}
 	return nil, preferred
@@ -546,7 +546,7 @@ func (s *ChatService) buildInterviewSystemPrompt(ctx context.Context, style, pur
 	purposePrompt := interviewPurposePrompts[purpose]
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(`You are an AI interviewer conducting an interview with %s. Your role is to ask thoughtful, well-informed questions — you do NOT answer questions yourself. You only ask them.
+	fmt.Fprintf(&sb, `You are an AI interviewer conducting an interview with %s. Your role is to ask thoughtful, well-informed questions — you do NOT answer questions yourself. You only ask them.
 
 **Critical Rules:**
 - You ask ONE question at a time. Wait for the interviewee's response before asking the next question.
@@ -555,7 +555,7 @@ func (s *ChatService) buildInterviewSystemPrompt(ctx context.Context, style, pur
 - Build on previous answers — refer back to things the interviewee said earlier when relevant.
 - Keep questions focused but open-ended enough to elicit rich, detailed responses.
 
-`, subjectName))
+`, subjectName)
 
 	sb.WriteString("**Your Interviewer Style:**\n")
 	sb.WriteString(stylePrompt)
@@ -564,10 +564,10 @@ func (s *ChatService) buildInterviewSystemPrompt(ctx context.Context, style, pur
 	sb.WriteString("\n\n")
 
 	if purposeDetail != "" {
-		sb.WriteString(fmt.Sprintf("**Specific Focus:** %s\n\n", purposeDetail))
+		fmt.Fprintf(&sb, "**Specific Focus:** %s\n\n", purposeDetail)
 	}
 
-	sb.WriteString(fmt.Sprintf("**About the interviewee:** %s (%s/%s/%s)\n\n", subjectName, he, him, his))
+	fmt.Fprintf(&sb, "**About the interviewee:** %s (%s/%s/%s)\n\n", subjectName, he, him, his)
 	sb.WriteString("**Biographical and archive context (use tools to explore further):**\n")
 	sb.WriteString(coreInstructions)
 
@@ -577,12 +577,12 @@ func (s *ChatService) buildInterviewSystemPrompt(ctx context.Context, style, pur
 // buildInterviewStartPrompt creates the initial user prompt that kicks off the interview.
 func (s *ChatService) buildInterviewStartPrompt(subjectName, purposeDetail string) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("You are beginning an interview with %s. ", subjectName))
+	fmt.Fprintf(&sb, "You are beginning an interview with %s. ", subjectName)
 	sb.WriteString("Before asking your first question, use the available tools to review biographical material (reference documents, subject profile, etc.) to inform your questions. ")
 	sb.WriteString("Then introduce yourself briefly and ask your opening question. ")
 	sb.WriteString("The opening question should be warm and inviting — something that eases the interviewee into the conversation.")
 	if purposeDetail != "" {
-		sb.WriteString(fmt.Sprintf("\n\nThe interviewee has indicated they'd like to focus on: %s", purposeDetail))
+		fmt.Fprintf(&sb, "\n\nThe interviewee has indicated they'd like to focus on: %s", purposeDetail)
 	}
 	return sb.String()
 }

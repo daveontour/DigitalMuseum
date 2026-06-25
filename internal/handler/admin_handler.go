@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -163,7 +164,7 @@ SELECT CAST(MAX(ts) AS TEXT) FROM (
 			result["image_tag_embeddings"] = runInfo{LastRunAt: embTS, Result: embResult, ResultMessage: embMsg}
 		}
 	} else if !errors.Is(err, sql.ErrNoRows) {
-		// best-effort: ignore missing row; log only unexpected errors
+		slog.Warn("unexpected image_tag_embeddings status query", "err", err)
 	}
 
 	writeJSON(w, result)
@@ -180,7 +181,7 @@ func (h *AdminHandler) GetControlDefaults(w http.ResponseWriter, r *http.Request
 		writeJSON(w, map[string]any{})
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := map[string]any{}
 	for rows.Next() {
@@ -563,7 +564,7 @@ func (h *AdminHandler) sampleEmailsForAI(ctx context.Context, limit int) (string
 	if err != nil {
 		return "", err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sb strings.Builder
 	i := 0
@@ -573,9 +574,9 @@ func (h *AdminHandler) sampleEmailsForAI(ctx context.Context, limit int) (string
 			continue
 		}
 		i++
-		sb.WriteString(fmt.Sprintf("--- Email %d ---\n", i))
+		fmt.Fprintf(&sb, "--- Email %d ---\n", i)
 		if subject != nil {
-			sb.WriteString(fmt.Sprintf("Subject: %s\n", *subject))
+			fmt.Fprintf(&sb, "Subject: %s\n", *subject)
 		}
 		if text != nil {
 			body := *text
@@ -651,7 +652,7 @@ func (h *AdminHandler) sampleMessagesFromArchiveOwner(ctx context.Context, limit
 	if err != nil {
 		return "", err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sb strings.Builder
 	i := 0
@@ -668,12 +669,12 @@ func (h *AdminHandler) sampleMessagesFromArchiveOwner(ctx context.Context, limit
 		if service.Valid && strings.TrimSpace(service.String) != "" {
 			svc = strings.TrimSpace(service.String)
 		}
-		sb.WriteString(fmt.Sprintf("--- Message %d (%s) ---\n", i, svc))
+		fmt.Fprintf(&sb, "--- Message %d (%s) ---\n", i, svc)
 		if senderName.Valid && strings.TrimSpace(senderName.String) != "" {
-			sb.WriteString(fmt.Sprintf("From: %s\n", strings.TrimSpace(senderName.String)))
+			fmt.Fprintf(&sb, "From: %s\n", strings.TrimSpace(senderName.String))
 		}
 		if subject.Valid && strings.TrimSpace(subject.String) != "" {
-			sb.WriteString(fmt.Sprintf("Subject: %s\n", strings.TrimSpace(subject.String)))
+			fmt.Fprintf(&sb, "Subject: %s\n", strings.TrimSpace(subject.String))
 		}
 		body := text.String
 		if len(body) > 500 {

@@ -40,7 +40,7 @@ func (r *PrivateStoreRepo) GetAll(ctx context.Context) ([]privateStoreRow, error
 	if err != nil {
 		return nil, fmt.Errorf("query private_store: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []privateStoreRow
 	for rows.Next() {

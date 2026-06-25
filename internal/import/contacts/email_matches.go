@@ -75,7 +75,7 @@ func LoadEmailMatchSets(ctx context.Context, db *sql.DB) (map[string]string, map
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to query email_matches table: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	groupMap := make(map[string][]string)
 	for rows.Next() {

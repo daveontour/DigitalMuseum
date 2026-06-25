@@ -225,7 +225,7 @@ func (s *MessageService) conversationTranscript(ctx context.Context, chatSession
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Conversation with %s\n\n", chatSession))
+	fmt.Fprintf(&sb, "Conversation with %s\n\n", chatSession)
 	for _, m := range msgs {
 		sender := "Unknown"
 		if m.SenderName != nil && *m.SenderName != "" {
@@ -239,7 +239,7 @@ func (s *MessageService) conversationTranscript(ctx context.Context, chatSession
 		if m.Text != nil {
 			text = *m.Text
 		}
-		sb.WriteString(fmt.Sprintf("[%s] %s: %s\n", date, sender, text))
+		fmt.Fprintf(&sb, "[%s] %s: %s\n", date, sender, text)
 	}
 	return sb.String(), nil
 }
@@ -247,7 +247,7 @@ func (s *MessageService) conversationTranscript(ctx context.Context, chatSession
 // SummarizeConversation fetches a conversation and asks Gemini to summarize it.
 func (s *MessageService) SummarizeConversation(ctx context.Context, chatSession string) (string, error) {
 	if s.gemini == nil {
-		return "", fmt.Errorf("AI summarization is not configured")
+		return "", fmt.Errorf("aI summarization is not configured")
 	}
 	transcript, err := s.conversationTranscript(ctx, chatSession)
 	if err != nil {
@@ -272,7 +272,7 @@ Conversation:
 		}
 		MarkUsageServerKey(stub, true)
 		RecordLLMUsage(ctx, s.billing, s.users, stub, err)
-		return "", fmt.Errorf("AI summarize: %w", err)
+		return "", fmt.Errorf("aI summarize: %w", err)
 	}
 	MarkUsageServerKey(result.Usage, true)
 	RecordLLMUsage(ctx, s.billing, s.users, result.Usage, nil)
@@ -282,7 +282,7 @@ Conversation:
 // RunConversationPrompt sends the same transcript as SummarizeConversation to Gemini, prefixed with the caller-supplied instruction.
 func (s *MessageService) RunConversationPrompt(ctx context.Context, chatSession, instruction string) (string, error) {
 	if s.gemini == nil {
-		return "", fmt.Errorf("AI is not configured")
+		return "", fmt.Errorf("aI is not configured")
 	}
 	transcript, err := s.conversationTranscript(ctx, chatSession)
 	if err != nil {
@@ -298,7 +298,7 @@ func (s *MessageService) RunConversationPrompt(ctx context.Context, chatSession,
 		}
 		MarkUsageServerKey(stub, true)
 		RecordLLMUsage(ctx, s.billing, s.users, stub, err)
-		return "", fmt.Errorf("AI conversation prompt: %w", err)
+		return "", fmt.Errorf("aI conversation prompt: %w", err)
 	}
 	MarkUsageServerKey(result.Usage, true)
 	RecordLLMUsage(ctx, s.billing, s.users, result.Usage, nil)

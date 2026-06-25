@@ -31,9 +31,9 @@ func (r *RegionsRepo) ListAll(ctx context.Context) ([]*model.RegionRow, error) {
 	rows, err := r.pool.QueryContext(ctx,
 		`SELECT id, key, sort_order, text FROM regions ORDER BY sort_order, id`)
 	if err != nil {
-		return nil, fmt.Errorf("ListAll regions: %w", err)
+		return nil, fmt.Errorf("listAll regions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.RegionRow
 	for rows.Next() {
 		row, err := scanRegionRow(rows)
@@ -76,7 +76,7 @@ func (r *RegionsRepo) KeyExists(ctx context.Context, key string) (bool, error) {
 	var n int
 	err := r.pool.QueryRowContext(ctx, `SELECT COUNT(1) FROM regions WHERE key = ?`, key).Scan(&n)
 	if err != nil {
-		return false, fmt.Errorf("KeyExists regions: %w", err)
+		return false, fmt.Errorf("keyExists regions: %w", err)
 	}
 	return n > 0, nil
 }
@@ -87,7 +87,7 @@ func (r *RegionsRepo) KeyExistsExcluding(ctx context.Context, key string, exclud
 	err := r.pool.QueryRowContext(ctx,
 		`SELECT COUNT(1) FROM regions WHERE key = ? AND id != ?`, key, excludeID).Scan(&n)
 	if err != nil {
-		return false, fmt.Errorf("KeyExistsExcluding regions: %w", err)
+		return false, fmt.Errorf("keyExistsExcluding regions: %w", err)
 	}
 	return n > 0, nil
 }
@@ -98,11 +98,11 @@ func (r *RegionsRepo) Create(ctx context.Context, key string, sortOrder int, tex
 		`INSERT INTO regions (key, sort_order, text) VALUES (?, ?, ?)`,
 		key, sortOrder, text)
 	if err != nil {
-		return nil, fmt.Errorf("Create region: %w", err)
+		return nil, fmt.Errorf("create region: %w", err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("Create region last insert id: %w", err)
+		return nil, fmt.Errorf("create region last insert id: %w", err)
 	}
 	return r.GetByID(ctx, id)
 }
@@ -113,7 +113,7 @@ func (r *RegionsRepo) Update(ctx context.Context, id int64, key string, sortOrde
 		`UPDATE regions SET key = ?, sort_order = ?, text = ? WHERE id = ?`,
 		key, sortOrder, text, id)
 	if err != nil {
-		return nil, fmt.Errorf("Update region: %w", err)
+		return nil, fmt.Errorf("update region: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
@@ -129,7 +129,7 @@ func (r *RegionsRepo) Update(ctx context.Context, id int64, key string, sortOrde
 func (r *RegionsRepo) Delete(ctx context.Context, id int64) (bool, error) {
 	res, err := r.pool.ExecContext(ctx, `DELETE FROM regions WHERE id = ?`, id)
 	if err != nil {
-		return false, fmt.Errorf("Delete region: %w", err)
+		return false, fmt.Errorf("delete region: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
@@ -145,13 +145,13 @@ func (r *RegionsRepo) ReorderSortOrder(ctx context.Context, items []struct {
 }) error {
 	tx, err := r.pool.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("Reorder regions begin: %w", err)
+		return fmt.Errorf("reorder regions begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, item := range items {
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE regions SET sort_order = ? WHERE id = ?`, item.SortOrder, item.ID); err != nil {
-			return fmt.Errorf("Reorder regions id=%d: %w", item.ID, err)
+			return fmt.Errorf("reorder regions id=%d: %w", item.ID, err)
 		}
 	}
 	return tx.Commit()
@@ -162,7 +162,7 @@ func (r *RegionsRepo) MaxSortOrder(ctx context.Context) (int, error) {
 	var max sql.NullInt64
 	err := r.pool.QueryRowContext(ctx, `SELECT MAX(sort_order) FROM regions`).Scan(&max)
 	if err != nil {
-		return 0, fmt.Errorf("MaxSortOrder regions: %w", err)
+		return 0, fmt.Errorf("maxSortOrder regions: %w", err)
 	}
 	if !max.Valid {
 		return -1, nil

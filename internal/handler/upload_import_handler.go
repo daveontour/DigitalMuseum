@@ -157,7 +157,7 @@ func (h *UploadImportHandler) startZipImportBackground(uid int64, importType, tm
 
 	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
 	go func() {
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 		switch importType {
 		case "whatsapp":
 			runUploadWhatsApp(ctx, h.pool, h.subjectConfigRepo, uploadJob, importRoot)
@@ -192,7 +192,7 @@ func (h *UploadImportHandler) preparePathImportAndStart(uid int64, importType, f
 	handlerOwnsCleanup := true
 	defer func() {
 		if handlerOwnsCleanup {
-			os.RemoveAll(tmpDir)
+			_ = os.RemoveAll(tmpDir)
 		}
 	}()
 	defer func() {
@@ -307,7 +307,7 @@ func runUploadWhatsApp(ctx context.Context, pool *sql.DB, subjectRepo *repositor
 
 	storage := importstorage.NewMessageStorage(ctx, pool, subjectRepo)
 
-	progressCallback := func(stats whatsappimport.ImportStats, justCompleted string) {
+	progressCallback := func(stats whatsappimport.ImportStatsSnapshot, justCompleted string) {
 		// statusLine := fmt.Sprintf("Processing conversation %d of %d: %s | Messages: %d (%d created, %d updated) | Attachments: %d found, %d missing | Errors: %d",
 		// 	stats.ConversationsProcessed, stats.TotalConversations, justCompleted,
 		// 	stats.MessagesImported, stats.MessagesCreated, stats.MessagesUpdated,
@@ -354,7 +354,7 @@ func runUploadIMessage(ctx context.Context, pool *sql.DB, subjectRepo *repositor
 
 	storage := importstorage.NewMessageStorage(ctx, pool, subjectRepo)
 
-	progressCallback := func(stats imessageimport.ImportStats) {
+	progressCallback := func(stats imessageimport.ImportStatsSnapshot) {
 		statusLine := ""
 		if stats.TotalConversations > 0 {
 			// statusLine = fmt.Sprintf("Processing conversation %d of %d: %s | Messages: %d (%d created, %d updated) | Attachments: %d found, %d missing | Errors: %d",
@@ -404,7 +404,7 @@ func runUploadInstagram(ctx context.Context, pool *sql.DB, subjectRepo *reposito
 
 	storage := importstorage.NewMessageStorage(ctx, pool, subjectRepo)
 
-	progressCallback := func(stats instagramimport.ImportStats) {
+	progressCallback := func(stats instagramimport.ImportStatsSnapshot) {
 		statusLine := ""
 		if stats.TotalConversations > 0 {
 			// statusLine = fmt.Sprintf("Processing conversation %d of %d: %s | Messages: %d (%d created, %d updated) | Attachments: %d found, %d missing | Errors: %d",
@@ -459,7 +459,7 @@ func runUploadFacebook(ctx context.Context, pool *sql.DB, subjectRepo *repositor
 	job.UpdateState(map[string]any{"status_line": "Running Facebook Messenger import..."})
 	job.Broadcast("progress", job.GetState())
 
-	messengerProgress := func(stats facebookimport.ImportStats) {
+	messengerProgress := func(stats facebookimport.ImportStatsSnapshot) {
 		job.UpdateState(map[string]any{
 			"status_line": fmt.Sprintf("Messenger: %d conversations, %d messages (%d created, %d updated)",
 				stats.ConversationsProcessed, stats.MessagesImported, stats.MessagesCreated, stats.MessagesUpdated),
@@ -480,7 +480,7 @@ func runUploadFacebook(ctx context.Context, pool *sql.DB, subjectRepo *repositor
 	job.UpdateState(map[string]any{"status_line": "Running Facebook Albums import..."})
 	job.Broadcast("progress", job.GetState())
 
-	albumsProgress := func(stats facebookalbumsimport.ImportStats) {
+	albumsProgress := func(stats facebookalbumsimport.ImportStatsSnapshot) {
 		job.UpdateState(map[string]any{
 			"status_line": fmt.Sprintf("Albums: %d processed, %d imported, %d images imported",
 				stats.AlbumsProcessed, stats.AlbumsImported, stats.ImagesImported),
@@ -522,7 +522,7 @@ func runUploadFacebook(ctx context.Context, pool *sql.DB, subjectRepo *repositor
 	job.UpdateState(map[string]any{"status_line": "Running Facebook Posts import..."})
 	job.Broadcast("progress", job.GetState())
 
-	postsProgress := func(stats facebookpostsimport.ImportStats) {
+	postsProgress := func(stats facebookpostsimport.ImportStatsSnapshot) {
 		job.UpdateState(map[string]any{
 			"status_line": fmt.Sprintf("Posts: %d processed, %d imported, %d updated",
 				stats.PostsProcessed, stats.PostsImported, stats.PostsUpdated),
@@ -625,7 +625,7 @@ func extractZip(zipPath, destDir string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	for _, f := range r.File {
 		name := filepath.Clean(f.Name)
 		if strings.HasPrefix(name, "..") {
@@ -657,12 +657,12 @@ func extractZipEntry(f *zip.File, destPath string) error {
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	out, err := os.Create(destPath)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	_, err = io.Copy(out, rc)
 	return err
 }

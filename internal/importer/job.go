@@ -211,7 +211,7 @@ func (j *ImportJob) ServeSSE(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	payload, _ := json.Marshal(map[string]any{"type": initialEventType, "data": initial})
-	fmt.Fprintf(w, "data: %s\n\n", payload)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", payload)
 	flusher.Flush()
 
 	ticker := time.NewTicker(15 * time.Second)
@@ -226,11 +226,11 @@ func (j *ImportJob) ServeSSE(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			fmt.Fprint(w, msg)
+			_, _ = fmt.Fprint(w, msg)
 			flusher.Flush()
 		case <-ticker.C:
 			// keepalive comment
-			fmt.Fprint(w, ": keepalive\n\n")
+			_, _ = fmt.Fprint(w, ": keepalive\n\n")
 			flusher.Flush()
 		}
 	}

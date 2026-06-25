@@ -117,7 +117,7 @@ func shellExecute(verb, file, params string) error {
 		1,
 	)
 	if ret <= 32 {
-		return fmt.Errorf("ShellExecute failed (code %d)", ret)
+		return fmt.Errorf("shellExecute failed (code %d)", ret)
 	}
 
 	return nil

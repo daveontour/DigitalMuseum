@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
@@ -154,7 +155,7 @@ func importFolder(ctx context.Context, c *client.Client, pool *sql.DB, folder st
 			break
 		}
 		if err := storeEmail(ctx, pool, folder, msg, newOnly, mailSource); err != nil {
-			fmt.Printf("[IMAP] warning storing email %d: %s\n", msg.SeqNum, err)
+			slog.Warn("[IMAP] warning storing email", "seq", msg.SeqNum, "err", err)
 			continue
 		}
 		count++
@@ -228,7 +229,7 @@ func storeEmail(ctx context.Context, pool *sql.DB, folder string, msg *goImap.Me
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Manual check+insert/update to handle nullable user_id correctly
 	// (ON CONFLICT doesn't work with NULL columns in unique constraints).
@@ -238,15 +239,16 @@ func storeEmail(ctx context.Context, pool *sql.DB, folder string, msg *goImap.Me
 		emailUID, folder, userIDVal,
 	).Scan(&emailID)
 
-	if checkErr == nil {
+	switch checkErr {
+	case nil:
 		// Update existing row.
 		_, err = tx.ExecContext(ctx, `
-			UPDATE emails SET
-				subject=?1, from_address=?2, to_addresses=?3, cc_addresses=?4, bcc_addresses=?5,
-				date=?6, raw_message=?7, plain_text=?8, snippet=?9, has_attachments=?10,
-				source=?11,
-				updated_at=CURRENT_TIMESTAMP
-			WHERE id=?12`,
+				UPDATE emails SET
+					subject=?1, from_address=?2, to_addresses=?3, cc_addresses=?4, bcc_addresses=?5,
+					date=?6, raw_message=?7, plain_text=?8, snippet=?9, has_attachments=?10,
+					source=?11,
+					updated_at=CURRENT_TIMESTAMP
+				WHERE id=?12`,
 			ensureUTF8(env.Subject), ensureUTF8(from), ensureUTF8(to), ensureUTF8(cc), ensureUTF8(bcc),
 			date, ptrEnsureUTF8(rawMsg), ptrEnsureUTF8(plainText), ptrEnsureUTF8(snippet), hasAttach,
 			mailSource,
@@ -255,22 +257,22 @@ func storeEmail(ctx context.Context, pool *sql.DB, folder string, msg *goImap.Me
 		if err != nil {
 			return err
 		}
-	} else if checkErr == sql.ErrNoRows {
+	case sql.ErrNoRows:
 		// Insert new row.
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO emails (uid, folder, subject, from_address, to_addresses, cc_addresses, bcc_addresses,
-			                    date, raw_message, plain_text, snippet, has_attachments, user_id, source,
-			                    user_deleted, is_personal, is_business, is_social, is_promotional,
-			                    is_spam, is_important, use_by_ai)
-			VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE)
-			RETURNING id`,
+				INSERT INTO emails (uid, folder, subject, from_address, to_addresses, cc_addresses, bcc_addresses,
+									date, raw_message, plain_text, snippet, has_attachments, user_id, source,
+									user_deleted, is_personal, is_business, is_social, is_promotional,
+									is_spam, is_important, use_by_ai)
+				VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE)
+				RETURNING id`,
 			emailUID, folder, ensureUTF8(env.Subject), ensureUTF8(from), ensureUTF8(to), ensureUTF8(cc), ensureUTF8(bcc),
 			date, ptrEnsureUTF8(rawMsg), ptrEnsureUTF8(plainText), ptrEnsureUTF8(snippet), hasAttach, userIDVal, mailSource,
 		).Scan(&emailID)
 		if err != nil {
 			return err
 		}
-	} else {
+	default:
 		return checkErr
 	}
 

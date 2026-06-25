@@ -479,25 +479,25 @@ func (s *ChatService) ChatContextStatus(ctx context.Context, r *http.Request) (t
 // GeminiAvailable reports whether the Gemini provider is configured for this request's user (and visitor session overrides).
 func (s *ChatService) GeminiAvailable(ctx context.Context, r *http.Request) bool {
 	p := s.effectiveGeminiProvider(ctx, r, "")
-	return p != nil && p.IsAvailable()
+	return p.IsAvailable()
 }
 
 // ClaudeAvailable reports whether the Claude provider is configured for this request's user (and visitor session overrides).
 func (s *ChatService) ClaudeAvailable(ctx context.Context, r *http.Request) bool {
 	p := s.effectiveClaudeProvider(ctx, r, "")
-	return p != nil && p.IsAvailable()
+	return p.IsAvailable()
 }
 
 // DeepSeekAvailable reports whether DeepSeek is configured for this request's user (and visitor session overrides).
 func (s *ChatService) DeepSeekAvailable(ctx context.Context, r *http.Request) bool {
 	p := s.effectiveDeepSeekProvider(ctx, r, "")
-	return p != nil && p.IsAvailable()
+	return p.IsAvailable()
 }
 
 // OpenAIAvailable reports whether OpenAI is configured for this request's user (and visitor session overrides).
 func (s *ChatService) OpenAIAvailable(ctx context.Context, r *http.Request) bool {
 	p := s.effectiveOpenAIProvider(ctx, r, "")
-	return p != nil && p.IsAvailable()
+	return p.IsAvailable()
 }
 
 // ServerTavilyKeyConfigured reports whether a non-empty Tavily API key is configured server-side (e.g. TAVILY_API_KEY in .env).
@@ -1100,7 +1100,7 @@ func (s *ChatService) loadVoiceInstructions(ctx context.Context) map[string]voic
 	// Merge custom voices from DB (built-in keys are never overwritten)
 	rows, err := s.pool.QueryContext(ctx, `SELECT key, name, description, instructions FROM custom_voices`)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var key, name, instructions string
 			var desc *string
@@ -1370,20 +1370,20 @@ func (s *ChatService) GenerateCompleteProfile(ctx context.Context, name string, 
 	geminiP := s.effectiveGeminiProvider(ctx, nil, authSessionID)
 	localaiP := s.localAIProviderForChat(ctx)
 	openaiP := s.effectiveOpenAIProvider(ctx, nil, authSessionID)
-	if provider == "openai" && (openaiP == nil || !openaiP.IsAvailable()) {
+	if provider == "openai" && !openaiP.IsAvailable() {
 		provider = "gemini"
 	}
-	if provider == "deepseek" && (deepseekP == nil || !deepseekP.IsAvailable()) {
+	if provider == "deepseek" && !deepseekP.IsAvailable() {
 		provider = "gemini" // fallback
 	}
-	if provider == "claude" && (claudeP == nil || !claudeP.IsAvailable()) {
+	if provider == "claude" && !claudeP.IsAvailable() {
 		provider = "gemini" // fallback
 	}
-	if provider == "gemini" && (geminiP == nil || !geminiP.IsAvailable()) {
+	if provider == "gemini" && !geminiP.IsAvailable() {
 		provider = "claude" // fallback
 	}
-	if provider == "claude" && (claudeP == nil || !claudeP.IsAvailable()) {
-		if deepseekP != nil && deepseekP.IsAvailable() {
+	if provider == "claude" && !claudeP.IsAvailable() {
+		if deepseekP.IsAvailable() {
 			provider = "deepseek"
 		}
 	}

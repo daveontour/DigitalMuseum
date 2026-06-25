@@ -87,7 +87,7 @@ func (h *MessageSimilarityHandler) Search(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("vector search failed: %v", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type resultItem struct {
 		RowID    int64 `json:"row_id"`
@@ -206,7 +206,7 @@ func (h *MessageSimilarityHandler) SearchUnique(w http.ResponseWriter, r *http.R
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("vector search failed: %v", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type resultItem struct {
 		RowID    int64 `json:"row_id"`
@@ -300,7 +300,7 @@ func (h *MessageSimilarityHandler) loadMessagesByIDs(ctx context.Context, uid in
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	byID := map[int64]map[string]any{}
 	for rows.Next() {

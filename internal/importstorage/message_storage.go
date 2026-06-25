@@ -83,7 +83,7 @@ func (s *MessageStorage) SaveIMessage(ctx context.Context, data MessageData, att
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var existingID int64
 	var isUpdate bool
@@ -102,7 +102,8 @@ func (s *MessageStorage) SaveIMessage(ctx context.Context, data MessageData, att
 		data.Type,
 	).Scan(&existingID)
 
-	if err == nil {
+	switch err {
+	case nil:
 		isUpdate = true
 		updateQuery := `UPDATE messages SET
 			delivered_date = ?,
@@ -140,7 +141,7 @@ func (s *MessageStorage) SaveIMessage(ctx context.Context, data MessageData, att
 			return 0, false, fmt.Errorf("failed to delete existing attachments: %w", err)
 		}
 
-	} else if err == sql.ErrNoRows {
+	case sql.ErrNoRows:
 		isUpdate = false
 		insertQuery := `INSERT INTO messages (
 			chat_session, message_date, delivered_date, read_date, edited_date,
@@ -170,7 +171,7 @@ func (s *MessageStorage) SaveIMessage(ctx context.Context, data MessageData, att
 		if err != nil {
 			return 0, false, fmt.Errorf("failed to insert message: %w", err)
 		}
-	} else {
+	default:
 		return 0, false, fmt.Errorf("failed to check for existing message: %w", err)
 	}
 
@@ -312,7 +313,7 @@ func (s *MessageStorage) SaveMessagesBatch(ctx context.Context, messages []Messa
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	type messageKey struct {
 		chatSession string
@@ -355,7 +356,7 @@ func (s *MessageStorage) SaveMessagesBatch(ctx context.Context, messages []Messa
 			checkQuery.WriteString(")")
 			rows, err := tx.QueryContext(ctx, checkQuery.String(), args...)
 			if err == nil {
-				defer rows.Close()
+				defer func() { _ = rows.Close() }()
 				for rows.Next() {
 					var id int64
 					var chatSession string
@@ -535,7 +536,7 @@ func (s *MessageStorage) batchInsertMessages(ctx context.Context, tx *sql.Tx, me
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []int64
 	for rows.Next() {

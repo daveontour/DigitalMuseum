@@ -71,10 +71,22 @@ type ImportStats struct {
 	mu               sync.Mutex
 }
 
-func (s *ImportStats) copyStats() ImportStats {
+// ImportStatsSnapshot is a mutex-free progress snapshot for callbacks.
+type ImportStatsSnapshot struct {
+	TotalFiles       int
+	FilesProcessed   int
+	ImagesImported   int
+	ImagesUpdated    int
+	ImagesReferenced int
+	Errors           int
+	ErrorMessages    []string
+	CurrentFile      string
+}
+
+func (s *ImportStats) copyStats() ImportStatsSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return ImportStats{
+	return ImportStatsSnapshot{
 		TotalFiles:       s.TotalFiles,
 		FilesProcessed:   s.FilesProcessed,
 		ImagesImported:   s.ImagesImported,
@@ -87,7 +99,7 @@ func (s *ImportStats) copyStats() ImportStats {
 }
 
 // ProgressCallback is called after each image is processed
-type ProgressCallback func(ImportStats)
+type ProgressCallback func(ImportStatsSnapshot)
 
 // CancelledCheck returns true if the import should be cancelled
 type CancelledCheck func() bool
@@ -135,7 +147,7 @@ func ImportImagesFromDirectories(
 			return nil, fmt.Errorf("path is not a directory: %s", rootPath)
 		}
 
-		filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
+		if err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
 			if cancelledCheck != nil && cancelledCheck() {
 				return fmt.Errorf("cancelled")
 			}
@@ -172,7 +184,9 @@ func ImportImagesFromDirectories(
 				return filepath.SkipAll
 			}
 			return nil
-		})
+		}); err != nil {
+			return nil, fmt.Errorf("walk filesystem import dir %s: %w", rootPath, err)
+		}
 	}
 
 	if len(workItems) == 0 {

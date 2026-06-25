@@ -56,7 +56,7 @@ func LoadExclusionsFromDB(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("query email_exclusions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cfg ExclusionsConfig
 	for rows.Next() {

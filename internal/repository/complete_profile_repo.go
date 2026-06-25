@@ -34,7 +34,7 @@ func (r *CompleteProfileRepo) ListProfileEntries(ctx context.Context) ([]Profile
 	if err != nil {
 		return nil, fmt.Errorf("list complete profile entries: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []ProfileListEntry
 	for rows.Next() {
 		var e ProfileListEntry

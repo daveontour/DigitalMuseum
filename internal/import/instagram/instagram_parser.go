@@ -78,7 +78,7 @@ func extractMessageNumber(path string) int {
 	parts := strings.Split(base, "_")
 	if len(parts) >= 2 {
 		var n int
-		fmt.Sscanf(parts[1], "%d", &n)
+		_, _ = fmt.Sscanf(parts[1], "%d", &n)
 		return n
 	}
 	return 0

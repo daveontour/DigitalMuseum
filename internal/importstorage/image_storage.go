@@ -57,7 +57,7 @@ func (s *ImageStorage) LoadFilesystemSourceRefSet(ctx context.Context) (map[stri
 	if err != nil {
 		return nil, fmt.Errorf("load filesystem source refs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string]struct{})
 	for rows.Next() {
@@ -100,7 +100,7 @@ func (s *ImageStorage) SaveImage(ctx context.Context, sourceRef string, imageDat
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if !sqlutil.IsSQLite(ctx, s.pool) {
 		if _, err = tx.ExecContext(ctx, "SET LOCAL synchronous_commit = off"); err != nil {
@@ -198,7 +198,7 @@ func (s *ImageStorage) SaveImagesBatch(ctx context.Context, items []BatchImageIt
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if !sqlutil.IsSQLite(ctx, s.pool) {
 		if _, err = tx.ExecContext(ctx, "SET LOCAL synchronous_commit = off"); err != nil {
@@ -221,7 +221,7 @@ func (s *ImageStorage) SaveImagesBatch(ctx context.Context, items []BatchImageIt
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to check existing images: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var ref string

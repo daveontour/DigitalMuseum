@@ -61,10 +61,23 @@ type ImportStats struct {
 	mu                    sync.Mutex
 }
 
-func (s *ImportStats) copyStats() ImportStats {
+// ImportStatsSnapshot is a mutex-free progress snapshot for callbacks.
+type ImportStatsSnapshot struct {
+	AlbumsProcessed       int
+	TotalAlbums           int
+	AlbumsImported        int
+	ImagesImported        int
+	ImagesFound           int
+	ImagesMissing         int
+	MissingImageFilenames []string
+	Errors                int
+	CurrentAlbum          string
+}
+
+func (s *ImportStats) copyStats() ImportStatsSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return ImportStats{
+	return ImportStatsSnapshot{
 		AlbumsProcessed:       s.AlbumsProcessed,
 		TotalAlbums:           s.TotalAlbums,
 		AlbumsImported:        s.AlbumsImported,
@@ -78,7 +91,7 @@ func (s *ImportStats) copyStats() ImportStats {
 }
 
 // ProgressCallback is called after each album is processed.
-type ProgressCallback func(ImportStats)
+type ProgressCallback func(ImportStatsSnapshot)
 
 // CancelledCheck returns true if the import should be cancelled.
 type CancelledCheck func() bool
@@ -435,7 +448,7 @@ func FindImageFile(albumDir, uri, exportRoot string, filenameCache map[string]st
 		return "", false
 	}
 	var found string
-	filepath.WalkDir(albumDir, func(p string, d fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(albumDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -444,7 +457,9 @@ func FindImageFile(albumDir, uri, exportRoot string, filenameCache map[string]st
 			return errFound
 		}
 		return nil
-	})
+	}); err != nil && !errors.Is(err, errFound) {
+		return "", false
+	}
 	if found != "" {
 		return found, true
 	}
@@ -458,7 +473,7 @@ func BuildFilenameCache(rootDirs []string) map[string]string {
 		if rootDir == "" {
 			continue
 		}
-		filepath.WalkDir(rootDir, func(p string, d fs.DirEntry, err error) error {
+		_ = filepath.WalkDir(rootDir, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return nil
 			}

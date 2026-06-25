@@ -25,7 +25,7 @@ func fileBirthTime(path string) (time.Time, bool) {
 	if err != nil {
 		return time.Time{}, false
 	}
-	defer windows.CloseHandle(handle)
+	defer func() { _ = windows.CloseHandle(handle) }()
 
 	var created, accessed, written windows.Filetime
 	if err := windows.GetFileTime(handle, &created, &accessed, &written); err != nil {

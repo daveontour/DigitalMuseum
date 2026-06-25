@@ -271,13 +271,6 @@ func headerRowCustom(pdf *fpdf.Fpdf, ws []float64, cols []string) {
 	pdf.SetFont("Helvetica", "", 7)
 }
 
-func dataRowCustom(pdf *fpdf.Fpdf, ws []float64, cols []string) {
-	for i := range cols {
-		pdf.CellFormat(ws[i], 5, safeLine(cols[i]), "1", 0, "L", false, 0, "")
-	}
-	pdf.Ln(-1)
-}
-
 // dataRowEventDetail draws one event-detail row. Column 10 (error message) wraps using MultiCell;
 // other columns use a matching cell height.
 func dataRowEventDetail(pdf *fpdf.Fpdf, ws []float64, row []string, lineH float64) {

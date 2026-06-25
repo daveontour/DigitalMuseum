@@ -66,7 +66,7 @@ func (s *ContactService) BulkDelete(ctx context.Context, ids []int64) (deleted, 
 // It also applies to the email_classifications table if a row exists.
 func (s *ContactService) UpdateClassification(ctx context.Context, name, classification string) error {
 	if err := s.repo.ApplyClassificationToContacts(ctx, name, classification); err != nil {
-		return fmt.Errorf("UpdateClassification: %w", err)
+		return fmt.Errorf("updateClassification: %w", err)
 	}
 	return nil
 }

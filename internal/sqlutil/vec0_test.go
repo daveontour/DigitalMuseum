@@ -17,7 +17,7 @@ func TestVec0Upsert_ReplacesExistingRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 	if _, err := db.ExecContext(ctx, `CREATE VIRTUAL TABLE media_tag_embeddings USING vec0(embedding float[768], int_ids text)`); err != nil {

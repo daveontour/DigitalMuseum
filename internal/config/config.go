@@ -235,7 +235,7 @@ func Load() (*Config, error) {
 	tlsCert := strings.TrimSpace(os.Getenv("TLS_CERT_FILE"))
 	tlsKey := strings.TrimSpace(os.Getenv("TLS_KEY_FILE"))
 	if (tlsCert != "" && tlsKey == "") || (tlsCert == "" && tlsKey != "") {
-		return nil, fmt.Errorf("TLS: set both TLS_CERT_FILE and TLS_KEY_FILE, or leave both unset for plain HTTP")
+		return nil, fmt.Errorf("tLS: set both TLS_CERT_FILE and TLS_KEY_FILE, or leave both unset for plain HTTP")
 	}
 
 	attachments, err := loadAttachmentConfig()
@@ -381,7 +381,7 @@ func loadAttachmentConfig() (AttachmentConfig, error) {
 	minSizeStr := strings.TrimSpace(getenv("ATTACHMENT_MIN_SIZE", "0"))
 	minSize, err := strconv.ParseInt(minSizeStr, 10, 64)
 	if err != nil || minSize < 0 {
-		return AttachmentConfig{}, fmt.Errorf("ATTACHMENT_MIN_SIZE must be a non-negative integer, got: %s", minSizeStr)
+		return AttachmentConfig{}, fmt.Errorf("aTTACHMENT_MIN_SIZE must be a non-negative integer, got: %s", minSizeStr)
 	}
 
 	return AttachmentConfig{

@@ -30,9 +30,9 @@ func scanSuggestionRow(row interface{ Scan(...any) error }) (*model.SuggestionRo
 func (r *SuggestionsRepo) ListAll(ctx context.Context) ([]*model.SuggestionRow, error) {
 	rows, err := r.pool.QueryContext(ctx, `SELECT id, key, text FROM suggestions ORDER BY id`)
 	if err != nil {
-		return nil, fmt.Errorf("ListAll suggestions: %w", err)
+		return nil, fmt.Errorf("listAll suggestions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.SuggestionRow
 	for rows.Next() {
 		row, err := scanSuggestionRow(rows)
@@ -75,7 +75,7 @@ func (r *SuggestionsRepo) KeyExists(ctx context.Context, key string) (bool, erro
 	var n int
 	err := r.pool.QueryRowContext(ctx, `SELECT COUNT(1) FROM suggestions WHERE key = ?`, key).Scan(&n)
 	if err != nil {
-		return false, fmt.Errorf("KeyExists suggestions: %w", err)
+		return false, fmt.Errorf("keyExists suggestions: %w", err)
 	}
 	return n > 0, nil
 }
@@ -86,7 +86,7 @@ func (r *SuggestionsRepo) KeyExistsExcluding(ctx context.Context, key string, ex
 	err := r.pool.QueryRowContext(ctx,
 		`SELECT COUNT(1) FROM suggestions WHERE key = ? AND id != ?`, key, excludeID).Scan(&n)
 	if err != nil {
-		return false, fmt.Errorf("KeyExistsExcluding suggestions: %w", err)
+		return false, fmt.Errorf("keyExistsExcluding suggestions: %w", err)
 	}
 	return n > 0, nil
 }
@@ -95,11 +95,11 @@ func (r *SuggestionsRepo) KeyExistsExcluding(ctx context.Context, key string, ex
 func (r *SuggestionsRepo) Create(ctx context.Context, key, text string) (*model.SuggestionRow, error) {
 	res, err := r.pool.ExecContext(ctx, `INSERT INTO suggestions (key, text) VALUES (?, ?)`, key, text)
 	if err != nil {
-		return nil, fmt.Errorf("Create suggestion: %w", err)
+		return nil, fmt.Errorf("create suggestion: %w", err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("Create suggestion last insert id: %w", err)
+		return nil, fmt.Errorf("create suggestion last insert id: %w", err)
 	}
 	return r.GetByID(ctx, id)
 }
@@ -108,7 +108,7 @@ func (r *SuggestionsRepo) Create(ctx context.Context, key, text string) (*model.
 func (r *SuggestionsRepo) Update(ctx context.Context, id int64, key, text string) (*model.SuggestionRow, error) {
 	res, err := r.pool.ExecContext(ctx, `UPDATE suggestions SET key = ?, text = ? WHERE id = ?`, key, text, id)
 	if err != nil {
-		return nil, fmt.Errorf("Update suggestion: %w", err)
+		return nil, fmt.Errorf("update suggestion: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
@@ -124,7 +124,7 @@ func (r *SuggestionsRepo) Update(ctx context.Context, id int64, key, text string
 func (r *SuggestionsRepo) Delete(ctx context.Context, id int64) (bool, error) {
 	res, err := r.pool.ExecContext(ctx, `DELETE FROM suggestions WHERE id = ?`, id)
 	if err != nil {
-		return false, fmt.Errorf("Delete suggestion: %w", err)
+		return false, fmt.Errorf("delete suggestion: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {

@@ -17,7 +17,7 @@ func TestSeedRegionsFromFileIfMissingInsertOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	for _, stmt := range []string{
 		`CREATE TABLE regions (

@@ -75,9 +75,9 @@ func (r *DocumentRepo) List(ctx context.Context, search, category, tag, contentT
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListDocuments: %w", err)
+		return nil, fmt.Errorf("listDocuments: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []*model.ReferenceDocument
 	for rows.Next() {
@@ -116,9 +116,9 @@ func (r *DocumentRepo) ListForSystemPromptInclusion(ctx context.Context) ([]mode
 	q += ` ORDER BY id ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListForSystemPromptInclusion: %w", err)
+		return nil, fmt.Errorf("listForSystemPromptInclusion: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []model.ReferenceDocumentPromptBlob
 	for rows.Next() {
 		var row model.ReferenceDocumentPromptBlob
@@ -141,7 +141,7 @@ func (r *DocumentRepo) GetByID(ctx context.Context, id int64) (*model.ReferenceD
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetDocumentByID %d: %w", id, err)
+		return nil, fmt.Errorf("getDocumentByID %d: %w", id, err)
 	}
 	return d, nil
 }
@@ -181,7 +181,7 @@ func (r *DocumentRepo) Create(ctx context.Context,
 		tags, categories, notes, availableForTask, includeInSystemPrompt, isPrivate, isSensitive, isEncrypted, uidVal(uid),
 	))
 	if err != nil {
-		return nil, fmt.Errorf("CreateDocument: %w", err)
+		return nil, fmt.Errorf("createDocument: %w", err)
 	}
 	return d, nil
 }
@@ -212,7 +212,7 @@ func (r *DocumentRepo) Update(ctx context.Context, id int64,
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("UpdateDocument %d: %w", id, err)
+		return nil, fmt.Errorf("updateDocument %d: %w", id, err)
 	}
 	return d, nil
 }
@@ -241,7 +241,7 @@ func (r *DocumentRepo) FindIdentityProfile(ctx context.Context) (*model.Referenc
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("FindIdentityProfile: %w", err)
+		return nil, fmt.Errorf("findIdentityProfile: %w", err)
 	}
 	return d, nil
 }
@@ -275,9 +275,9 @@ func (r *DocumentRepo) ListSensitive(ctx context.Context) ([]*model.ReferenceDoc
 	q += " ORDER BY created_at DESC"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListSensitive: %w", err)
+		return nil, fmt.Errorf("listSensitive: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.ReferenceDocument
 	for rows.Next() {
 		d, err := scanDocument(rows)
@@ -300,7 +300,7 @@ func (r *DocumentRepo) GetSensitiveByID(ctx context.Context, id int64) (*model.R
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetSensitiveByID %d: %w", id, err)
+		return nil, fmt.Errorf("getSensitiveByID %d: %w", id, err)
 	}
 	return d, nil
 }
@@ -314,9 +314,9 @@ func (r *DocumentRepo) ListUnencrypted(ctx context.Context) ([]*model.ReferenceD
 	q += " ORDER BY id"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListUnencrypted: %w", err)
+		return nil, fmt.Errorf("listUnencrypted: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.ReferenceDocument
 	for rows.Next() {
 		d, err := scanDocument(rows)

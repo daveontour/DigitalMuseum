@@ -388,7 +388,7 @@ func (s *AuthService) EnsureAdminUser(ctx context.Context, email, password strin
 		return nil
 	}
 	if len(password) < minPasswordLength {
-		return fmt.Errorf("ADMIN_PASSWORD must be at least %d characters", minPasswordLength)
+		return fmt.Errorf("aDMIN_PASSWORD must be at least %d characters", minPasswordLength)
 	}
 	hash, err := appcrypto.HashPassword(password)
 	if err != nil {

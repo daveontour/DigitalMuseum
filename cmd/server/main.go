@@ -103,7 +103,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("connect to billing database: %w", err)
 	}
-	defer billingDB.Close()
+	defer func() { _ = billingDB.Close() }()
 
 	migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer migrateCancel()
@@ -121,7 +121,7 @@ func run() error {
 		return fmt.Errorf("connect to database: %w", err)
 	}
 	if db != nil {
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 	}
 
 	logSQLitePaths("after_open_ping_ok", cfg.DB.SQLitePath, billingCfg.BillingSQLitePath)

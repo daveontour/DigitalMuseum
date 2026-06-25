@@ -108,7 +108,7 @@ func (r *ContactRepo) ListShort(ctx context.Context, p ContactListParams) ([]*mo
 	// Count
 	var total int
 	if err := r.pool.QueryRowContext(ctx, sql, args...).Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("ContactListCount: %w", err)
+		return nil, 0, fmt.Errorf("contactListCount: %w", err)
 	}
 
 	// Validate order
@@ -132,9 +132,9 @@ func (r *ContactRepo) ListShort(ctx context.Context, p ContactListParams) ([]*mo
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("ContactList: %w", err)
+		return nil, 0, fmt.Errorf("contactList: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []*model.Contact
 	for rows.Next() {
@@ -170,7 +170,7 @@ func (r *ContactRepo) ListNames(ctx context.Context) ([]struct {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []struct {
 		ID   int64
 		Name string
@@ -208,7 +208,7 @@ func (r *ContactRepo) ContactExistsForUser(ctx context.Context, contactID int64)
 		if isNoRows(err) {
 			return false, nil
 		}
-		return false, fmt.Errorf("ContactExistsForUser: %w", err)
+		return false, fmt.Errorf("contactExistsForUser: %w", err)
 	}
 	return true, nil
 }
@@ -237,7 +237,7 @@ func (r *ContactRepo) GetContact(ctx context.Context, id int64) (*model.ContactD
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetContact: %w", err)
+		return nil, fmt.Errorf("getContact: %w", err)
 	}
 	if em.Valid {
 		s := em.String
@@ -311,9 +311,9 @@ func (r *ContactRepo) ListOwnerContactSuggestions(ctx context.Context, subjectNa
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListOwnerContactSuggestions: %w", err)
+		return nil, fmt.Errorf("listOwnerContactSuggestions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []model.OwnerContactSuggestion
 	for rows.Next() {
@@ -508,9 +508,9 @@ func (r *ContactRepo) GetRelationshipGraph(ctx context.Context, types, sources [
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetRelationshipGraph: %w", err)
+		return nil, fmt.Errorf("getRelationshipGraph: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []*model.ContactGraph
 	for rows.Next() {
@@ -548,7 +548,7 @@ func (r *ContactRepo) ListEmailMatches(ctx context.Context, primaryName string) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.EmailMatch
 	for rows.Next() {
 		m, err := scanEmailMatch(rows)
@@ -591,7 +591,7 @@ func (r *ContactRepo) CreateEmailMatch(ctx context.Context, primaryName, email s
 		`INSERT INTO email_matches (primary_name, email, user_id) VALUES (?1,?2,?3)
 		 RETURNING id, primary_name, email, created_at, updated_at`, primaryName, email, uidVal(uid)))
 	if err != nil {
-		return nil, fmt.Errorf("CreateEmailMatch: %w", err)
+		return nil, fmt.Errorf("createEmailMatch: %w", err)
 	}
 	return m, nil
 }
@@ -659,7 +659,7 @@ func (r *ContactRepo) ListEmailExclusions(ctx context.Context, search string, na
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.EmailExclusion
 	for rows.Next() {
 		e, err := scanEmailExclusion(rows)
@@ -702,7 +702,7 @@ func (r *ContactRepo) CreateEmailExclusion(ctx context.Context, email, name stri
 		`INSERT INTO email_exclusions (email, name, name_email, user_id) VALUES (?1,?2,?3,?4)
 		 RETURNING id, email, name, name_email, created_at, updated_at`, email, name, nameEmail, uidVal(uid)))
 	if err != nil {
-		return nil, fmt.Errorf("CreateEmailExclusion: %w", err)
+		return nil, fmt.Errorf("createEmailExclusion: %w", err)
 	}
 	return e, nil
 }
@@ -770,7 +770,7 @@ func (r *ContactRepo) ListEmailClassifications(ctx context.Context, name, classi
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.EmailClassification
 	for rows.Next() {
 		c, err := scanEmailClassification(rows)
@@ -813,7 +813,7 @@ func (r *ContactRepo) CreateEmailClassification(ctx context.Context, name, class
 		`INSERT INTO email_classifications (name, classification, user_id) VALUES (?1,?2,?3)
 		 RETURNING id, name, classification, created_at, updated_at`, name, classification, uidVal(uid)))
 	if err != nil {
-		return nil, fmt.Errorf("CreateEmailClassification: %w", err)
+		return nil, fmt.Errorf("createEmailClassification: %w", err)
 	}
 	return c, nil
 }

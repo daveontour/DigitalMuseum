@@ -47,9 +47,9 @@ func (r *MessageRepo) GetChatSessionRows(ctx context.Context) ([]model.ChatSessi
 		ORDER BY MAX(m.message_date) DESC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetChatSessionRows: %w", err)
+		return nil, fmt.Errorf("getChatSessionRows: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []model.ChatSessionRow
 	for rows.Next() {
@@ -88,9 +88,9 @@ func (r *MessageRepo) GetConversationMessages(ctx context.Context, chatSession s
 	q += ` ORDER BY message_date ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetConversationMessages: %w", err)
+		return nil, fmt.Errorf("getConversationMessages: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanMessages(rows)
 }
 
@@ -116,9 +116,9 @@ func (r *MessageRepo) GetFirstAttachmentForMessages(ctx context.Context, message
 		) t WHERE rn = 1`, inCond)
 	rows, err := r.pool.QueryContext(ctx, q, inArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("GetFirstAttachmentForMessages: %w", err)
+		return nil, fmt.Errorf("getFirstAttachmentForMessages: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var msgID int64
@@ -144,9 +144,9 @@ func (r *MessageRepo) GetMessageByID(ctx context.Context, id int64) (*model.Mess
 	q, args = addUIDFilter(q, args, uid)
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetMessageByID %d: %w", id, err)
+		return nil, fmt.Errorf("getMessageByID %d: %w", id, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	msgs, err := scanMessages(rows)
 	if err != nil {
@@ -173,7 +173,7 @@ func (r *MessageRepo) GetAttachmentMediaForMessage(ctx context.Context, messageI
 		if isNoRows(err) {
 			return nil, nil, nil
 		}
-		return nil, nil, fmt.Errorf("GetAttachmentMediaForMessage: %w", err)
+		return nil, nil, fmt.Errorf("getAttachmentMediaForMessage: %w", err)
 	}
 
 	// Get media_item
@@ -182,7 +182,7 @@ func (r *MessageRepo) GetAttachmentMediaForMessage(ctx context.Context, messageI
 	if err != nil {
 		return nil, nil, err
 	}
-	defer itemRows.Close()
+	defer func() { _ = itemRows.Close() }()
 
 	items, err := scanMediaItemsForMessage(itemRows)
 	if err != nil || len(items) == 0 {
@@ -210,7 +210,7 @@ func (r *MessageRepo) DeleteBySession(ctx context.Context, chatSession string) (
 	uid := uidFromCtx(ctx)
 	tx, err := r.pool.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, fmt.Errorf("DeleteBySession begin tx: %w", err)
+		return 0, fmt.Errorf("deleteBySession begin tx: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
@@ -226,7 +226,7 @@ func (r *MessageRepo) DeleteBySession(ctx context.Context, chatSession string) (
 	q += ")"
 	_, err = tx.ExecContext(ctx, q, args...)
 	if err != nil {
-		return 0, fmt.Errorf("DeleteBySession attachments: %w", err)
+		return 0, fmt.Errorf("deleteBySession attachments: %w", err)
 	}
 
 	dq := `DELETE FROM messages WHERE chat_session = ?1`
@@ -234,10 +234,10 @@ func (r *MessageRepo) DeleteBySession(ctx context.Context, chatSession string) (
 	dq, dargs = addUIDFilter(dq, dargs, uid)
 	tag, err := tx.ExecContext(ctx, dq, dargs...)
 	if err != nil {
-		return 0, fmt.Errorf("DeleteBySession messages: %w", err)
+		return 0, fmt.Errorf("deleteBySession messages: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("DeleteBySession commit: %w", err)
+		return 0, fmt.Errorf("deleteBySession commit: %w", err)
 	}
 	return rowsAffectedOrZero(tag), nil
 }

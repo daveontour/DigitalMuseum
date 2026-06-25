@@ -263,7 +263,7 @@ func (h *FileDupeHandler) sendSSE(w http.ResponseWriter, flusher http.Flusher, e
 		return
 	}
 
-	fmt.Fprintf(w, "data: %s\n\n", data)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 	flusher.Flush()
 }
 

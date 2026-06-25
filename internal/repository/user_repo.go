@@ -102,7 +102,7 @@ func (r *UserRepo) FindByFullName(ctx context.Context, fullName string) (*User, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []*User
 	for rows.Next() {
@@ -343,7 +343,7 @@ func (r *UserRepo) ListAll(ctx context.Context) ([]*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var users []*User
 	for rows.Next() {
 		var u User

@@ -84,7 +84,7 @@ func (r *SubjectConfigRepo) Upsert(ctx context.Context, p UpsertSubjectConfigPar
 	err := r.pool.QueryRowContext(ctx, q, args...).Scan(&id)
 	noRow := isNoRows(err)
 	if err != nil && !noRow {
-		return nil, fmt.Errorf("Upsert check: %w", err)
+		return nil, fmt.Errorf("upsert check: %w", err)
 	}
 
 	if noRow {
@@ -110,7 +110,7 @@ func (r *SubjectConfigRepo) Upsert(ctx context.Context, p UpsertSubjectConfigPar
 			p.PhoneNumbers, p.WhatsAppHandle, p.InstagramHandle, insSubjContact, uidVal(uid),
 		).Scan(&id)
 		if err != nil {
-			return nil, fmt.Errorf("Upsert insert: %w", err)
+			return nil, fmt.Errorf("upsert insert: %w", err)
 		}
 	} else {
 		// Always update the required fields; only overwrite optional fields when provided.
@@ -147,7 +147,7 @@ func (r *SubjectConfigRepo) Upsert(ctx context.Context, p UpsertSubjectConfigPar
 			fmt.Sprintf(`UPDATE subject_configuration SET %s WHERE id = ?`, strings.Join(set, ", ")),
 			args...)
 		if err != nil {
-			return nil, fmt.Errorf("Upsert update: %w", err)
+			return nil, fmt.Errorf("upsert update: %w", err)
 		}
 	}
 
@@ -187,7 +187,7 @@ func (r *SubjectConfigRepo) GetFirst(ctx context.Context) (*model.SubjectConfig,
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetFirst subject_configuration: %w", err)
+		return nil, fmt.Errorf("getFirst subject_configuration: %w", err)
 	}
 	return cfg, nil
 }
@@ -209,7 +209,7 @@ func (r *SubjectConfigRepo) GetContactID(ctx context.Context) (int64, error) {
 		if isNoRows(err) {
 			return 0, nil
 		}
-		return 0, fmt.Errorf("GetContactID: %w", err)
+		return 0, fmt.Errorf("getContactID: %w", err)
 	}
 	if !nid.Valid {
 		return 0, nil
@@ -230,7 +230,7 @@ func (r *SubjectConfigRepo) FindUserIDBySubjectName(ctx context.Context, name st
 		return 0, false, nil
 	}
 	if err != nil {
-		return 0, false, fmt.Errorf("FindUserIDBySubjectName: %w", err)
+		return 0, false, fmt.Errorf("findUserIDBySubjectName: %w", err)
 	}
 	if !uid.Valid {
 		return 0, true, nil // single-tenant/legacy row

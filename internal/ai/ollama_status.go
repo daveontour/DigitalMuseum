@@ -129,7 +129,7 @@ func probeOllamaServer(ctx context.Context, baseURL, modelName string) ollamaSer
 		out.serverError = err.Error()
 		return out
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		out.serverError = fmt.Sprintf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))

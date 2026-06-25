@@ -812,7 +812,7 @@ func (h *ContactHandler) ExportEmailExclusions(w http.ResponseWriter, r *http.Re
 	b, _ := json.MarshalIndent(map[string]any{"email": emails, "name": names, "name_email": pairs}, "", "  ")
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", `attachment; filename="exclusions.json"`)
-	w.Write(b)
+	_, _ = w.Write(b)
 }
 
 func (h *ContactHandler) ImportEmailExclusions(w http.ResponseWriter, r *http.Request) {
@@ -899,7 +899,7 @@ func (h *ContactHandler) ExportEmailMatches(w http.ResponseWriter, r *http.Reque
 	b, _ := json.MarshalIndent(out, "", "  ")
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", `attachment; filename="email_matches.json"`)
-	w.Write(b)
+	_, _ = w.Write(b)
 }
 
 func (h *ContactHandler) ImportEmailMatches(w http.ResponseWriter, r *http.Request) {
@@ -950,7 +950,7 @@ func (h *ContactHandler) ExportEmailClassifications(w http.ResponseWriter, r *ht
 	b, _ := json.MarshalIndent(out, "", "  ")
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", `attachment; filename="email_classifications.json"`)
-	w.Write(b)
+	_, _ = w.Write(b)
 }
 
 func (h *ContactHandler) ImportEmailClassifications(w http.ResponseWriter, r *http.Request) {

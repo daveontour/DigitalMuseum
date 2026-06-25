@@ -22,7 +22,7 @@ func LoadEmailClassifications(ctx context.Context, db *sql.DB) (EmailClassificat
 	if err != nil {
 		return nil, fmt.Errorf("query email_classifications: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(EmailClassifications)
 	for rows.Next() {
@@ -77,7 +77,7 @@ func ApplyClassificationsToContacts(ctx context.Context, db *sql.DB, classificat
 	if err != nil {
 		return fmt.Errorf("query contacts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type contact struct {
 		id               int

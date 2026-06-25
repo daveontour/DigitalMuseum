@@ -36,9 +36,9 @@ func (r *InterestRepo) List(ctx context.Context) ([]*model.Interest, error) {
 	q += " ORDER BY name"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListInterests: %w", err)
+		return nil, fmt.Errorf("listInterests: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.Interest
 	for rows.Next() {
 		i, err := scanInterest(rows)
@@ -100,7 +100,7 @@ func (r *InterestRepo) Create(ctx context.Context, name string) (*model.Interest
 		`INSERT INTO interests (name, user_id) VALUES (?1, ?2)
 		 RETURNING id, name, created_at, updated_at`, name, uidVal(uid)))
 	if err != nil {
-		return nil, fmt.Errorf("CreateInterest: %w", err)
+		return nil, fmt.Errorf("createInterest: %w", err)
 	}
 	return i, nil
 }
@@ -117,7 +117,7 @@ func (r *InterestRepo) Update(ctx context.Context, id int64, name string) (*mode
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("UpdateInterest %d: %w", id, err)
+		return nil, fmt.Errorf("updateInterest %d: %w", id, err)
 	}
 	return i, nil
 }

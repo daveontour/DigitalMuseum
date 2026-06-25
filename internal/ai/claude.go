@@ -314,13 +314,13 @@ func claudePost(ctx context.Context, apiKey string, body map[string]any) (map[st
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Claude API %d: %s", resp.StatusCode, string(data))
+		return nil, fmt.Errorf("claude API %d: %s", resp.StatusCode, string(data))
 	}
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {

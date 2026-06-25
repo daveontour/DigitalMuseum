@@ -224,7 +224,7 @@ func (h *ImportDataPurgeHandler) purgeFacebookMessenger(ctx context.Context, uid
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err = sqlutil.DeleteMediaItemsByUserAndSourceTx(ctx, tx, uid, "Facebook"); err != nil {
 		return 0, fmt.Errorf("facebook messenger media: %w", err)
@@ -246,7 +246,7 @@ func (h *ImportDataPurgeHandler) purgeFacebookAlbums(ctx context.Context, uid in
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err = sqlutil.DeleteMediaItemsByUserAndSourceTx(ctx, tx, uid, "facebook_album"); err != nil {
 		return 0, fmt.Errorf("facebook albums media: %w", err)
@@ -275,7 +275,7 @@ func (h *ImportDataPurgeHandler) purgeFacebookPosts(ctx context.Context, uid int
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err = sqlutil.DeleteMediaItemsByUserAndSourceTx(ctx, tx, uid, "facebook_post"); err != nil {
 		return 0, fmt.Errorf("facebook posts media: %w", err)
@@ -304,7 +304,7 @@ func (h *ImportDataPurgeHandler) purgeFilesystemMedia(ctx context.Context, uid i
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	n, err := sqlutil.DeleteMediaItemsByUserAndSourceTx(ctx, tx, uid, "filesystem")
 	if err != nil {

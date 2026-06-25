@@ -107,7 +107,6 @@ const InterviewerMode = (() => {
     }
 
     async function _viewFinishedInterview() {
-        debugger;
         const id = _finishedSelect ? parseInt(_finishedSelect.value, 10) : 0;
         if (!id) return;
 

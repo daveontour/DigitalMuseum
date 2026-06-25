@@ -1184,7 +1184,7 @@ func classifyImageKeywordsWithRunPod(ctx context.Context, encodedImageB64 string
 		apiKey = strings.TrimSpace(os.Getenv("RUNPOD_API_KEY"))
 	}
 	if apiKey == "" {
-		return "", fmt.Errorf("RunPod API key is not set (set RUNPOD_API_KEY or save a key under Settings → API Keys)")
+		return "", fmt.Errorf("runPod API key is not set (set RUNPOD_API_KEY or save a key under Settings → API Keys)")
 	}
 	url, err := runPodImageClassifyRunsyncURL(ctx)
 	if err != nil {
@@ -1210,7 +1210,7 @@ func classifyImageKeywordsWithRunPod(ctx context.Context, encodedImageB64 string
 	if err != nil {
 		return "", fmt.Errorf("call runpod: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("read runpod response: %w", err)
@@ -1701,14 +1701,14 @@ func (h *ImageHandler) SimilarByTagsSearch(w http.ResponseWriter, r *http.Reques
 		var intIDs string
 		var distance any
 		if err := rows.Scan(&rowID, &intIDs, &distance); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("scan: %v", err))
 			return
 		}
 		candidates = append(candidates, cand{id: rowID, distance: distance})
 	}
 	if err := rows.Err(); err != nil {
-		rows.Close()
+		_ = rows.Close()
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("iterate: %v", err))
 		return
 	}
@@ -1897,7 +1897,7 @@ func runFacebookPostEmbeddingBackfill(pool *sql.DB, embeddingSvc *service.Embedd
 		job.Broadcast("failed", job.GetState())
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type row struct {
 		id   int64
@@ -2024,7 +2024,7 @@ func (h *ImageHandler) SimilarFacebookPostsByText(w http.ResponseWriter, r *http
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("vector search failed: %v", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	results := make([]map[string]any, 0, req.N)
 	for rows.Next() {
 		var id int64
@@ -2126,7 +2126,7 @@ func runFacebookAlbumEmbeddingBackfill(pool *sql.DB, embeddingSvc *service.Embed
 		job.Broadcast("failed", job.GetState())
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	type row struct {
 		id   int64
 		text string
@@ -2251,7 +2251,7 @@ func (h *ImageHandler) SimilarFacebookAlbumsByDescription(w http.ResponseWriter,
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("vector search failed: %v", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	results := make([]map[string]any, 0, req.N)
 	for rows.Next() {
 		var id int64
@@ -2461,7 +2461,7 @@ func classifyImageKeywordsWithOllama(ctx context.Context, encodedImageB64 string
 	if err != nil {
 		return "", fmt.Errorf("call ollama: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("ollama API status %d", resp.StatusCode)
 	}

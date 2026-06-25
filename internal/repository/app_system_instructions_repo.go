@@ -34,7 +34,7 @@ func (r *AppSystemInstructionsRepo) Get(ctx context.Context) (*AppSystemInstruct
 		if isNoRows(err) {
 			return &AppSystemInstructions{}, nil
 		}
-		return nil, fmt.Errorf("AppSystemInstructions Get: %w", err)
+		return nil, fmt.Errorf("appSystemInstructions Get: %w", err)
 	}
 	return &out, nil
 }
@@ -50,7 +50,7 @@ func (r *AppSystemInstructionsRepo) Upsert(ctx context.Context, chat, core, ques
 			question_instructions = EXCLUDED.question_instructions,
 			updated_at = CURRENT_TIMESTAMP`, chat, core, question)
 	if err != nil {
-		return fmt.Errorf("AppSystemInstructions Upsert: %w", err)
+		return fmt.Errorf("appSystemInstructions Upsert: %w", err)
 	}
 	return nil
 }

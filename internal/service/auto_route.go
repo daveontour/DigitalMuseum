@@ -180,7 +180,7 @@ func (s *ChatService) pickHostedProviderForAuto(ctx context.Context, r *http.Req
 			p = s.effectiveGeminiProvider(ctx, r, "")
 			name = "gemini"
 		}
-		if p != nil && p.IsAvailable() {
+		if p.IsAvailable() {
 			return name, p
 		}
 	}

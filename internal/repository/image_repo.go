@@ -87,7 +87,7 @@ func (r *ImageRepo) GetBlobByID(ctx context.Context, blobID int64) (*model.Media
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetBlobByID %d: %w", blobID, err)
+		return nil, fmt.Errorf("getBlobByID %d: %w", blobID, err)
 	}
 	return b, nil
 }
@@ -108,7 +108,7 @@ func (r *ImageRepo) GetBlobByMetadataID(ctx context.Context, metaID int64) (*mod
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetBlobByMetadataID %d: %w", metaID, err)
+		return nil, fmt.Errorf("getBlobByMetadataID %d: %w", metaID, err)
 	}
 	return b, nil
 }
@@ -256,7 +256,7 @@ func (r *ImageRepo) Search(ctx context.Context, p model.ImageSearchParams) ([]*m
 	if err != nil {
 		return nil, fmt.Errorf("image Search: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanMediaItems(rows)
 }
 
@@ -269,9 +269,9 @@ func (r *ImageRepo) GetDistinctYears(ctx context.Context) ([]int, error) {
 	q += " ORDER BY year DESC"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetDistinctYears: %w", err)
+		return nil, fmt.Errorf("getDistinctYears: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var years []int
 	for rows.Next() {
@@ -293,9 +293,9 @@ func (r *ImageRepo) GetAllTagStrings(ctx context.Context) ([]string, error) {
 	q, args = addUIDFilter(q, args, uid)
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetAllTagStrings: %w", err)
+		return nil, fmt.Errorf("getAllTagStrings: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var all []string
 	for rows.Next() {
@@ -328,9 +328,9 @@ func (r *ImageRepo) ListMediaItemsForTagEmbeddingBackfill(ctx context.Context, o
 	q += ` ORDER BY id ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListMediaItemsForTagEmbeddingBackfill: %w", err)
+		return nil, fmt.Errorf("listMediaItemsForTagEmbeddingBackfill: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []MediaTagEmbeddingRow
 	for rows.Next() {
@@ -364,9 +364,9 @@ func (r *ImageRepo) ListMediaItemsForClassificationTagQA(ctx context.Context) ([
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListMediaItemsForClassificationTagQA: %w", err)
+		return nil, fmt.Errorf("listMediaItemsForClassificationTagQA: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []MediaClassificationQARow
 	for rows.Next() {
@@ -394,9 +394,9 @@ func (r *ImageRepo) ListImageIDsRequireClassification(ctx context.Context) ([]in
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListImageIDsRequireClassification: %w", err)
+		return nil, fmt.Errorf("listImageIDsRequireClassification: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []int64
 	for rows.Next() {
@@ -428,9 +428,9 @@ func (r *ImageRepo) ListImageIDsMissingTag(ctx context.Context, tag string) ([]i
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListImageIDsMissingTag: %w", err)
+		return nil, fmt.Errorf("listImageIDsMissingTag: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []int64
 	for rows.Next() {
@@ -453,9 +453,9 @@ func (r *ImageRepo) GetLocations(ctx context.Context) ([]*model.MediaItem, error
 	// q, args = addUIDFilter(q, args, uid)
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetLocations: %w", err)
+		return nil, fmt.Errorf("getLocations: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanMediaItems(rows)
 }
 
@@ -464,8 +464,6 @@ var knownLocationCategorySources = []string{
 	"email_attachment", "gmail_attachment",
 	"message", "imessage", "sms", "message_attachment",
 }
-
-const locationGPSPredicate = `(has_gps != 0 OR (latitude IS NOT NULL AND longitude IS NOT NULL))`
 
 func resolveLocationCategorySources(categories []string) (sources []string, includeOther bool) {
 	if len(categories) > 0 && strings.ToLower(strings.TrimSpace(categories[0])) == "all" {
@@ -559,7 +557,6 @@ func (r *ImageRepo) GetRandomLocationsByCategories(ctx context.Context, categori
 	if region = strings.TrimSpace(region); region != "" {
 		whereSQL += fmt.Sprintf(" AND region = ?%d", nextN)
 		args = append(args, region)
-		nextN++
 	}
 	limitIdx := len(args) + 1
 	args = append(args, limit)
@@ -574,9 +571,9 @@ func (r *ImageRepo) GetRandomLocationsByCategories(ctx context.Context, categori
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetRandomLocationsByCategories: %w", err)
+		return nil, fmt.Errorf("getRandomLocationsByCategories: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanMediaItems(rows)
 }
 
@@ -618,9 +615,9 @@ func (r *ImageRepo) GetNearbyLocations(ctx context.Context, lat, lng, radiusKm f
 
 	rows, err := r.pool.QueryContext(ctx, q, latMin, latMax, lngMin, lngMax)
 	if err != nil {
-		return nil, fmt.Errorf("GetNearbyLocations: %w", err)
+		return nil, fmt.Errorf("getNearbyLocations: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items, err := scanMediaItems(rows)
 	if err != nil {
@@ -660,9 +657,9 @@ func (r *ImageRepo) CountGPSBySource(ctx context.Context) ([]model.GPSCountBySou
 	q += ` GROUP BY 1 ORDER BY 2 DESC, 1 ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("CountGPSBySource: %w", err)
+		return nil, fmt.Errorf("countGPSBySource: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var counts []model.GPSCountBySource
 	for rows.Next() {
@@ -687,9 +684,9 @@ func (r *ImageRepo) CountImagesByRegion(ctx context.Context) ([]model.ImageRegio
 	q += ` GROUP BY TRIM(region) ORDER BY COUNT(*) DESC, TRIM(region) ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("CountImagesByRegion: %w", err)
+		return nil, fmt.Errorf("countImagesByRegion: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var counts []model.ImageRegionCount
 	for rows.Next() {
@@ -714,9 +711,9 @@ func (r *ImageRepo) CountGPSByRegion(ctx context.Context) ([]model.GPSRegionCoun
 	q += ` GROUP BY TRIM(region) ORDER BY COUNT(*) DESC, TRIM(region) ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("CountGPSByRegion: %w", err)
+		return nil, fmt.Errorf("countGPSByRegion: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var counts []model.GPSRegionCount
 	for rows.Next() {
@@ -737,15 +734,15 @@ func (r *ImageRepo) GetFacebookPlaces(ctx context.Context) ([]model.FacebookPlac
 		WHERE source = 'facebook'
 		ORDER BY name ASC`)
 	if err != nil {
-		return nil, fmt.Errorf("GetFacebookPlaces: %w", err)
+		return nil, fmt.Errorf("getFacebookPlaces: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var places []model.FacebookPlaceItem
 	for rows.Next() {
 		var p model.FacebookPlaceItem
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Address, &p.Latitude, &p.Longitude, &p.Region, &p.SourceReference); err != nil {
-			return nil, fmt.Errorf("GetFacebookPlaces scan: %w", err)
+			return nil, fmt.Errorf("getFacebookPlaces scan: %w", err)
 		}
 		places = append(places, p)
 	}
@@ -836,7 +833,7 @@ func (r *ImageRepo) UpdateTags(ctx context.Context, id int64, newTags string) (b
 			"user_id", uid,
 			"err", err,
 		)
-		return false, fmt.Errorf("UpdateTags: %w", err)
+		return false, fmt.Errorf("updateTags: %w", err)
 	}
 
 	existingLen := 0
@@ -883,7 +880,7 @@ func (r *ImageRepo) UpdateTags(ctx context.Context, id int64, newTags string) (b
 			"user_id", uid,
 			"err", err,
 		)
-		return false, fmt.Errorf("UpdateTags: %w", err)
+		return false, fmt.Errorf("updateTags: %w", err)
 	}
 
 	n, raErr := res.RowsAffected()
@@ -1009,7 +1006,7 @@ func (r *ImageRepo) ListDuplicateImageGPSGroups(ctx context.Context) ([]Duplicat
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListDuplicateImageGPSGroups: %w", err)
+		return nil, fmt.Errorf("listDuplicateImageGPSGroups: %w", err)
 	}
 
 	type gpsKey struct {
@@ -1020,7 +1017,7 @@ func (r *ImageRepo) ListDuplicateImageGPSGroups(ctx context.Context) ([]Duplicat
 		var lat, lng float64
 		var cnt int
 		if err := rows.Scan(&lat, &lng, &cnt); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		keys = append(keys, gpsKey{lat: lat, lng: lng})
@@ -1068,7 +1065,7 @@ func (r *ImageRepo) listImageIDsAtGPS(ctx context.Context, lat, lng float64) ([]
 	if err != nil {
 		return nil, fmt.Errorf("listImageIDsAtGPS: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []int64
 	for rows.Next() {
@@ -1145,7 +1142,7 @@ func (r *ImageRepo) ClearGPSOnMediaItem(ctx context.Context, id int64) (bool, er
 	q, args = addUIDFilter(q, args, uid)
 	res, err := r.pool.ExecContext(ctx, q, args...)
 	if err != nil {
-		return false, fmt.Errorf("ClearGPSOnMediaItem %d: %w", id, err)
+		return false, fmt.Errorf("clearGPSOnMediaItem %d: %w", id, err)
 	}
 	return rowsAffectedOrZero(res) > 0, nil
 }
@@ -1176,7 +1173,6 @@ func (r *ImageRepo) UpdateMetadata(ctx context.Context, id int64, description, t
 	if rating != nil {
 		setParts = append(setParts, fmt.Sprintf("rating = ?%d", n))
 		args = append(args, *rating)
-		n++
 	}
 	if len(setParts) == 0 {
 		return true, nil
@@ -1186,7 +1182,7 @@ func (r *ImageRepo) UpdateMetadata(ctx context.Context, id int64, description, t
 	//sql, args = addUIDFilterDollar(sql, args, uid)
 	res, err := r.pool.ExecContext(ctx, sql, args...)
 	if err != nil {
-		return false, fmt.Errorf("UpdateMetadata: %w", err)
+		return false, fmt.Errorf("updateMetadata: %w", err)
 	}
 	return rowsAffectedOrZero(res) > 0, nil
 }
@@ -1201,7 +1197,7 @@ func (r *ImageRepo) SetRequireClassification(ctx context.Context, id int64, requ
 	q, args = addUIDFilterDollar(q, args, uid)
 	res, err := r.pool.ExecContext(ctx, q, args...)
 	if err != nil {
-		return false, fmt.Errorf("SetRequireClassification: %w", err)
+		return false, fmt.Errorf("setRequireClassification: %w", err)
 	}
 	return rowsAffectedOrZero(res) > 0, nil
 }
@@ -1218,7 +1214,7 @@ func (r *ImageRepo) DeleteByMetadataID(ctx context.Context, id int64) (bool, err
 		if isNoRows(err) {
 			return false, nil
 		}
-		return false, fmt.Errorf("DeleteByMetadataID: %w", err)
+		return false, fmt.Errorf("deleteByMetadataID: %w", err)
 	}
 	_, _ = r.pool.ExecContext(ctx, `DELETE FROM media_tag_embeddings WHERE rowid = ?1`, id)
 	dq := `DELETE FROM media_items WHERE id = ?1`
@@ -1226,7 +1222,7 @@ func (r *ImageRepo) DeleteByMetadataID(ctx context.Context, id int64) (bool, err
 	dq, dargs = addUIDFilter(dq, dargs, uid)
 	_, err = r.pool.ExecContext(ctx, dq, dargs...)
 	if err != nil {
-		return false, fmt.Errorf("DeleteByMetadataID: %w", err)
+		return false, fmt.Errorf("deleteByMetadataID: %w", err)
 	}
 	_, _ = r.pool.ExecContext(ctx, `DELETE FROM media_blobs WHERE id = ?1`, blobID)
 	return true, nil
@@ -1261,7 +1257,6 @@ func (r *ImageRepo) DeleteByIDRange(ctx context.Context, all bool, startID, endI
 		if endID != nil {
 			parts = append(parts, fmt.Sprintf("id <= ?%d", n))
 			args = append(args, *endID)
-			n++
 		}
 		cond = strings.Join(parts, " AND ")
 	}
@@ -1269,9 +1264,9 @@ func (r *ImageRepo) DeleteByIDRange(ctx context.Context, all bool, startID, endI
 	q, args = addUIDFilter(q, args, uid)
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return 0, fmt.Errorf("DeleteByIDRange: %w", err)
+		return 0, fmt.Errorf("deleteByIDRange: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids, blobIDs []int64
 	for rows.Next() {
 		var id, blobID int64
@@ -1291,13 +1286,13 @@ func (r *ImageRepo) DeleteByIDRange(ctx context.Context, all bool, startID, endI
 	delMI := fmt.Sprintf(`DELETE FROM media_items WHERE %s`, miCond)
 	_, err = r.pool.ExecContext(ctx, delMI, miArgs...)
 	if err != nil {
-		return 0, fmt.Errorf("DeleteByIDRange: %w", err)
+		return 0, fmt.Errorf("deleteByIDRange: %w", err)
 	}
 	mbCond, mbArgs, _ := sqlutil.Int64IN("id", blobIDs, 1)
 	delMB := fmt.Sprintf(`DELETE FROM media_blobs WHERE %s`, mbCond)
 	_, err = r.pool.ExecContext(ctx, delMB, mbArgs...)
 	if err != nil {
-		return 0, fmt.Errorf("DeleteByIDRange: %w", err)
+		return 0, fmt.Errorf("deleteByIDRange: %w", err)
 	}
 	return int64(len(ids)), nil
 }
@@ -1318,9 +1313,9 @@ func (r *ImageRepo) ListReferencedItems(ctx context.Context) ([]ReferencedItem, 
 	q, args = addUIDFilter(q, args, uid)
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListReferencedItems: %w", err)
+		return nil, fmt.Errorf("listReferencedItems: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var items []ReferencedItem
 	for rows.Next() {
 		var it ReferencedItem
@@ -1337,17 +1332,17 @@ func (r *ImageRepo) ListReferencedItems(ctx context.Context) ([]ReferencedItem, 
 func (r *ImageRepo) UpdateBlobImageDataAndClearReferenced(ctx context.Context, itemID, blobID int64, data []byte) error {
 	tx, err := r.pool.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("UpdateBlobImageDataAndClearReferenced begin tx: %w", err)
+		return fmt.Errorf("updateBlobImageDataAndClearReferenced begin tx: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
 	_, err = tx.ExecContext(ctx, `UPDATE media_blobs SET image_data = ?2 WHERE id = ?1`, blobID, data)
 	if err != nil {
-		return fmt.Errorf("UpdateBlobImageData: %w", err)
+		return fmt.Errorf("updateBlobImageData: %w", err)
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE media_items SET is_referenced = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ?1`, itemID)
 	if err != nil {
-		return fmt.Errorf("SetItemNotReferenced: %w", err)
+		return fmt.Errorf("setItemNotReferenced: %w", err)
 	}
 	return tx.Commit()
 }
@@ -1378,9 +1373,9 @@ func (r *ImageRepo) ListMediaItemsForExport(ctx context.Context) ([]ExportItem, 
 	q += " ORDER BY id"
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListMediaItemsForExport: %w", err)
+		return nil, fmt.Errorf("listMediaItemsForExport: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var items []ExportItem
 	for rows.Next() {
 		var it ExportItem
@@ -1408,9 +1403,9 @@ func (r *ImageRepo) ListImageMetadataForJSONExport(ctx context.Context) ([]model
 
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListImageMetadataForJSONExport: %w", err)
+		return nil, fmt.Errorf("listImageMetadataForJSONExport: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []model.ImageMetadataJSONRecord
 	for rows.Next() {
@@ -1480,9 +1475,9 @@ func (r *ImageRepo) GetFacebookAlbums(ctx context.Context) ([]model.FacebookAlbu
 		ORDER BY fa.name`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetFacebookAlbums: %w", err)
+		return nil, fmt.Errorf("getFacebookAlbums: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var albums []model.FacebookAlbumResponse
 	for rows.Next() {
@@ -1507,9 +1502,9 @@ func (r *ImageRepo) GetAlbumImages(ctx context.Context, albumID int64) ([]*model
 	q += ` ORDER BY mi.created_at ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetAlbumImages: %w", err)
+		return nil, fmt.Errorf("getAlbumImages: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanMediaItems(rows)
 }
 
@@ -1567,10 +1562,9 @@ func (r *ImageRepo) GetFacebookPosts(ctx context.Context, p GetFacebookPostsPara
 		argNum++
 	}
 	if len(p.PostIDs) > 0 {
-		inCond, inArgs, next := sqlutil.Int64IN("fp.id", p.PostIDs, argNum)
+		inCond, inArgs, _ := sqlutil.Int64IN("fp.id", p.PostIDs, argNum)
 		conds = append(conds, inCond)
 		args = append(args, inArgs...)
-		argNum = next
 	}
 
 	if len(conds) > 0 {
@@ -1580,7 +1574,6 @@ func (r *ImageRepo) GetFacebookPosts(ctx context.Context, p GetFacebookPostsPara
 	if uid > 0 {
 		args = append(args, uid)
 		baseQuery += fmt.Sprintf(" AND fp.user_id = ?%d", len(args))
-		argNum++
 	}
 
 	baseQuery += " GROUP BY fp.id, fp.timestamp, fp.title, fp.post_text, fp.external_url, fp.post_type"
@@ -1590,7 +1583,7 @@ func (r *ImageRepo) GetFacebookPosts(ctx context.Context, p GetFacebookPostsPara
 	countQuery := `SELECT COUNT(*) FROM (` + baseQuery + `) AS sub`
 	var total int
 	if err := r.pool.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
-		return nil, fmt.Errorf("GetFacebookPosts count: %w", err)
+		return nil, fmt.Errorf("getFacebookPosts count: %w", err)
 	}
 
 	// Fetch page
@@ -1600,9 +1593,9 @@ func (r *ImageRepo) GetFacebookPosts(ctx context.Context, p GetFacebookPostsPara
 
 	rows, err := r.pool.QueryContext(ctx, pageQuery, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetFacebookPosts: %w", err)
+		return nil, fmt.Errorf("getFacebookPosts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var posts []model.FacebookPostListItem
 	for rows.Next() {
@@ -1653,9 +1646,9 @@ func (r *ImageRepo) GetPostMedia(ctx context.Context, postID int64) ([]*model.Me
 	q += ` ORDER BY mi.created_at ASC`
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetPostMedia: %w", err)
+		return nil, fmt.Errorf("getPostMedia: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanMediaItems(rows)
 }
 

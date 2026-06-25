@@ -64,7 +64,7 @@ func (r *AttachmentRepo) GetRandom(ctx context.Context) (*model.AttachmentInfo, 
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetRandomAttachment: %w", err)
+		return nil, fmt.Errorf("getRandomAttachment: %w", err)
 	}
 	return a, nil
 }
@@ -90,7 +90,7 @@ func (r *AttachmentRepo) GetByIDOrder(ctx context.Context, offset int) (*model.A
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetAttachmentByIDOrder: %w", err)
+		return nil, fmt.Errorf("getAttachmentByIDOrder: %w", err)
 	}
 	return a, nil
 }
@@ -127,7 +127,7 @@ func (r *AttachmentRepo) GetBySize(ctx context.Context, orderDesc bool, offset i
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetAttachmentBySize: %w", err)
+		return nil, fmt.Errorf("getAttachmentBySize: %w", err)
 	}
 	a.Size = sz
 	return &a, nil
@@ -171,7 +171,7 @@ func (r *AttachmentRepo) GetInfo(ctx context.Context, id int64) (*model.Attachme
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("GetAttachmentInfo: %w", err)
+		return nil, fmt.Errorf("getAttachmentInfo: %w", err)
 	}
 	return a, nil
 }
@@ -191,10 +191,9 @@ func (r *AttachmentRepo) GetData(ctx context.Context, id int64) (data, thumbnail
 		Scan(&data, &thumbnail, &mediaType, &filename)
 	if err != nil {
 		if isNoRows(err) {
-			err = nil
 			return nil, nil, "", "", nil
 		}
-		err = fmt.Errorf("GetAttachmentData: %w", err)
+		err = fmt.Errorf("getAttachmentData: %w", err)
 	}
 	return
 }
@@ -270,7 +269,7 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 
 	var total int64
 	if err := r.pool.QueryRowContext(ctx, countBase, countArgs...).Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("ListImagesCount: %w", err)
+		return nil, 0, fmt.Errorf("listImagesCount: %w", err)
 	}
 
 	// Build list query
@@ -292,9 +291,9 @@ func (r *AttachmentRepo) ListImages(ctx context.Context, page, pageSize int, ord
 
 	rows, err := r.pool.QueryContext(ctx, listBase, listArgs...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("ListImages: %w", err)
+		return nil, 0, fmt.Errorf("listImages: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []*model.AttachmentInfo
 	for rows.Next() {

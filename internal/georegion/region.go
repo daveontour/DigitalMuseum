@@ -62,7 +62,7 @@ func updateTableRegions(ctx context.Context, db *sql.DB, table string, extraWher
 	if err != nil {
 		return 0, fmt.Errorf("query %s for region update: %w", table, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type row struct {
 		id        int64

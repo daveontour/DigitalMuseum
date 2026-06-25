@@ -53,7 +53,7 @@ func (t *DBTime) Scan(src interface{}) error {
 
 // Value implements driver.Valuer.
 func (t DBTime) Value() (driver.Value, error) {
-	if t.Time.IsZero() {
+	if t.IsZero() {
 		return nil, nil
 	}
 	return t.UTC().Format(time.RFC3339Nano), nil

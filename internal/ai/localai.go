@@ -442,13 +442,13 @@ func ollamaPost(ctx context.Context, baseURL string, body ollamaRequest) (*ollam
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Ollama API %d: %s", resp.StatusCode, string(data))
+		return nil, fmt.Errorf("ollama API %d: %s", resp.StatusCode, string(data))
 	}
 	var result ollamaResponse
 	if err := json.Unmarshal(data, &result); err != nil {
@@ -472,13 +472,13 @@ func ollamaEmbedPost(ctx context.Context, baseURL string, body map[string]any) (
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Ollama embed API %d: %s", resp.StatusCode, string(data))
+		return nil, fmt.Errorf("ollama embed API %d: %s", resp.StatusCode, string(data))
 	}
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {

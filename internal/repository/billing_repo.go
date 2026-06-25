@@ -134,7 +134,7 @@ func (r *BillingRepo) SummaryByUser(ctx context.Context, userID int64, userEmail
 	if err != nil {
 		return sum, nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var p ProviderBreakdown
 		if err := rows.Scan(&p.Provider, &p.InputTokens, &p.OutputTokens, &p.EventCount); err != nil {
@@ -168,7 +168,7 @@ func (r *BillingRepo) SummaryByUser(ctx context.Context, userID int64, userEmail
 	if err != nil {
 		return sum, byProvider, nil, err
 	}
-	defer rows2.Close()
+	defer func() { _ = rows2.Close() }()
 	for rows2.Next() {
 		var v VisitorBreakdown
 		if err := rows2.Scan(&v.IsVisitor, &v.InputTokens, &v.OutputTokens, &v.EventCount); err != nil {
@@ -218,7 +218,7 @@ func (r *BillingRepo) ListEventsByUser(ctx context.Context, userID int64, userEm
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []LLMUsageEvent
 	for rows.Next() {
 		var e LLMUsageEvent
@@ -306,7 +306,7 @@ func (r *BillingRepo) ListFailedEvents(ctx context.Context, userID *int64, userE
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []LLMUsageEvent
 	for rows.Next() {
 		var e LLMUsageEvent
@@ -381,7 +381,7 @@ func (r *BillingRepo) ListEventsByUserAll(ctx context.Context, userID int64, fro
 	if err != nil {
 		return nil, false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var e LLMUsageEvent
 		var model, email, firstName, familyName, errMsg sql.NullString
@@ -476,7 +476,7 @@ func (r *BillingRepo) TimeseriesByUser5Min(ctx context.Context, userID int64, us
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []TimeseriesBucket
 	for rows.Next() {
 		var b TimeseriesBucket

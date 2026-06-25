@@ -1,6 +1,6 @@
 {
   "env": {
-    "CGO_CFLAGS": "-IC:/NonOneDrive/ElectronMuseum/cgo-compat"
+    "CGO_CFLAGS": "-ID:/NonOneDrive/DigitalMuseum/cgo-compat"
   },
   "permissions": {
     "allow": [

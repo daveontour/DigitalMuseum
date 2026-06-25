@@ -364,7 +364,7 @@ func (h *ArtefactHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "file field is required")
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	imageBytes, err := io.ReadAll(f)
 	if err != nil {
@@ -536,7 +536,7 @@ func readArtefactImportPayload(w http.ResponseWriter, r *http.Request) ([]byte, 
 			writeError(w, http.StatusBadRequest, "file is required")
 			return nil, false
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		raw, err := io.ReadAll(io.LimitReader(f, maxUpload))
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "could not read uploaded file")

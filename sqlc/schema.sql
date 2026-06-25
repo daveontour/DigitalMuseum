@@ -1,6 +1,6 @@
 -- Digital Museum — canonical database schema
 -- Source of truth for sqlc code generation (sqlc.yaml points here).
--- Runtime DDL is in internal/database/migrate.go (schemaDDL / rlsDDL).
+-- Runtime DDL is in internal/database/migrate.go (schemaDDL).
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;

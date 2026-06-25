@@ -181,7 +181,7 @@ func (s *SensitiveService) AddUser(ctx context.Context, userPassword, masterPass
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	keyringID, err := appcrypto.AddSensitiveKeyringSeatTx(ctx, tx, s.pool, userPassword, masterPassword, s.pepper)
 	if err != nil {
 		return err
@@ -224,7 +224,7 @@ func (s *SensitiveService) ListVisitorKeyHints(ctx context.Context) ([]model.Vis
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []model.VisitorKeyHint
 	for rows.Next() {
 		var item model.VisitorKeyHint
@@ -261,7 +261,7 @@ func (s *SensitiveService) ListOrphanVisitorKeyringIDs(ctx context.Context) ([]i
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []int64
 	for rows.Next() {
 		var id int64
@@ -345,7 +345,7 @@ func (s *SensitiveService) ListVisitorKeyReferenceDocPermissions(ctx context.Con
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []VisitorKeyRefDocPermissionRow
 	for rows.Next() {
 		var row VisitorKeyRefDocPermissionRow
@@ -384,7 +384,7 @@ func (s *SensitiveService) ReplaceVisitorKeyHintReferenceDocuments(ctx context.C
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx, `DELETE FROM visitor_key_hint_reference_documents WHERE visitor_key_hint_id = ?1`, hintID); err != nil {
 		return err
 	}
@@ -455,7 +455,7 @@ func (s *SensitiveService) ListVisitorKeySensitiveReferenceDocPermissions(ctx co
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []VisitorKeyRefDocPermissionRow
 	for rows.Next() {
 		var row VisitorKeyRefDocPermissionRow
@@ -494,7 +494,7 @@ func (s *SensitiveService) ReplaceVisitorKeyHintSensitiveReferenceDocuments(ctx 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx, `DELETE FROM visitor_key_hint_sensitive_reference_documents WHERE visitor_key_hint_id = ?1`, hintID); err != nil {
 		return err
 	}

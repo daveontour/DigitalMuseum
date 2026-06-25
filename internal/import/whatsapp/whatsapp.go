@@ -48,15 +48,29 @@ type ImportStats struct {
 	mu                             sync.Mutex
 }
 
-func (s *ImportStats) copyStats() ImportStats {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.cloneLocked()
+// ImportStatsSnapshot is a mutex-free progress snapshot for callbacks.
+type ImportStatsSnapshot struct {
+	ConversationsProcessed         int
+	TotalConversations             int
+	MessagesImported               int
+	MessagesUpdated                int
+	MessagesCreated                int
+	Errors                         int
+	AttachmentsFound               int
+	AttachmentsMissing             int
+	AttachmentErrorsFileNotFound   int
+	AttachmentErrorsFileRead       int
+	AttachmentErrorsBlobInsert     int
+	AttachmentErrorsMetadataInsert int
+	AttachmentErrorsJunctionInsert int
+	MissingAttachmentFilenames     []string
+	AttachmentErrors               []string
+	CurrentConversation            string
 }
 
-// cloneLocked returns a snapshot of aggregate fields; caller must hold s.mu.
-func (s *ImportStats) cloneLocked() ImportStats {
-	return ImportStats{
+// snapshot returns aggregate fields; caller must hold s.mu.
+func (s *ImportStats) snapshot() ImportStatsSnapshot {
+	return ImportStatsSnapshot{
 		ConversationsProcessed:         s.ConversationsProcessed,
 		TotalConversations:             s.TotalConversations,
 		MessagesImported:               s.MessagesImported,
@@ -81,7 +95,7 @@ func finishConversation(stats *ImportStats, conversationName string, progressCal
 	stats.mu.Lock()
 	stats.ConversationsProcessed++
 	stats.CurrentConversation = conversationName
-	snap := stats.cloneLocked()
+	snap := stats.snapshot()
 	stats.mu.Unlock()
 	if progressCallback != nil {
 		progressCallback(snap, conversationName)
@@ -90,7 +104,7 @@ func finishConversation(stats *ImportStats, conversationName string, progressCal
 
 // ProgressCallback is called after each conversation is processed. justCompleted is the folder
 // name for that conversation (safe under parallel workers; do not use stats.CurrentConversation alone).
-type ProgressCallback func(stats ImportStats, justCompleted string)
+type ProgressCallback func(stats ImportStatsSnapshot, justCompleted string)
 
 // CancelledCheck returns true if the import should be cancelled
 type CancelledCheck func() bool
@@ -227,7 +241,7 @@ func processCSVFile(ctx context.Context, storage *importstorage.MessageStorage, 
 	if err != nil {
 		return fmt.Errorf("failed to open CSV file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	messages, err := ParseCSV(file)
 	if err != nil {

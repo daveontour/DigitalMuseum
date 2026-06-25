@@ -57,12 +57,12 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 			var svc string
 			var cnt int64
 			if err := rows.Scan(&svc, &cnt); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			out.MessageCounts[svc] = cnt
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("messages by service scan: %w", err)
 		}
@@ -85,14 +85,14 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 			var yr sql.NullInt64
 			var cnt int64
 			if err := rows.Scan(&yr, &cnt); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			if yr.Valid && yr.Int64 > 0 {
 				out.MessagesByYear[int(yr.Int64)] = cnt
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("messages by year scan: %w", err)
 		}
@@ -114,14 +114,14 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 			var yr sql.NullInt64
 			var cnt int64
 			if err := rows.Scan(&yr, &cnt); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			if yr.Valid && yr.Int64 > 0 {
 				out.EmailsByYear[int(yr.Int64)] = cnt
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("emails by year scan: %w", err)
 		}
@@ -144,12 +144,12 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 		for rows.Next() {
 			var cc model.ContactCount
 			if err := rows.Scan(&cc.Name, &cc.Count); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			out.TopSenders = append(out.TopSenders, cc)
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("top senders scan: %w", err)
 		}
@@ -181,12 +181,12 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 			var cat string
 			var cnt int64
 			if err := rows.Scan(&cat, &cnt); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			out.ContactsByCategory[cat] = cnt
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("contacts by category scan: %w", err)
 		}
@@ -279,12 +279,12 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 			var reg string
 			var cnt int64
 			if err := rows.Scan(&reg, &cnt); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			out.ImagesByRegion[reg] = cnt
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("images by region scan: %w", err)
 		}
@@ -328,12 +328,12 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 			var src string
 			var cnt int64
 			if err := rows.Scan(&src, &cnt); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			out.EmailsBySource[src] = cnt
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("emails by source scan: %w", err)
 		}
@@ -374,12 +374,12 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context, includeEmbeddin
 			var svc string
 			var cnt int64
 			if err := rows.Scan(&svc, &cnt); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			out.MessageCounts[svc] = cnt
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("messages by service scan: %w", err)
 		}
@@ -497,12 +497,12 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context, includeEmbeddin
 			var src string
 			var cnt int64
 			if err := rows.Scan(&src, &cnt); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			out.EmailsBySource[src] = cnt
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("emails by source scan: %w", err)
 		}
@@ -511,7 +511,7 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context, includeEmbeddin
 	if includeEmbeddingProgress {
 	// Embedding progress (how much content still needs an AI embedding to be
 	// searchable). Mirrors the exact "missing embedding" predicates used by the
-	// backfill jobs themselves (see runEmailEmbeddingBackfill / runMessageEmbeddingBackfill
+	// backfill jobs themselves (see runEmailEmbeddingBackfill / runMessageContextEmbeddingBackfill
 	// in importer_handler.go, runFacebookPostEmbeddingBackfill / runFacebookAlbumEmbeddingBackfill
 	// and ListMediaItemsForTagEmbeddingBackfill in image_handler.go / image_repo.go).
 	{
@@ -638,7 +638,7 @@ func (r *DashboardRepo) GetSubjectContactNames(ctx context.Context) ([]string, e
 	if err != nil {
 		return nil, fmt.Errorf("subject contact names: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var names []string
 	for rows.Next() {
 		var n string

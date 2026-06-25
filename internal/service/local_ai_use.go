@@ -48,7 +48,7 @@ func (s *ChatService) localAIProviderForChat(ctx context.Context) appai.ChatProv
 		return nil
 	}
 	p := s.effectiveLocalAIProvider()
-	if p == nil || !p.IsAvailable() {
+	if !p.IsAvailable() {
 		return nil
 	}
 	return p

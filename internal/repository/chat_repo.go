@@ -31,7 +31,7 @@ func (r *ChatRepo) CreateConversation(ctx context.Context, title, voice string) 
 		title, voice, uidVal(uid),
 	).Scan(&c.ID, &c.Title, &c.Voice, &c.CreatedAt, &c.UpdatedAt, &c.LastMessageAt)
 	if err != nil {
-		return nil, fmt.Errorf("CreateConversation: %w", err)
+		return nil, fmt.Errorf("createConversation: %w", err)
 	}
 	return &c, nil
 }
@@ -45,9 +45,9 @@ func (r *ChatRepo) GetConversation(ctx context.Context, id int64) (*model.ChatCo
 	q, args = addUIDFilter(q, args, uid)
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("GetConversation %d: %w", id, err)
+		return nil, fmt.Errorf("getConversation %d: %w", id, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if rows.Next() {
 		var c model.ChatConversation
 		if err := rows.Scan(&c.ID, &c.Title, &c.Voice, &c.CreatedAt, &c.UpdatedAt, &c.LastMessageAt); err != nil {
@@ -72,9 +72,9 @@ func (r *ChatRepo) ListConversations(ctx context.Context, limit *int) ([]*model.
 	}
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ListConversations: %w", err)
+		return nil, fmt.Errorf("listConversations: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.ChatConversation
 	for rows.Next() {
 		var c model.ChatConversation
@@ -103,14 +103,14 @@ func (r *ChatRepo) TurnCountsBatch(ctx context.Context, ids []int64) (map[int64]
 		inCond)
 	rows, err := r.pool.QueryContext(ctx, q, inArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("TurnCountsBatch: %w", err)
+		return nil, fmt.Errorf("turnCountsBatch: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	counts := make(map[int64]int64, len(ids))
 	for rows.Next() {
 		var id, n int64
 		if err := rows.Scan(&id, &n); err != nil {
-			return nil, fmt.Errorf("TurnCountsBatch scan: %w", err)
+			return nil, fmt.Errorf("turnCountsBatch scan: %w", err)
 		}
 		counts[id] = n
 	}
@@ -133,7 +133,7 @@ func (r *ChatRepo) UpdateConversation(ctx context.Context, id int64, title, voic
 		if isNoRows(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("UpdateConversation %d: %w", id, err)
+		return nil, fmt.Errorf("updateConversation %d: %w", id, err)
 	}
 	return &c, nil
 }
@@ -143,7 +143,7 @@ func (r *ChatRepo) UpdateConversation(ctx context.Context, id int64, title, voic
 func (r *ChatRepo) ClearConversationTurns(ctx context.Context, conversationID int64) (int64, error) {
 	tx, err := r.pool.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, fmt.Errorf("ClearConversationTurns begin: %w", err)
+		return 0, fmt.Errorf("clearConversationTurns begin: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
@@ -155,7 +155,7 @@ func (r *ChatRepo) ClearConversationTurns(ctx context.Context, conversationID in
 	delQ += `)`
 	res, err := tx.ExecContext(ctx, delQ, args...)
 	if err != nil {
-		return 0, fmt.Errorf("ClearConversationTurns delete: %w", err)
+		return 0, fmt.Errorf("clearConversationTurns delete: %w", err)
 	}
 	n, _ := res.RowsAffected()
 
@@ -163,7 +163,7 @@ func (r *ChatRepo) ClearConversationTurns(ctx context.Context, conversationID in
 	updArgs := []any{conversationID}
 	updQ, updArgs = addUIDFilter(updQ, updArgs, uid)
 	if _, err := tx.ExecContext(ctx, updQ, updArgs...); err != nil {
-		return 0, fmt.Errorf("ClearConversationTurns update conversation: %w", err)
+		return 0, fmt.Errorf("clearConversationTurns update conversation: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
@@ -192,9 +192,9 @@ func (r *ChatRepo) GetTurns(ctx context.Context, conversationID int64, limit int
 		 ) sub ORDER BY turn_number ASC`,
 		conversationID, limit)
 	if err != nil {
-		return nil, fmt.Errorf("GetTurns: %w", err)
+		return nil, fmt.Errorf("getTurns: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*model.ChatTurn
 	for rows.Next() {
 		var t model.ChatTurn
@@ -211,7 +211,7 @@ func (r *ChatRepo) GetTurns(ctx context.Context, conversationID int64, limit int
 func (r *ChatRepo) SaveTurn(ctx context.Context, conversationID int64, userInput, responseText, voice string, temperature float64) error {
 	tx, err := r.pool.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("SaveTurn begin tx: %w", err)
+		return fmt.Errorf("saveTurn begin tx: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
@@ -223,13 +223,13 @@ func (r *ChatRepo) SaveTurn(ctx context.Context, conversationID int64, userInput
 		conversationID, userInput, responseText, voice, temperature,
 	)
 	if err != nil {
-		return fmt.Errorf("SaveTurn insert: %w", err)
+		return fmt.Errorf("saveTurn insert: %w", err)
 	}
 	_, err = tx.ExecContext(ctx,
 		`UPDATE chat_conversations SET last_message_at = ?1 WHERE id = ?2`,
 		time.Now(), conversationID)
 	if err != nil {
-		return fmt.Errorf("SaveTurn update: %w", err)
+		return fmt.Errorf("saveTurn update: %w", err)
 	}
 	return tx.Commit()
 }

@@ -283,13 +283,13 @@ func geminiPost(ctx context.Context, apiKey, modelName string, body map[string]a
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Gemini API %d: %s", resp.StatusCode, string(data))
+		return nil, fmt.Errorf("gemini API %d: %s", resp.StatusCode, string(data))
 	}
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {

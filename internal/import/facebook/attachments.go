@@ -50,7 +50,7 @@ func FindAttachmentFile(conversationDir, uri, exportRoot string) (string, bool) 
 	}
 
 	var foundPath string
-	filepath.WalkDir(conversationDir, func(p string, d os.DirEntry, err error) error {
+	if err := filepath.WalkDir(conversationDir, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -59,7 +59,9 @@ func FindAttachmentFile(conversationDir, uri, exportRoot string) (string, bool) 
 			return errFound
 		}
 		return nil
-	})
+	}); err != nil && !errors.Is(err, errFound) {
+		return "", false
+	}
 	if foundPath != "" {
 		return foundPath, true
 	}

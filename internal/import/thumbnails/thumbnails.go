@@ -24,10 +24,18 @@ type ImportStats struct {
 	mu          sync.Mutex
 }
 
-func (s *ImportStats) copyStats() ImportStats {
+// ImportStatsSnapshot is a mutex-free progress snapshot for callbacks.
+type ImportStatsSnapshot struct {
+	TotalItems  int
+	Processed   int64
+	Errors      int64
+	CurrentItem string
+}
+
+func (s *ImportStats) copyStats() ImportStatsSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return ImportStats{
+	return ImportStatsSnapshot{
 		TotalItems:  s.TotalItems,
 		Processed:   s.Processed,
 		Errors:      s.Errors,
@@ -36,7 +44,7 @@ func (s *ImportStats) copyStats() ImportStats {
 }
 
 // ProgressCallback is called periodically during processing.
-type ProgressCallback func(ImportStats)
+type ProgressCallback func(ImportStatsSnapshot)
 
 // CancelledCheck returns true if processing should stop.
 type CancelledCheck func() bool
@@ -101,7 +109,7 @@ func ProcessThumbnailsAndExif(
 	if err != nil {
 		return nil, fmt.Errorf("failed to query media items: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var workItems []mediaItemWork
 	var mediaItemID, blobID int64
@@ -242,7 +250,7 @@ func processMediaItem(ctx context.Context, pool *sql.DB, processor *Processor, w
 
 	thumbData, exifData, err := processor.CreateThumbAndGetExif(imageData, true, true, 200)
 	if err != nil {
-		return processResult{Success: false, Error: fmt.Errorf("CreateThumbAndGetExif failed for media_item_id=%d blob_id=%d: %w",
+		return processResult{Success: false, Error: fmt.Errorf("createThumbAndGetExif failed for media_item_id=%d blob_id=%d: %w",
 			work.MediaItemID, work.BlobID, err)}
 	}
 
@@ -250,7 +258,7 @@ func processMediaItem(ctx context.Context, pool *sql.DB, processor *Processor, w
 	if err != nil {
 		return processResult{Success: false, Error: fmt.Errorf("failed to begin transaction: %w", err)}
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if thumbData != nil {
 		updateBlobQuery := `UPDATE media_blobs SET thumbnail_data = ?1 WHERE id = ?2`

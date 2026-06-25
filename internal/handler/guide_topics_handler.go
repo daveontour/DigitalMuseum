@@ -246,7 +246,7 @@ func readGuideTopicsImportFile(w http.ResponseWriter, r *http.Request) ([]byte, 
 		writeError(w, http.StatusBadRequest, "file is required")
 		return nil, false
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(io.LimitReader(file, maxUpload))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "failed to read upload")
