@@ -5655,7 +5655,10 @@ const App = (() => {
         if (window.electronAPI && typeof window.electronAPI.getAppInfo === 'function') {
             window.electronAPI.getAppInfo().then(info => {
                 const el = document.getElementById('electron-titlebar-text');
-                if (el && info) el.textContent = `${info.description}  v${info.version}`;
+                if (!el || !info) return;
+                const name = String(info.name || 'Digital Museum').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                const version = String(info.version || '').trim();
+                el.textContent = version ? `${name} · v${version}` : name;
             }).catch(() => {});
         }
 

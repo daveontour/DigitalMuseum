@@ -101,11 +101,93 @@ const AuthModule = (() => {
             });
         }
 
+        // Wire about button
+        const aboutBtn = document.getElementById('account-about-btn');
+        if (aboutBtn && !aboutBtn.dataset.wired) {
+            aboutBtn.dataset.wired = '1';
+            aboutBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                void openAboutModal();
+            });
+        }
+
         // Wire logout button
         const logoutBtn = document.getElementById('account-logout-btn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', logout);
         }
+    }
+
+    async function resolveAppInfo() {
+        if (window.electronAPI && typeof window.electronAPI.getAppInfo === 'function') {
+            try {
+                const info = await window.electronAPI.getAppInfo();
+                if (info) return info;
+            } catch (err) {
+                console.debug('getAppInfo failed', err);
+            }
+        }
+        return {
+            name: 'Digital Museum',
+            version: 'dev',
+            description: 'AI-powered personal digital archive. Import emails, messages, photos, and documents, then explore them through an AI chat interface.',
+        };
+    }
+
+    function closeAboutModal() {
+        const modal = document.getElementById('about-modal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('about-modal-open');
+        }
+        const menu = document.getElementById('account-dropdown-menu');
+        if (menu) menu.style.display = 'none';
+    }
+
+    async function openAboutModal() {
+        const modal = document.getElementById('about-modal');
+        const nameEl = document.getElementById('about-app-name');
+        const versionEl = document.getElementById('about-app-version');
+        const descEl = document.getElementById('about-app-description');
+        if (!modal || !nameEl || !versionEl || !descEl) return;
+
+        const menu = document.getElementById('account-dropdown-menu');
+        if (menu) menu.style.display = 'none';
+
+        nameEl.textContent = 'Digital Museum';
+        versionEl.textContent = 'Version …';
+        descEl.textContent = 'Loading…';
+        modal.classList.add('about-modal-open');
+        modal.style.display = 'flex';
+
+        const info = await resolveAppInfo();
+        const rawName = (info && info.name) ? String(info.name) : 'Digital Museum';
+        const appName = rawName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        const version = (info && info.version) ? String(info.version) : 'dev';
+        const description = (info && info.description)
+            ? String(info.description)
+            : 'AI-powered personal digital archive.';
+
+        nameEl.textContent = appName;
+        versionEl.textContent = `Version ${version}`;
+        descEl.textContent = description;
+    }
+
+    function initAboutModal() {
+        const modal = document.getElementById('about-modal');
+        if (!modal || modal.dataset.wired) return;
+        modal.dataset.wired = '1';
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeAboutModal();
+        });
+        document.getElementById('about-modal-close-btn')?.addEventListener('click', closeAboutModal);
+        document.getElementById('about-modal-ok-btn')?.addEventListener('click', closeAboutModal);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                closeAboutModal();
+            }
+        });
     }
 
     async function logout() {
@@ -167,6 +249,7 @@ const AuthModule = (() => {
     }
 
     // Self-initialize (loaded after app.js, so Modals.initAll() has already run)
+    initAboutModal();
     init();
 
     return { init, getUser, logout };

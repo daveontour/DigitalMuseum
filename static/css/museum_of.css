@@ -5735,6 +5735,37 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     z-index: 5000 !important;
 }
 
+#about-modal {
+    z-index: 5000 !important;
+}
+
+#about-modal.about-modal-open {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.about-modal-content {
+    max-width: 480px !important;
+}
+
+.about-app-name {
+    margin: 0 0 6px;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.about-app-version {
+    margin: 0 0 14px;
+    font-size: var(--text-md);
+    color: var(--color-text-muted);
+}
+
+.about-app-description {
+    margin: 0;
+}
+
 .confirmation-modal-content {
     width: 600px !important;
     max-width: 95vw;

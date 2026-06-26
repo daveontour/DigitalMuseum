@@ -156,6 +156,9 @@
                                 <i class="fas fa-sync-alt" style="margin-right:6px;"></i>Reload Guide Topics
                             </button>
                         </div>
+                        <button type="button" id="account-about-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
+                            <i class="fas fa-info-circle" style="margin-right:6px;"></i>About
+                        </button>
                         <button id="account-logout-btn" class="account-dropdown-item" type="button" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
                             <i class="fas fa-sign-out-alt" style="margin-right:6px;"></i>Sign Out
                         </button>
@@ -5490,6 +5493,24 @@
                 <div id="artefact-document-text-wrap" class="artefact-document-text-wrap" style="display:none;">
                     <div id="artefact-document-md" class="artefact-document-md rendered-content"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About modal at body level (must not live inside config-modal-overlay) -->
+    <div id="about-modal" class="modal about-modal" style="display:none; position:fixed; inset:0; z-index:5000; align-items:center; justify-content:center; background:rgba(15,23,42,0.55);">
+        <div class="modal-content confirmation-modal-content about-modal-content" onclick="event.stopPropagation()">
+            <div class="confirmation-modal-header">
+                <h2 id="about-modal-title">About</h2>
+                <button type="button" class="modal-close-btn" id="about-modal-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="confirmation-modal-body about-modal-body">
+                <p id="about-app-name" class="about-app-name"></p>
+                <p id="about-app-version" class="about-app-version"></p>
+                <p id="about-app-description" class="confirmation-modal-text about-app-description"></p>
+            </div>
+            <div class="confirmation-modal-buttons" style="display:flex; justify-content:flex-end;">
+                <button type="button" id="about-modal-ok-btn" class="modal-btn modal-btn-primary">OK</button>
             </div>
         </div>
     </div>

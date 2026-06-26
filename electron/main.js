@@ -955,7 +955,11 @@ app.on('window-all-closed', () => {
   // (macOS convention would be different but this is a Windows-first app)
 });
 
-ipcMain.handle('get-app-info', () => ({ version: app.getVersion(), name:app.getName(),description: app.getName() }));
+ipcMain.handle('get-app-info', () => ({
+  version: app.getVersion(),
+  name: app.getName(),
+  description: 'AI-powered personal digital archive. Import emails, messages, photos, and documents, then explore your archive through AI chat, guides, and interactive tools.',
+}));
 
 // ── File / directory picker (used by import dialogs) ─────────────────────────
 ipcMain.handle('show-open-dialog', (_event, options) => dialog.showOpenDialog(options));
