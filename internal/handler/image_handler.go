@@ -103,23 +103,18 @@ func effectiveRunpodWorkers(ctx context.Context, pool *sql.DB, uid int64) int {
 	return imageAIClassificationWorkerCountFromEnv()
 }
 
+// effectiveRunpodAPIKey resolves the RunPod API key from the archive owner's saved
+// settings only — there is no server-wide RUNPOD_API_KEY fallback.
 func effectiveRunpodAPIKey(ctx context.Context, pool *sql.DB, uid int64) string {
-	env := strings.TrimSpace(os.Getenv("RUNPOD_API_KEY"))
 	if pool == nil || uid == 0 {
-		return env
+		return ""
 	}
 	ur := repository.NewUserRepo(pool)
 	stored, err := ur.GetUserLLMStored(ctx, uid)
 	if err != nil || stored == nil {
-		return env
-	}
-	if strings.TrimSpace(stored.RunpodAPIKey) != "" {
-		return strings.TrimSpace(stored.RunpodAPIKey)
-	}
-	if !stored.AllowServerLLMKeys {
 		return ""
 	}
-	return env
+	return strings.TrimSpace(stored.RunpodAPIKey)
 }
 
 // ImageHandler handles all /images/*, /getLocations, and /facebook/albums/* read endpoints.
@@ -1181,10 +1176,7 @@ func extractRunPodAssistantContentForKeywords(result map[string]any) (string, er
 func classifyImageKeywordsWithRunPod(ctx context.Context, encodedImageB64 string) (string, error) {
 	apiKey := strings.TrimSpace(runpodAPIKeyFromCtx(ctx))
 	if apiKey == "" {
-		apiKey = strings.TrimSpace(os.Getenv("RUNPOD_API_KEY"))
-	}
-	if apiKey == "" {
-		return "", fmt.Errorf("runPod API key is not set (set RUNPOD_API_KEY or save a key under Settings → API Keys)")
+		return "", fmt.Errorf("runPod API key is not set (save a key under Configuration → API Keys)")
 	}
 	url, err := runPodImageClassifyRunsyncURL(ctx)
 	if err != nil {

@@ -45,15 +45,8 @@ var ErrVisitorSessionLLMNotUpdated = errors.New("session not found, expired, or 
 
 // sessionLLMJSON is the JSON shape stored in sessions.visitor_llm_overrides.
 type sessionLLMJSON struct {
-	GeminiAPIKey     string `json:"gemini_api_key,omitempty"`
-	AnthropicAPIKey  string `json:"anthropic_api_key,omitempty"`
-	GeminiModel      string `json:"gemini_model,omitempty"`
-	ClaudeModel      string `json:"claude_model,omitempty"`
+	OpenRouterAPIKey string `json:"openrouter_api_key,omitempty"`
 	TavilyAPIKey     string `json:"tavily_api_key,omitempty"`
-	DeepSeekAPIKey   string `json:"deepseek_api_key,omitempty"`
-	DeepSeekModel    string `json:"deepseek_model,omitempty"`
-	OpenAIAPIKey     string `json:"openai_api_key,omitempty"`
-	OpenAIModel      string `json:"openai_model,omitempty"`
 	RunpodAPIKey     string `json:"runpod_api_key,omitempty"`
 	ElevenLabsAPIKey string `json:"elevenlabs_api_key,omitempty"`
 	RunpodEndpointID string `json:"runpod_endpoint_id,omitempty"`
@@ -62,15 +55,8 @@ type sessionLLMJSON struct {
 
 func sessionLLMFromStored(s UserLLMStored) sessionLLMJSON {
 	return sessionLLMJSON{
-		GeminiAPIKey:     s.GeminiAPIKey,
-		AnthropicAPIKey:  s.AnthropicAPIKey,
-		GeminiModel:      s.GeminiModel,
-		ClaudeModel:      s.ClaudeModel,
+		OpenRouterAPIKey: s.OpenRouterAPIKey,
 		TavilyAPIKey:     s.TavilyAPIKey,
-		DeepSeekAPIKey:   s.DeepSeekAPIKey,
-		DeepSeekModel:    s.DeepSeekModel,
-		OpenAIAPIKey:     s.OpenAIAPIKey,
-		OpenAIModel:      s.OpenAIModel,
 		RunpodAPIKey:     s.RunpodAPIKey,
 		ElevenLabsAPIKey: s.ElevenLabsAPIKey,
 		RunpodEndpointID: s.RunpodEndpointID,
@@ -80,15 +66,8 @@ func sessionLLMFromStored(s UserLLMStored) sessionLLMJSON {
 
 func (j sessionLLMJSON) toStored() UserLLMStored {
 	return UserLLMStored{
-		GeminiAPIKey:     j.GeminiAPIKey,
-		AnthropicAPIKey:  j.AnthropicAPIKey,
-		GeminiModel:      j.GeminiModel,
-		ClaudeModel:      j.ClaudeModel,
+		OpenRouterAPIKey: j.OpenRouterAPIKey,
 		TavilyAPIKey:     j.TavilyAPIKey,
-		DeepSeekAPIKey:   j.DeepSeekAPIKey,
-		DeepSeekModel:    j.DeepSeekModel,
-		OpenAIAPIKey:     j.OpenAIAPIKey,
-		OpenAIModel:      j.OpenAIModel,
 		RunpodAPIKey:     j.RunpodAPIKey,
 		ElevenLabsAPIKey: j.ElevenLabsAPIKey,
 		RunpodEndpointID: j.RunpodEndpointID,

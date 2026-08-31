@@ -1,5 +1,20 @@
 'use strict';
 
+// Shared cache of admin-managed AI model display names, keyed by model key.
+// Populated by app.js's loadLLMProviderAvailability() from GET /chat/availability's
+// "models" array; read by label-lookup helpers below so they show real display names
+// for dynamically-added models instead of just the raw key.
+const AIModelLabels = {
+    _labels: {},
+    set(models) {
+        (models || []).forEach((m) => {
+            if (m && m.key) this._labels[m.key] = m.display_name || m.key;
+        });
+    },
+    get(key, fallback) {
+        return this._labels[key] || fallback || key;
+    },
+};
 
 // --- Polyfills or Global Helpers ---
 function generateUUID() { // Public Domain/MIT
@@ -75,13 +90,6 @@ const CONSTANTS = {
     },
     LOCAL_STORAGE_KEYS: {
         CHAT_SETTINGS: 'chatSettings'
-    },
-    LLM_PROVIDERS: {
-        GEMINI: "{{gemini_configured}}",
-        CLAUDE: "{{claude_configured}}",
-        DEEPSEEK: "{{deepseek_configured}}",
-        OPENAI: "{{openai_configured}}",
-        LOCALAI: "{{localai_configured}}"
     },
     /** True when DEPLOYMENT_NATURE=local — path-based import tiles are shown; otherwise they are hidden. */
     DEPLOYMENT_NATURE_LOCAL: "{{deployment_nature_local}}",
@@ -819,12 +827,8 @@ const UI = (() => {
     }
 
     function autoRouteProviderLabel(name) {
-        if (name === 'claude') return 'Claude';
-        if (name === 'deepseek') return 'DeepSeek';
-        if (name === 'openai') return 'ChatGPT';
         if (name === 'localai') return 'Local AI';
-        if (name === 'gemini') return 'Gemini';
-        return name || 'Unknown';
+        return AIModelLabels.get(name, name || 'Unknown');
     }
 
     function setChatAutoRoutingNotice(autoRoute) {
@@ -899,11 +903,8 @@ const UI = (() => {
         const el = document.getElementById('chat-context-failover-msg');
         if (!el || !wrap) return;
         const providerLabel = (p) => {
-            if (p === 'claude') return 'Claude';
-            if (p === 'deepseek') return 'DeepSeek';
-            if (p === 'openai') return 'ChatGPT';
             if (p === 'localai') return 'Local AI';
-            return 'Gemini';
+            return AIModelLabels.get(p, p || 'Unknown');
         };
         const fromN = providerLabel(fromProvider);
         const toN = providerLabel(toProvider);
@@ -1065,6 +1066,58 @@ const UI = (() => {
         syncChatContextStatusBarVisibility();
     }
 
+    let openRouterCreditsRefreshInFlight = false;
+
+    /** Fetches the remaining OpenRouter credit balance and updates the status bar segment.
+     *  Called after every chat completion and when the user clicks the segment; hides the
+     *  segment when no OpenRouter key is configured or the lookup fails, rather than
+     *  showing a stale/dash value.
+     *  @param {{ manual?: boolean }} [options] manual=true shows a brief "…" loading state
+     *  (the segment is normally hidden until the first successful fetch, so a manual click
+     *  before that point has nothing visible to show a loading state on). */
+    async function refreshOpenRouterCredits(options = {}) {
+        const seg = document.getElementById('chat-context-openrouter-credits-seg');
+        const el = document.getElementById('chat-context-openrouter-credits');
+        if (!seg || !el) return;
+        if (openRouterCreditsRefreshInFlight) return;
+        openRouterCreditsRefreshInFlight = true;
+        const manual = options.manual === true;
+        if (manual && seg.style.display !== 'none') {
+            el.textContent = '…';
+        }
+        try {
+            const res = await fetch('/chat/openrouter-credits', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (!data || !data.configured || typeof data.remaining_credits !== 'number' || !Number.isFinite(data.remaining_credits)) {
+                seg.style.display = 'none';
+                return;
+            }
+            el.textContent = data.remaining_credits.toFixed(2);
+            seg.style.display = '';
+            syncChatContextStatusBarVisibility();
+        } catch (e) {
+            seg.style.display = 'none';
+        } finally {
+            openRouterCreditsRefreshInFlight = false;
+        }
+    }
+
+    function initOpenRouterCreditsClick() {
+        const seg = document.getElementById('chat-context-openrouter-credits-seg');
+        if (!seg || seg.dataset.creditsClickBound === '1') return;
+        seg.dataset.creditsClickBound = '1';
+        seg.addEventListener('click', () => {
+            void refreshOpenRouterCredits({ manual: true });
+        });
+        seg.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                void refreshOpenRouterCredits({ manual: true });
+            }
+        });
+    }
+
     function setChatLastRequestStatsFromEmbedded(embeddedJson) {
         const inEl = document.getElementById('chat-context-last-in');
         const outEl = document.getElementById('chat-context-last-out');
@@ -1095,6 +1148,7 @@ const UI = (() => {
             clearChatAutoRoutingNotice();
         }
         syncChatContextStatusBarVisibility();
+        void refreshOpenRouterCredits();
     }
 
     return {
@@ -1103,6 +1157,8 @@ const UI = (() => {
         syncChatContextStatusBarVisibility,
         updateChatContextStatusBarFromAvailability,
         setChatLastRequestStatsFromEmbedded,
+        refreshOpenRouterCredits,
+        initOpenRouterCreditsClick,
         setChatProviderFailoverNotice,
         clearChatProviderFailoverNotice,
         setChatAutoRoutingNotice,

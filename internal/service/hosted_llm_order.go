@@ -6,72 +6,80 @@ import (
 	"strings"
 )
 
-// HostedLLMProviderOrderConfigKey is the app_configuration key for hosted provider try order.
+// HostedLLMProviderOrderConfigKey is the app_configuration key for the Auto-routing
+// classifier provider and the error-failover on/off toggle.
 const HostedLLMProviderOrderConfigKey = "hosted_llm_provider_order_v1"
-
-// DefaultHostedLLMProviderOrder is the fallback try order for Gemini, Claude, and DeepSeek.
-var DefaultHostedLLMProviderOrder = []string{"gemini", "claude", "deepseek", "openai"}
 
 // DefaultClassifierProvider is the default AI provider for Auto routing classification.
 const DefaultClassifierProvider = "localai"
 
-// HostedLLMProviderOrderConfig is persisted under HostedLLMProviderOrderConfigKey.
+// HostedLLMProviderOrderConfig is persisted under HostedLLMProviderOrderConfigKey. Hosted
+// provider try order for both Auto routing and error failover always follows the AI Models
+// tab's sort_order (see defaultHostedLLMProviderOrder) — only the classifier provider and
+// the failover on/off toggle are independently configurable.
 type HostedLLMProviderOrderConfig struct {
-	AutoOrder          []string
-	FailoverOrder      []string
 	ClassifierProvider string
 	FailoverEnabled    bool
 }
 
 type hostedLLMProviderOrderConfig struct {
-	AutoOrder          []string `json:"auto_order"`
-	FailoverOrder      []string `json:"failover_order"`
-	ClassifierProvider string   `json:"classifier_provider"`
-	FailoverEnabled    *bool    `json:"failover_enabled"`
+	ClassifierProvider string `json:"classifier_provider"`
+	FailoverEnabled    *bool  `json:"failover_enabled"`
 }
 
-func isValidClassifierProviderName(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "localai", "gemini", "claude", "deepseek", "openai":
-		return true
-	default:
-		return false
+// defaultHostedLLMProviderOrder returns every enabled AI Models row's key ordered by
+// sort_order — including "localai" at its own position, unlike ListEnabled — the single
+// source of truth for both Auto routing and error failover try order (see the AI Models
+// config tab, where Local AI can be enabled/disabled and reordered like any other row).
+func (s *ChatService) defaultHostedLLMProviderOrder(ctx context.Context) []string {
+	if s.aiModelsSvc == nil {
+		return nil
 	}
-}
-
-func normalizeClassifierProvider(name string) string {
-	name = strings.ToLower(strings.TrimSpace(name))
-	if isValidClassifierProviderName(name) {
-		return name
-	}
-	return DefaultClassifierProvider
-}
-
-func normalizeHostedProviderOrder(order []string) []string {
-	valid := map[string]bool{"gemini": true, "claude": true, "deepseek": true, "openai": true}
-	var out []string
-	seen := map[string]bool{}
-	for _, p := range order {
-		p = strings.ToLower(strings.TrimSpace(p))
-		if !valid[p] || seen[p] {
-			continue
-		}
-		seen[p] = true
-		out = append(out, p)
-	}
-	for _, p := range DefaultHostedLLMProviderOrder {
-		if !seen[p] {
-			out = append(out, p)
+	models, _ := s.aiModelsSvc.ListAll(ctx)
+	out := make([]string, 0, len(models))
+	for _, m := range models {
+		if m.Enabled {
+			out = append(out, m.Key)
 		}
 	}
 	return out
 }
 
-// HostedProviderTryOrder builds try order for Auto routing: last manually selected provider first, then auto_order.
-func HostedProviderTryOrder(lastManualHosted string, configuredOrder []string) []string {
-	order := normalizeHostedProviderOrder(configuredOrder)
+// isValidHostedProviderName reports whether name is a currently-enabled AI model key
+// (including "localai").
+func (s *ChatService) isValidHostedProviderName(ctx context.Context, name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" || s.aiModelsSvc == nil {
+		return false
+	}
+	if name == "localai" {
+		return s.aiModelsSvc.LocalAIRowEnabled(ctx)
+	}
+	return s.aiModelsSvc.IsEnabledKey(ctx, name)
+}
+
+func (s *ChatService) isValidClassifierProviderName(ctx context.Context, name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "localai" {
+		return true
+	}
+	return s.isValidHostedProviderName(ctx, name)
+}
+
+func (s *ChatService) normalizeClassifierProvider(ctx context.Context, name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if s.isValidClassifierProviderName(ctx, name) {
+		return name
+	}
+	return DefaultClassifierProvider
+}
+
+// HostedProviderTryOrder builds try order for Auto routing: last manually selected provider
+// first, then the AI Models tab's sort_order.
+func (s *ChatService) HostedProviderTryOrder(ctx context.Context, lastManualHosted string) []string {
+	order := s.defaultHostedLLMProviderOrder(ctx)
 	last := strings.ToLower(strings.TrimSpace(lastManualHosted))
-	if !isValidHostedProviderName(last) {
+	if !s.isValidHostedProviderName(ctx, last) {
 		return order
 	}
 	out := []string{last}
@@ -83,10 +91,11 @@ func HostedProviderTryOrder(lastManualHosted string, configuredOrder []string) [
 	return out
 }
 
-// FailoverProviderTryOrder returns configured failover order excluding the failed primary provider.
-func FailoverProviderTryOrder(primary string, configuredOrder []string) []string {
+// FailoverProviderTryOrder returns the AI Models tab's sort_order, excluding the failed
+// primary provider.
+func (s *ChatService) FailoverProviderTryOrder(ctx context.Context, primary string) []string {
 	primary = strings.ToLower(strings.TrimSpace(primary))
-	order := normalizeHostedProviderOrder(configuredOrder)
+	order := s.defaultHostedLLMProviderOrder(ctx)
 	var out []string
 	for _, p := range order {
 		if p != primary {
@@ -96,10 +105,8 @@ func FailoverProviderTryOrder(primary string, configuredOrder []string) []string
 	return out
 }
 
-func parseHostedLLMProviderOrderJSON(raw string) HostedLLMProviderOrderConfig {
+func (s *ChatService) parseHostedLLMProviderOrderJSON(ctx context.Context, raw string) HostedLLMProviderOrderConfig {
 	out := HostedLLMProviderOrderConfig{
-		AutoOrder:          append([]string(nil), DefaultHostedLLMProviderOrder...),
-		FailoverOrder:      append([]string(nil), DefaultHostedLLMProviderOrder...),
 		ClassifierProvider: DefaultClassifierProvider,
 		FailoverEnabled:    true,
 	}
@@ -111,13 +118,7 @@ func parseHostedLLMProviderOrderJSON(raw string) HostedLLMProviderOrderConfig {
 	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
 		return out
 	}
-	if len(cfg.AutoOrder) > 0 {
-		out.AutoOrder = normalizeHostedProviderOrder(cfg.AutoOrder)
-	}
-	if len(cfg.FailoverOrder) > 0 {
-		out.FailoverOrder = normalizeHostedProviderOrder(cfg.FailoverOrder)
-	}
-	out.ClassifierProvider = normalizeClassifierProvider(cfg.ClassifierProvider)
+	out.ClassifierProvider = s.normalizeClassifierProvider(ctx, cfg.ClassifierProvider)
 	if cfg.FailoverEnabled != nil {
 		out.FailoverEnabled = *cfg.FailoverEnabled
 	}
@@ -126,8 +127,6 @@ func parseHostedLLMProviderOrderJSON(raw string) HostedLLMProviderOrderConfig {
 
 func (s *ChatService) loadHostedLLMProviderOrderConfig(ctx context.Context) HostedLLMProviderOrderConfig {
 	out := HostedLLMProviderOrderConfig{
-		AutoOrder:          append([]string(nil), DefaultHostedLLMProviderOrder...),
-		FailoverOrder:      append([]string(nil), DefaultHostedLLMProviderOrder...),
 		ClassifierProvider: DefaultClassifierProvider,
 		FailoverEnabled:    true,
 	}
@@ -138,10 +137,5 @@ func (s *ChatService) loadHostedLLMProviderOrderConfig(ctx context.Context) Host
 	if err != nil || raw == nil {
 		return out
 	}
-	return parseHostedLLMProviderOrderJSON(*raw)
-}
-
-func (s *ChatService) loadHostedLLMProviderOrder(ctx context.Context) (autoOrder, failoverOrder []string) {
-	cfg := s.loadHostedLLMProviderOrderConfig(ctx)
-	return cfg.AutoOrder, cfg.FailoverOrder
+	return s.parseHostedLLMProviderOrderJSON(ctx, *raw)
 }

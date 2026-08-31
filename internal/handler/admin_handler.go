@@ -25,7 +25,7 @@ type AdminHandler struct {
 	pool              *sql.DB
 	subjectConfigRepo *repository.SubjectConfigRepo
 	contactRepo       *repository.ContactRepo
-	gemini            *appai.GeminiProvider
+	summarizer        appai.SummarizerResolver
 	sessionStore      *keystore.SessionMasterStore
 	billing           *repository.BillingRepo
 	users             *repository.UserRepo
@@ -42,8 +42,8 @@ func NewAdminHandler(pool *sql.DB, subjectConfigRepo *repository.SubjectConfigRe
 	}
 }
 
-// WithGemini injects a GeminiProvider for AI summarization.
-func (h *AdminHandler) WithGemini(g *appai.GeminiProvider) { h.gemini = g }
+// WithSummarizer attaches the AI provider resolver used for AI summarization.
+func (h *AdminHandler) WithSummarizer(r appai.SummarizerResolver) { h.summarizer = r }
 
 // WithBilling attaches the billing repo and user repo for LLM usage rows (identity snapshot).
 func (h *AdminHandler) WithBilling(b *repository.BillingRepo, users *repository.UserRepo) {
@@ -232,8 +232,13 @@ func (h *AdminHandler) SummarizeWritingStyle(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	ctx := r.Context()
-	if h.gemini == nil {
+	if h.summarizer == nil {
 		writeError(w, http.StatusServiceUnavailable, "AI summarization is not configured")
+		return
+	}
+	provider, providerKey := h.summarizer.ResolveSummarizer(ctx)
+	if provider == nil {
+		writeError(w, http.StatusServiceUnavailable, "no AI provider available for summarization")
 		return
 	}
 
@@ -263,11 +268,11 @@ Email samples:
 Message samples:
 %s`, sample, msgs)
 
-	result, err := h.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
+	result, err := provider.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
 	if err != nil {
 		stub := result.Usage
 		if stub == nil {
-			stub = service.StubLLMUsage("gemini", "")
+			stub = service.StubLLMUsage(providerKey, "")
 		}
 		service.MarkUsageServerKey(stub, true)
 		service.RecordLLMUsage(ctx, h.billing, h.users, stub, err)
@@ -296,8 +301,13 @@ func (h *AdminHandler) SummarizePsychologicalProfile(w http.ResponseWriter, r *h
 		return
 	}
 	ctx := r.Context()
-	if h.gemini == nil {
+	if h.summarizer == nil {
 		writeError(w, http.StatusServiceUnavailable, "AI summarization is not configured")
+		return
+	}
+	provider, providerKey := h.summarizer.ResolveSummarizer(ctx)
+	if provider == nil {
+		writeError(w, http.StatusServiceUnavailable, "no AI provider available for summarization")
 		return
 	}
 
@@ -329,11 +339,11 @@ Email samples:
 Message samples:
 %s`, sample, msgs)
 
-	result, err := h.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
+	result, err := provider.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
 	if err != nil {
 		stub := result.Usage
 		if stub == nil {
-			stub = service.StubLLMUsage("gemini", "")
+			stub = service.StubLLMUsage(providerKey, "")
 		}
 		service.MarkUsageServerKey(stub, true)
 		service.RecordLLMUsage(ctx, h.billing, h.users, stub, err)
@@ -365,11 +375,16 @@ func (h *AdminHandler) GenerateSuggestedInterests(w http.ResponseWriter, r *http
 		writeError(w, http.StatusServiceUnavailable, "interests service not configured")
 		return
 	}
-	if h.gemini == nil {
+	if h.summarizer == nil {
 		writeError(w, http.StatusServiceUnavailable, "AI summarization is not configured")
 		return
 	}
 	ctx := r.Context()
+	provider, providerKey := h.summarizer.ResolveSummarizer(ctx)
+	if provider == nil {
+		writeError(w, http.StatusServiceUnavailable, "no AI provider available for summarization")
+		return
+	}
 
 	existing, err := h.interestSvc.List(ctx)
 	if err != nil {
@@ -420,11 +435,11 @@ Email samples:
 Message samples:
 %s`, existingBlock, sample, msgs)
 
-	result, err := h.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
+	result, err := provider.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
 	if err != nil {
 		stub := result.Usage
 		if stub == nil {
-			stub = service.StubLLMUsage("gemini", "")
+			stub = service.StubLLMUsage(providerKey, "")
 		}
 		service.MarkUsageServerKey(stub, true)
 		service.RecordLLMUsage(ctx, h.billing, h.users, stub, err)

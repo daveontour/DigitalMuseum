@@ -83,6 +83,7 @@ func TestExtractJSONObject(t *testing.T) {
 }
 
 func TestHostedProviderTryOrderLegacy(t *testing.T) {
+	s, ctx := newTestChatServiceWithModels(t, "gemini", "claude", "deepseek", "openai")
 	tests := []struct {
 		lastManual string
 		want       []string
@@ -94,7 +95,7 @@ func TestHostedProviderTryOrderLegacy(t *testing.T) {
 		{"deepseek", []string{"deepseek", "gemini", "claude", "openai"}},
 	}
 	for _, tc := range tests {
-		got := hostedProviderTryOrder(tc.lastManual, DefaultHostedLLMProviderOrder)
+		got := s.HostedProviderTryOrder(ctx, tc.lastManual)
 		if len(got) != len(tc.want) {
 			t.Fatalf("lastManual=%q: got %v want %v", tc.lastManual, got, tc.want)
 		}

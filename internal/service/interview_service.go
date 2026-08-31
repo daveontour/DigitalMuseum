@@ -500,33 +500,18 @@ func (s *ChatService) GetInterviewTurns(
 
 // pickInterviewProvider resolves and returns the LLM provider.
 func (s *ChatService) pickInterviewProvider(ctx context.Context, r *http.Request, preferred string) (appai.ChatProvider, string) {
-	if preferred == "claude" {
-		cp := s.effectiveClaudeProvider(ctx, r, "")
-		if cp.IsAvailable() {
-			return cp, "claude"
-		}
-	}
-	if preferred == "deepseek" {
-		dp := s.effectiveDeepSeekProvider(ctx, r, "")
-		if dp.IsAvailable() {
-			return dp, "deepseek"
-		}
-	}
-	if preferred == "openai" {
-		op := s.effectiveOpenAIProvider(ctx, r, "")
-		if op.IsAvailable() {
-			return op, "openai"
-		}
-	}
 	if preferred == "localai" {
-		lp := s.localAIProviderForChat(ctx)
-		if lp != nil {
+		if lp := s.localAIProviderForChat(ctx); lp != nil && lp.IsAvailable() {
 			return lp, "localai"
 		}
+	} else if preferred != "" {
+		if p := s.effectiveProviderByKey(ctx, r, "", preferred); p != nil && p.IsAvailable() {
+			return p, preferred
+		}
 	}
-	gp := s.effectiveGeminiProvider(ctx, r, "")
-	if gp.IsAvailable() {
-		return gp, "gemini"
+	name := s.defaultProviderName(ctx, "")
+	if p := s.effectiveProviderByKey(ctx, r, "", name); p != nil && p.IsAvailable() {
+		return p, name
 	}
 	return nil, preferred
 }

@@ -111,13 +111,6 @@
                     </div>
                 </div>
             </div>
-            <!-- <div class="top-bar-llm">
-                <label for="llm-provider-select-legacy" class="top-bar-label">LLM Provider</label>
-                <select id="llm-provider-select-legacy">
-                    <option value="gemini" selected>Gemini</option>
-                    <option value="claude">Claude</option>
-                </select>
-            </div> -->
             <label for="its-me-visitor-switch" class="top-bar-label" style="margin-right: 8px;">Who's Asking? </label>
             <div class="its-me-visitor-switch" id="its-me-visitor-switch" role="switch" aria-checked="false">
                 <span class="its-me-visitor-option" data-value="its-me">{{owner}}</span>
@@ -348,6 +341,7 @@
                     <span class="chat-context-status-seg chat-context-status-last" title="Most recent chat completion">
                         Last request: <span id="chat-context-last-in">—</span> in / <span id="chat-context-last-out">—</span> out tokens
                         · <span id="chat-context-last-toolcalls-seg" class="chat-context-status-clickable" role="button" tabindex="0" title="View tool call log for last request"><span id="chat-context-last-toolcalls">—</span> tool calls</span>
+                        · <span id="chat-context-openrouter-credits-seg" class="chat-context-status-clickable" role="button" tabindex="0" title="Remaining OpenRouter credit balance, refreshed after each completion — click to refresh now" style="display:none">$<span id="chat-context-openrouter-credits">—</span> credits left</span>
                     </span>
                     <span class="chat-context-status-sep" id="chat-request-only-sep" aria-hidden="true" style="display:none">|</span>
                     <label class="chat-context-status-seg chat-context-request-only-seg" id="chat-request-only-label" for="chat-request-only-checkbox" style="display:none" title="When checked, Send submits only the text in the input box — no system prompt, history, or tools are sent to the LLM">
@@ -445,7 +439,7 @@
                     <button class="modal-close-btn" id="close-have-a-chat-setup-modal">&times;</button>
                 </div>
                 <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:16px;">
-                    <p class="have-a-chat-setup-intro">Two archive <strong>voices</strong> reply in turn, each backed by <strong>Gemini</strong>, <strong>Claude</strong>, <strong>DeepSeek</strong>, or <strong>Local AI</strong> (you pick below). Add an optional topic to steer the thread, or leave it open so they explore freely. After you start, use the bar above the chat to <strong>pause</strong>, <strong>inject</strong> your own comment or question, or <strong>stop</strong> the run.</p>
+                    <p class="have-a-chat-setup-intro">Two archive <strong>voices</strong> reply in turn, each backed by any configured AI model or <strong>Local AI</strong> (you pick below). Add an optional topic to steer the thread, or leave it open so they explore freely. After you start, use the bar above the chat to <strong>pause</strong>, <strong>inject</strong> your own comment or question, or <strong>stop</strong> the run.</p>
                     <div>
                         <label style="display:block; font-weight:bold; margin-bottom:4px;">Topic / Starter Prompt <span style="font-weight:normal;color:var(--color-text-muted);">(optional)</span></label>
                         <textarea id="have-a-chat-topic" rows="3" style="width:100%; box-sizing:border-box; border-radius:6px; border:1px solid #bfc9da; padding:8px; font-size:var(--text-base);" placeholder="e.g. 'What do the messages reveal about relationships?' — or leave blank to let the AIs explore freely."></textarea>
@@ -757,17 +751,17 @@
                         <button id="config-tab-btn-settings" type="button" class="config-tab-button active" data-tab="settings">
                             <i class="fas fa-sliders-h"></i> Appearance
                         </button>
-                        <button id="config-tab-btn-inactivity-prompt" type="button" class="config-tab-button" data-tab="inactivity-prompt">
-                            <i class="fas fa-hourglass-half"></i> Inactivity Prompt
-                        </button>
                         <button id="config-tab-btn-api-keys" type="button" class="config-tab-button" data-tab="api-keys">
                             <i class="fas fa-plug"></i> API Keys
                         </button>
+                        <button id="config-tab-btn-ai-models-config" type="button" class="config-tab-button" data-tab="ai-models-config">
+                            <i class="fas fa-robot"></i> AI Models
+                        </button>
+                        <button id="config-tab-btn-model-catalog" type="button" class="config-tab-button" data-tab="model-catalog">
+                            <i class="fas fa-list"></i> Model Catalog
+                        </button>
                         <button id="config-tab-btn-ai-setup-config" type="button" class="config-tab-button" data-tab="ai-setup-config">
                             <i class="fas fa-microchip"></i> Local AI Setup
-                        </button>
-                        <button id="config-tab-btn-hosted-llm-order" type="button" class="config-tab-button" data-tab="hosted-llm-order">
-                            <i class="fas fa-sort-amount-down"></i> Hosted LLM Order
                         </button>
                         <button id="config-tab-btn-subject-configuration" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="subject-configuration">
                             <i class="fas fa-user"></i> Subject Configuration
@@ -851,17 +845,13 @@
                         </div>
                     </section>
                     </div>
-                </div>
-                <div class="config-tab-content" id="inactivity-prompt-tab">
-                    <section class="section-config">
-                        <h1>Inactivity Prompt</h1>
+                    <section class="config-section">
+                        <h3>Inactivity Prompt</h3>
                         <p class="config-tab-lead" style="max-width: none;">
                             After you send a chat message, a random timer runs between the minimum and maximum seconds below.
                             When it expires, the assistant silently checks in or continues the conversation.
                             Each LLM check-in counts toward usage billing.
                         </p>
-                    </section>
-                    <section class="config-section">
                         <div class="setting-group">
                             <label for="inactivity-prompt-enabled">
                                 <input type="checkbox" id="inactivity-prompt-enabled">
@@ -887,89 +877,34 @@
                         <h1>AI API Keys & Models</h1>
                     </section>
                     <section class="config-section" id="user-llm-settings-section" style="display:none;">
-                        <p id="user-llm-intro" style="color:var(--color-text-muted); font-size:var(--text-md); margin-bottom:8px; max-width:52rem;"></p>
+                        <p id="user-llm-intro" style="color:var(--color-text-muted); font-size:var(--text-md); margin-bottom:20px; max-width:52rem;"></p>
                         <p id="user-llm-subject-hints" style="color:var(--color-text-muted); font-size:var(--text-caption); margin-bottom:12px; max-width:52rem;"></p>
                         <div class="setting-group user-llm-provider-row">
-                            <div class="user-llm-field-col">
-                                <label for="user-llm-gemini-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Google Gemini API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-gemini-key" aria-label="Information about Gemini API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-gemini-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="password" id="user-llm-gemini-key" class="modal-input user-llm-field-input" autocomplete="off">
-                                </div>
-                            </div>
-                            <div class="user-llm-field-col">
-                                <label for="user-llm-gemini-model" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Google Gemini model name</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-gemini-model" aria-label="Information about Gemini model name"><i class="fas fa-info-circle" aria-hidden="true"></i></button></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="text" id="user-llm-gemini-model" class="modal-input user-llm-field-input user-llm-field-input--model">
-                                </div>
-                            </div>
-                            <div class="user-llm-field-col user-llm-field-col--actions">
-                                <div class="user-llm-field-controls user-llm-field-controls--action-only">
-                                    <button type="button" class="modal-btn modal-btn-secondary user-llm-clear-btn" id="user-llm-clear-gemini" aria-label="Clear Gemini API key and model overrides">Clear Gemini</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="setting-group user-llm-provider-row">
-                            <div class="user-llm-field-col">
-                                <label for="user-llm-anthropic-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Anthropic Claude API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-anthropic-key" aria-label="Information about Anthropic API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-anthropic-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="password" id="user-llm-anthropic-key" class="modal-input user-llm-field-input" autocomplete="off">
-                                </div>
-                            </div>
-                            <div class="user-llm-field-col">
-                                <label for="user-llm-claude-model" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">AnthropicClaude model name</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-claude-model" aria-label="Information about Claude model name"><i class="fas fa-info-circle" aria-hidden="true"></i></button></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="text" id="user-llm-claude-model" class="modal-input user-llm-field-input user-llm-field-input--model">
+                            <div class="user-llm-field-col user-llm-field-col--span-2">
+                                <label for="user-llm-openrouter-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">OpenRouter API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-openrouter-key" aria-label="Information about OpenRouter API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(routes to every AI model configured in the AI Models tab)</span><span id="user-llm-openrouter-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
+                                <div class="user-llm-field-controls user-llm-key-field-controls">
+                                    <div class="user-llm-key-input-wrap">
+                                        <input type="password" id="user-llm-openrouter-key" class="modal-input user-llm-field-input" autocomplete="off">
+                                        <button type="button" class="user-llm-key-toggle-btn" id="user-llm-toggle-openrouter-key" tabindex="-1" aria-label="Show OpenRouter API key" aria-pressed="false"><i class="fas fa-eye" aria-hidden="true"></i></button>
+                                    </div>
+                                    <span class="user-llm-key-status-icon" id="user-llm-openrouter-key-status" role="img" aria-label="API key status"></span>
                                 </div>
                             </div>
                             <div class="user-llm-field-col user-llm-field-col--actions">
                                 <div class="user-llm-field-controls user-llm-field-controls--action-only">
-                                    <button type="button" class="modal-btn modal-btn-secondary user-llm-clear-btn" id="user-llm-clear-anthropic" aria-label="Clear Anthropic API key and Claude model overrides">Clear Anthropic</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="setting-group user-llm-provider-row">
-                            <div class="user-llm-field-col">
-                                <label for="user-llm-deepseek-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">DeepSeek API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-deepseek-key" aria-label="Information about DeepSeek API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-deepseek-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="password" id="user-llm-deepseek-key" class="modal-input user-llm-field-input" autocomplete="off">
-                                </div>
-                            </div>
-                            <div class="user-llm-field-col">
-                                <label for="user-llm-deepseek-model" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">DeepSeek model name</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-deepseek-model" aria-label="Information about DeepSeek model name"><i class="fas fa-info-circle" aria-hidden="true"></i></button></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="text" id="user-llm-deepseek-model" class="modal-input user-llm-field-input user-llm-field-input--model">
-                                </div>
-                            </div>
-                            <div class="user-llm-field-col user-llm-field-col--actions">
-                                <div class="user-llm-field-controls user-llm-field-controls--action-only">
-                                    <button type="button" class="modal-btn modal-btn-secondary user-llm-clear-btn" id="user-llm-clear-deepseek" aria-label="Clear DeepSeek API key and model overrides">Clear DeepSeek</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="setting-group user-llm-provider-row">
-                            <div class="user-llm-field-col">
-                                <label for="user-llm-openai-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">OpenAI API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-openai-key" aria-label="Information about OpenAI API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span id="user-llm-openai-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="password" id="user-llm-openai-key" class="modal-input user-llm-field-input" autocomplete="off">
-                                </div>
-                            </div>
-                            <div class="user-llm-field-col">
-                                <label for="user-llm-openai-model" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">ChatGPT model name</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-openai-model" aria-label="Information about ChatGPT model name"><i class="fas fa-info-circle" aria-hidden="true"></i></button></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="text" id="user-llm-openai-model" class="modal-input user-llm-field-input user-llm-field-input--model">
-                                </div>
-                            </div>
-                            <div class="user-llm-field-col user-llm-field-col--actions">
-                                <div class="user-llm-field-controls user-llm-field-controls--action-only">
-                                    <button type="button" class="modal-btn modal-btn-secondary user-llm-clear-btn" id="user-llm-clear-openai" aria-label="Clear OpenAI API key and ChatGPT model overrides">Clear ChatGPT</button>
+                                    <button type="button" class="modal-btn modal-btn-secondary user-llm-clear-btn" id="user-llm-clear-openrouter" aria-label="Clear OpenRouter API key override">Clear OpenRouter</button>
                                 </div>
                             </div>
                         </div>
                         <div class="setting-group user-llm-provider-row user-llm-provider-row--tavily">
                             <div class="user-llm-field-col user-llm-field-col--span-2">
                                 <label for="user-llm-tavily-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">Tavily API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-tavily-key" aria-label="Information about Tavily API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(web search)</span><span id="user-llm-tavily-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="password" id="user-llm-tavily-key" class="modal-input user-llm-field-input" autocomplete="off">
+                                <div class="user-llm-field-controls user-llm-key-field-controls">
+                                    <div class="user-llm-key-input-wrap">
+                                        <input type="password" id="user-llm-tavily-key" class="modal-input user-llm-field-input" autocomplete="off">
+                                        <button type="button" class="user-llm-key-toggle-btn" id="user-llm-toggle-tavily-key" tabindex="-1" aria-label="Show Tavily API key" aria-pressed="false"><i class="fas fa-eye" aria-hidden="true"></i></button>
+                                    </div>
+                                    <span class="user-llm-key-status-icon" id="user-llm-tavily-key-status" role="img" aria-label="API key status"></span>
                                 </div>
                             </div>
                             <div class="user-llm-field-col user-llm-field-col--actions">
@@ -979,20 +914,31 @@
                             </div>
                         </div>
                         <div class="setting-group user-llm-provider-row user-llm-provider-row--runpod">
-                            <div class="user-llm-field-col">
+                            <div class="user-llm-field-col user-llm-field-col--span-2 user-llm-runpod-key-col">
                                 <label for="user-llm-runpod-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">RunPod API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-runpod-key" aria-label="Information about RunPod API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(image AI classification)</span><span id="user-llm-runpod-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="password" id="user-llm-runpod-key" class="modal-input user-llm-field-input" autocomplete="off">
+                                <div class="user-llm-field-controls user-llm-key-field-controls">
+                                    <div class="user-llm-key-input-wrap">
+                                        <input type="password" id="user-llm-runpod-key" class="modal-input user-llm-field-input" autocomplete="off">
+                                        <button type="button" class="user-llm-key-toggle-btn" id="user-llm-toggle-runpod-key" tabindex="-1" aria-label="Show RunPod API key" aria-pressed="false"><i class="fas fa-eye" aria-hidden="true"></i></button>
+                                    </div>
+                                    <span class="user-llm-key-status-icon" id="user-llm-runpod-key-status" role="img" aria-label="API key status"></span>
                                 </div>
                             </div>
-                            <div class="user-llm-field-col">
+                            <div class="user-llm-field-col user-llm-field-col--actions user-llm-runpod-actions-col">
+                                <div class="user-llm-field-controls user-llm-field-controls--action-only">
+                                    <button type="button" class="modal-btn modal-btn-secondary user-llm-clear-btn" id="user-llm-clear-runpod" aria-label="Clear RunPod overrides">Clear RunPod</button>
+                                </div>
+                            </div>
+                            <div class="user-llm-field-col user-llm-runpod-endpoint-col">
                                 <label for="user-llm-runpod-endpoint" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">RunPod Endpoint ID</span></label>
                                 <div class="user-llm-field-controls">
                                     <input type="text" id="user-llm-runpod-endpoint" class="modal-input user-llm-field-input user-llm-field-input--model" autocomplete="off" spellcheck="false">
                                 </div>
-                                <div style="margin-top:8px;">
-                                    <label for="user-llm-runpod-workers" style="font-size:var(--text-sm);font-weight:600;display:block;margin-bottom:4px;">Workers</label>
-                                    <select id="user-llm-runpod-workers" class="modal-input" style="width:100%;box-sizing:border-box;">
+                            </div>
+                            <div class="user-llm-field-col user-llm-runpod-workers-col">
+                                <label for="user-llm-runpod-workers">Workers</label>
+                                <div class="user-llm-field-controls">
+                                    <select id="user-llm-runpod-workers" class="modal-input user-llm-field-input" style="width:100%;box-sizing:border-box;">
                                         <option value="0">Server default</option>
                                         <option value="1">1 worker</option>
                                         <option value="2">2 workers</option>
@@ -1005,17 +951,16 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="user-llm-field-col user-llm-field-col--actions">
-                                <div class="user-llm-field-controls user-llm-field-controls--action-only">
-                                    <button type="button" class="modal-btn modal-btn-secondary user-llm-clear-btn" id="user-llm-clear-runpod" aria-label="Clear RunPod overrides">Clear RunPod</button>
-                                </div>
-                            </div>
                         </div>
                         <div class="setting-group user-llm-provider-row user-llm-provider-row--elevenlabs">
                             <div class="user-llm-field-col user-llm-field-col--span-2">
                                 <label for="user-llm-elevenlabs-key" class="user-llm-field-label-with-info"><span class="user-llm-field-label-lead">ElevenLabs API key</span><button type="button" class="user-llm-field-info-btn" id="user-llm-info-elevenlabs-key" aria-label="Information about ElevenLabs API key"><i class="fas fa-info-circle" aria-hidden="true"></i></button><span class="user-llm-label-hint">(speech / voice)</span><span id="user-llm-elevenlabs-key-hint" class="user-llm-field-hint-after-info" style="color:var(--color-text-muted);font-weight:normal;"></span></label>
-                                <div class="user-llm-field-controls">
-                                    <input type="password" id="user-llm-elevenlabs-key" class="modal-input user-llm-field-input" autocomplete="off">
+                                <div class="user-llm-field-controls user-llm-key-field-controls">
+                                    <div class="user-llm-key-input-wrap">
+                                        <input type="password" id="user-llm-elevenlabs-key" class="modal-input user-llm-field-input" autocomplete="off">
+                                        <button type="button" class="user-llm-key-toggle-btn" id="user-llm-toggle-elevenlabs-key" tabindex="-1" aria-label="Show ElevenLabs API key" aria-pressed="false"><i class="fas fa-eye" aria-hidden="true"></i></button>
+                                    </div>
+                                    <span class="user-llm-key-status-icon" id="user-llm-elevenlabs-key-status" role="img" aria-label="API key status"></span>
                                 </div>
                             </div>
                             <div class="user-llm-field-col user-llm-field-col--actions">
@@ -1109,64 +1054,103 @@
                                 </div>
                             </div>
                             <p class="local-ai-setup-footer-hint">
-                                Prefer more capable cloud AI? Add a Claude, Gemini, or DeepSeek API key in <strong>API Keys</strong>.
+                                Prefer more capable cloud AI? Add an OpenRouter API key in <strong>API Keys</strong> and manage available models in <strong>AI Models</strong>.
                             </p>
                         </div>
                     </section>
                 </div>
-                <div class="config-tab-content" id="hosted-llm-order-tab">
+                <div class="config-tab-content" id="ai-models-config-tab">
                     <section class="section-config">
-                        <h1>Hosted LLM Order</h1>
-                        <p class="config-tab-lead" style="max-width: none;">
-                            Choose the order in which cloud providers (Gemini, Claude, DeepSeek, ChatGPT) are tried when Auto routes to a hosted model or when the selected provider returns an error.
+                        <h1>AI Models</h1>
+                        <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body);">
+                            Manage the AI models available throughout the app (chat, Have-a-Chat, Interviews, Quiz, and Auto routing). Each hosted model is routed through OpenRouter using the model slug you provide — see <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a> for available slugs. Local AI is always listed below (it needs no slug) and can be enabled/disabled and reordered like any hosted model — its position here also sets where it's tried during Auto routing and error failover. Pick the <strong>Classifier</strong> radio button for the model that decides, when Auto routing is selected, whether a request needs a hosted model or can be handled locally. Changes take effect immediately, without a restart.
                         </p>
                     </section>
                     <section class="config-section">
-                        <h3>Request Classification</h3>
-                        <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
-                            When Auto is selected as the AI Provider, this provider classifies each request to deterimie if it can be handled by the Local AI or wheter it needs to be routed to the on of the hosted systems.
-                            It also determines whether user profile and context information is required to answer the request. This optimises cost saving by avoiding unnecessary use of the hosted systems.
-                            If the chosen provider is unavailable, Local AI is used as a fallback when possible.
-                        </p>
-                        <div class="setting-group hosted-llm-classifier-row">
-                            <label for="hosted-llm-classifier-provider">Classifier AI Provider:</label>
-                            <select id="hosted-llm-classifier-provider" class="form-control" aria-describedby="hosted-llm-classifier-provider-hint" style="width:200px;">
-                                <option value="localai">Local AI</option>
-                                <option value="gemini">Gemini</option>
-                                <option value="claude">Claude</option>
-                                <option value="deepseek">DeepSeek</option>
-                                <option value="openai">ChatGPT</option>
-                            </select>
+                        <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; justify-content:space-between; margin-bottom: 0.75rem;">
+                            <h3 style="margin:0;">Models</h3>
+                            <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+                                <button type="button" class="modal-btn modal-btn-primary" id="ai-models-config-add-btn"><i class="fas fa-plus" aria-hidden="true"></i> Add model</button>
+                            </div>
                         </div>
+                        <div id="ai-models-config-loading" style="padding: 1rem; color: var(--color-text-muted);">Loading AI models…</div>
+                        <div id="ai-models-config-table-wrap" style="display:none;">
+                            <table class="manage-contacts-data-table contacts-table ai-models-config-table" style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Key</th>
+                                        <th>Display name</th>
+                                        <th>OpenRouter model slug</th>
+                                        <th style="text-align:center;">Enabled</th>
+                                        <th style="text-align:center;">Classifier</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ai-models-config-tbody"></tbody>
+                            </table>
+                            <p id="ai-models-config-empty" style="display:none; margin-top:0.75rem; color:var(--color-text-muted);">No hosted AI models added yet — Local AI is still available above. Click <strong>Add model</strong> to browse the catalog.</p>
+                        </div>
+                        <p id="ai-models-config-status" role="status" aria-live="polite" style="margin-top:0.75rem; min-height:1.35em; font-size:var(--text-md);"></p>
                     </section>
-                    <div class="hosted-llm-order-panels-row">
-                    <section class="config-section hosted-llm-order-panel">
-                        <h3>Auto Routing Order of Hosted Providers</h3>
-                        <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
-                            After your last manually selected hosted provider (if available), try the providers below in this order.
-                        </p>
-                        <ol id="hosted-llm-auto-order-list" class="hosted-llm-order-list" aria-label="Auto routing provider order"></ol>
-                    </section>
-                    <section class="config-section hosted-llm-order-panel">
-                        <h3>Error Failover Order of Hosted Providers</h3>
-                        <p class="config-tab-lead" style="max-width: none; margin-top: 0;">
-                            When the selected hosted provider fails, try the remaining providers in this order.
+                    <section class="config-section">
+                        <h3 style="margin:0 0 0.5rem 0;">Error Failover</h3>
+                        <p class="config-tab-lead" style="max-width: none; margin: 0 0 0.75rem 0;">
+                            When a hosted request fails — and when Auto routes to a hosted model — the remaining enabled models above are tried in the order shown until one succeeds.
                         </p>
                         <div class="setting-group">
-                            <label for="hosted-llm-failover-enabled-checkbox" title="When unchecked, a hosted provider error is shown instead of trying other providers">
-                                <input type="checkbox" id="hosted-llm-failover-enabled-checkbox" checked>
+                            <label for="ai-models-config-failover-enabled-checkbox" title="When unchecked, a hosted provider error is shown instead of trying other providers">
+                                <input type="checkbox" id="ai-models-config-failover-enabled-checkbox" checked>
                                 Enable error failover
                             </label>
                         </div>
-                        <ol id="hosted-llm-failover-order-list" class="hosted-llm-order-list" aria-label="Failover provider order"></ol>
                     </section>
-                    </div>
+                </div>
+                <div class="config-tab-content" id="model-catalog-tab">
+                    <section class="section-config">
+                        <h1>Model Catalog</h1>
+                        <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body);">
+                            Browse every model OpenRouter can route to. Search or filter below, click a row (or <strong>Details</strong>) for the full spec, then click <strong>Use</strong> to add it to your <strong>AI Models</strong> list.
+                        </p>
+                    </section>
                     <section class="config-section">
-                        <div class="setting-group" style="margin-top: 0;">
-                            <button type="button" id="hosted-llm-order-save-btn" class="modal-btn modal-btn-primary">Save</button>
-                            <button type="button" id="hosted-llm-order-reset-btn" class="modal-btn modal-btn-secondary" style="margin-left: 0.5rem;">Reset to default</button>
-                            <span id="hosted-llm-order-status" class="config-tab-lead" style="margin-left: 1rem; color: var(--color-text-muted);"></span>
+                        <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; margin-bottom: 0.75rem;">
+                            <input type="text" id="model-catalog-search" class="form-control" placeholder="Search by name, id, or description…" style="flex:1; min-width:220px;">
+                            <select id="model-catalog-modality-filter" class="form-control" style="max-width:180px;">
+                                <option value="">All modalities</option>
+                                <option value="text">Text only</option>
+                                <option value="image">Accepts images</option>
+                                <option value="file">Accepts files</option>
+                            </select>
+                            <label for="model-catalog-free-only" style="display:flex; align-items:center; gap:0.35rem; white-space:nowrap;">
+                                <input type="checkbox" id="model-catalog-free-only"> Free only
+                            </label>
+                            <select id="model-catalog-sort" class="form-control" style="max-width:220px;">
+                                <option value="name">Sort: Name (A-Z)</option>
+                                <option value="context-desc">Sort: Context length (high-low)</option>
+                                <option value="price-asc">Sort: Price (low-high)</option>
+                                <option value="price-desc">Sort: Price (high-low)</option>
+                            </select>
+                            <button type="button" class="modal-btn modal-btn-secondary" id="model-catalog-refresh-btn"><i class="fas fa-sync-alt" aria-hidden="true"></i> Refresh</button>
                         </div>
+                        <div id="model-catalog-loading" style="padding: 1rem; color: var(--color-text-muted);">Loading OpenRouter model catalog…</div>
+                        <div id="model-catalog-table-wrap" style="display:none;">
+                            <p id="model-catalog-count" style="margin: 0 0 0.5rem 0; color: var(--color-text-muted); font-size: var(--text-sm);"></p>
+                            <div style="max-height: 480px; overflow-y:auto; overflow-x:auto;">
+                                <table class="manage-contacts-data-table contacts-table" style="width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Prompt / Completion (per 1M tokens)</th>
+                                            <th>Context length</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="model-catalog-tbody"></tbody>
+                                </table>
+                            </div>
+                            <p id="model-catalog-empty" style="display:none; margin-top:0.75rem; color:var(--color-text-muted);">No models match your search/filter.</p>
+                        </div>
+                        <p id="model-catalog-status" role="status" aria-live="polite" style="margin-top:0.75rem; min-height:1.35em; font-size:var(--text-md);"></p>
                     </section>
                 </div>
                 <div class="config-tab-content" id="regions-config-tab">
@@ -2805,7 +2789,8 @@
                         </div>
                         <div id="previous-responses-detail-meta" style="padding: 8px 1rem; font-size: var(--text-sm); color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); margin: 0 1rem;"></div>
                         <div id="previous-responses-detail-content" style="flex: 1; overflow-y: auto; padding: 1rem; background: var(--color-bg-base); border-radius: 4px; margin: 0 1rem 1rem; line-height: 1.6;"></div>
-                        <div style="padding: 0 1rem 1rem;">
+                        <div style="padding: 0 1rem 1rem; display: flex; gap: 10px;">
+                            <button id="previous-responses-download-pdf-btn" class="modal-btn modal-btn-secondary"><i class="fas fa-file-pdf" aria-hidden="true"></i> Download PDF</button>
                             <button id="previous-responses-delete-btn" class="modal-btn modal-btn-danger">Delete</button>
                         </div>
                     </div>
@@ -4138,6 +4123,58 @@
         </div>
 
         <!-- Regions config edit modal -->
+        <div id="ai-models-config-edit-modal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 520px; padding: 0;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-robot"></i> <span id="ai-models-config-edit-title">Add AI Model</span></h2>
+                    <button type="button" class="modal-close-btn" id="ai-models-config-edit-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="ai-models-config-edit-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
+                    <div class="setting-group">
+                        <label for="ai-models-config-edit-key" class="artefact-field-label">Key</label>
+                        <input type="text" id="ai-models-config-edit-key" class="form-control" placeholder="e.g. mistral">
+                        <span style="color:var(--color-text-muted); font-size:var(--text-sm);">Lowercase identifier used internally and in provider selects. Cannot be changed after creation.</span>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ai-models-config-edit-display-name" class="artefact-field-label">Display name</label>
+                        <input type="text" id="ai-models-config-edit-display-name" class="form-control" placeholder="e.g. Mistral Large">
+                    </div>
+                    <div class="setting-group">
+                        <label for="ai-models-config-edit-model-slug" class="artefact-field-label">OpenRouter model slug</label>
+                        <input type="text" id="ai-models-config-edit-model-slug" class="form-control" placeholder="e.g. mistralai/mistral-large">
+                    </div>
+                    <div class="setting-group">
+                        <label for="ai-models-config-edit-enabled">
+                            <input type="checkbox" id="ai-models-config-edit-enabled" checked>
+                            Enabled (selectable throughout the app)
+                        </label>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
+                        <button type="button" id="ai-models-config-edit-cancel" class="modal-btn modal-btn-secondary">Cancel</button>
+                        <button type="button" id="ai-models-config-edit-save" class="modal-btn modal-btn-primary">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Catalog detail modal -->
+        <div id="model-catalog-detail-modal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 620px; padding: 0;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-info-circle"></i> <span id="model-catalog-detail-title">Model details</span></h2>
+                    <button type="button" class="modal-close-btn" id="model-catalog-detail-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="model-catalog-detail-body" style="max-height:55vh; overflow-y:auto; font-size:var(--text-md); line-height:var(--line-height-body);"></div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
+                        <button type="button" id="model-catalog-detail-close-btn" class="modal-btn modal-btn-secondary">Close</button>
+                        <button type="button" id="model-catalog-detail-use-btn" class="modal-btn modal-btn-primary"><i class="fas fa-plus" aria-hidden="true"></i> Use this model</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="regions-config-edit-modal" class="modal" style="display: none;">
             <div class="modal-content" style="max-width: 520px; padding: 0;">
                 <div class="modal-header">
@@ -4766,6 +4803,7 @@
 
     <script>window.DM_REGION_CONFIG = {{ regions_config_json }};</script>
     <script src="/static/js/museum/foundation.js" defer></script>
+    <script src="/static/js/museum/ai-models.js" defer></script>
     <script src="/static/js/museum/app-dialogs.js" defer></script>
     <script src="/static/js/museum/chat.js" defer></script>
     <script src="/static/js/museum/modals-core.js" defer></script>
@@ -4781,6 +4819,8 @@
     <script src="/static/js/museum/modals-regions.js" defer></script>
     <script src="/static/js/museum/modals-suggestions-config.js" defer></script>
     <script src="/static/js/museum/modals-guide-topics-config.js" defer></script>
+    <script src="/static/js/museum/modals-ai-models-config.js" defer></script>
+    <script src="/static/js/museum/model-catalog.js" defer></script>
     <script src="/static/js/museum/modals-filedupe.js" defer></script>
     <script src="/static/js/museum/modals-tool-test.js" defer></script>
     <script src="/static/js/museum/identity-profile-wizard.js" defer></script>
@@ -5149,7 +5189,7 @@
                 </fieldset>
                 <fieldset style="margin: 0 0 1rem 0; padding: 0.5rem 0.75rem; border: 1px solid #dee2e6; border-radius: 4px;">
                     <legend style="font-size: var(--text-caption); color: #555;">AI (LLM) for this visitor</legend>
-                    <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-trusted-key-llm-allow-owner-keys" checked/> Use archive owner&rsquo;s saved API keys (Gemini / Claude / Tavily)</label>
+                    <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-trusted-key-llm-allow-owner-keys" checked/> Use archive owner&rsquo;s saved API keys (OpenRouter / Tavily)</label>
                     <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-trusted-key-llm-allow-server-keys" checked/> Use server default keys when the owner allows that in account settings</label>
                 </fieldset>
                 <div id="create-trusted-key-error" style="color: #dc3545; margin-bottom: 0.5rem; display: none;"></div>
@@ -5217,7 +5257,7 @@
                 </fieldset>
                 <fieldset style="margin: 0 0 1rem 0; padding: 0.5rem 0.75rem; border: 1px solid #dee2e6; border-radius: 4px;">
                     <legend style="font-size: var(--text-caption); color: #555;">AI (LLM) for this visitor</legend>
-                    <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-llm-allow-owner-keys" checked/> Use archive owner&rsquo;s saved API keys (Gemini / Claude / Tavily)</label>
+                    <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-llm-allow-owner-keys" checked/> Use archive owner&rsquo;s saved API keys (OpenRouter / Tavily)</label>
                     <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="add-doc-key-llm-allow-server-keys" checked/> Use server default keys when the owner is allowed to use them</label>
                 </fieldset>
                 <div id="add-doc-key-error" style="color: #dc3545; margin-bottom: 0.5rem; display: none;"></div>
@@ -5277,7 +5317,7 @@
                     </fieldset>
                     <fieldset style="flex: 1 1 220px; margin: 0; min-width: 0; padding: 0.5rem 0.75rem; border: 1px solid #dee2e6; border-radius: 4px;">
                         <legend style="font-size: var(--text-caption); color: #555;">AI (LLM) for this visitor</legend>
-                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-llm-allow-owner-keys"/> Use archive owner&rsquo;s saved API keys (Gemini / Claude / Tavily)</label>
+                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-llm-allow-owner-keys"/> Use archive owner&rsquo;s saved API keys (OpenRouter / Tavily)</label>
                         <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="edit-visitor-key-llm-allow-server-keys"/> Use server default keys when the owner is allowed to use them</label>
                     </fieldset>
                 </div>
@@ -5334,7 +5374,7 @@
                     </fieldset>
                     <fieldset class="visitor-key-create-access-fieldset">
                         <legend style="font-size: var(--text-caption); color: #555;">AI (LLM) for this visitor</legend>
-                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-llm-allow-owner-keys" checked/> Use archive owner&rsquo;s saved API keys (Gemini / Claude / Tavily)</label>
+                        <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-llm-allow-owner-keys" checked/> Use archive owner&rsquo;s saved API keys (OpenRouter / Tavily)</label>
                         <label style="display:block; margin: 0.2rem 0; font-size: var(--text-md);"><input type="checkbox" id="create-visitor-key-llm-allow-server-keys" checked/> Use server default keys when the owner allows that in account settings</label>
                     </fieldset>
                 </div>
@@ -5585,6 +5625,11 @@
             </div>
             </div>
             <div class="info-box-archive-overview" aria-label="Archive overview" style="padding:10px;">
+                <div id="welcome-openrouter-key-warning" class="welcome-openrouter-warning" role="alert" style="display:none;">
+                    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                    <span>No OpenRouter API key is configured yet — cloud AI (chat, Have-a-Chat, web search, etc.) won&rsquo;t work until you add one. Local AI still works without a key.</span>
+                    <button type="button" id="welcome-openrouter-key-warning-btn" class="modal-btn modal-btn-primary">Add API key</button>
+                </div>
                 <section class="info-box-onboarding-controls" aria-label="Getting started controls">
                     <div class="info-box-onboarding-actions">
                         <button type="button" id="welcome-identity-profile-btn" class="modal-btn modal-btn-primary">
@@ -5618,36 +5663,8 @@
         <h3 id="archive-overview-llm-modal-title" style="margin:0 0 10px 0;font-size:var(--text-heading-lg);color:var(--color-text);">Add API keys</h3>
         <p id="archive-overview-llm-modal-intro" style="margin:0 0 16px 0;font-size:var(--text-md);color:var(--color-text-muted);line-height:1.45;"></p>
         <div class="setting-group" style="margin-bottom:12px;">
-            <label for="overview-llm-gemini-key">Gemini API key</label>
-            <input type="password" id="overview-llm-gemini-key" class="modal-input" style="width:100%;box-sizing:border-box;" autocomplete="off">
-        </div>
-        <div class="setting-group" style="margin-bottom:12px;">
-            <label for="overview-llm-gemini-model">Gemini model <span style="color:#94a3b8;font-weight:normal;">(optional)</span></label>
-            <input type="text" id="overview-llm-gemini-model" class="modal-input" style="width:100%;box-sizing:border-box;" placeholder="e.g. gemini-2.5-flash">
-        </div>
-        <div class="setting-group" style="margin-bottom:12px;">
-            <label for="overview-llm-anthropic-key">Anthropic API key</label>
-            <input type="password" id="overview-llm-anthropic-key" class="modal-input" style="width:100%;box-sizing:border-box;" autocomplete="off">
-        </div>
-        <div class="setting-group" style="margin-bottom:12px;">
-            <label for="overview-llm-claude-model">Claude model <span style="color:#94a3b8;font-weight:normal;">(optional)</span></label>
-            <input type="text" id="overview-llm-claude-model" class="modal-input" style="width:100%;box-sizing:border-box;" placeholder="e.g. claude-sonnet-4-6">
-        </div>
-        <div class="setting-group" style="margin-bottom:12px;">
-            <label for="overview-llm-deepseek-key">DeepSeek API key</label>
-            <input type="password" id="overview-llm-deepseek-key" class="modal-input" style="width:100%;box-sizing:border-box;" autocomplete="off">
-        </div>
-        <div class="setting-group" style="margin-bottom:12px;">
-            <label for="overview-llm-deepseek-model">DeepSeek model <span style="color:#94a3b8;font-weight:normal;">(optional)</span></label>
-            <input type="text" id="overview-llm-deepseek-model" class="modal-input" style="width:100%;box-sizing:border-box;" placeholder="e.g. deepseek-chat">
-        </div>
-        <div class="setting-group" style="margin-bottom:12px;">
-            <label for="overview-llm-openai-key">OpenAI API key</label>
-            <input type="password" id="overview-llm-openai-key" class="modal-input" style="width:100%;box-sizing:border-box;" autocomplete="off">
-        </div>
-        <div class="setting-group" style="margin-bottom:12px;">
-            <label for="overview-llm-openai-model">ChatGPT model <span style="color:#94a3b8;font-weight:normal;">(optional)</span></label>
-            <input type="text" id="overview-llm-openai-model" class="modal-input" style="width:100%;box-sizing:border-box;" placeholder="e.g. gpt-4.1-mini">
+            <label for="overview-llm-openrouter-key">OpenRouter API key</label>
+            <input type="password" id="overview-llm-openrouter-key" class="modal-input" style="width:100%;box-sizing:border-box;" autocomplete="off">
         </div>
         <div class="setting-group" style="margin-bottom:12px;">
             <label for="overview-llm-tavily-key">Tavily API key <span style="color:#94a3b8;font-weight:normal;">(optional, web search)</span></label>
@@ -5665,6 +5682,23 @@
             <button type="button" id="archive-overview-llm-save-btn" class="modal-btn modal-btn-primary">Save</button>
             <button type="button" id="archive-overview-llm-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
             <span id="archive-overview-llm-save-status" style="font-size:var(--text-md);color:var(--color-text-muted);"></span>
+        </div>
+    </div>
+</div>
+
+<!-- API key required warning — shown when an action needs a hosted AI provider before one is configured -->
+<div id="api-key-required-modal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 460px; padding: 0;">
+        <div class="modal-header">
+            <h2><i class="fas fa-triangle-exclamation" style="color: var(--color-danger);"></i> API Key Required</h2>
+            <button type="button" class="modal-close-btn" id="api-key-required-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="api-key-required-modal-message" style="margin:0 0 1rem 0; color: var(--color-text); font-size: var(--text-md); line-height: var(--line-height-body);"></p>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" id="api-key-required-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
+                <button type="button" id="api-key-required-goto-btn" class="modal-btn modal-btn-primary"><i class="fas fa-key" aria-hidden="true"></i> Go to Configuration</button>
+            </div>
         </div>
     </div>
 </div>

@@ -42,9 +42,15 @@ func (s *ChatService) LocalAIInfrastructureAvailable(ctx context.Context) bool {
 	return probe.BaseURLConfigured && probe.ServerReachable && probe.ChatModelAvailable
 }
 
-// localAIProviderForChat returns the Local AI provider when infrastructure is up and use is enabled.
+// localAIProviderForChat returns the Local AI provider when infrastructure is up, per-archive
+// use is enabled (LocalAIUseEnabled), and its ai_models row isn't disabled (LocalAIRowEnabled —
+// the Enabled checkbox on the AI Models tab). This is the single choke point every consumer of
+// Local AI goes through, so disabling either gate takes effect everywhere immediately.
 func (s *ChatService) localAIProviderForChat(ctx context.Context) appai.ChatProvider {
 	if !s.LocalAIUseEnabled(ctx) {
+		return nil
+	}
+	if s.aiModelsSvc != nil && !s.aiModelsSvc.LocalAIRowEnabled(ctx) {
 		return nil
 	}
 	p := s.effectiveLocalAIProvider()

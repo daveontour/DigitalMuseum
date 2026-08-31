@@ -1895,6 +1895,26 @@ body {
     border-radius: 8px;
     background: var(--color-bg-surface);
 }
+.welcome-openrouter-warning {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 12px 0;
+    padding: 10px 14px;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    background: #fee2e2;
+    color: #991b1b;
+    font-size: var(--text-md);
+}
+.welcome-openrouter-warning i {
+    flex: 0 0 auto;
+}
+.welcome-openrouter-warning span {
+    flex: 1 1 auto;
+    min-width: 200px;
+}
 .info-box-onboarding-actions {
     display: flex;
     gap: 8px;
@@ -5264,6 +5284,25 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     background-color: var(--color-bg-hover);
 }
 
+/* Configuration → AI Models table — per-key row tint (set via --ai-model-row-bg on each tr) */
+#config-modal-overlay #ai-models-config-table-wrap table.ai-models-config-table tbody tr.ai-models-config-row {
+    background-color: var(--ai-model-row-bg, var(--color-bg-elevated));
+}
+#config-modal-overlay #ai-models-config-table-wrap table.ai-models-config-table tbody tr.ai-models-config-row:hover {
+    background-color: color-mix(in srgb, var(--ai-model-row-bg, var(--color-bg-elevated)) 82%, var(--color-text)) !important;
+}
+#config-modal-overlay #ai-models-config-table-wrap table.ai-models-config-table tbody tr.ai-models-config-row td code {
+    color: var(--color-text);
+}
+/* Local AI — always-present pinned row, not an ai_models DB entry */
+#config-modal-overlay #ai-models-config-table-wrap table.ai-models-config-table tbody tr.ai-models-config-row--local {
+    background-color: var(--color-bg-elevated);
+    border-bottom: 2px solid var(--color-border);
+}
+#config-modal-overlay #ai-models-config-table-wrap table.ai-models-config-table tbody tr.ai-models-config-row--local td:nth-child(2) {
+    font-weight: 600;
+}
+
 /* Import control tiles (Messages and Images tabs) */
 .import-control-tile {
     padding: 18px;
@@ -5378,6 +5417,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     --user-llm-actions-col: 12.5rem;
     --user-llm-field-bg-ok: #d1fae5;
     --user-llm-field-bg-warn: #fef3c7;
+    --user-llm-field-bg-danger: #fee2e2;
 }
 #user-llm-settings-section .user-llm-provider-row {
     display: grid;
@@ -5386,20 +5426,37 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     row-gap: 0.35rem;
     align-items: stretch;
     margin-bottom: 1.1rem;
+    max-width: 60rem;;
 }
-#user-llm-settings-section .user-llm-provider-row--tavily .user-llm-field-col--span-2,
-#user-llm-settings-section .user-llm-provider-row--runpod .user-llm-field-col--span-2,
-#user-llm-settings-section .user-llm-provider-row--elevenlabs .user-llm-field-col--span-2 {
+#user-llm-settings-section .user-llm-field-col--span-2 {
     grid-column: 1 / span 2;
     min-width: 0;
+}
+#user-llm-settings-section .user-llm-field-col--actions {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 0;
+}
+#user-llm-settings-section .user-llm-runpod-key-col {
+    grid-column: 1 / span 2;
+    grid-row: 1;
+}
+#user-llm-settings-section .user-llm-runpod-actions-col {
+    grid-column: 3;
+    grid-row: 1;
+}
+#user-llm-settings-section .user-llm-runpod-endpoint-col {
+    grid-column: 1;
+    grid-row: 2;
+}
+#user-llm-settings-section .user-llm-runpod-workers-col {
+    grid-column: 2;
+    grid-row: 2;
 }
 #user-llm-settings-section .user-llm-field-col {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    min-width: 0;
-}
-#user-llm-settings-section .user-llm-field-col--actions {
     min-width: 0;
 }
 #user-llm-settings-section .user-llm-field-row label,
@@ -5553,6 +5610,60 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     caret-color: var(--color-text);
     transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
+#user-llm-settings-section .user-llm-key-input-wrap {
+    position: relative;
+    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+#user-llm-settings-section .user-llm-key-field-controls {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+}
+#user-llm-settings-section .user-llm-key-status-icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 2.2rem;
+    font-size: var(--text-lg);
+    line-height: 1;
+}
+#user-llm-settings-section .user-llm-key-status-icon--ok {
+    color: #15803d;
+}
+#user-llm-settings-section .user-llm-key-status-icon--warn {
+    color: var(--color-warning);
+}
+#user-llm-settings-section .user-llm-key-status-icon--danger {
+    color: var(--color-danger, #dc2626);
+}
+#user-llm-settings-section .user-llm-key-input-wrap .user-llm-field-input {
+    padding-right: 2.2rem;
+}
+#user-llm-settings-section .user-llm-key-toggle-btn {
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+}
+#user-llm-settings-section .user-llm-key-toggle-btn:hover,
+#user-llm-settings-section .user-llm-key-toggle-btn:focus-visible {
+    color: var(--color-text);
+    background: var(--color-bg-hover);
+}
 #user-llm-settings-section .user-llm-field-input.user-llm-field-input--state-ok {
     background-color: var(--user-llm-field-bg-ok);
     color: #14532d;
@@ -5562,6 +5673,11 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     background-color: var(--user-llm-field-bg-warn);
     color: #92400e;
     caret-color: #92400e;
+}
+#user-llm-settings-section .user-llm-field-input.user-llm-field-input--state-danger {
+    background-color: var(--user-llm-field-bg-danger);
+    color: #991b1b;
+    caret-color: #991b1b;
 }
 #user-llm-settings-section .user-llm-field-input:focus {
     outline: none;
@@ -5578,6 +5694,11 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     color: #92400e;
     caret-color: #92400e;
 }
+#user-llm-settings-section .user-llm-field-input.user-llm-field-input--state-danger:focus {
+    background-color: var(--user-llm-field-bg-danger);
+    color: #991b1b;
+    caret-color: #991b1b;
+}
 #user-llm-settings-section .user-llm-clear-btn {
     width: 100%;
     min-height: 2.2rem;
@@ -5592,10 +5713,14 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     #user-llm-settings-section .user-llm-provider-row {
         grid-template-columns: 1fr;
     }
-    #user-llm-settings-section .user-llm-provider-row--tavily .user-llm-field-col--span-2,
-    #user-llm-settings-section .user-llm-provider-row--runpod .user-llm-field-col--span-2,
-    #user-llm-settings-section .user-llm-provider-row--elevenlabs .user-llm-field-col--span-2 {
+    #user-llm-settings-section .user-llm-field-col--span-2,
+    #user-llm-settings-section .user-llm-runpod-key-col,
+    #user-llm-settings-section .user-llm-runpod-endpoint-col,
+    #user-llm-settings-section .user-llm-runpod-workers-col,
+    #user-llm-settings-section .user-llm-field-col--actions,
+    #user-llm-settings-section .user-llm-runpod-actions-col {
         grid-column: 1;
+        grid-row: auto;
     }
     #user-llm-settings-section .user-llm-field-col--actions .user-llm-field-controls--action-only {
         margin-top: 0;
@@ -10719,78 +10844,6 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 .chat-auto-routing-reason-actions {
     display: flex;
     justify-content: flex-end;
-}
-
-.hosted-llm-order-panels-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2rem;
-    align-items: flex-start;
-}
-
-.hosted-llm-classifier-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem 1rem;
-}
-
-.hosted-llm-classifier-row label {
-    display: inline;
-    margin-bottom: 0;
-    white-space: nowrap;
-}
-
-.hosted-llm-classifier-row select {
-    width: 120px;
-    flex: 1 1 12rem;
-}
-
-.hosted-llm-order-panels-row .hosted-llm-order-panel {
-    flex: 1 1 280px;
-    min-width: 0;
-    margin-bottom: 0;
-}
-
-.hosted-llm-order-panels-row .hosted-llm-order-list {
-    max-width: none;
-    width: 100%;
-}
-
-.hosted-llm-order-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    max-width: 28rem;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.hosted-llm-order-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    background: var(--color-bg-alt, rgba(255, 255, 255, 0.04));
-    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
-    border-radius: var(--radius-md, 8px);
-}
-
-.hosted-llm-order-rank {
-    min-width: 1.5rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
-}
-
-.hosted-llm-order-label {
-    flex: 1;
-    font-size: var(--text-md);
-}
-
-.hosted-llm-order-move-btn {
-    padding: 4px 8px;
-    min-width: 2rem;
 }
 
 /* Interview messages — centered layout distinct from normal chat */

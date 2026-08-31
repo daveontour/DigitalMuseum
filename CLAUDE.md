@@ -5,9 +5,11 @@
 Digital Museum is an AI-powered digital archive platform packaged as an
 **Electron desktop app**. Each registered user owns one archive containing their entire
 digital life (emails, messages, photos, Facebook, iMessage, WhatsApp, documents),
-imported into a SQLite database and queryable through an AI chat interface. Claude,
-Gemini, and a local Ollama/Gemma4 model can access the data via a tool-calling layer
-and answer questions, adopt personas, and explore the archive conversationally.
+imported into a SQLite database and queryable through an AI chat interface. Any
+admin-configured AI model (routed through OpenRouter — Claude, Gemini, DeepSeek, or any
+other OpenRouter-supported model) and a local Ollama/Gemma4 model can access the data
+via a tool-calling layer and answer questions, adopt personas, and explore the archive
+conversationally.
 
 Additional features beyond the core chat interface include:
 - **Have-a-Chat** — two-voice conversation sessions (two AI personas talking to each other)
@@ -22,7 +24,7 @@ Additional features beyond the core chat interface include:
 - **Backend:** Go 1.25, Chi v5 router, `database/sql` with `github.com/mattn/go-sqlite3` (CGO)
 - **Frontend:** Vanilla JavaScript (no framework), marked.js, highlight.js, Font Awesome
 - **Database:** SQLite (two files — main app DB and billing DB); vector fields use `sqlite-vec`
-- **AI Providers:** Anthropic Claude (`claude-sonnet-4-6`), Google Gemini (`gemini-2.5-flash`), DeepSeek (`deepseek-chat`) via Anthropic-compatible API, OpenAI ChatGPT (`gpt-4.1-mini`) via Chat Completions API, and local Ollama (`gemma4`) via native Ollama API
+- **AI Providers:** A single OpenRouter adapter (`internal/ai/openrouter.go`) backs every admin-configured AI model (managed in Configuration → AI Models, seeded by default with Claude, Gemini, DeepSeek, and ChatGPT presets — any OpenRouter-supported model can be added), plus local Ollama (`gemma4`) via native Ollama API for fully offline use and embeddings
 - **Module:** `github.com/daveontour/aimuseum`
 
 ## Project Layout
@@ -89,27 +91,23 @@ The server reads `.env` from the working directory (set by Electron to the proje
 in dev mode, or the install root in packaged mode). User-editable settings live in
 `%APPDATA%\Digital Museum\.env` and are layered on top.
 
+**OpenRouter, Tavily, and RunPod API keys are NOT read from `.env`.** They are configured
+only from Configuration → API Keys in the running app (archive owner's saved key, stored in
+the `users` table — see `internal/repository/user_llm.go`), with no server-wide fallback.
+(ElevenLabs still supports an optional env-configured default via `ELEVENLABS_API_KEY`.)
+
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `SQLITE_PATH` | Yes | Absolute path to the main SQLite database file |
 | `ADMIN_SQLITE_PATH` | No | Billing/admin SQLite file; default `<exeDir>/data/admin.sqlite`. Optional override: absolute as-is, relative resolved against exe dir |
 | `HOST_PORT` | No | HTTP listen port (default: 8000; Electron overrides to 8081) |
 | `PAGE_TITLE` | No | Browser page title (default: `Digital Museum of SUBJECT_NAME`) |
-| `ANTHROPIC_API_KEY` | At least one AI key | Claude API |
-| `CLAUDE_MODEL_NAME` | No | Default: `claude-sonnet-4-6` |
-| `DEEPSEEK_API_KEY` | No | DeepSeek API key (Anthropic-compatible Messages API at `api.deepseek.com/anthropic`) |
-| `DEEPSEEK_MODEL_NAME` | No | Default: `deepseek-chat` |
-| `OPENAI_API_KEY` | No | OpenAI API key (Chat Completions API at `api.openai.com`) |
-| `OPENAI_MODEL_NAME` | No | Default: `gpt-4.1-mini` |
-| `GEMINI_API_KEY` | At least one AI key | Gemini API |
-| `GEMINI_MODEL_NAME` | No | Default: `gemini-2.5-flash` |
 | `LOCALAI_BASE_URL` | No | Ollama chat base URL, e.g. `http://localhost:11434` |
 | `LOCALAI_EMBEDDING_BASE_URL` | No | Ollama embedding base URL (default `http://127.0.0.1:11435`); separate daemon from chat |
 | `LOCALAI_MODEL_NAME` | No | Default: `local-model` (use `gemma4` for Ollama) |
 | `LOCALAI_API_KEY` | No | Not required by Ollama; kept for compatibility |
 | `LOCALAI_EMBEDDING_MODEL` | No | Falls back to `LOCALAI_MODEL_NAME` if empty |
 | `LOCALAI_NUM_CTX` | No | Per-request `num_ctx` sent to Ollama under `options`. Empty / 0 / non-positive omits the field so Ollama uses its server-side default (set via `OLLAMA_NUM_CTX` when Electron starts the daemon). |
-| `TAVILY_API_KEY` | No | Enables `search_tavily` web-search tool |
 | `GMAIL_CLIENT_ID` | No | Google OAuth 2.0 Desktop App client ID |
 | `GMAIL_CLIENT_SECRET` | No | Google OAuth 2.0 client secret |
 | `GMAIL_REDIRECT_URL` | No | Set automatically by Electron at startup |
@@ -131,6 +129,7 @@ in dev mode, or the install root in packaged mode). User-editable settings live 
 | `ATTACHMENT_MIN_SIZE` | No | Minimum attachment size in bytes (default: 0) |
 | `FILESYSTEM_IMPORT_EXCLUDE_PATTERNS` | No | Comma-separated glob patterns to skip during filesystem import |
 | `GUIDE_TOPICS_CONFIG_PATH` | No | Override path to the guide topics seed JSON (default: `ASSET_STATIC_DIR/data/guide_topics.json`) |
+| `AI_MODELS_CONFIG_PATH` | No | Override path to the AI models seed JSON (default: `ASSET_STATIC_DIR/data/ai_models.json`) |
 | `GUIDE_TOPICS_RELOAD_FROM_FILE_ON_STARTUP` | No | Set `true` to delete all `guide_topics` rows on server startup and reload from the seed JSON file (default: insert-if-missing only) |
 | `SUGGESTIONS_CONFIG_PATH` | No | Override path to the suggestions seed JSON (default: `ASSET_STATIC_DIR/data/suggestions.json`) |
 
@@ -243,30 +242,53 @@ Both daemons are started with `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_MAX_LOADED_MODELS=
 - Per-archive **`local_ai_use_enabled_v1`** in `app_configuration` (via `POST /api/configuration`) controls whether Local AI appears in provider menus and Auto routing; default enabled when unset. See `internal/service/local_ai_use.go`.
 - Configuration → **AI & Setup** and the login **Local AI Setup** panel use [`static/js/museum/local-ai-setup.js`](static/js/museum/local-ai-setup.js) and the status API. Browser mode shows server Ollama status; Electron additionally offers start/download via IPC.
 
-## DeepSeek Provider
+## AI Models & the OpenRouter Adapter
 
-`internal/ai/deepseek.go` implements `ChatProvider` using DeepSeek's **Anthropic-compatible Messages API**:
+`internal/ai/openrouter.go` implements `ChatProvider` (`OpenRouterProvider`) using
+OpenRouter's OpenAI-compatible **Chat Completions API**:
 
-- Endpoint: `POST https://api.deepseek.com/anthropic/v1/messages`
-- Authentication: `x-api-key` header (same field name as Anthropic)
-- Protocol: identical to Claude's Messages API — same tool-calling format, same `stop_reason: "tool_use"` loop
-- Uses `anthropic-version: 2023-06-01` header required by DeepSeek's endpoint
-- Token counts read from standard `usage.input_tokens` / `usage.output_tokens`
-- Returns `nil` from constructor when `DEEPSEEK_API_KEY` is empty
-
-Select via `"provider": "deepseek"` in `POST /chat/generate` and `Have-a-Chat` requests.
-
-## OpenAI Provider
-
-`internal/ai/openai.go` implements `ChatProvider` using OpenAI's **Chat Completions API**:
-
-- Endpoint: `POST https://api.openai.com/v1/chat/completions`
+- Endpoint: `POST https://openrouter.ai/api/v1/chat/completions`
 - Authentication: `Authorization: Bearer` header
-- Native `tools` / `tool_calls` loop (same max iterations as other providers)
+- Native `tools` / `tool_calls` loop (same max iterations as every provider, `maxToolCallIterations` in `internal/ai/provider.go`); tool-call arguments arrive as a JSON string requiring `json.Unmarshal` (same shape as OpenAI's API)
 - Token counts from `usage.prompt_tokens` / `usage.completion_tokens`
-- Returns `nil` from constructor when `OPENAI_API_KEY` is empty
+- One `OpenRouterProvider` instance backs one admin-configured AI model; its `providerKey` field (the model's admin-defined key, e.g. `"claude"`) is stamped into `LLMUsage.Provider` so billing keeps a distinct bucket per model
+- Returns `nil` from constructor when the resolved API key or model slug is empty
 
-Select via `"provider": "openai"` in `POST /chat/generate` and `Have-a-Chat` requests.
+**AI Models are admin-managed, not hardcoded.** `internal/service/ai_models_service.go` +
+`internal/repository/ai_models_repo.go` + `internal/handler/ai_models_handler.go` implement
+a deployment-wide CRUD table (`ai_models`: `key`, `display_name`, `model_slug`, `enabled`,
+`sort_order`) managed from Configuration → **AI Models**. Seeded on first run from
+`static/data/ai_models.json` (insert-if-missing, same pattern as Guide Topics/Suggestions)
+with four defaults — `claude`, `gemini`, `deepseek`, `openai` — each mapped to an OpenRouter
+model slug (e.g. `anthropic/claude-sonnet-4.5`). Admins can add, edit, disable, delete, and
+reorder any model; the `key` a chat request selects (`"provider"` in `POST /chat/generate`
+and `Have-a-Chat` requests) is looked up against this table by
+`ChatService.effectiveProviderByKey` — there is no fixed set of valid provider names beyond
+`"auto"` and `"localai"`. `AIModelsService` caches reads in-process (invalidated on every
+write) since a model is resolved by key on every chat generation.
+
+Routes: `GET /api/ai-models` (admin, all rows), `GET /api/ai-models/available` (enabled-only,
+`sort_order`, used by every provider picker in the app via the shared `AIModels` JS cache
+module in `static/js/museum/ai-models.js`), `POST /api/ai-models`, `PATCH /api/ai-models/{id}`,
+`DELETE /api/ai-models/{id}`.
+
+The OpenRouter API key backing every model is configured only via Configuration → **API
+Keys** — there is no `OPENROUTER_API_KEY` env var. One shared key (not per-model) is stored
+per archive owner (`users.user_openrouter_api_key`) and optionally overridden per visitor
+session; `ChatService.effectiveOpenRouterConfig` resolves owner → visitor (no server tier).
+Tavily and RunPod keys follow the same owner → visitor precedence and are also
+env-var-free; ElevenLabs is the only one of the four that still supports a server-side
+`ELEVENLABS_API_KEY` fallback. The API Keys tab shades the required OpenRouter key field
+red and the optional keys yellow until each is configured, green once set, with an eye-icon
+toggle to reveal what's typed; actions that need a hosted AI provider before one is
+configured show a warning dialog routing to this tab (`static/js/museum/app.js`'s
+`blockIfChatProviderNotReady`), and the welcome dialog shows the same warning when no
+OpenRouter key resolves for the owner.
+
+Configuration → **Model Catalog** (`static/js/museum/model-catalog.js`,
+`GET /api/ai-models/catalog`) lets an owner search/filter OpenRouter's full public model
+list (name, cost per 1M tokens, context length, full spec on click) and hand a picked
+model to the AI Models "Add model" form instead of typing a slug by hand.
 
 ## Admin User Management
 
@@ -400,7 +422,7 @@ Admin JSON/UI lives under `/admin/llm-usage/…`. Users can download their own P
 - **Reference doc inlining:** `internal/service/reference_prompt_inline.go` appends any `reference_documents` rows with `include_in_system_prompt = true` directly into the system prompt (decrypts if needed; skips for restricted visitor sessions)
 - History: last 30 turns from `chat_turns` table
 - Tool loop: up to `maxToolCallIterations` per request in all providers
-- **Provider selection:** `"claude"`, `"gemini"`, `"deepseek"`, `"openai"`, or `"localai"` in request body
+- **Provider selection:** `"auto"`, `"localai"`, or any `key` from the admin-managed AI Models table (default seed: `"claude"`, `"gemini"`, `"deepseek"`, `"openai"`) in request body
 - All AI tool SQL is scoped by `user_id` via `toolsUIDFilter(ctx, q, args)` in `internal/ai/tools.go`
 
 ### Pam Bot (Dementia Companion)
@@ -661,10 +683,8 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | LLM usage repository | `internal/repository/billing_repo.go` |
 | LLM usage PDF export | `internal/billingpdf/bill.go` |
 | AI provider interface | `internal/ai/provider.go` |
-| Claude provider | `internal/ai/claude.go` |
-| DeepSeek (Anthropic-compatible API) | `internal/ai/deepseek.go` |
-| OpenAI / ChatGPT (Chat Completions API) | `internal/ai/openai.go` |
-| Gemini provider | `internal/ai/gemini.go` |
+| OpenRouter adapter (backs every admin-configured AI model) | `internal/ai/openrouter.go` |
+| AI Models CRUD (admin-managed model list) | `internal/service/ai_models_service.go`, `internal/repository/ai_models_repo.go`, `internal/handler/ai_models_handler.go` |
 | Local AI / Ollama provider | `internal/ai/localai.go` |
 | Tool definitions | `internal/ai/provider.go` → `GetToolDefinitions()` |
 | Tool execution | `internal/ai/tools.go` → `NewToolExecutor()` |

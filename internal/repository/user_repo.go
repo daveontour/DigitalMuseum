@@ -355,8 +355,8 @@ func (r *UserRepo) ListAll(ctx context.Context) ([]*User, error) {
 	return users, rows.Err()
 }
 
-// SetAllowServerLLMKeys sets whether the user may use server GEMINI_API_KEY, ANTHROPIC_API_KEY,
-// and TAVILY_API_KEY when they have not set their own (per-provider) keys.
+// SetAllowServerLLMKeys sets whether the user may use the server OPENROUTER_API_KEY and
+// TAVILY_API_KEY when they have not set their own keys.
 func (r *UserRepo) SetAllowServerLLMKeys(ctx context.Context, userID int64, allow bool) error {
 	_, err := r.pool.ExecContext(ctx, `UPDATE users SET allow_server_llm_keys = ?2 WHERE id = ?1`, userID, allow)
 	return err

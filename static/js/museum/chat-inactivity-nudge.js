@@ -158,7 +158,7 @@ const ChatInactivityNudge = (() => {
         let lastManual = null;
         try {
             const v = localStorage.getItem('dm_last_hosted_llm_provider');
-            if (v === 'gemini' || v === 'claude' || v === 'deepseek' || v === 'openai') lastManual = v;
+            if (v && v !== 'auto' && v !== 'localai') lastManual = v;
         } catch (_) { /* ignore */ }
         return {
             prompt: '.',

@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/daveontour/aimuseum/internal/appctx"
 	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/georegion"
 	"github.com/daveontour/aimuseum/internal/repository"
@@ -31,11 +30,6 @@ type TemplateHandler struct {
 	suggestionsSvc                     *service.SuggestionsService
 	templatesDir                       string
 	pythonStaticDir                    string
-	defaultGeminiOK                    bool
-	defaultClaudeOK                    bool
-	defaultDeepSeekOK                  bool
-	defaultOpenAIOK                    bool
-	defaultLocalAIOK                   bool
 	pageTitle                          string
 	deploymentNatureLocal              bool
 	guideTopicsReloadFromFileOnStartup bool
@@ -49,11 +43,6 @@ func NewTemplateHandler(subjectRepo *repository.SubjectConfigRepo, userRepo *rep
 		suggestionsSvc:                     suggestionsSvc,
 		templatesDir:                       cfg.App.TemplatesDir,
 		pythonStaticDir:                    cfg.App.AssetStaticDir,
-		defaultGeminiOK:                    cfg.AI.GeminiAPIKey != "",
-		defaultClaudeOK:                    cfg.AI.AnthropicAPIKey != "",
-		defaultDeepSeekOK:                  strings.TrimSpace(cfg.AI.DeepSeekAPIKey) != "",
-		defaultOpenAIOK:                    strings.TrimSpace(cfg.AI.OpenAIAPIKey) != "",
-		defaultLocalAIOK:                   strings.TrimSpace(cfg.AI.LocalAIBaseURL) != "",
 		pageTitle:                          cfg.App.PageTitle,
 		deploymentNatureLocal:              strings.EqualFold(strings.TrimSpace(cfg.App.DeploymentNature), "local"),
 		guideTopicsReloadFromFileOnStartup: cfg.App.GuideTopicsReloadFromFileOnStartup,
@@ -72,6 +61,7 @@ func (h *TemplateHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/static/js/museum/modals-people.js", h.GetModalsPeopleJS)
 	r.Get("/login", h.GetLogin)
 	r.Get("/s/{token}", h.GetSharePage)
+	r.Get("/quiz", h.GetQuizPage)
 }
 
 // loginHostShowsAdvancedPanel is true for loopback hosts so dev servers (e.g. go run on
@@ -138,6 +128,18 @@ func (h *TemplateHandler) GetLogin(w http.ResponseWriter, r *http.Request) {
 		loginExtras["static_local_ai_setup_js_cache_bust"] = "0"
 	}
 	content = renderJinja(content, map[string]string{}, loginExtras)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(content))
+}
+
+// GetQuizPage handles GET /quiz → serves quiz.html.
+// Unauthenticated (see exemptExact in internal/middleware/auth.go); no password required to play.
+func (h *TemplateHandler) GetQuizPage(w http.ResponseWriter, r *http.Request) {
+	content, err := h.readFile(h.templatesDir, "quiz.html")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "quiz page not found")
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(content))
 }
@@ -314,51 +316,6 @@ func unmarshalSuggestionsJSON(rendered string) (map[string]any, error) {
 // GetFoundationJS handles GET /static/js/museum/foundation.js.
 func (h *TemplateHandler) GetFoundationJS(w http.ResponseWriter, r *http.Request) {
 	ctx := h.buildContext(r)
-	geminiOK := h.defaultGeminiOK
-	claudeOK := h.defaultClaudeOK
-	deepseekOK := h.defaultDeepSeekOK
-	openaiOK := h.defaultOpenAIOK
-	if uid := appctx.UserIDFromCtx(r.Context()); uid != 0 && h.userRepo != nil {
-		if stored, err := h.userRepo.GetUserLLMStored(r.Context(), uid); err == nil && stored != nil {
-			if strings.TrimSpace(stored.GeminiAPIKey) != "" {
-				geminiOK = true
-			}
-			if strings.TrimSpace(stored.AnthropicAPIKey) != "" {
-				claudeOK = true
-			}
-			if strings.TrimSpace(stored.DeepSeekAPIKey) != "" {
-				deepseekOK = true
-			}
-			if strings.TrimSpace(stored.OpenAIAPIKey) != "" {
-				openaiOK = true
-			}
-		}
-	}
-	if geminiOK {
-		ctx["gemini_configured"] = "True"
-	} else {
-		ctx["gemini_configured"] = "False"
-	}
-	if claudeOK {
-		ctx["claude_configured"] = "True"
-	} else {
-		ctx["claude_configured"] = "False"
-	}
-	if deepseekOK {
-		ctx["deepseek_configured"] = "True"
-	} else {
-		ctx["deepseek_configured"] = "False"
-	}
-	if openaiOK {
-		ctx["openai_configured"] = "True"
-	} else {
-		ctx["openai_configured"] = "False"
-	}
-	if h.defaultLocalAIOK {
-		ctx["localai_configured"] = "True"
-	} else {
-		ctx["localai_configured"] = "False"
-	}
 
 	content, err := h.readFile(h.pythonStaticDir, filepath.Join("js", "museum", "foundation.js"))
 	if err != nil {

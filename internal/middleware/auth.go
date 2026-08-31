@@ -27,6 +27,7 @@ var exemptPrefixes = []string{
 	"/visitor/",
 	"/admin",        // admin panel has its own session-based auth
 	"/api/profiles", // localhost-only archive profile endpoints; isLocalhost() guards in handler
+	"/api/quiz/",    // unauthenticated "Take the Quiz" login-page feature
 }
 
 // exemptExact lists paths that are always accessible without authentication.
@@ -36,6 +37,7 @@ var exemptExact = map[string]bool{
 	"/auth/login":                    true,
 	"/auth/register":                 true,
 	"/login":                         true,
+	"/quiz":                          true,
 	"/profiles":                      true,
 	"/api/resolved-main-sqlite-path": true,
 	"/api/local-ai/status":           true,

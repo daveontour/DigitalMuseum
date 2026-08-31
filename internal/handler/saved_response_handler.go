@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/daveontour/aimuseum/internal/keystore"
+	"github.com/daveontour/aimuseum/internal/responsepdf"
 	"github.com/daveontour/aimuseum/internal/service"
 	"github.com/go-chi/chi/v5"
 )
@@ -28,6 +29,7 @@ func (h *SavedResponseHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/saved-responses", h.List)
 	r.Post("/api/saved-responses", h.Create)
 	r.Get("/api/saved-responses/{id}", h.GetByID)
+	r.Get("/api/saved-responses/{id}/pdf", h.DownloadPDF)
 	r.Put("/api/saved-responses/{id}", h.Update)
 	r.Delete("/api/saved-responses/{id}", h.Delete)
 }
@@ -87,6 +89,64 @@ func (h *SavedResponseHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, savedResponseMap(s.ID, s.Title, s.Content, s.Voice, s.LLMProvider,
 		s.CreatedAt.Format("2006-01-02T15:04:05.999999")))
+}
+
+// ── DownloadPDF ───────────────────────────────────────────────────────────────
+
+func (h *SavedResponseHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseSavedResponseID(w, r)
+	if !ok {
+		return
+	}
+	s, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving saved response: %s", err))
+		return
+	}
+	if s == nil {
+		writeError(w, http.StatusNotFound, "saved response not found")
+		return
+	}
+	data, err := responsepdf.Render(responsepdf.Meta{
+		Title:       s.Title,
+		Content:     s.Content,
+		Voice:       s.Voice,
+		LLMProvider: s.LLMProvider,
+		CreatedAt:   s.CreatedAt.Time,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error rendering PDF: %s", err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.pdf"`, pdfSafeFilename(s.Title)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+// pdfSafeFilename strips characters that are awkward in a Content-Disposition filename.
+func pdfSafeFilename(title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		title = "chat-response"
+	}
+	var b strings.Builder
+	for _, r := range title {
+		switch {
+		case r == '"' || r == '\\' || r == '/' || r < 0x20:
+			continue
+		default:
+			b.WriteRune(r)
+		}
+	}
+	out := b.String()
+	if len(out) > 120 {
+		out = out[:120]
+	}
+	if out == "" {
+		out = "chat-response"
+	}
+	return out
 }
 
 // ── Create ────────────────────────────────────────────────────────────────────

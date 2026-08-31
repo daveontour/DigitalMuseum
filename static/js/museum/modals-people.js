@@ -218,7 +218,7 @@ Modals.Contacts = (() => {
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
-                const provider = (typeof DOM !== 'undefined' && DOM.llmProviderSelect?.value) ? DOM.llmProviderSelect.value : 'gemini';
+                const provider = (typeof DOM !== 'undefined' && DOM.llmProviderSelect?.value) ? DOM.llmProviderSelect.value : '';
                 const resp = await fetch('/chat/complete-profile', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -589,7 +589,18 @@ Modals.Profiles = (() => {
         const emptyMsg = () => document.getElementById('profiles-empty-msg');
         let profilesPollTimer = null;
         let profilesNameSortOrder = 'asc';
-        const ALLOWED_PROFILE_PROVIDERS = new Set(['gemini', 'claude', 'deepseek', 'openai', 'localai']);
+
+        function isAllowedProfileProvider(key) {
+            return key === 'localai' || (typeof AIModels !== 'undefined' && AIModels.isValidKey(key));
+        }
+
+        function defaultProfileProvider() {
+            if (typeof AIModels !== 'undefined') {
+                const dk = AIModels.defaultKey();
+                if (dk) return dk;
+            }
+            return 'localai';
+        }
 
         function profilesLlmProviderEl() {
             if (typeof DOM !== 'undefined' && DOM.profilesLlmProviderSelect) return DOM.profilesLlmProviderSelect;
@@ -600,22 +611,22 @@ Modals.Profiles = (() => {
             const pSel = profilesLlmProviderEl();
             const chatSel = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
             if (!pSel) return;
-            const v = (chatSel && chatSel.value) ? String(chatSel.value).trim().toLowerCase() : 'gemini';
-            pSel.value = ALLOWED_PROFILE_PROVIDERS.has(v) ? v : 'gemini';
+            const v = (chatSel && chatSel.value) ? String(chatSel.value).trim().toLowerCase() : defaultProfileProvider();
+            pSel.value = isAllowedProfileProvider(v) ? v : defaultProfileProvider();
         }
 
         function selectedProfilesProvider() {
             const pSel = profilesLlmProviderEl();
             if (pSel && pSel.value) {
                 const v = String(pSel.value).trim().toLowerCase();
-                if (ALLOWED_PROFILE_PROVIDERS.has(v)) return v;
+                if (isAllowedProfileProvider(v)) return v;
             }
             const chatSel = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
             if (chatSel && chatSel.value) {
                 const v = String(chatSel.value).trim().toLowerCase();
-                if (ALLOWED_PROFILE_PROVIDERS.has(v)) return v;
+                if (isAllowedProfileProvider(v)) return v;
             }
-            return 'gemini';
+            return defaultProfileProvider();
         }
 
         function updateProfilesNameSortHeader() {

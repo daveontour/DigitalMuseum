@@ -819,6 +819,18 @@ func schemaDDL() []string {
 			text TEXT NOT NULL
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_guide_topics_key ON guide_topics (key)`,
+
+		// ── AI models (deployment-wide, admin-managed OpenRouter model list) ──
+		`CREATE TABLE IF NOT EXISTS ai_models (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			key          TEXT NOT NULL,
+			display_name TEXT NOT NULL,
+			model_slug   TEXT NOT NULL,
+			enabled      INTEGER NOT NULL DEFAULT 1,
+			sort_order   INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_models_key ON ai_models (key)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_models_sort ON ai_models (sort_order, id)`,
 	}
 }
 
@@ -1024,6 +1036,9 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	if err := addUserRunpodElevenlabsAPIColumns(ctx, db); err != nil {
+		return err
+	}
+	if err := addUserOpenRouterAPIKeyColumn(ctx, db); err != nil {
 		return err
 	}
 	if err := addSubjectConfigurationSubjectContactIDColumn(ctx, db); err != nil {
@@ -1266,6 +1281,35 @@ func addUserOpenAILLMColumns(ctx context.Context, db *sql.DB) error {
 		}
 		slog.Info("sqlite migration: added users." + col.name)
 	}
+	return nil
+}
+
+func addUserOpenRouterAPIKeyColumn(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'users'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master users: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	var has int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'user_openrouter_api_key'`,
+	).Scan(&has); err != nil {
+		return fmt.Errorf("pragma_table_info users.user_openrouter_api_key: %w", err)
+	}
+	if has > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE users ADD COLUMN user_openrouter_api_key TEXT`); err != nil {
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "duplicate column") && !strings.Contains(msg, "already exists") {
+			return fmt.Errorf("add users.user_openrouter_api_key: %w", err)
+		}
+	}
+	slog.Info("sqlite migration: added users.user_openrouter_api_key")
 	return nil
 }
 

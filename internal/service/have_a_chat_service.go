@@ -44,36 +44,12 @@ func (s *ChatService) GenerateHaveAChatTurn(
 
 	// ── Pick the actual AI provider ──────────────────────────────────────────
 	var provider appai.ChatProvider
-	providerName := "gemini"
-	switch speakingProviderKey {
-	case "claude":
-		cp := s.effectiveClaudeProvider(ctx, r, "")
-		if cp.IsAvailable() {
-			provider = cp
-			providerName = "claude"
-		}
-	case "deepseek":
-		dp := s.effectiveDeepSeekProvider(ctx, r, "")
-		if dp.IsAvailable() {
-			provider = dp
-			providerName = "deepseek"
-		}
-	case "openai":
-		op := s.effectiveOpenAIProvider(ctx, r, "")
-		if op.IsAvailable() {
-			provider = op
-			providerName = "openai"
-		}
-	case "localai":
-		lp := s.localAIProviderForChat(ctx)
-		if lp != nil {
-			provider = lp
-			providerName = "localai"
-		}
-	}
-	if provider == nil {
-		provider = s.effectiveGeminiProvider(ctx, r, "")
-		providerName = "gemini"
+	providerName := s.defaultProviderName(ctx, speakingProviderKey)
+	if speakingProviderKey == "localai" {
+		provider = s.localAIProviderForChat(ctx)
+		providerName = "localai"
+	} else {
+		provider = s.effectiveProviderByKey(ctx, r, "", providerName)
 	}
 	if provider == nil || !provider.IsAvailable() {
 		err := fmt.Errorf("provider '%s' is not available — check API key", speakingProviderKey)

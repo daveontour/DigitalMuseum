@@ -1,0 +1,32 @@
+{
+  "models": [
+    {
+      "key": "claude",
+      "display_name": "Claude",
+      "model_slug": "anthropic/claude-sonnet-4.5",
+      "enabled": true,
+      "sort_order": 0
+    },
+    {
+      "key": "gemini",
+      "display_name": "Gemini",
+      "model_slug": "google/gemini-2.5-flash",
+      "enabled": true,
+      "sort_order": 1
+    },
+    {
+      "key": "deepseek",
+      "display_name": "DeepSeek",
+      "model_slug": "deepseek/deepseek-chat",
+      "enabled": true,
+      "sort_order": 2
+    },
+    {
+      "key": "openai",
+      "display_name": "ChatGPT",
+      "model_slug": "openai/gpt-4.1-mini",
+      "enabled": true,
+      "sort_order": 3
+    }
+  ]
+}

@@ -21,27 +21,30 @@ const toolTestResultMaxBytes = 100 * 1024
 
 // LLMToolsTestHandler runs diagnostic executions of chat AI tools for the owner UI.
 type LLMToolsTestHandler struct {
-	pool            *sql.DB
-	sessionStore    *keystore.SessionMasterStore
-	subjectConfig   *repository.SubjectConfigRepo
-	tavilyKey       string
-	pepper          string
-	authSvc         *service.AuthService
+	pool          *sql.DB
+	sessionStore  *keystore.SessionMasterStore
+	subjectConfig *repository.SubjectConfigRepo
+	chatSvc       *service.ChatService
+	pepper        string
+	authSvc       *service.AuthService
 }
 
-// NewLLMToolsTestHandler constructs LLMToolsTestHandler.
+// NewLLMToolsTestHandler constructs LLMToolsTestHandler. The Tavily API key used by the
+// web-search tool is resolved per-request from chatSvc (owner-configured only — there is
+// no server-wide default).
 func NewLLMToolsTestHandler(
 	pool *sql.DB,
 	sessionStore *keystore.SessionMasterStore,
 	subjectConfig *repository.SubjectConfigRepo,
-	tavilyKey, pepper string,
+	chatSvc *service.ChatService,
+	pepper string,
 	authSvc *service.AuthService,
 ) *LLMToolsTestHandler {
 	return &LLMToolsTestHandler{
 		pool:          pool,
 		sessionStore:  sessionStore,
 		subjectConfig: subjectConfig,
-		tavilyKey:     tavilyKey,
+		chatSvc:       chatSvc,
 		pepper:        pepper,
 		authSvc:       authSvc,
 	}
@@ -183,7 +186,11 @@ func (h *LLMToolsTestHandler) TestTools(w http.ResponseWriter, r *http.Request) 
 	}
 
 	subjectName := h.loadSubjectName(ctx)
-	executor := appai.NewToolExecutor(h.pool, subjectName, h.tavilyKey, h.pepper, h.getRAM(r))
+	tavilyKey := ""
+	if h.chatSvc != nil {
+		tavilyKey = h.chatSvc.EffectiveTavilyKey(ctx, r)
+	}
+	executor := appai.NewToolExecutor(h.pool, subjectName, tavilyKey, h.pepper, h.getRAM(r))
 
 	results := make([]map[string]any, 0, len(body.Tools))
 	for _, item := range body.Tools {

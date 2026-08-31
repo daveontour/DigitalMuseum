@@ -84,11 +84,9 @@ const HaveAChat = (() => {
     }
 
     function _llmDisplayName(provider) {
-        if (provider === 'claude') return 'Claude';
-        if (provider === 'deepseek') return 'DeepSeek';
-        if (provider === 'openai') return 'ChatGPT';
         if (provider === 'localai') return 'Local AI';
-        return 'Gemini';
+        if (typeof AIModelLabels !== 'undefined') return AIModelLabels.get(provider, provider);
+        return provider || 'Unknown';
     }
 
     function _populateVoiceSelects() {

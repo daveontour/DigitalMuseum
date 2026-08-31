@@ -482,7 +482,8 @@ const LocalAiSetup = (() => {
                 return;
             }
             if (String(parsed.classifier_provider || '').toLowerCase().trim() !== 'localai') return;
-            parsed.classifier_provider = 'gemini';
+            await AIModels.ensureLoaded();
+            parsed.classifier_provider = AIModels.defaultKey() || 'localai';
             const saveRes = await fetch('/api/configuration', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -490,19 +491,19 @@ const LocalAiSetup = (() => {
                 body: JSON.stringify({
                     key: HOSTED_KEY,
                     value: JSON.stringify(parsed),
-                    description: 'Hosted LLM provider try order for Auto routing and error failover, plus Auto classifier provider',
+                    description: 'Auto routing classifier provider, plus the error failover on/off toggle (provider order follows AI Models sort_order)',
                 }),
             });
             if (!saveRes.ok) return;
             if (typeof Modals !== 'undefined'
-                && Modals.HostedLLMOrderConfig
-                && Modals.HostedLLMOrderConfig.ensureLoaded) {
-                await Modals.HostedLLMOrderConfig.ensureLoaded();
+                && Modals.AutoRoutingConfig
+                && Modals.AutoRoutingConfig.ensureLoaded) {
+                await Modals.AutoRoutingConfig.ensureLoaded();
             }
             if (typeof Modals !== 'undefined'
-                && Modals.HostedLLMOrderConfig
-                && Modals.HostedLLMOrderConfig.reconcileClassifierProvider) {
-                Modals.HostedLLMOrderConfig.reconcileClassifierProvider();
+                && Modals.AutoRoutingConfig
+                && Modals.AutoRoutingConfig.reconcileClassifierProvider) {
+                Modals.AutoRoutingConfig.reconcileClassifierProvider();
             }
         } catch (_) { /* best effort */ }
     }

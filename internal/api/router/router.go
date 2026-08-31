@@ -170,6 +170,13 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	guideTopicsHandler := handler.NewGuideTopicsHandler(guideTopicsSvc, cfg.App)
 	guideTopicsHandler.RegisterRoutes(r)
 
+	// ── AI models (deployment-wide, admin-managed OpenRouter model list) ───────
+	aiModelsRepo := repository.NewAIModelsRepo(pool)
+	aiModelsSvc := service.NewAIModelsService(aiModelsRepo)
+	openRouterCatalogSvc := service.NewOpenRouterCatalogService()
+	aiModelsHandler := handler.NewAIModelsHandler(aiModelsSvc, openRouterCatalogSvc)
+	aiModelsHandler.RegisterRoutes(r)
+
 	// ── Templated endpoints (GET /, suggestions, JS files) ───────────────────
 	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, userRepo, suggestionsSvc, cfg)
 	templateHandler.RegisterRoutes(r)
@@ -272,14 +279,8 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	messageSimilarityHandler := handler.NewMessageSimilarityHandler(pool, embeddingSvc)
 	messageSimilarityHandler.RegisterRoutes(r)
 
-	// ── Chat & AI ────────────────────────────────────────────────────────────
-	geminiProvider := appai.NewGeminiProvider(cfg.AI.GeminiAPIKey, cfg.AI.GeminiModelName)
-	emailSvc.WithGemini(geminiProvider)
-	messageSvc.WithGemini(geminiProvider)
-
 	// ── Admin & AI summarization ───────────────────────────────────────────────
 	adminHandler := handler.NewAdminHandler(pool, subjectConfigRepo, contactRepo, sessionMasterStore)
-	adminHandler.WithGemini(geminiProvider)
 	adminHandler.WithBilling(billingRepo, userRepo)
 	adminHandler.WithInterestService(interestSvc)
 	adminHandler.RegisterRoutes(r)
@@ -316,15 +317,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		documentRepo,
 		pool,
 		userRepo,
-		cfg.AI.GeminiAPIKey,
-		cfg.AI.GeminiModelName,
-		cfg.AI.AnthropicAPIKey,
-		cfg.AI.ClaudeModelName,
-		cfg.AI.DeepSeekAPIKey,
-		cfg.AI.DeepSeekModelName,
-		cfg.AI.OpenAIAPIKey,
-		cfg.AI.OpenAIModelName,
-		cfg.AI.TavilyAPIKey,
+		aiModelsSvc,
 		cfg.AI.LocalAIBaseURL,
 		cfg.AI.LocalAIEmbeddingBaseURL,
 		cfg.AI.LocalAIAPIKey,
@@ -339,6 +332,9 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		dashboardSvc,
 		configRepo,
 	)
+	emailSvc.WithSummarizer(chatSvc)
+	messageSvc.WithSummarizer(chatSvc)
+	adminHandler.WithSummarizer(chatSvc)
 	chatHandler := handler.NewChatHandler(chatSvc, completeProfileRepo, sessionMasterStore)
 	chatHandler.RegisterRoutes(r)
 	localAISettingsHandler := handler.NewLocalAISettingsHandler(chatSvc, cfg.AI.LocalAIBaseURL)
@@ -361,7 +357,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	llmToolsAccessHandler := handler.NewLLMToolsAccessHandler(privateStoreSvc, sessionMasterStore, authSvc)
 	llmToolsAccessHandler.RegisterRoutes(r)
 
-	llmToolsTestHandler := handler.NewLLMToolsTestHandler(pool, sessionMasterStore, subjectConfigRepo, cfg.AI.TavilyAPIKey, cfg.Crypto.KeyringPepper, authSvc)
+	llmToolsTestHandler := handler.NewLLMToolsTestHandler(pool, sessionMasterStore, subjectConfigRepo, chatSvc, cfg.Crypto.KeyringPepper, authSvc)
 	llmToolsTestHandler.RegisterRoutes(r)
 
 	// ── Background jobs scheduler (per-user maintenance jobs) ─────────────────
@@ -381,6 +377,10 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	visitorSvc := service.NewVisitorService(userRepo, subjectConfigRepo, sensitiveSvc, pool, cfg.Crypto.KeyringPepper)
 	visitorHandler := handler.NewVisitorHandler(visitorSvc, authSvc, sessionMasterStore, cfg.Server.SessionCookieSecure)
 	visitorHandler.RegisterRoutes(r)
+
+	// ── Quiz (unauthenticated "Take the Quiz" login-page feature) ────────────
+	quizHandler := handler.NewQuizHandler(chatSvc, visitorSvc)
+	quizHandler.RegisterRoutes(r)
 
 	return r, backgroundJobsScheduler, nil
 }

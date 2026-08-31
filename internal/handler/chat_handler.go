@@ -33,6 +33,7 @@ func NewChatHandler(svc *service.ChatService, cpRepo *repository.CompleteProfile
 // RegisterRoutes mounts the chat endpoints on r.
 func (h *ChatHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/chat/availability", h.GetAvailability)
+	r.Get("/chat/openrouter-credits", h.GetOpenRouterCredits)
 	r.Get("/api/local-ai/status", h.GetLocalAIStatus)
 	r.Post("/chat/generate", h.Generate)
 	r.Post("/chat/generate-random-question", h.GenerateRandomQuestion)
@@ -59,30 +60,38 @@ func (h *ChatHandler) GetAvailability(w http.ResponseWriter, r *http.Request) {
 		slog.Error("chat context status", "err", err)
 		tools, refDocs = 0, 0
 	}
+	defaultModelKey, _ := h.svc.DefaultAIModelKey(r.Context())
 	writeJSON(w, map[string]any{
-		"gemini_available":                    h.svc.GeminiAvailable(r.Context(), r),
-		"claude_available":                    h.svc.ClaudeAvailable(r.Context(), r),
-		"deepseek_available":                  h.svc.DeepSeekAvailable(r.Context(), r),
-		"openai_available":                    h.svc.OpenAIAvailable(r.Context(), r),
-		"localai_available":                   h.svc.LocalAIAvailable(r.Context()),
-		"localai_infrastructure_available":    h.svc.LocalAIInfrastructureAvailable(r.Context()),
-		"localai_use_enabled":                 h.svc.LocalAIUseEnabled(r.Context()),
-		"auto_available":                      h.svc.AutoAvailable(r.Context(), r),
-		"tavily_env_configured":               h.svc.ServerTavilyKeyConfigured(),
-		"runpod_env_configured":               h.svc.ServerRunpodKeyConfigured(),
-		"runpod_endpoint_id_env":              h.svc.ServerRunpodEndpointID(),
-		"runpod_workers_env":                  h.svc.ServerRunpodWorkers(),
-		"elevenlabs_env_configured":           h.svc.ServerElevenLabsKeyConfigured(),
-		"server_gemini_model_default_set":     h.svc.ServerGeminiModelDefaultSet(),
-		"server_gemini_model_default":         h.svc.ServerGeminiModelDefault(),
-		"server_claude_model_default_set":     h.svc.ServerClaudeModelDefaultSet(),
-		"server_claude_model_default":         h.svc.ServerClaudeModelDefault(),
-		"server_deepseek_model_default_set":   h.svc.ServerDeepSeekModelDefaultSet(),
-		"server_deepseek_model_default":       h.svc.ServerDeepSeekModelDefault(),
-		"server_openai_model_default_set":     h.svc.ServerOpenAIModelDefaultSet(),
-		"server_openai_model_default":         h.svc.ServerOpenAIModelDefault(),
-		"llm_tools_count":                     tools,
-		"reference_documents_available_count": refDocs,
+		"models":                               h.svc.AvailableAIModels(r.Context(), r),
+		"default_model_key":                    defaultModelKey,
+		"localai_available":                    h.svc.LocalAIAvailable(r.Context()),
+		"localai_infrastructure_available":     h.svc.LocalAIInfrastructureAvailable(r.Context()),
+		"localai_use_enabled":                  h.svc.LocalAIUseEnabled(r.Context()),
+		"auto_available":                       h.svc.AutoAvailable(r.Context(), r),
+		"runpod_endpoint_id_env":               h.svc.ServerRunpodEndpointID(),
+		"runpod_workers_env":                   h.svc.ServerRunpodWorkers(),
+		"elevenlabs_env_configured":            h.svc.ServerElevenLabsKeyConfigured(),
+		"llm_tools_count":                      tools,
+		"reference_documents_available_count":  refDocs,
+	})
+}
+
+// GET /chat/openrouter-credits — remaining OpenRouter credit balance for the effective
+// key (server default, or user/visitor override). Used to refresh the chat status bar
+// after each completion; returns {"configured": false} rather than an error when no
+// OpenRouter key is configured or the credits lookup fails, so the UI can show a dash.
+func (h *ChatHandler) GetOpenRouterCredits(w http.ResponseWriter, r *http.Request) {
+	credits, err := h.svc.OpenRouterCredits(r.Context(), r)
+	if err != nil {
+		slog.Warn("openrouter credits lookup failed", "err", err)
+		writeJSON(w, map[string]any{"configured": false})
+		return
+	}
+	writeJSON(w, map[string]any{
+		"configured":        true,
+		"total_credits":     credits.TotalCredits,
+		"total_usage":       credits.TotalUsage,
+		"remaining_credits": credits.Remaining(),
 	})
 }
 

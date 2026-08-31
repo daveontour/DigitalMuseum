@@ -88,6 +88,7 @@ type AppConfig struct {
 	SuggestionsConfigPath  string // optional override; default is AssetStaticDir/data/suggestions.json
 	GuideTopicsConfigPath            string // optional override; default is AssetStaticDir/data/guide_topics.json
 	GuideTopicsReloadFromFileOnStartup bool // GUIDE_TOPICS_RELOAD_FROM_FILE_ON_STARTUP=true replaces DB rows from seed file on startup
+	AIModelsConfigPath   string // optional override; default is AssetStaticDir/data/ai_models.json
 	DeploymentNature                 string // "local" = show filesystem path import tiles; unset/other = hide them
 }
 
@@ -113,6 +114,14 @@ func (a AppConfig) GuideTopicsConfigFile() string {
 		return p
 	}
 	return filepath.Join(a.AssetStaticDir, "data", "guide_topics.json")
+}
+
+// AIModelsConfigFile returns the path to ai_models.json (AI_MODELS_CONFIG_PATH or AssetStaticDir/data/ai_models.json).
+func (a AppConfig) AIModelsConfigFile() string {
+	if p := strings.TrimSpace(a.AIModelsConfigPath); p != "" {
+		return p
+	}
+	return filepath.Join(a.AssetStaticDir, "data", "ai_models.json")
 }
 
 // DefaultsConfig holds default values shown in the control panel UI.
@@ -149,21 +158,13 @@ type DefaultsConfig struct {
 }
 
 // AIConfig holds AI provider settings.
+//
+// OpenRouter, Tavily, and RunPod API keys are intentionally NOT read from the
+// environment — they are configurable only via Configuration → API Keys in
+// the running app (see internal/repository/user_llm.go). LocalAI settings
+// remain env-configured since they describe the local Ollama daemon, not a
+// hosted credential.
 type AIConfig struct {
-	GeminiAPIKey    string
-	GeminiModelName string
-
-	AnthropicAPIKey string
-	ClaudeModelName string
-
-	DeepSeekAPIKey    string
-	DeepSeekModelName string
-
-	OpenAIAPIKey    string
-	OpenAIModelName string
-
-	TavilyAPIKey string
-
 	LocalAIBaseURL          string
 	LocalAIEmbeddingBaseURL string
 	LocalAIAPIKey           string
@@ -261,6 +262,7 @@ func Load() (*Config, error) {
 			SuggestionsConfigPath:              os.Getenv("SUGGESTIONS_CONFIG_PATH"),
 			GuideTopicsConfigPath:              os.Getenv("GUIDE_TOPICS_CONFIG_PATH"),
 			GuideTopicsReloadFromFileOnStartup: parseBool(os.Getenv("GUIDE_TOPICS_RELOAD_FROM_FILE_ON_STARTUP")),
+			AIModelsConfigPath:                 os.Getenv("AI_MODELS_CONFIG_PATH"),
 			DeploymentNature:                   getenv("DEPLOYMENT_NATURE", "web"),
 		},
 		Crypto:      cryptoCfg,
@@ -329,20 +331,6 @@ func loadDefaultsConfig() DefaultsConfig {
 
 func loadAIConfig() AIConfig {
 	return AIConfig{
-		GeminiAPIKey:    os.Getenv("GEMINI_API_KEY"),
-		GeminiModelName: getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash"),
-
-		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
-		ClaudeModelName: getenv("CLAUDE_MODEL_NAME", "claude-sonnet-4-6"),
-
-		DeepSeekAPIKey:    os.Getenv("DEEPSEEK_API_KEY"),
-		DeepSeekModelName: getenv("DEEPSEEK_MODEL_NAME", "deepseek-chat"),
-
-		OpenAIAPIKey:    os.Getenv("OPENAI_API_KEY"),
-		OpenAIModelName: getenv("OPENAI_MODEL_NAME", "gpt-4.1-mini"),
-
-		TavilyAPIKey: os.Getenv("TAVILY_API_KEY"),
-
 		LocalAIBaseURL:          os.Getenv("LOCALAI_BASE_URL"),
 		LocalAIEmbeddingBaseURL: getenv("LOCALAI_EMBEDDING_BASE_URL", "http://127.0.0.1:11435"),
 		LocalAIAPIKey:           os.Getenv("LOCALAI_API_KEY"),

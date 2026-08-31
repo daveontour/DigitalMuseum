@@ -10,31 +10,82 @@ import (
 	"strings"
 )
 
-const openAIChatCompletionsURL = "https://api.openai.com/v1/chat/completions"
+const openRouterChatCompletionsURL = "https://openrouter.ai/api/v1/chat/completions"
+const openRouterCreditsURL = "https://openrouter.ai/api/v1/credits"
 
-// OpenAIProvider calls the OpenAI Chat Completions API with tool-calling support.
-type OpenAIProvider struct {
-	apiKey    string
-	modelName string
+// OpenRouterCredits reports an OpenRouter account's cumulative purchased credits and
+// usage, as returned by GET /api/v1/credits for the given API key.
+type OpenRouterCredits struct {
+	TotalCredits float64 `json:"total_credits"`
+	TotalUsage   float64 `json:"total_usage"`
 }
 
-// NewOpenAIProvider creates an OpenAIProvider. Returns nil if apiKey is empty.
-func NewOpenAIProvider(apiKey, modelName string) *OpenAIProvider {
-	if apiKey == "" {
+// Remaining estimates the remaining credit balance (total purchased minus total used).
+func (c OpenRouterCredits) Remaining() float64 {
+	return c.TotalCredits - c.TotalUsage
+}
+
+// FetchOpenRouterCredits queries OpenRouter's credits endpoint for apiKey.
+func FetchOpenRouterCredits(ctx context.Context, apiKey string) (*OpenRouterCredits, error) {
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, fmt.Errorf("openrouter credits: no API key configured")
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, openRouterCreditsURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("openRouter credits API %d: %s", resp.StatusCode, string(data))
+	}
+	var wrapper struct {
+		Data OpenRouterCredits `json:"data"`
+	}
+	if err := json.Unmarshal(data, &wrapper); err != nil {
+		return nil, err
+	}
+	return &wrapper.Data, nil
+}
+
+// OpenRouterProvider calls the OpenRouter Chat Completions API (an
+// OpenAI-compatible superset that can route to any of OpenRouter's
+// supported models) with tool-calling support. One OpenRouterProvider
+// instance backs one admin-configured AI model preset; providerKey is
+// stamped into LLMUsage.Provider so billing keeps a distinct bucket per
+// model, exactly as the old per-vendor providers did.
+type OpenRouterProvider struct {
+	apiKey      string
+	modelName   string // OpenRouter compound model slug, e.g. "anthropic/claude-sonnet-4.5"
+	providerKey string // admin-configured model key, e.g. "claude" — stamped into LLMUsage.Provider
+}
+
+// NewOpenRouterProvider creates an OpenRouterProvider. Returns nil if apiKey
+// or modelName is empty.
+func NewOpenRouterProvider(apiKey, modelName, providerKey string) *OpenRouterProvider {
+	if apiKey == "" || modelName == "" {
 		return nil
 	}
-	if modelName == "" {
-		modelName = "gpt-4.1-mini"
+	if providerKey == "" {
+		providerKey = "openrouter"
 	}
-	return &OpenAIProvider{apiKey: apiKey, modelName: modelName}
+	return &OpenRouterProvider{apiKey: apiKey, modelName: modelName, providerKey: providerKey}
 }
 
-func (p *OpenAIProvider) IsAvailable() bool { return p != nil }
+func (p *OpenRouterProvider) IsAvailable() bool { return p != nil }
 
 // SimpleGenerate sends a prompt without tools. Used for classification and summarization.
-func (p *OpenAIProvider) SimpleGenerate(ctx context.Context, prompt string) (string, *LLMUsage, error) {
+func (p *OpenRouterProvider) SimpleGenerate(ctx context.Context, prompt string) (string, *LLMUsage, error) {
 	if p == nil || p.apiKey == "" {
-		return "", nil, fmt.Errorf("openai: not configured")
+		return "", nil, fmt.Errorf("openrouter(%s): not configured", p.providerLabelOrUnknown())
 	}
 	body := map[string]any{
 		"model":       p.modelName,
@@ -47,11 +98,18 @@ func (p *OpenAIProvider) SimpleGenerate(ctx context.Context, prompt string) (str
 	if err != nil {
 		return "", nil, err
 	}
-	usage := openAIUsageFromResponse(resp, p.modelName)
-	return strings.TrimSpace(openAIExtractText(resp)), usage, nil
+	usage := p.usageFromResponse(resp)
+	return strings.TrimSpace(openRouterExtractText(resp)), usage, nil
 }
 
-func openAIUsageFromResponse(resp map[string]any, modelName string) *LLMUsage {
+func (p *OpenRouterProvider) providerLabelOrUnknown() string {
+	if p == nil || p.providerKey == "" {
+		return "unknown"
+	}
+	return p.providerKey
+}
+
+func (p *OpenRouterProvider) usageFromResponse(resp map[string]any) *LLMUsage {
 	in, out := 0, 0
 	if u, ok := resp["usage"].(map[string]any); ok {
 		if v, ok := u["prompt_tokens"].(float64); ok {
@@ -64,10 +122,10 @@ func openAIUsageFromResponse(resp map[string]any, modelName string) *LLMUsage {
 	if in == 0 && out == 0 {
 		return nil
 	}
-	return &LLMUsage{Provider: "openai", Model: modelName, InputTokens: in, OutputTokens: out}
+	return &LLMUsage{Provider: p.providerKey, Model: p.modelName, InputTokens: in, OutputTokens: out}
 }
 
-func openAIExtractText(resp map[string]any) string {
+func openRouterExtractText(resp map[string]any) string {
 	choices, _ := resp["choices"].([]any)
 	if len(choices) == 0 {
 		return ""
@@ -81,7 +139,7 @@ func openAIExtractText(resp map[string]any) string {
 	return content
 }
 
-func openAIExtractToolCalls(resp map[string]any) []map[string]any {
+func openRouterExtractToolCalls(resp map[string]any) []map[string]any {
 	choices, _ := resp["choices"].([]any)
 	if len(choices) == 0 {
 		return nil
@@ -101,8 +159,8 @@ func openAIExtractToolCalls(resp map[string]any) []map[string]any {
 	return out
 }
 
-// GenerateResponse calls OpenAI with a tool-calling loop.
-func (p *OpenAIProvider) GenerateResponse(
+// GenerateResponse calls OpenRouter with a tool-calling loop.
+func (p *OpenRouterProvider) GenerateResponse(
 	ctx context.Context,
 	req GenerateRequest,
 	systemPrompt string,
@@ -139,7 +197,7 @@ func (p *OpenAIProvider) GenerateResponse(
 		})
 	}
 
-	messages := buildOpenAIMessages(req, history, systemPrompt)
+	messages := buildOpenRouterMessages(req, history, systemPrompt)
 	funcCallsMade := []map[string]any{}
 	inputTokens := 0
 	outputTokens := 0
@@ -156,7 +214,7 @@ func (p *OpenAIProvider) GenerateResponse(
 
 		resp, err := p.post(ctx, body)
 		if err != nil {
-			return GenerateResult{}, fmt.Errorf("openai: %w", err)
+			return GenerateResult{}, fmt.Errorf("openrouter(%s): %w", p.providerKey, err)
 		}
 
 		if u, ok := resp["usage"].(map[string]any); ok {
@@ -168,9 +226,9 @@ func (p *OpenAIProvider) GenerateResponse(
 			}
 		}
 
-		toolCalls := openAIExtractToolCalls(resp)
+		toolCalls := openRouterExtractToolCalls(resp)
 		if len(toolCalls) == 0 {
-			responseText := strings.TrimSpace(openAIExtractText(resp))
+			responseText := strings.TrimSpace(openRouterExtractText(resp))
 			if responseText == "" {
 				responseText = "I apologize, but I couldn't generate a response."
 			}
@@ -181,7 +239,7 @@ func (p *OpenAIProvider) GenerateResponse(
 				"input_tokens":     inputTokens,
 				"output_tokens":    outputTokens,
 				"total_tokens":     inputTokens + outputTokens,
-				"provider":         "openai",
+				"provider":         p.providerKey,
 				"model":            p.modelName,
 			}
 			if len(embeddedElements) > 0 {
@@ -193,7 +251,7 @@ func (p *OpenAIProvider) GenerateResponse(
 				MetadataJSON: string(metaJSON),
 				Voice:        req.Voice,
 				Usage: &LLMUsage{
-					Provider:     "openai",
+					Provider:     p.providerKey,
 					Model:        p.modelName,
 					InputTokens:  inputTokens,
 					OutputTokens: outputTokens,
@@ -245,10 +303,10 @@ func (p *OpenAIProvider) GenerateResponse(
 		}
 	}
 
-	return GenerateResult{}, fmt.Errorf("openai: exceeded max tool-calling iterations")
+	return GenerateResult{}, fmt.Errorf("openrouter(%s): exceeded max tool-calling iterations", p.providerKey)
 }
 
-func buildOpenAIMessages(req GenerateRequest, history []ConvTurn, systemPrompt string) []map[string]any {
+func buildOpenRouterMessages(req GenerateRequest, history []ConvTurn, systemPrompt string) []map[string]any {
 	var messages []map[string]any
 	if systemPrompt != "" {
 		messages = append(messages, map[string]any{
@@ -291,12 +349,12 @@ func buildOpenAIMessages(req GenerateRequest, history []ConvTurn, systemPrompt s
 	return messages
 }
 
-func (p *OpenAIProvider) post(ctx context.Context, body map[string]any) (map[string]any, error) {
+func (p *OpenRouterProvider) post(ctx context.Context, body map[string]any) (map[string]any, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, openAIChatCompletionsURL, bytes.NewReader(b))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, openRouterChatCompletionsURL, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +370,7 @@ func (p *OpenAIProvider) post(ctx context.Context, body map[string]any) (map[str
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("openAI API %d: %s", resp.StatusCode, string(data))
+		return nil, fmt.Errorf("openRouter API %d: %s", resp.StatusCode, string(data))
 	}
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {

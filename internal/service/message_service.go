@@ -16,10 +16,10 @@ import (
 
 // MessageService coordinates message read and write operations.
 type MessageService struct {
-	repo    *repository.MessageRepo
-	gemini  *appai.GeminiProvider
-	billing *repository.BillingRepo
-	users   *repository.UserRepo
+	repo       *repository.MessageRepo
+	summarizer appai.SummarizerResolver
+	billing    *repository.BillingRepo
+	users      *repository.UserRepo
 }
 
 // NewMessageService creates a MessageService.
@@ -27,8 +27,8 @@ func NewMessageService(repo *repository.MessageRepo) *MessageService {
 	return &MessageService{repo: repo}
 }
 
-// WithGemini injects a GeminiProvider for AI summarization.
-func (s *MessageService) WithGemini(g *appai.GeminiProvider) { s.gemini = g }
+// WithSummarizer attaches the AI provider resolver used for AI summarization.
+func (s *MessageService) WithSummarizer(r appai.SummarizerResolver) { s.summarizer = r }
 
 // WithBilling attaches the billing repo and optional user repo (for denormalized identity on billing rows).
 func (s *MessageService) WithBilling(b *repository.BillingRepo, users *repository.UserRepo) {
@@ -246,8 +246,12 @@ func (s *MessageService) conversationTranscript(ctx context.Context, chatSession
 
 // SummarizeConversation fetches a conversation and asks Gemini to summarize it.
 func (s *MessageService) SummarizeConversation(ctx context.Context, chatSession string) (string, error) {
-	if s.gemini == nil {
+	if s.summarizer == nil {
 		return "", fmt.Errorf("aI summarization is not configured")
+	}
+	provider, providerKey := s.summarizer.ResolveSummarizer(ctx)
+	if provider == nil {
+		return "", fmt.Errorf("no AI provider available for summarization")
 	}
 	transcript, err := s.conversationTranscript(ctx, chatSession)
 	if err != nil {
@@ -264,11 +268,11 @@ func (s *MessageService) SummarizeConversation(ctx context.Context, chatSession 
 Conversation:
 %s`, transcript)
 
-	result, err := s.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
+	result, err := provider.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
 	if err != nil {
 		stub := result.Usage
 		if stub == nil {
-			stub = StubLLMUsage("gemini", "")
+			stub = StubLLMUsage(providerKey, "")
 		}
 		MarkUsageServerKey(stub, true)
 		RecordLLMUsage(ctx, s.billing, s.users, stub, err)
@@ -279,10 +283,15 @@ Conversation:
 	return result.PlainText, nil
 }
 
-// RunConversationPrompt sends the same transcript as SummarizeConversation to Gemini, prefixed with the caller-supplied instruction.
+// RunConversationPrompt sends the same transcript as SummarizeConversation to the resolved
+// summarizer provider, prefixed with the caller-supplied instruction.
 func (s *MessageService) RunConversationPrompt(ctx context.Context, chatSession, instruction string) (string, error) {
-	if s.gemini == nil {
+	if s.summarizer == nil {
 		return "", fmt.Errorf("aI is not configured")
+	}
+	provider, providerKey := s.summarizer.ResolveSummarizer(ctx)
+	if provider == nil {
+		return "", fmt.Errorf("no AI provider available for summarization")
 	}
 	transcript, err := s.conversationTranscript(ctx, chatSession)
 	if err != nil {
@@ -290,11 +299,11 @@ func (s *MessageService) RunConversationPrompt(ctx context.Context, chatSession,
 	}
 	prompt := fmt.Sprintf("%s\n\n%s", strings.TrimSpace(instruction), transcript)
 
-	result, err := s.gemini.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
+	result, err := provider.GenerateResponse(ctx, appai.GenerateRequest{UserInput: prompt}, "", nil, nil, nil)
 	if err != nil {
 		stub := result.Usage
 		if stub == nil {
-			stub = StubLLMUsage("gemini", "")
+			stub = StubLLMUsage(providerKey, "")
 		}
 		MarkUsageServerKey(stub, true)
 		RecordLLMUsage(ctx, s.billing, s.users, stub, err)

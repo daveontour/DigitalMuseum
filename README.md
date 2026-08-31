@@ -2,6 +2,32 @@
 
 A personal digital archive and AI-powered memory explorer packaged as an **Electron desktop app**. Digital Museum aggregates your emails, messages, photos, and social media into a single searchable SQLite archive, then lets you explore it through a conversational AI that has direct access to your data.
 
+## Quick Start
+
+```bash
+# 1. Clone and enter the repo
+git clone <repo-url> DigitalMuseum && cd DigitalMuseum
+
+# 2. Copy and configure the environment file
+cp .env.example .env
+# Edit .env — set SQLITE_PATH and at least one AI provider key
+
+# 3. Build and run the Go server (requires CGO + gcc on PATH)
+make run
+
+# 4. Open http://localhost:8000 in your browser
+```
+
+First run automatically applies all database migrations and seeds reference data from `static/data/`.
+
+To run the full desktop app instead of just the server:
+
+```bash
+cd electron && npm install && npx electron .
+```
+
+See [Prerequisites](#prerequisites) for CGO and compiler setup.
+
 ## Features
 
 - **AI chat with tool access** — ask the AI to search your emails, messages, photos, Facebook posts, and more. Supports Anthropic Claude, Google Gemini, DeepSeek, and local Ollama/Gemma4.
@@ -93,22 +119,17 @@ The server reads `.env` from the executable directory or working directory. In E
 
 ### AI Providers (at least one required for chat)
 
+OpenRouter, Tavily, and RunPod API keys are **not** environment variables — sign in as the
+archive owner and set them in Configuration → API Keys (no server-wide fallback). Local AI
+below needs no API key at all.
+
 | Variable | Description |
 |---|---|
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key |
-| `CLAUDE_MODEL_NAME` | Model override (default `claude-sonnet-4-6`) |
-| `GEMINI_API_KEY` | Google Gemini API key |
-| `GEMINI_MODEL_NAME` | Model override (default `gemini-2.5-flash`) |
-| `DEEPSEEK_API_KEY` | DeepSeek API key (Anthropic-compatible endpoint) |
-| `DEEPSEEK_MODEL_NAME` | Model override (default `deepseek-chat`) |
-| `OPENAI_API_KEY` | OpenAI API key (ChatGPT) |
-| `OPENAI_MODEL_NAME` | Model override (default `gpt-4.1-mini`) |
 | `LOCALAI_BASE_URL` | Ollama chat base URL, e.g. `http://localhost:11434` |
 | `LOCALAI_EMBEDDING_BASE_URL` | Ollama embedding base URL (default `http://127.0.0.1:11435`) |
 | `LOCALAI_MODEL_NAME` | Ollama model name (default `local-model`; use `gemma4`) |
 | `LOCALAI_API_KEY` | Not required by Ollama; kept for compatibility |
 | `LOCALAI_EMBEDDING_MODEL` | Embedding model (falls back to `LOCALAI_MODEL_NAME`) |
-| `TAVILY_API_KEY` | Tavily web search key (optional — enables AI web search) |
 
 ### Server
 
@@ -275,6 +296,38 @@ Patterns for senders that should be excluded from contact processing.
   ]
 }
 ```
+
+## Testing
+
+```bash
+# Run all Go tests
+make test
+
+# Run with verbose output
+make test-verbose
+
+# Run with race detector
+make race
+
+# Lint (requires golangci-lint v2.4+)
+make lint
+```
+
+Install the linter if needed:
+
+```bash
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+```
+
+## Contributing
+
+1. Keep all SQL in parameterised form — no string concatenation.
+2. Every new archive data table must include `user_id BIGINT REFERENCES users(id)` and have `AND user_id = $N` on all queries.
+3. Database migrations go in `internal/database/` as new idempotent functions (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`). Never modify an existing migration.
+4. Billing DB inserts must be best-effort — wrap them so they never fail the user-facing request.
+5. Import goroutines must capture `user_id` from the HTTP context **before** launching the goroutine, then use `context.WithValue` to thread it through.
+6. Run `make tidy` after changing `go.mod` dependencies.
+7. Seed data files (`static/data/*.json`) are upserted on startup — editing them and restarting is safe.
 
 ## Architecture
 

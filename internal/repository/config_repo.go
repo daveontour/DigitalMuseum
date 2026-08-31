@@ -33,14 +33,9 @@ type KnownKey struct {
 var knownKeys = func() []KnownKey {
 	str := func(s string) *string { return &s }
 	return []KnownKey{
-		{"GEMINI_API_KEY", nil, false, "Google Gemini API key"},
-		{"GEMINI_MODEL_NAME", str("gemini-2.5-flash"), false, "Gemini model name"},
-		{"ANTHROPIC_API_KEY", nil, false, "Anthropic Claude API key"},
-		{"CLAUDE_MODEL_NAME", str("claude-sonnet-4-6"), false, "Claude model name"},
-		{"DEEPSEEK_API_KEY", nil, false, "DeepSeek API key (Anthropic-compatible Messages API)"},
-		{"DEEPSEEK_MODEL_NAME", str("deepseek-chat"), false, "DeepSeek model name"},
-		{"TAVILY_API_KEY", nil, false, "Tavily web search API key"},
-		{"RUNPOD_API_KEY", nil, false, "RunPod API key (serverless image AI classification)"},
+		// OpenRouter, Tavily, and RunPod API keys are configured only via
+		// Configuration → API Keys in the running app — not as env-seeded
+		// app_configuration rows.
 		{"ELEVENLABS_API_KEY", nil, false, "ElevenLabs API key (speech / voice integrations)"},
 		{"PAGE_TITLE", str("Digital Museum of SUBJECT_NAME"), false, "Browser page title"},
 		{"ATTACHMENT_ALLOWED_TYPES", str(""), false, "Comma-separated allowed attachment MIME/ext types"},

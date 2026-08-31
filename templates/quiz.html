@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take the Quiz — Digital Museum</title>
+    <link rel="stylesheet" href="/static/css/museum_of.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fredoka:wght@500;600;700&display=swap">
+    <style>
+        html { font-family: var(--font-sans-ui); }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+            font-family: 'Inter', var(--font-sans-ui);
+            color: #fff;
+            background:
+                radial-gradient(circle at 50% -10%, rgba(251,191,36,0.16), transparent 55%),
+                radial-gradient(circle at 15% 110%, rgba(59,130,246,0.18), transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(236,72,153,0.12), transparent 45%),
+                #0d1117;
+            overflow-x: hidden;
+        }
+        .quiz-shell { width: 100%; max-width: 720px; }
+
+        .quiz-marquee {
+            text-align: center;
+            font-family: 'Fredoka', var(--font-sans-ui);
+            font-weight: 700;
+            font-size: clamp(1.6rem, 5vw, 2.6rem);
+            letter-spacing: 0.5px;
+            margin: 0 0 6px;
+            background: linear-gradient(90deg, #fbbf24, #fde68a 35%, #fbbf24 70%, #f59e0b);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 28px rgba(251,191,36,0.35);
+        }
+        .quiz-subtitle {
+            text-align: center;
+            color: #8fa4c8;
+            margin: 0 0 28px;
+            font-size: 1rem;
+        }
+
+        .quiz-card {
+            background: #1a2540;
+            border: 1px solid #2a3a6b;
+            border-radius: 16px;
+            padding: 36px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(251,191,36,0.06);
+            position: relative;
+        }
+        @media (max-width: 640px) { .quiz-card { padding: 22px; } }
+
+        .quiz-back-link {
+            display: inline-flex; align-items: center; gap: 6px;
+            color: #6b80a8; text-decoration: none; font-size: 0.85rem;
+            margin-bottom: 18px; transition: color 0.15s;
+        }
+        .quiz-back-link:hover { color: #cdd6e8; }
+
+        /* ── Start screen ── */
+        #quiz-start-screen p.quiz-lead { color: #cdd6e8; font-size: 1.02rem; line-height: 1.55; margin: 0 0 22px; text-align: center; }
+        .quiz-mature-row {
+            display: flex; align-items: center; gap: 10px; justify-content: center;
+            background: #0d1117; border: 1px solid #2a3a6b; border-radius: 10px;
+            padding: 14px 18px; margin: 0 0 26px;
+        }
+        .quiz-mature-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: #fbbf24; cursor: pointer; }
+        .quiz-mature-row label { color: #cdd6e8; font-size: 0.92rem; cursor: pointer; user-select: none; }
+        .quiz-mature-row .quiz-mature-note { display: block; color: #6b80a8; font-size: 0.78rem; margin-top: 2px; }
+
+        .quiz-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            border: none; border-radius: 10px; cursor: pointer;
+            font-family: inherit; font-weight: 700; letter-spacing: 0.2px;
+            transition: transform 0.1s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+        .quiz-btn:active { transform: scale(0.98); }
+        .quiz-btn-primary {
+            width: 100%; padding: 16px; font-size: 1.1rem;
+            background: linear-gradient(90deg, #f59e0b, #fbbf24);
+            color: #1a1206;
+            box-shadow: 0 6px 20px rgba(251,191,36,0.3);
+        }
+        .quiz-btn-primary:hover { box-shadow: 0 8px 26px rgba(251,191,36,0.45); }
+        .quiz-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
+        .quiz-btn-secondary {
+            padding: 12px 22px; font-size: 0.95rem;
+            background: #243358; color: #cdd6e8; border: 1px solid #3d5278;
+        }
+        .quiz-btn-secondary:hover { background: #2c3e6b; color: #fff; }
+
+        /* ── Loading ── */
+        #quiz-loading-screen { display: none; text-align: center; padding: 30px 0; }
+        .quiz-spinner {
+            width: 46px; height: 46px; margin: 0 auto 18px;
+            border: 4px solid #2a3a6b; border-top-color: #fbbf24;
+            border-radius: 50%; animation: quiz-spin 0.9s linear infinite;
+        }
+        @keyframes quiz-spin { to { transform: rotate(360deg); } }
+        #quiz-loading-screen p { color: #8fa4c8; font-size: 0.95rem; }
+
+        /* ── Error ── */
+        #quiz-error-screen { display: none; text-align: center; padding: 10px 0; }
+        #quiz-error-screen .quiz-error-icon { font-size: 2.2rem; color: #f87171; margin-bottom: 12px; }
+        #quiz-error-screen p { color: #cdd6e8; margin-bottom: 22px; }
+
+        /* ── Game screen ── */
+        #quiz-game-screen { display: none; }
+        .quiz-hud {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 22px; gap: 12px;
+        }
+        .quiz-progress-chip {
+            font-size: 0.85rem; font-weight: 600; color: #8fa4c8;
+            background: #0d1117; border: 1px solid #2a3a6b; border-radius: 20px;
+            padding: 6px 14px;
+        }
+        .quiz-score-chip {
+            font-size: 0.9rem; font-weight: 700; color: #1a1206;
+            background: linear-gradient(90deg, #fbbf24, #fde68a);
+            border-radius: 20px; padding: 6px 16px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .quiz-progress-track {
+            height: 6px; border-radius: 3px; background: #0d1117; overflow: hidden;
+            margin-bottom: 26px; border: 1px solid #2a3a6b;
+        }
+        .quiz-progress-fill {
+            height: 100%; background: linear-gradient(90deg, #3b82f6, #fbbf24);
+            transition: width 0.3s ease;
+        }
+
+        .quiz-question {
+            font-family: 'Fredoka', var(--font-sans-ui);
+            font-size: clamp(1.15rem, 3.4vw, 1.5rem);
+            font-weight: 600; line-height: 1.4; color: #fff;
+            margin: 0 0 24px; text-align: center;
+            min-height: 2.8em; display: flex; align-items: center; justify-content: center;
+        }
+
+        .quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 8px; }
+        @media (max-width: 560px) { .quiz-options { grid-template-columns: 1fr; } }
+
+        .quiz-option {
+            display: flex; align-items: center; gap: 12px; text-align: left;
+            padding: 14px 16px; border-radius: 10px;
+            border: 1.5px solid #3d5278; background: #1e2d4f; color: #e2e8f0;
+            font-family: inherit; font-size: 0.98rem; font-weight: 500;
+            cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.1s;
+        }
+        .quiz-option:hover:not(:disabled) { border-color: #fbbf24; background: #243358; transform: translateY(-1px); }
+        .quiz-option:disabled { cursor: default; }
+        .quiz-option-letter {
+            flex: 0 0 30px; height: 30px; border-radius: 50%;
+            background: #0d1117; border: 1px solid #3d5278;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.85rem; color: #8fa4c8;
+        }
+        .quiz-option.is-correct { border-color: #4ade80; background: rgba(74,222,128,0.14); }
+        .quiz-option.is-correct .quiz-option-letter { background: #166534; color: #4ade80; border-color: #166534; }
+        .quiz-option.is-wrong { border-color: #f87171; background: rgba(248,113,113,0.14); }
+        .quiz-option.is-wrong .quiz-option-letter { background: #7f1d1d; color: #f87171; border-color: #7f1d1d; }
+        .quiz-option.is-dimmed { opacity: 0.55; }
+
+        #quiz-fun-fact {
+            display: none; margin-top: 18px; padding: 14px 16px;
+            background: #0d1117; border: 1px solid #2a3a6b; border-left: 3px solid #fbbf24;
+            border-radius: 8px; color: #cdd6e8; font-size: 0.9rem; line-height: 1.5;
+        }
+        #quiz-fun-fact strong { color: #fbbf24; }
+
+        #quiz-next-wrap { display: none; margin-top: 24px; text-align: center; }
+
+        /* ── Result screen ── */
+        #quiz-result-screen { display: none; text-align: center; }
+        .quiz-result-emoji { font-size: 3.2rem; margin-bottom: 6px; }
+        .quiz-result-score {
+            font-family: 'Fredoka', var(--font-sans-ui);
+            font-size: clamp(2.4rem, 8vw, 3.4rem); font-weight: 700;
+            background: linear-gradient(90deg, #fbbf24, #fde68a, #fbbf24);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            margin: 4px 0 14px;
+        }
+        #quiz-result-assessment {
+            color: #e2e8f0; font-size: 1.05rem; line-height: 1.6;
+            margin: 0 auto 28px; max-width: 520px;
+        }
+        .quiz-result-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <div class="quiz-shell">
+        <h1 class="quiz-marquee"><i class="fas fa-star" style="margin-right:8px;"></i>The Big Quiz Show<i class="fas fa-star" style="margin-left:8px;"></i></h1>
+        <p class="quiz-subtitle" id="quiz-subtitle-text">How well do you really know the story behind this archive?</p>
+
+        <div class="quiz-card">
+            <a href="/login" class="quiz-back-link"><i class="fas fa-arrow-left"></i> Back to sign in</a>
+
+            <!-- ── Start screen ── -->
+            <div id="quiz-start-screen">
+                <p class="quiz-lead">Ten multiple-choice questions, generated fresh from the archive. No password
+                    needed — just pick your answer and see how you score!</p>
+                <div class="quiz-mature-row">
+                    <input type="checkbox" id="quiz-mature-checkbox">
+                    <label for="quiz-mature-checkbox">
+                        Include mature content
+                        <span class="quiz-mature-note">Allows cheekier, more adult-toned questions where the material supports it.</span>
+                    </label>
+                </div>
+                <div class="quiz-mature-row">
+                    <input type="checkbox" id="quiz-roast-checkbox">
+                    <label for="quiz-roast-checkbox">
+                        🔥 Roast Mode
+                        <span class="quiz-mature-note">Cheekier, gently embarrassing questions — affectionate teasing, never explicit.</span>
+                    </label>
+                </div>
+                <button type="button" class="quiz-btn quiz-btn-primary" id="quiz-start-btn">
+                    <i class="fas fa-play"></i> Start the Quiz!
+                </button>
+            </div>
+
+            <!-- ── Loading ── -->
+            <div id="quiz-loading-screen">
+                <div class="quiz-spinner"></div>
+                <p id="quiz-loading-text">Cooking up your quiz questions…</p>
+                <p id="quiz-loading-detail" style="color:#6b80a8; font-size:0.82rem; margin-top:6px;"></p>
+            </div>
+
+            <!-- ── Error ── -->
+            <div id="quiz-error-screen">
+                <div class="quiz-error-icon"><i class="fas fa-triangle-exclamation"></i></div>
+                <p id="quiz-error-text">Something went wrong generating the quiz.</p>
+                <button type="button" class="quiz-btn quiz-btn-secondary" id="quiz-error-retry-btn"><i class="fas fa-rotate-right"></i> Try Again</button>
+            </div>
+
+            <!-- ── Game screen ── -->
+            <div id="quiz-game-screen">
+                <div class="quiz-hud">
+                    <span class="quiz-progress-chip" id="quiz-progress-chip">Question 1 of 10</span>
+                    <span class="quiz-score-chip"><i class="fas fa-bolt"></i> <span id="quiz-score-value">0</span> pts</span>
+                </div>
+                <div class="quiz-progress-track"><div class="quiz-progress-fill" id="quiz-progress-fill" style="width:10%;"></div></div>
+
+                <h2 class="quiz-question" id="quiz-question-text"></h2>
+                <div class="quiz-options" id="quiz-options"></div>
+
+                <div id="quiz-fun-fact"></div>
+
+                <div id="quiz-next-wrap">
+                    <button type="button" class="quiz-btn quiz-btn-primary" id="quiz-next-btn" style="width:auto; padding:12px 32px;">
+                        Next Question <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Result screen ── -->
+            <div id="quiz-result-screen">
+                <div class="quiz-result-emoji" id="quiz-result-emoji">🎉</div>
+                <div class="quiz-result-score" id="quiz-result-score">0 / 10</div>
+                <p id="quiz-result-assessment"></p>
+                <div class="quiz-result-actions">
+                    <button type="button" class="quiz-btn quiz-btn-primary" id="quiz-play-again-btn" style="width:auto; padding:14px 30px;">
+                        <i class="fas fa-rotate-right"></i> Play Again
+                    </button>
+                    <a href="/login" class="quiz-btn quiz-btn-secondary" style="text-decoration:none;"><i class="fas fa-sign-in-alt"></i> Back to Sign In</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const screens = {
+                start:  document.getElementById('quiz-start-screen'),
+                loading: document.getElementById('quiz-loading-screen'),
+                error:  document.getElementById('quiz-error-screen'),
+                game:   document.getElementById('quiz-game-screen'),
+                result: document.getElementById('quiz-result-screen'),
+            };
+            function showScreen(name) {
+                Object.keys(screens).forEach(k => { screens[k].style.display = (k === name) ? 'block' : 'none'; });
+            }
+
+            const subtitleEl = document.getElementById('quiz-subtitle-text');
+            const matureCheckbox = document.getElementById('quiz-mature-checkbox');
+            const roastCheckbox = document.getElementById('quiz-roast-checkbox');
+
+            let quiz = null;          // { subject_name, questions: [...] }
+            let currentIndex = 0;
+            let score = 0;
+            let answered = false;
+            let quizEventSource = null;
+
+            function loadingMessages() {
+                return [
+                    'Cooking up your quiz questions…',
+                    'Digging through the archive for good trivia…',
+                    'Consulting the archive AI…',
+                    'Shuffling the answer options…',
+                    'Almost ready — polishing the questions…',
+                ];
+            }
+            let loadingTimer = null;
+            function startLoadingMessages() {
+                const msgs = loadingMessages();
+                const el = document.getElementById('quiz-loading-text');
+                let i = 0;
+                el.textContent = msgs[0];
+                loadingTimer = setInterval(() => {
+                    i = (i + 1) % msgs.length;
+                    el.textContent = msgs[i];
+                }, 2200);
+            }
+            function stopLoadingMessages() {
+                if (loadingTimer) { clearInterval(loadingTimer); loadingTimer = null; }
+            }
+
+            function closeQuizStream() {
+                if (quizEventSource) { quizEventSource.close(); quizEventSource = null; }
+            }
+
+            function showQuizError(message) {
+                document.getElementById('quiz-error-text').textContent =
+                    message || 'Something went wrong generating the quiz. Please try again.';
+                showScreen('error');
+            }
+
+            function applySubjectName() {
+                if (quiz && quiz.subject_name) {
+                    document.querySelector('.quiz-marquee').innerHTML =
+                        '<i class="fas fa-star" style="margin-right:8px;"></i>The ' + escapeHtml(quiz.subject_name) + ' Quiz Show<i class="fas fa-star" style="margin-left:8px;"></i>';
+                    subtitleEl.textContent = 'How well do you really know ' + quiz.subject_name + '?';
+                }
+            }
+
+            // Subscribes to live progress (current AI provider / tool) and the final
+            // result over SSE. Must only be opened once the server has confirmed the
+            // job was (re)started — otherwise a stale "completed" snapshot from a
+            // previous quiz could be delivered on connect.
+            function startQuizStream() {
+                closeQuizStream();
+                const detailEl = document.getElementById('quiz-loading-detail');
+                quizEventSource = new EventSource('/api/quiz/generate/stream');
+                quizEventSource.onmessage = function (event) {
+                    let ed;
+                    try { ed = JSON.parse(event.data); } catch (e) { return; }
+                    const type = ed.type;
+                    const data = ed.data || {};
+                    if (type === 'progress' && data.status_line) {
+                        detailEl.textContent = data.status_line;
+                    } else if (type === 'completed') {
+                        closeQuizStream();
+                        stopLoadingMessages();
+                        if (!data || !Array.isArray(data.questions) || data.questions.length === 0) {
+                            showQuizError('The quiz could not be generated. Please try again.');
+                            return;
+                        }
+                        quiz = data;
+                        applySubjectName();
+                        currentIndex = 0;
+                        score = 0;
+                        renderQuestion();
+                        showScreen('game');
+                    } else if (type === 'error') {
+                        closeQuizStream();
+                        stopLoadingMessages();
+                        showQuizError(data.error_message);
+                    }
+                };
+                quizEventSource.onerror = function () { /* EventSource auto-reconnects */ };
+            }
+
+            async function startQuiz() {
+                showScreen('loading');
+                document.getElementById('quiz-loading-detail').textContent = '';
+                startLoadingMessages();
+                try {
+                    const res = await fetch('/api/quiz/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            include_mature: !!matureCheckbox.checked,
+                            roast_mode: !!roastCheckbox.checked,
+                        }),
+                    });
+                    if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        const fallback = res.status === 409
+                            ? 'A quiz is already being generated — please wait a moment and try again.'
+                            : 'The quiz could not be generated.';
+                        throw new Error((data && (data.error || data.detail)) || fallback);
+                    }
+                    // Job started server-side; the SSE stream delivers progress and the final result.
+                    startQuizStream();
+                } catch (err) {
+                    stopLoadingMessages();
+                    showQuizError((err && err.message) ? err.message : null);
+                }
+            }
+
+            function escapeHtml(s) {
+                return String(s).replace(/[&<>"']/g, c => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                }[c]));
+            }
+
+            const letters = ['A', 'B', 'C', 'D'];
+
+            function renderQuestion() {
+                answered = false;
+                const q = quiz.questions[currentIndex];
+                document.getElementById('quiz-progress-chip').textContent =
+                    'Question ' + (currentIndex + 1) + ' of ' + quiz.questions.length;
+                document.getElementById('quiz-progress-fill').style.width =
+                    (((currentIndex) / quiz.questions.length) * 100) + '%';
+                document.getElementById('quiz-score-value').textContent = score;
+                document.getElementById('quiz-question-text').textContent = q.question;
+
+                const optionsEl = document.getElementById('quiz-options');
+                optionsEl.innerHTML = '';
+                q.options.forEach((opt, idx) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'quiz-option';
+                    btn.innerHTML = '<span class="quiz-option-letter">' + letters[idx] + '</span><span>' + escapeHtml(opt) + '</span>';
+                    btn.addEventListener('click', () => selectAnswer(idx));
+                    optionsEl.appendChild(btn);
+                });
+
+                document.getElementById('quiz-fun-fact').style.display = 'none';
+                document.getElementById('quiz-next-wrap').style.display = 'none';
+            }
+
+            function selectAnswer(idx) {
+                if (answered) return;
+                answered = true;
+                const q = quiz.questions[currentIndex];
+                const buttons = document.querySelectorAll('#quiz-options .quiz-option');
+                buttons.forEach((btn, i) => {
+                    btn.disabled = true;
+                    if (i === q.correct_index) btn.classList.add('is-correct');
+                    else if (i === idx) btn.classList.add('is-wrong');
+                    else btn.classList.add('is-dimmed');
+                });
+
+                if (idx === q.correct_index) score += 1;
+                document.getElementById('quiz-score-value').textContent = score;
+                document.getElementById('quiz-progress-fill').style.width =
+                    (((currentIndex + 1) / quiz.questions.length) * 100) + '%';
+
+                if (q.fun_fact) {
+                    const factEl = document.getElementById('quiz-fun-fact');
+                    factEl.innerHTML = '<strong>' + (idx === q.correct_index ? 'Correct! ' : 'Fun fact: ') + '</strong>' + escapeHtml(q.fun_fact);
+                    factEl.style.display = 'block';
+                }
+
+                const nextWrap = document.getElementById('quiz-next-wrap');
+                const nextBtn = document.getElementById('quiz-next-btn');
+                nextBtn.innerHTML = (currentIndex === quiz.questions.length - 1)
+                    ? 'See My Score <i class="fas fa-flag-checkered"></i>'
+                    : 'Next Question <i class="fas fa-arrow-right"></i>';
+                nextWrap.style.display = 'block';
+            }
+
+            document.getElementById('quiz-next-btn').addEventListener('click', () => {
+                currentIndex += 1;
+                if (currentIndex >= quiz.questions.length) {
+                    showResult();
+                } else {
+                    renderQuestion();
+                }
+            });
+
+            function assessmentFor(score, total, subjectName) {
+                const name = subjectName || 'the subject';
+                const pct = score / total;
+                if (pct === 1) {
+                    return ['🏆', 'PERFECT SCORE! You clearly know ' + name + ' inside and out — were you secretly there for all of it?'];
+                } else if (pct >= 0.8) {
+                    return ['🌟', "Seriously impressive! You know " + name + "'s story better than most of the family."];
+                } else if (pct >= 0.6) {
+                    return ['👍', "Solid effort! You know your stuff — though " + name + " could probably still surprise you."];
+                } else if (pct >= 0.4) {
+                    return ['🤔', "Not bad, but " + name + " might raise an eyebrow at a couple of those answers."];
+                } else if (pct >= 0.2) {
+                    return ['😅', "Ouch. Might be time to spend a bit more time exploring the archive!"];
+                }
+                return ['🫣', "Did you two even meet? Time to dive into the archive and get to know " + name + " properly!"];
+            }
+
+            function showResult() {
+                const total = quiz.questions.length;
+                const [emoji, text] = assessmentFor(score, total, quiz.subject_name);
+                document.getElementById('quiz-result-emoji').textContent = emoji;
+                document.getElementById('quiz-result-score').textContent = score + ' / ' + total;
+                document.getElementById('quiz-result-assessment').textContent = text;
+                showScreen('result');
+            }
+
+            document.getElementById('quiz-start-btn').addEventListener('click', startQuiz);
+            document.getElementById('quiz-error-retry-btn').addEventListener('click', startQuiz);
+            document.getElementById('quiz-play-again-btn').addEventListener('click', startQuiz);
+
+            showScreen('start');
+        }());
+    </script>
+</body>
+</html>

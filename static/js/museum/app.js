@@ -88,15 +88,26 @@ const App = (() => {
         return !!(availability.localai_infrastructure_available || availability.localai_available);
     }
 
+    // availMap shape: { auto, localai, _order: [key,...], [key]: available }
+    // _order lists hosted AI model keys in server sort_order (the dynamic replacement
+    // for the old fixed gemini/claude/deepseek/openai set).
     function buildProviderAvailabilityMap(availability) {
-        return {
+        const models = Array.isArray(availability.models) ? availability.models : [];
+        const map = {
             auto: !!availability.auto_available,
-            gemini: !!availability.gemini_available,
-            claude: !!availability.claude_available,
-            deepseek: !!availability.deepseek_available,
-            openai: !!availability.openai_available,
             localai: effectiveLocalAIAvailable(availability),
+            _order: [],
         };
+        models.forEach((m) => {
+            if (!m || !m.key) return;
+            map[m.key] = !!m.available;
+            map._order.push(m.key);
+        });
+        return map;
+    }
+
+    function isHostedProviderKey(availMap, key) {
+        return !!(availMap && availMap._order && availMap._order.indexOf(key) !== -1);
     }
 
     const LLM_PROVIDER_SELECT_IDS = [
@@ -105,67 +116,41 @@ const App = (() => {
         'interview-provider',
         'have-a-chat-provider-a',
         'have-a-chat-provider-b',
-        'hosted-llm-classifier-provider',
     ];
 
     function firstAvailableProvider(availMap, preferAuto) {
         if (preferAuto && availMap.auto) return 'auto';
-        if (availMap.gemini) return 'gemini';
-        if (availMap.claude) return 'claude';
-        if (availMap.deepseek) return 'deepseek';
-        if (availMap.openai) return 'openai';
+        const order = availMap._order || [];
+        for (const key of order) {
+            if (availMap[key]) return key;
+        }
         if (availMap.localai) return 'localai';
-        return preferAuto ? 'auto' : 'gemini';
+        return preferAuto ? 'auto' : (order[0] || 'localai');
     }
 
     async function getLLMProviderAvailabilityPair() {
         try {
             const res = await fetch('/chat/availability', { credentials: 'same-origin' });
-            if (!res.ok) return { gemini: true, claude: true, deepseek: true, openai: true, localai: false };
+            if (!res.ok) return { _order: [], localai: false };
             const av = await res.json();
-            return {
-                gemini: !!av.gemini_available,
-                claude: !!av.claude_available,
-                deepseek: !!av.deepseek_available,
-                openai: !!av.openai_available,
-                localai: effectiveLocalAIAvailable(av),
-            };
+            if (typeof AIModelLabels !== 'undefined' && Array.isArray(av.models)) AIModelLabels.set(av.models);
+            return buildProviderAvailabilityMap(av);
         } catch (e) {
-            return { gemini: true, claude: true, deepseek: true, openai: true, localai: false };
+            return { _order: [], localai: false };
         }
-    }
-
-    function otherLLMProvider(p) {
-        if (p === 'auto') return 'gemini';
-        if (p === 'localai') return 'gemini';
-        const failover = (typeof Modals !== 'undefined'
-            && Modals.HostedLLMOrderConfig
-            && Modals.HostedLLMOrderConfig.getFailoverCandidates)
-            ? Modals.HostedLLMOrderConfig.getFailoverCandidates(p)
-            : [];
-        if (failover.length) return failover[0];
-        if (p === 'gemini') return 'claude';
-        if (p === 'claude') return 'gemini';
-        if (p === 'deepseek') return 'gemini';
-        if (p === 'openai') return 'gemini';
-        return 'gemini';
     }
 
     function getHostedFailoverCandidates(primary) {
         if (typeof Modals !== 'undefined'
-            && Modals.HostedLLMOrderConfig
-            && Modals.HostedLLMOrderConfig.getFailoverCandidates) {
-            return Modals.HostedLLMOrderConfig.getFailoverCandidates(primary);
+            && Modals.AutoRoutingConfig
+            && Modals.AutoRoutingConfig.getFailoverCandidates) {
+            return Modals.AutoRoutingConfig.getFailoverCandidates(primary);
         }
-        const p = String(primary || '').toLowerCase().trim();
-        return ['gemini', 'claude', 'deepseek', 'openai'].filter((name) => name !== p);
+        return [];
     }
 
     function isHostedProviderAvailable(name, av) {
-        if (name === 'claude') return !!av.claude;
-        if (name === 'deepseek') return !!av.deepseek;
-        if (name === 'openai') return !!av.openai;
-        return !!av.gemini;
+        return !!(av && av[name]);
     }
 
     const LAST_HOSTED_LLM_PROVIDER_KEY = 'dm_last_hosted_llm_provider';
@@ -173,13 +158,13 @@ const App = (() => {
     function getLastManualHostedProvider() {
         try {
             const v = localStorage.getItem(LAST_HOSTED_LLM_PROVIDER_KEY);
-            if (v === 'gemini' || v === 'claude' || v === 'deepseek' || v === 'openai') return v;
+            if (v && v !== 'auto' && v !== 'localai') return v;
         } catch (_) { /* ignore */ }
         return null;
     }
 
     function saveLastManualHostedProviderIfHosted(value) {
-        if (value === 'gemini' || value === 'claude' || value === 'deepseek' || value === 'openai') {
+        if (value && value !== 'auto' && value !== 'localai') {
             try {
                 localStorage.setItem(LAST_HOSTED_LLM_PROVIDER_KEY, value);
             } catch (_) { /* ignore */ }
@@ -270,7 +255,7 @@ const App = (() => {
      *  (the user explicitly chose a local model and should not be silently routed to a cloud provider). */
     async function runChatWithProviderFailover(url, buildPayload, signal) {
         const select = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
-        const primary = (select && select.value) ? select.value : 'gemini';
+        const primary = (select && select.value) ? select.value : '';
         if (typeof UI !== 'undefined' && UI.clearChatAutoRoutingNotice) {
             UI.clearChatAutoRoutingNotice();
         }
@@ -290,9 +275,9 @@ const App = (() => {
             return { ok: false, error: first.error || 'Local AI request failed', data: first.data };
         }
         const failoverEnabled = (typeof Modals !== 'undefined'
-            && Modals.HostedLLMOrderConfig
-            && Modals.HostedLLMOrderConfig.isFailoverEnabled)
-            ? Modals.HostedLLMOrderConfig.isFailoverEnabled()
+            && Modals.AutoRoutingConfig
+            && Modals.AutoRoutingConfig.isFailoverEnabled)
+            ? Modals.AutoRoutingConfig.isFailoverEnabled()
             : true;
         if (!failoverEnabled) {
             return { ok: false, error: first.error || 'Request failed', data: first.data };
@@ -340,8 +325,64 @@ const App = (() => {
         return { ok: false, error: lastError, data: first.data };
     }
 
+    /** Shows the "API Key Required" warning modal; resolves true if the user clicked
+     *  "Go to Configuration" (which also opens it there), false on Cancel/close. */
+    function showApiKeyRequiredDialog(message) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('api-key-required-modal');
+            const msgEl = document.getElementById('api-key-required-modal-message');
+            const goBtn = document.getElementById('api-key-required-goto-btn');
+            const cancelBtn = document.getElementById('api-key-required-cancel-btn');
+            const closeBtn = document.getElementById('api-key-required-close-btn');
+            if (!modal || !goBtn || !cancelBtn) { resolve(false); return; }
+            if (msgEl) {
+                msgEl.textContent = message
+                    || 'This action needs an OpenRouter API key, which hasn’t been configured yet.';
+            }
+            modal.style.display = 'flex';
+            function cleanup() {
+                modal.style.display = 'none';
+                goBtn.removeEventListener('click', onGo);
+                cancelBtn.removeEventListener('click', onCancel);
+                if (closeBtn) closeBtn.removeEventListener('click', onCancel);
+            }
+            function onGo() {
+                cleanup();
+                if (typeof window.openConfigurationToTab === 'function') window.openConfigurationToTab('api-keys');
+                resolve(true);
+            }
+            function onCancel() {
+                cleanup();
+                resolve(false);
+            }
+            goBtn.addEventListener('click', onGo);
+            cancelBtn.addEventListener('click', onCancel);
+            if (closeBtn) closeBtn.addEventListener('click', onCancel);
+        });
+    }
+
+    /** Returns true (and shows the warning dialog) when the currently selected chat
+     *  provider needs an OpenRouter key that has not been configured — callers should
+     *  bail out immediately without sending anything. Local AI never requires a key. */
+    async function blockIfChatProviderNotReady() {
+        const select = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
+        const provider = (select && select.value) ? select.value : 'auto';
+        if (provider === 'localai') return false;
+        const av = await getLLMProviderAvailabilityPair();
+        const ready = provider === 'auto'
+            ? !!(av.auto || av.localai)
+            : isHostedProviderAvailable(provider, av);
+        if (ready) return false;
+        await showApiKeyRequiredDialog(
+            'This action needs an OpenRouter API key, which hasn’t been configured yet. '
+            + 'Add one in Configuration → API Keys, or switch to Local AI in the provider list.'
+        );
+        return true;
+    }
+
     async function processFormSubmit(userPrompt, category = null, title = null, supplementary_prompt = null) {
         if (!userPrompt && !category && !title) return;
+        if (await blockIfChatProviderNotReady()) return;
 
  //       Check and show reference documents notification before proceeding
         await Modals.ReferenceDocumentsNotification.checkAndShow(async () => {
@@ -422,6 +463,7 @@ const App = (() => {
         var title = "Generate a random question about " + CONSTANTS.OWNER_NAME + "'s life.";
 
         if (!userPrompt && !category && !title) return;
+        if (await blockIfChatProviderNotReady()) return;
 
         // Check and show reference documents notification before proceeding
         await Modals.ReferenceDocumentsNotification.checkAndShow(async () => {
@@ -485,7 +527,7 @@ const App = (() => {
         });
     }
     async function processAnswerSubmit(userPrompt) {
-
+        if (await blockIfChatProviderNotReady()) return;
 
         // Check and show reference documents notification before proceeding
         await Modals.ReferenceDocumentsNotification.checkAndShow(async () => {
@@ -1155,16 +1197,21 @@ const App = (() => {
                 }
                 if (targetTab === 'settings' || targetTab === 'api-keys') {
                     if (Modals.UserLLMSettings && Modals.UserLLMSettings.load) void Modals.UserLLMSettings.load();
-                    if (targetTab === 'settings') void loadLLMProviderAvailability();
-                }
-                if (targetTab === 'inactivity-prompt') {
-                    if (Modals.InactivityPromptConfig && Modals.InactivityPromptConfig.load) {
-                        void Modals.InactivityPromptConfig.load();
+                    if (targetTab === 'settings') {
+                        void loadLLMProviderAvailability();
+                        if (Modals.InactivityPromptConfig && Modals.InactivityPromptConfig.load) {
+                            void Modals.InactivityPromptConfig.load();
+                        }
                     }
                 }
-                if (targetTab === 'hosted-llm-order') {
-                    if (Modals.HostedLLMOrderConfig && Modals.HostedLLMOrderConfig.load) {
-                        void Modals.HostedLLMOrderConfig.load();
+                if (targetTab === 'ai-models-config') {
+                    if (Modals.AIModelsConfig && Modals.AIModelsConfig.load) {
+                        void Modals.AIModelsConfig.load();
+                    }
+                }
+                if (targetTab === 'model-catalog') {
+                    if (Modals.ModelCatalog && Modals.ModelCatalog.load) {
+                        void Modals.ModelCatalog.load();
                     }
                 }
             });
@@ -1190,6 +1237,7 @@ const App = (() => {
             if (tabBtn) tabBtn.click();
             if (typeof refreshSettingsDataImportModalLLM === 'function') refreshSettingsDataImportModalLLM();
         }
+        window.openConfigurationToTab = openConfigurationToTab;
 
         async function onChatStatusBarConfigClick(tabName) {
             if (!(await fetchMasterUnlockedForDataImport())) {
@@ -1238,6 +1286,9 @@ const App = (() => {
         }
         if (typeof UI !== 'undefined' && UI.initChatAutoRoutingReasonModal) {
             UI.initChatAutoRoutingReasonModal();
+        }
+        if (typeof UI !== 'undefined' && UI.initOpenRouterCreditsClick) {
+            UI.initOpenRouterCreditsClick();
         }
 
         // Dashboard: load stats and render. prefix e.g. 'stats-' for Dashboard modal (ids: prefix + 'dashboard-stats', …).
@@ -1517,48 +1568,24 @@ const App = (() => {
                 if (meRes.ok) {
                     try { me = await meRes.json(); } catch (_) { /* ignore */ }
                 }
-                const gOk = !!av.gemini_available;
-                const cOk = !!av.claude_available;
-                const dOk = !!av.deepseek_available;
-                const oOk = !!av.openai_available;
+                const models = Array.isArray(av.models) ? av.models : [];
                 const lOk = effectiveLocalAIAvailable(av);
-                const gemVal = gOk
-                    ? '<strong style="color:#15803d;">Ready</strong>'
-                    : '<strong style="color:#b91c1c;">Not available</strong> — configure a Gemini API key';
-                const claVal = cOk
-                    ? '<strong style="color:#15803d;">Ready</strong>'
-                    : '<strong style="color:#b91c1c;">Not available</strong> — configure an Anthropic API key';
-                const deepVal = dOk
-                    ? '<strong style="color:#15803d;">Ready</strong>'
-                    : '<strong style="color:#b91c1c;">Not available</strong> — configure a DeepSeek API key';
-                const openaiVal = oOk
-                    ? '<strong style="color:#15803d;">Ready</strong>'
-                    : '<strong style="color:#b91c1c;">Not available</strong> — configure an OpenAI API key';
+                const anyHostedOk = models.some((m) => m && m.available);
                 const localVal = lOk
                     ? '<strong style="color:#15803d;">Ready</strong>'
                     : '<strong style="color:#b91c1c;">Not Available</strong>';
                 const parts = [];
-                parts.push(row2('<span style="color:#64748b;">Gemini</span>', `<span>${gemVal}</span>`));
-                parts.push(row2('<span style="color:#64748b;">Claude</span>', `<span>${claVal}</span>`));
-                parts.push(row2('<span style="color:#64748b;">DeepSeek</span>', `<span>${deepVal}</span>`));
-                parts.push(row2('<span style="color:#64748b;">ChatGPT</span>', `<span>${openaiVal}</span>`));
+                models.forEach((m) => {
+                    if (!m || !m.key) return;
+                    const val = m.available
+                        ? '<strong style="color:#15803d;">Ready</strong>'
+                        : '<strong style="color:#b91c1c;">Not available</strong> — configure an OpenRouter API key';
+                    parts.push(row2(`<span style="color:#64748b;">${esc(m.display_name || m.key)}</span>`, `<span>${val}</span>`));
+                });
                 parts.push(row2('<span style="color:#64748b;">Local AI</span>', `<span>${localVal}</span>`));
                 if (me && me.llm_settings) {
                     const ls = me.llm_settings;
                     const sess = !!ls.session_scoped;
-                    const scope = sess ? '<span style="color:#64748b;font-weight:normal;"> — session</span>' : '<span style="color:#64748b;font-weight:normal;"> — saved on account</span>';
-                    if (ls.gemini_model) {
-                        parts.push(row2(`<span style="color:#64748b;">Gemini model${scope}</span>`, `<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:0.85rem;">${esc(ls.gemini_model)}</code>`));
-                    }
-                    if (ls.claude_model) {
-                        parts.push(row2(`<span style="color:#64748b;">Claude model${scope}</span>`, `<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:0.85rem;">${esc(ls.claude_model)}</code>`));
-                    }
-                    if (ls.deepseek_model) {
-                        parts.push(row2(`<span style="color:#64748b;">DeepSeek model${scope}</span>`, `<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:0.85rem;">${esc(ls.deepseek_model)}</code>`));
-                    }
-                    if (ls.openai_model) {
-                        parts.push(row2(`<span style="color:#64748b;">ChatGPT model${scope}</span>`, `<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:0.85rem;">${esc(ls.openai_model)}</code>`));
-                    }
                     const tavVal = ls.tavily_api_key_set
                         ? '<strong style="color:#15803d;">Key set</strong> — search tool can use your Tavily key' + (sess ? ' <span style="color:#64748b;font-weight:normal;">(this session)</span>' : '')
                         : '<span style="color:#64748b;">No personal Tavily key in Settings — server default or none</span>';
@@ -1579,7 +1606,7 @@ const App = (() => {
                 const lbl = document.getElementById('overview-llm-keys-open-btn-label');
                 archiveOverviewMeForKeys = null;
                 if (wrap) {
-                    if (!gOk && !cOk && !dOk && !oOk && !lOk && me) {
+                    if (!anyHostedOk && !lOk && me) {
                         wrap.style.display = 'block';
                         archiveOverviewMeForKeys = me;
                         if (lbl) {
@@ -1622,35 +1649,16 @@ const App = (() => {
                 if (titleEl) titleEl.textContent = sess ? 'API keys for this visit' : 'Add your API keys';
                 if (introEl) {
                     introEl.textContent = sess
-                        ? 'Keys are stored on this browser session only and clear when the session ends. Enter at least one cloud API key (Gemini, Anthropic, DeepSeek, or ChatGPT) to use chat.'
-                        : 'Keys are saved to your account. Enter at least one cloud API key (Gemini, Anthropic, DeepSeek, or ChatGPT) when no server key is available for you.';
+                        ? 'Keys are stored on this browser session only and clear when the session ends. Enter an OpenRouter API key to use chat.'
+                        : 'Keys are saved to your account. Enter an OpenRouter API key when no server key is available for you.';
                 }
-                const gk = document.getElementById('overview-llm-gemini-key');
-                const ak = document.getElementById('overview-llm-anthropic-key');
-                const dk = document.getElementById('overview-llm-deepseek-key');
-                const oK = document.getElementById('overview-llm-openai-key');
+                const ork = document.getElementById('overview-llm-openrouter-key');
                 const tk = document.getElementById('overview-llm-tavily-key');
                 const rk = document.getElementById('overview-llm-runpod-key');
                 const elK = document.getElementById('overview-llm-elevenlabs-key');
-                const gm = document.getElementById('overview-llm-gemini-model');
-                const cm = document.getElementById('overview-llm-claude-model');
-                const dsm = document.getElementById('overview-llm-deepseek-model');
-                const osm = document.getElementById('overview-llm-openai-model');
-                if (gk) {
-                    gk.value = '';
-                    gk.placeholder = sess ? 'Leave blank to use owner or server default' : 'Paste key to save';
-                }
-                if (ak) {
-                    ak.value = '';
-                    ak.placeholder = sess ? 'Leave blank to use owner or server default' : 'Paste key to save';
-                }
-                if (dk) {
-                    dk.value = '';
-                    dk.placeholder = sess ? 'Leave blank to use owner or server default' : 'Paste key to save';
-                }
-                if (oK) {
-                    oK.value = '';
-                    oK.placeholder = sess ? 'Leave blank to use owner or server default' : 'Paste key to save';
+                if (ork) {
+                    ork.value = '';
+                    ork.placeholder = sess ? 'Leave blank to use owner or server default' : 'Paste key to save';
                 }
                 if (tk) {
                     tk.value = '';
@@ -1664,10 +1672,6 @@ const App = (() => {
                     elK.value = '';
                     elK.placeholder = 'Optional — ElevenLabs speech';
                 }
-                if (gm) gm.value = ls.gemini_model || '';
-                if (cm) cm.value = ls.claude_model || '';
-                if (dsm) dsm.value = ls.deepseek_model || '';
-                if (osm) osm.value = ls.openai_model || '';
                 const st = document.getElementById('archive-overview-llm-save-status');
                 if (st) st.textContent = '';
                 modal.style.display = 'flex';
@@ -1682,43 +1686,26 @@ const App = (() => {
             if (saveBtn) {
                 saveBtn.addEventListener('click', async () => {
                     const st = document.getElementById('archive-overview-llm-save-status');
-                    const gkEl = document.getElementById('overview-llm-gemini-key');
-                    const akEl = document.getElementById('overview-llm-anthropic-key');
-                    const dkEl = document.getElementById('overview-llm-deepseek-key');
-                    const okEl = document.getElementById('overview-llm-openai-key');
+                    const orkEl = document.getElementById('overview-llm-openrouter-key');
                     const tkEl = document.getElementById('overview-llm-tavily-key');
                     const rkEl = document.getElementById('overview-llm-runpod-key');
                     const elKEl = document.getElementById('overview-llm-elevenlabs-key');
-                    const gmEl = document.getElementById('overview-llm-gemini-model');
-                    const cmEl = document.getElementById('overview-llm-claude-model');
-                    const dsmEl = document.getElementById('overview-llm-deepseek-model');
-                    const osmEl = document.getElementById('overview-llm-openai-model');
-                    const gk = (gkEl && gkEl.value.trim()) || '';
-                    const ak = (akEl && akEl.value.trim()) || '';
-                    const dk = (dkEl && dkEl.value.trim()) || '';
-                    const ok = (okEl && okEl.value.trim()) || '';
+                    const ork = (orkEl && orkEl.value.trim()) || '';
                     const tk = (tkEl && tkEl.value.trim()) || '';
                     const rp = (rkEl && rkEl.value.trim()) || '';
                     const elK = (elKEl && elKEl.value.trim()) || '';
-                    if (!gk && !ak && !dk && !ok) {
+                    if (!ork) {
                         if (st) {
-                            st.textContent = 'Enter at least one API key: Gemini, Anthropic, DeepSeek, or ChatGPT.';
+                            st.textContent = 'Enter an OpenRouter API key.';
                             st.style.color = '#b91c1c';
                         }
                         return;
                     }
                     const body = {};
-                    if (gk) body.gemini_api_key = gk;
-                    if (ak) body.anthropic_api_key = ak;
-                    if (dk) body.deepseek_api_key = dk;
-                    if (ok) body.openai_api_key = ok;
+                    body.openrouter_api_key = ork;
                     if (tk) body.tavily_api_key = tk;
                     if (rp) body.runpod_api_key = rp;
                     if (elK) body.elevenlabs_api_key = elK;
-                    body.gemini_model = (gmEl && gmEl.value.trim()) || '';
-                    body.claude_model = (cmEl && cmEl.value.trim()) || '';
-                    body.deepseek_model = (dsmEl && dsmEl.value.trim()) || '';
-                    body.openai_model = (osmEl && osmEl.value.trim()) || '';
                     saveBtn.disabled = true;
                     if (st) {
                         st.textContent = 'Saving…';
@@ -5193,15 +5180,12 @@ const App = (() => {
             .filter(Boolean);
         if (!selects.length) return;
 
-        function applyProviderAvailabilityToSelect(sel, availMap) {
+        function applyProviderAvailabilityToSelect(sel, availMap, models) {
             if (!sel) return;
             const includeAuto = sel.querySelector('option[value="auto"]') != null;
             const providers = [
                 ...(includeAuto ? [{ value: 'auto', label: 'Auto' }] : []),
-                { value: 'gemini', label: 'Gemini' },
-                { value: 'claude', label: 'Claude' },
-                { value: 'deepseek', label: 'DeepSeek' },
-                { value: 'openai', label: 'ChatGPT' },
+                ...models.map((m) => ({ value: m.key, label: m.display_name || m.key })),
                 { value: 'localai', label: 'Local AI' },
             ];
 
@@ -5220,10 +5204,10 @@ const App = (() => {
                 sel.appendChild(opt);
             });
 
-            if (sel.options.length === 0) {
+            if (sel.options.length === 0 && providers.length > 0) {
                 const fallback = document.createElement('option');
-                fallback.value = 'gemini';
-                fallback.textContent = 'Gemini';
+                fallback.value = providers[providers.length > 1 ? 1 : 0].value;
+                fallback.textContent = providers[providers.length > 1 ? 1 : 0].label;
                 sel.appendChild(fallback);
             }
 
@@ -5249,14 +5233,19 @@ const App = (() => {
             const av = await avRes.json();
             av.localai_use_enabled = resolveLocalAIUseEnabled(useEnabled);
             const availMap = buildProviderAvailabilityMap(av);
-            selects.forEach((sel) => applyProviderAvailabilityToSelect(sel, availMap));
+            const models = Array.isArray(av.models) ? av.models : [];
+            if (typeof AIModelLabels !== 'undefined') AIModelLabels.set(models);
+            selects.forEach((sel) => applyProviderAvailabilityToSelect(sel, availMap, models));
             if (typeof Modals !== 'undefined'
-                && Modals.HostedLLMOrderConfig
-                && Modals.HostedLLMOrderConfig.reconcileClassifierProvider) {
-                Modals.HostedLLMOrderConfig.reconcileClassifierProvider();
+                && Modals.AutoRoutingConfig
+                && Modals.AutoRoutingConfig.reconcileClassifierProvider) {
+                Modals.AutoRoutingConfig.reconcileClassifierProvider();
             }
             if (typeof UI !== 'undefined' && UI.updateChatContextStatusBarFromAvailability) {
                 UI.updateChatContextStatusBarFromAvailability(av);
+            }
+            if (typeof UI !== 'undefined' && UI.refreshOpenRouterCredits) {
+                void UI.refreshOpenRouterCredits();
             }
         } catch (e) {
             console.error('Failed to load LLM availability:', e);
@@ -5407,6 +5396,22 @@ const App = (() => {
         if (dontShow) dontShow.checked = !!state.dontShowAgain;
     }
 
+    /** Shows/hides the welcome dialog's "no OpenRouter API key configured" warning banner. */
+    async function checkWelcomeOpenRouterKeyWarning() {
+        const warn = document.getElementById('welcome-openrouter-key-warning');
+        if (!warn) return;
+        try {
+            const res = await fetch('/chat/availability', { credentials: 'same-origin' });
+            if (!res.ok) { warn.style.display = 'none'; return; }
+            const av = await res.json();
+            const models = Array.isArray(av.models) ? av.models : [];
+            const anyHostedOk = models.some((m) => m && m.available);
+            warn.style.display = anyHostedOk ? 'none' : 'flex';
+        } catch (_) {
+            warn.style.display = 'none';
+        }
+    }
+
     function showWelcomeOnboardingModal() {
         const modal = document.getElementById('info-box-modal');
         if (!modal) return;
@@ -5415,6 +5420,7 @@ const App = (() => {
         if (typeof UI !== 'undefined' && UI.setControlsEnabled) UI.setControlsEnabled(false);
         renderOnboardingChecklistState();
         void loadArchiveOverviewLLMStatus();
+        void checkWelcomeOpenRouterKeyWarning();
     }
 
     function restartOnboardingFlow() {
@@ -5435,6 +5441,15 @@ const App = (() => {
                         'You can restart onboarding anytime from Guide → Reeanable Welcome Dialog.'
                     );
                 }
+            });
+        }
+
+        const openRouterWarnBtn = document.getElementById('welcome-openrouter-key-warning-btn');
+        if (openRouterWarnBtn && !openRouterWarnBtn.dataset.onboardingWired) {
+            openRouterWarnBtn.dataset.onboardingWired = '1';
+            openRouterWarnBtn.addEventListener('click', () => {
+                if (window.closeInfoBoxModal) window.closeInfoBoxModal({ skipMasterPrompt: true });
+                if (typeof window.openConfigurationToTab === 'function') window.openConfigurationToTab('api-keys');
             });
         }
 
@@ -5674,18 +5689,16 @@ const App = (() => {
                 modal.style.display = '';
                 if (typeof UI !== 'undefined' && UI.setControlsEnabled) UI.setControlsEnabled(true);
             }
-            const geminiOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.GEMINI === 'True';
-            const claudeOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.CLAUDE === 'True';
-            const deepseekOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.DEEPSEEK === 'True';
-            const openaiOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.OPENAI === 'True';
-            const localaiOk = CONSTANTS.LLM_PROVIDERS && CONSTANTS.LLM_PROVIDERS.LOCALAI === 'True';
-            if (!geminiOk && !claudeOk && !deepseekOk && !openaiOk && !localaiOk && typeof Modals !== 'undefined' && Modals.ConfirmationModal) {
-                Modals.ConfirmationModal.open(
-                    'No AI Provider Available',
-                    'No LLM provider is available. AI functions will not be available until at least one API key or local endpoint (Gemini, Anthropic, DeepSeek, ChatGPT, or Local AI) is set in the server environment (for example in the .env file).',
-                    undefined
-                );
-            }
+            getLLMProviderAvailabilityPair().then((av) => {
+                const anyHostedOk = (av._order || []).some((key) => av[key]);
+                if (!anyHostedOk && !av.localai && typeof Modals !== 'undefined' && Modals.ConfirmationModal) {
+                    Modals.ConfirmationModal.open(
+                        'No AI Provider Available',
+                        'No LLM provider is available. AI functions will not be available until an OpenRouter API key or a Local AI endpoint is set in the server environment (for example in the .env file).',
+                        undefined
+                    );
+                }
+            }).catch(() => {});
             if (!options || !options.skipMasterPrompt) {
                 maybePromptMasterKeyUnlock();
             }
@@ -5760,8 +5773,8 @@ const App = (() => {
             }
             await loadLLMProviderAvailability();
         })();
-        if (Modals.HostedLLMOrderConfig && Modals.HostedLLMOrderConfig.ensureLoaded) {
-            void Modals.HostedLLMOrderConfig.ensureLoaded();
+        if (Modals.AutoRoutingConfig && Modals.AutoRoutingConfig.ensureLoaded) {
+            void Modals.AutoRoutingConfig.ensureLoaded();
         }
         if (typeof UI !== 'undefined' && UI.syncChatContextStatusBarVisibility) {
             UI.syncChatContextStatusBarVisibility();

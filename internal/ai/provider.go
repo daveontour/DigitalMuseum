@@ -1,4 +1,7 @@
-// Package ai provides chat provider implementations for Gemini, Claude, DeepSeek, OpenAI, and LocalAI.
+// Package ai provides chat provider implementations: OpenRouterProvider (a
+// single OpenAI-compatible adapter backing every admin-configured hosted AI
+// model preset — Claude, Gemini, DeepSeek, OpenAI models and any custom
+// model an admin adds, all routed through OpenRouter) and LocalAI (Ollama).
 package ai
 
 import (
@@ -53,7 +56,8 @@ type GenerateResult struct {
 // ToolExecutor executes a named AI tool and returns a JSON-serialisable result.
 type ToolExecutor func(ctx context.Context, name string, args map[string]any) (map[string]any, error)
 
-// ChatProvider is the interface implemented by Gemini, Claude, DeepSeek (Anthropic-compatible), OpenAI, and LocalAI.
+// ChatProvider is the interface implemented by OpenRouterProvider (which backs
+// every admin-configured hosted AI model preset) and LocalAI.
 type ChatProvider interface {
 	IsAvailable() bool
 	// GenerateResponse runs a tool loop. toolDecls nil means expose all built-in tools (legacy).
@@ -67,6 +71,20 @@ type ChatProvider interface {
 		executor ToolExecutor,
 		toolDecls *[]map[string]any,
 	) (GenerateResult, error)
+	// SimpleGenerate sends a prompt without tools. Used for classification,
+	// summarization, and identity-profile extraction.
+	SimpleGenerate(ctx context.Context, prompt string) (string, *LLMUsage, error)
+}
+
+// SummarizerResolver resolves a ChatProvider for one-shot summarization tasks (email/message
+// thread summarization, admin bulk-classification/writing-style/psych-profile generation) that
+// don't go through the full chat request flow. Implemented by service.ChatService, which prefers
+// the well-known "gemini" model key for historical continuity and falls back to the default
+// enabled AI model if "gemini" is missing or disabled.
+type SummarizerResolver interface {
+	// ResolveSummarizer returns the provider to use and the model key it resolved to (for billing),
+	// or (nil, "") if no AI model is available.
+	ResolveSummarizer(ctx context.Context) (ChatProvider, string)
 }
 
 // GetToolDefinitions returns the shared tool schema for callers that pass explicit toolDecls.

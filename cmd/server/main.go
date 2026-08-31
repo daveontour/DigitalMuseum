@@ -159,6 +159,9 @@ func run() error {
 		} else if err := database.SeedGuideTopicsFromFileIfMissing(migrateCtx, db.Std, cfg.App.GuideTopicsConfigFile()); err != nil {
 			return fmt.Errorf("seed guide topics: %w", err)
 		}
+		if err := database.SeedAIModelsFromFileIfMissing(migrateCtx, db.Std, cfg.App.AIModelsConfigFile()); err != nil {
+			return fmt.Errorf("seed ai models: %w", err)
+		}
 	}
 
 	// ── HTTP server ────────────────────────────────────────────────────────────

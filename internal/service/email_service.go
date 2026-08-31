@@ -22,10 +22,10 @@ type EmailUpdateParams struct {
 
 // EmailService coordinates email read and write operations.
 type EmailService struct {
-	repo    *repository.EmailRepo
-	gemini  *ai.GeminiProvider
-	billing *repository.BillingRepo
-	users   *repository.UserRepo
+	repo       *repository.EmailRepo
+	summarizer ai.SummarizerResolver
+	billing    *repository.BillingRepo
+	users      *repository.UserRepo
 }
 
 // NewEmailService creates an EmailService.
@@ -33,9 +33,9 @@ func NewEmailService(repo *repository.EmailRepo) *EmailService {
 	return &EmailService{repo: repo}
 }
 
-// WithGemini attaches a Gemini provider for thread summarization.
-func (s *EmailService) WithGemini(g *ai.GeminiProvider) {
-	s.gemini = g
+// WithSummarizer attaches the AI provider resolver used for thread summarization.
+func (s *EmailService) WithSummarizer(r ai.SummarizerResolver) {
+	s.summarizer = r
 }
 
 // WithBilling attaches the billing repo and optional user repo (for denormalized identity on billing rows).
@@ -155,8 +155,12 @@ const emailThreadLLMSystemPrompt = "You are a helpful assistant that summarises 
 // SummarizeThread collects all emails involving participant and asks Gemini to
 // produce a concise summary. Returns an error if Gemini is unavailable.
 func (s *EmailService) SummarizeThread(ctx context.Context, participant string) (string, error) {
-	if s.gemini == nil {
-		return "", fmt.Errorf("gemini provider not configured")
+	if s.summarizer == nil {
+		return "", fmt.Errorf("summarizer not configured")
+	}
+	provider, providerKey := s.summarizer.ResolveSummarizer(ctx)
+	if provider == nil {
+		return "", fmt.Errorf("no AI provider available for summarization")
 	}
 
 	transcript, n, err := s.emailThreadTranscript(ctx, participant)
@@ -168,7 +172,7 @@ func (s *EmailService) SummarizeThread(ctx context.Context, participant string) 
 	}
 
 	prompt := "Please provide a concise summary of the following email conversation:\n\n" + transcript
-	result, err := s.gemini.GenerateResponse(ctx,
+	result, err := provider.GenerateResponse(ctx,
 		ai.GenerateRequest{UserInput: prompt},
 		emailThreadLLMSystemPrompt,
 		nil,
@@ -178,21 +182,26 @@ func (s *EmailService) SummarizeThread(ctx context.Context, participant string) 
 	if err != nil {
 		stub := result.Usage
 		if stub == nil {
-			stub = StubLLMUsage("gemini", "")
+			stub = StubLLMUsage(providerKey, "")
 		}
 		MarkUsageServerKey(stub, true)
 		RecordLLMUsage(ctx, s.billing, s.users, stub, err)
-		return "", fmt.Errorf("gemini summarize: %w", err)
+		return "", fmt.Errorf("summarize: %w", err)
 	}
 	MarkUsageServerKey(result.Usage, true)
 	RecordLLMUsage(ctx, s.billing, s.users, result.Usage, nil)
 	return result.PlainText, nil
 }
 
-// RunEmailThreadPrompt sends the thread transcript to Gemini with a caller-supplied instruction.
+// RunEmailThreadPrompt sends the thread transcript to the resolved summarizer provider with a
+// caller-supplied instruction.
 func (s *EmailService) RunEmailThreadPrompt(ctx context.Context, participant, instruction string) (string, error) {
-	if s.gemini == nil {
-		return "", fmt.Errorf("gemini provider not configured")
+	if s.summarizer == nil {
+		return "", fmt.Errorf("summarizer not configured")
+	}
+	provider, providerKey := s.summarizer.ResolveSummarizer(ctx)
+	if provider == nil {
+		return "", fmt.Errorf("no AI provider available for summarization")
 	}
 	transcript, n, err := s.emailThreadTranscript(ctx, participant)
 	if err != nil {
@@ -202,7 +211,7 @@ func (s *EmailService) RunEmailThreadPrompt(ctx context.Context, participant, in
 		return "", fmt.Errorf("no emails found for this participant")
 	}
 	prompt := fmt.Sprintf("%s\n\n%s", strings.TrimSpace(instruction), transcript)
-	result, err := s.gemini.GenerateResponse(ctx,
+	result, err := provider.GenerateResponse(ctx,
 		ai.GenerateRequest{UserInput: prompt},
 		emailThreadLLMSystemPrompt,
 		nil,
@@ -212,11 +221,11 @@ func (s *EmailService) RunEmailThreadPrompt(ctx context.Context, participant, in
 	if err != nil {
 		stub := result.Usage
 		if stub == nil {
-			stub = StubLLMUsage("gemini", "")
+			stub = StubLLMUsage(providerKey, "")
 		}
 		MarkUsageServerKey(stub, true)
 		RecordLLMUsage(ctx, s.billing, s.users, stub, err)
-		return "", fmt.Errorf("gemini email thread prompt: %w", err)
+		return "", fmt.Errorf("email thread prompt: %w", err)
 	}
 	MarkUsageServerKey(result.Usage, true)
 	RecordLLMUsage(ctx, s.billing, s.users, result.Usage, nil)

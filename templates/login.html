@@ -221,6 +221,26 @@
         }
         #login-admin-login-btn:hover { background: #243358; border-color: #3b82f6; color: #fff; }
 
+        #login-quiz-btn {
+            position: fixed;
+            top: calc(env(titlebar-area-height, 0px) + 14px);
+            left: 14px;
+            z-index: 100;
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid #6b5410;
+            background: linear-gradient(90deg, #f59e0b, #fbbf24);
+            color: #1a1206;
+            font-size: 0.88rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: transform 0.1s ease, box-shadow 0.15s ease;
+            -webkit-app-region: no-drag;
+            box-shadow: 0 3px 14px rgba(251,191,36,0.25);
+        }
+        #login-quiz-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 18px rgba(251,191,36,0.4); }
+
         @media (max-width: 640px) {
             .form-row { flex-direction: column; gap: 0; }
             .login-card { padding: 28px 20px; }
@@ -230,6 +250,7 @@
 <body>
     <div class="titlebar-drag" aria-hidden="true"></div>
     <button type="button" id="login-admin-login-btn" style="display:none;">Admin Login</button>
+    <button type="button" id="login-quiz-btn" style="display:none;"><i class="fas fa-gamepad" style="margin-right:6px;"></i>Take the Quiz</button>
 
     <!-- First-run step indicator (shown by JS when HAS_REGISTERED_USER=false) -->
     <div id="step-indicator">
@@ -297,7 +318,7 @@
                     </div>
                 </div>
                 <div style="margin-top:12px; padding-top:10px; border-top:1px solid #1e3050; color:#4a5a80; font-size:0.8rem;">
-                    Prefer more capable cloud AI? Add a Claude, Gemini, or DeepSeek API key in <strong style="color:#6b80a8;">Configuration</strong> after signing in.
+                    Prefer more capable AI Model? Obtain an OpenRouter API key and select from the available models in <strong style="color:#6b80a8;">Configuration -> AI Models</strong> after signing in.
                 </div>
             </div>
             <div id="adv-status" style="color:#f87171; font-size:0.82rem; margin-top:12px; display:none;"></div>
@@ -537,6 +558,7 @@
         tabRegister.addEventListener('click', () => showTab('register'));
         tabVisitor.addEventListener('click',  () => showTab('visitor'));
         document.getElementById('login-admin-login-btn').addEventListener('click', () => { window.location.href = '/admin'; });
+        document.getElementById('login-quiz-btn').addEventListener('click', () => { window.location.href = '/quiz'; });
 
         wireLoginPwToggle('login-password-toggle', 'login-password');
         wireLoginPwToggle('new-password-toggle', 'new-password');
@@ -559,6 +581,8 @@
             tabVisitor.style.display = 'none';
             document.getElementById('panel-visitor').classList.remove('active');
         }
+        // Quiz needs an active archive with at least one registered owner to generate from.
+        document.getElementById('login-quiz-btn').style.display = HAS_REGISTERED_USER ? 'block' : 'none';
 
         // ── Step indicator ────────────────────────────────────────────────────
         function setStep(n) {
