@@ -661,7 +661,7 @@
       "steps": [
         {
           "text": "The AI provider can be switched at any time without restarting. Open the voice and AI settings panel from the top bar.",
-          "glow": "#llm-provider-select",
+          "glow": "#llm-provider-open-config-btn",
           "position": "top-right"
         },
         {

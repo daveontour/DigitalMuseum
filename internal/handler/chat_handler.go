@@ -68,6 +68,8 @@ func (h *ChatHandler) GetAvailability(w http.ResponseWriter, r *http.Request) {
 		"localai_infrastructure_available":     h.svc.LocalAIInfrastructureAvailable(r.Context()),
 		"localai_use_enabled":                  h.svc.LocalAIUseEnabled(r.Context()),
 		"auto_available":                       h.svc.AutoAvailable(r.Context(), r),
+		"auto_selection_enabled":               h.svc.AutoSelectionEnabled(r.Context()),
+		"chat_provider":                        h.svc.ConfiguredChatProvider(r.Context()),
 		"runpod_endpoint_id_env":               h.svc.ServerRunpodEndpointID(),
 		"runpod_workers_env":                   h.svc.ServerRunpodWorkers(),
 		"elevenlabs_env_configured":            h.svc.ServerElevenLabsKeyConfigured(),

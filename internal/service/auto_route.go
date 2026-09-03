@@ -385,7 +385,42 @@ func autoRouteMetaFromDecision(decision AutoRouteDecision, routedProvider string
 }
 
 // resolveAutoProvider classifies the prompt and returns the provider to execute the chat request.
+// When Auto selection mode is disabled, skips the query classifier and picks the first available
+// model in AI Models table order (with last-manual-hosted preference).
 func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, prompt string, toolsCount, refDocCount int, hasSubjectProfile bool, lastManualHosted string) (appai.ChatProvider, string, map[string]any, AutoExecutionContext, error) {
+	orderCfg := s.loadHostedLLMProviderOrderConfig(ctx)
+	if !orderCfg.AutoSelectionEnabled {
+		providerName, provider := s.pickHostedProviderForAuto(ctx, r, lastManualHosted)
+		executionFallback := false
+		if provider == nil || !provider.IsAvailable() {
+			provider = s.localAIProviderForChat(ctx)
+			providerName = "localai"
+			executionFallback = true
+		}
+		if provider == nil || !provider.IsAvailable() {
+			meta := map[string]any{
+				"requested_provider":       "auto",
+				"auto_selection_enabled":   false,
+				"routed_provider":          providerName,
+				"classifier_skipped":       true,
+				"execution_fallback":       executionFallback,
+				"needs_reference_documents": true,
+				"needs_user_profile":        true,
+			}
+			return nil, "", meta, AutoExecutionContext{IncludeReferenceDocuments: true, IncludeUserProfile: true}, fmt.Errorf("auto routing: no provider available")
+		}
+		meta := map[string]any{
+			"requested_provider":        "auto",
+			"auto_selection_enabled":    false,
+			"routed_provider":           providerName,
+			"classifier_skipped":        true,
+			"execution_fallback":        executionFallback,
+			"needs_reference_documents": true,
+			"needs_user_profile":        true,
+		}
+		return provider, providerName, meta, AutoExecutionContext{IncludeReferenceDocuments: true, IncludeUserProfile: true}, nil
+	}
+
 	decision := s.classifyAutoRoute(ctx, r, prompt, toolsCount, refDocCount, hasSubjectProfile)
 	execCtx := autoExecutionContextFromDecision(decision)
 
@@ -421,6 +456,9 @@ func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, 
 // AutoAvailable reports whether the Auto provider can classify and execute requests.
 func (s *ChatService) AutoAvailable(ctx context.Context, r *http.Request) bool {
 	cfg := s.loadHostedLLMProviderOrderConfig(ctx)
+	if !cfg.AutoSelectionEnabled {
+		return false
+	}
 	if !s.classifierAvailable(ctx, r, cfg.ClassifierProvider) {
 		return false
 	}

@@ -101,6 +101,43 @@ func TestFailoverProviderTryOrder(t *testing.T) {
 	}
 }
 
+func TestOpenRouterModelSlugsForHosted(t *testing.T) {
+	s, ctx := newTestChatServiceWithModelRows(t,
+		modelRow{"claude", true, 0},
+		modelRow{"localai", true, 1},
+		modelRow{"openai", true, 2},
+		modelRow{"gemini", false, 3},
+	)
+	got := s.openRouterModelSlugsForHosted(ctx, "openai", true)
+	want := []string{"openai/model", "claude/model"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v want %v", got, want)
+		}
+	}
+	single := s.openRouterModelSlugsForHosted(ctx, "claude", false)
+	if len(single) != 1 || single[0] != "claude/model" {
+		t.Fatalf("failover off: got %v", single)
+	}
+	if s.openRouterModelSlugsForHosted(ctx, "localai", true) != nil {
+		t.Fatal("localai should return nil")
+	}
+}
+
+func TestOpenRouterModelSlugsForHostedCapsAtThree(t *testing.T) {
+	s, ctx := newTestChatServiceWithModels(t, "gemini", "claude", "deepseek", "openai")
+	got := s.openRouterModelSlugsForHosted(ctx, "gemini", true)
+	if len(got) != openRouterMaxModelsFallback {
+		t.Fatalf("got %d slugs %v, want at most %d", len(got), got, openRouterMaxModelsFallback)
+	}
+	if got[0] != "gemini/model" {
+		t.Fatalf("primary first: got %v", got)
+	}
+}
+
 func TestParseHostedLLMProviderOrderJSON(t *testing.T) {
 	s, ctx := newTestChatServiceWithModels(t, "gemini", "claude", "deepseek", "openai")
 	cfg := s.parseHostedLLMProviderOrderJSON(ctx, `{"classifier_provider":"gemini","failover_enabled":true}`)
@@ -114,12 +151,22 @@ func TestParseHostedLLMProviderOrderJSON(t *testing.T) {
 	if cfgDisabled.FailoverEnabled {
 		t.Fatalf("failover_enabled=false not parsed")
 	}
+	cfgAutoOff := s.parseHostedLLMProviderOrderJSON(ctx, `{"auto_selection_enabled":false,"chat_provider":"claude"}`)
+	if cfgAutoOff.AutoSelectionEnabled {
+		t.Fatalf("auto_selection_enabled=false not parsed")
+	}
+	if cfgAutoOff.ChatProvider != "claude" {
+		t.Fatalf("chat_provider=claude got %q", cfgAutoOff.ChatProvider)
+	}
 	cfgDefault := s.parseHostedLLMProviderOrderJSON(ctx, "")
 	if cfgDefault.ClassifierProvider != DefaultClassifierProvider {
 		t.Fatalf("default classifier=%q", cfgDefault.ClassifierProvider)
 	}
 	if !cfgDefault.FailoverEnabled {
 		t.Fatalf("default failover_enabled should be true")
+	}
+	if !cfgDefault.AutoSelectionEnabled {
+		t.Fatalf("default auto_selection_enabled should be true")
 	}
 }
 

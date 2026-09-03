@@ -191,9 +191,10 @@ body {
     gap: 24px;
     padding: 12.5px 20px;
     flex-shrink: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 0px solid rgba(255, 255, 255, 0.15);
     box-sizing: border-box;
     -webkit-app-region: drag;
+    background-color: var(--color-bg-base);
 }
 
 .top-bar button,
@@ -269,8 +270,26 @@ body {
     color: var(--color-text);
 }
 
-.top-bar-llm select,
-.top-bar #llm-provider-select {
+.top-bar-llm-provider-btn {
+    min-width: 120px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-input);
+    background: var(--color-bg-surface);
+    font-size: var(--text-sm);
+    color: var(--color-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-family: var(--font-sans-ui);
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+}
+
+.top-bar-llm select {
     min-width: 120px;
     padding: 6px 10px;
     border-radius: 6px;
@@ -281,12 +300,12 @@ body {
 }
 
 .top-bar-llm select:hover,
-.top-bar #llm-provider-select:hover {
+.top-bar-llm-provider-btn:hover {
     border-color: var(--color-blue);
 }
 
 .top-bar-llm select:focus,
-.top-bar #llm-provider-select:focus {
+.top-bar-llm-provider-btn:focus {
     outline: none;
     border-color: var(--color-blue);
     box-shadow: var(--focus-ring);
@@ -388,7 +407,8 @@ body {
 }
 
 .top-bar .top-bar-guide-btn:hover {
-    background-color: rgba(255, 255, 255, 0.3);
+    /* background-color: rgba(255, 255, 255, 0.3); */
+    background-color: var(--color-bg-base);
     color: #fff;
 }
 
@@ -418,7 +438,7 @@ body {
 
 .sidebar-right {
     border-right: none;
-    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    border-left: 0px solid rgba(255, 255, 255, 0.15);
     min-width: 196px;
     width: 196px;
     padding-top: 0px;
@@ -10686,8 +10706,9 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     display: flex;
     align-items: center;
     padding: 6px 14px;
-    background: linear-gradient(135deg, #152238, #1e2f4a);
-    border-top: 1px solid rgba(74, 144, 226, 0.35);
+    /* background: linear-gradient(135deg, #152238, #1e2f4a); */
+    background-color: var(--color-bg-base);
+    /* border-top: 1px solid rgba(74, 144, 226, 0.35); */
     font-size: 0.8rem;
     color: #b0c4de;
     flex-shrink: 0;
@@ -14419,6 +14440,18 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 #data-import-modal .data-import-progress-line[data-progress-state="done"], #data-sources-import-modal .data-import-progress-line[data-progress-state="done"] {
     color: #15803d;
+}
+#data-import-modal .data-import-progress-line[data-progress-state="loading"], #data-sources-import-modal .data-import-progress-line[data-progress-state="loading"] {
+    color: var(--color-text-muted, #6b7280);
+    font-style: italic;
+}
+#data-import-modal .data-import-progress-line[data-progress-state="loading"] .fa-spinner, #data-sources-import-modal .data-import-progress-line[data-progress-state="loading"] .fa-spinner {
+    margin-right: 0.35em;
+    font-size: 0.9em;
+}
+#data-import-modal .data-import-progress-line[data-progress-state="error"], #data-sources-import-modal .data-import-progress-line[data-progress-state="error"] {
+    color: #b91c1c;
+    font-style: italic;
 }
 
 /* "Run" buttons get a warm highlight ring when there's pending content to make searchable */

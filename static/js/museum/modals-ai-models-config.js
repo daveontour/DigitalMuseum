@@ -4,6 +4,12 @@ Modals.AIModelsConfig = (() => {
     let rows = [];
     let editingId = null;
     let classifierProvider = 'localai';
+    let autoSelectionEnabled = true;
+    let manualChatProvider = 'localai';
+
+    function effectiveChatProvider() {
+        return autoSelectionEnabled ? 'auto' : manualChatProvider;
+    }
 
     /** Distinct dark row tints — stable per model key; readable with --color-text (#e2e8f3). */
     const AI_MODEL_ROW_PALETTE = [
@@ -46,13 +52,49 @@ Modals.AIModelsConfig = (() => {
         el.style.color = isError ? 'var(--color-danger)' : 'var(--color-text-muted)';
     }
 
-    /** Refreshes every "AI Provider" selector in the app (top bar, Profiles, Interview,
-     *  Have-a-Chat) after an AI Models tab change. App.refreshChatAvailability is
-     *  loadLLMProviderAvailability() exposed by app.js's App module — the bare function name
-     *  isn't reachable from this file, only the App-namespaced alias is. */
+    /** Refreshes every provider picker and the top-bar label after an AI Models tab change. */
     function invalidateCaches() {
         if (typeof AIModels !== 'undefined') AIModels.invalidateCache();
         if (typeof App !== 'undefined' && App.refreshChatAvailability) void App.refreshChatAvailability();
+    }
+
+    function defaultChatProviderWhenNotAuto() {
+        const sorted = rows.slice().sort((a, b) => {
+            if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+            return a.id - b.id;
+        });
+        const first = sorted.find((r) => r.enabled);
+        return first ? first.key : 'localai';
+    }
+
+    function updateAutoSelectionUI() {
+        const chatHeader = getEl('ai-models-config-chat-col-header');
+        const classifierHeader = getEl('ai-models-config-classifier-col-header');
+        const tableWrap = getEl('ai-models-config-table-wrap');
+        const classifierOn = !!autoSelectionEnabled;
+        if (chatHeader) chatHeader.title = classifierOn
+            ? 'Disabled while query classifier is on — fixed model used when classifier is off'
+            : '';
+        if (classifierHeader) classifierHeader.style.display = classifierOn ? '' : 'none';
+        if (tableWrap) {
+            tableWrap.querySelectorAll('.ai-models-config-chat-cell').forEach((cell) => {
+                cell.querySelectorAll('.ai-models-config-chat-radio').forEach((radio) => {
+                    radio.disabled = classifierOn;
+                });
+            });
+            tableWrap.querySelectorAll('.ai-models-config-classifier-cell').forEach((cell) => {
+                cell.style.display = classifierOn ? '' : 'none';
+            });
+        }
+    }
+
+    function reflectManualChatProvider(key) {
+        manualChatProvider = key;
+        const tbody = getEl('ai-models-config-tbody');
+        if (!tbody) return;
+        tbody.querySelectorAll('.ai-models-config-chat-radio').forEach((radio) => {
+            radio.checked = radio.value === key;
+        });
     }
 
     function bindTableButtons() {
@@ -78,8 +120,24 @@ Modals.AIModelsConfig = (() => {
                 if (!radio.checked) return;
                 const key = radio.value;
                 classifierProvider = key;
-                saveClassifierConfig({ classifier_provider: key })
+                saveRoutingConfig({ classifier_provider: key })
                     .then(() => showStatus('Classifier updated.', false))
+                    .catch((err) => {
+                        showStatus(err.message, true);
+                        void load();
+                    });
+            });
+        });
+        tbody.querySelectorAll('.ai-models-config-chat-radio').forEach((radio) => {
+            radio.addEventListener('change', () => {
+                if (!radio.checked || autoSelectionEnabled) return;
+                const key = radio.value;
+                manualChatProvider = key;
+                saveRoutingConfig({ chat_provider: key })
+                    .then(() => {
+                        showStatus('Chat provider updated.', false);
+                        invalidateCaches();
+                    })
                     .catch((err) => {
                         showStatus(err.message, true);
                         void load();
@@ -124,14 +182,19 @@ Modals.AIModelsConfig = (() => {
                 <td style="text-align:center;">
                     <input type="checkbox" class="ai-models-config-enabled-checkbox" data-id="${row.id}" ${row.enabled ? 'checked' : ''} aria-label="Enabled"${isLocal ? ' title="Also requires Local AI to be enabled and reachable in Local AI Setup"' : ''}>
                 </td>
-                <td style="text-align:center;">
-                    <input type="radio" name="ai-models-classifier-radio" class="ai-models-config-classifier-radio" value="${escapeHtml(row.key)}" ${classifierProvider === row.key ? 'checked' : ''} aria-label="Use ${escapeHtml(row.display_name)} as the Auto-routing classifier">
+                <td style="text-align:center;" class="ai-models-config-chat-cell">
+                    <input type="radio" name="ai-models-chat-provider-radio" class="ai-models-config-chat-radio" value="${escapeHtml(row.key)}" ${manualChatProvider === row.key ? 'checked' : ''} aria-label="Use ${escapeHtml(row.display_name)} for main chat"${autoSelectionEnabled ? ' disabled' : ''}>
+                </td>
+                <td style="text-align:center;" class="ai-models-config-classifier-cell">
+                    <input type="radio" name="ai-models-classifier-radio" class="ai-models-config-classifier-radio" value="${escapeHtml(row.key)}" ${classifierProvider === row.key ? 'checked' : ''} aria-label="Use ${escapeHtml(row.display_name)} as the Auto-routing classifier"${autoSelectionEnabled ? '' : ' disabled hidden'}>
                 </td>
                 <td>${actionsCell}</td>
             </tr>
         `;
         }).join('');
         bindTableButtons();
+        updateAutoSelectionUI();
+        reflectManualChatProvider(manualChatProvider);
     }
 
     async function load() {
@@ -144,16 +207,20 @@ Modals.AIModelsConfig = (() => {
         showStatus('', false);
 
         try {
-            const [modelsResponse, classifierConfig] = await Promise.all([
+            const [modelsResponse, routingConfig] = await Promise.all([
                 fetch('/api/ai-models', { credentials: 'same-origin' }),
-                fetchClassifierConfig(),
+                fetchRoutingConfig(),
             ]);
             if (!modelsResponse.ok) throw new Error(`HTTP ${modelsResponse.status}`);
             const data = await modelsResponse.json();
             rows = Array.isArray(data.models) ? data.models : [];
-            classifierProvider = classifierConfig.classifier_provider;
+            classifierProvider = routingConfig.classifier_provider;
+            autoSelectionEnabled = routingConfig.auto_selection_enabled;
+            manualChatProvider = routingConfig.chat_provider;
+            const autoCheckbox = getEl('ai-models-config-auto-selection-checkbox');
+            if (autoCheckbox) autoCheckbox.checked = autoSelectionEnabled;
             const failoverCheckbox = getEl('ai-models-config-failover-enabled-checkbox');
-            if (failoverCheckbox) failoverCheckbox.checked = classifierConfig.failover_enabled;
+            if (failoverCheckbox) failoverCheckbox.checked = routingConfig.failover_enabled;
             renderTable();
         } catch (err) {
             if (loading) loading.style.display = 'none';
@@ -334,47 +401,77 @@ Modals.AIModelsConfig = (() => {
         if (tabBtn) tabBtn.click();
     }
 
-    // The classifier radio buttons and the "Enable error failover" checkbox both live on
-    // this table, but they're two independent fields of the SAME 'hosted_llm_provider_order_v1'
-    // app_configuration row (also read by Modals.AutoRoutingConfig for chat failover). Every
-    // write here re-reads the row first so one field is never clobbered while saving the other.
-    const CLASSIFIER_CONFIG_KEY = 'hosted_llm_provider_order_v1';
+    const ROUTING_CONFIG_KEY = 'hosted_llm_provider_order_v1';
 
-    async function fetchClassifierConfig() {
+    function normalizeManualChatProviderFromConfig(parsed) {
+        let key = String(parsed.chat_provider || '').toLowerCase().trim();
+        if (key === 'auto') key = '';
+        return key;
+    }
+
+    async function fetchRoutingConfig() {
         try {
             const response = await fetch('/api/configuration', { credentials: 'same-origin' });
             if (response.ok) {
                 const rowsResp = await response.json();
-                const row = Array.isArray(rowsResp) ? rowsResp.find((r) => r && r.key === CLASSIFIER_CONFIG_KEY) : null;
+                const row = Array.isArray(rowsResp) ? rowsResp.find((r) => r && r.key === ROUTING_CONFIG_KEY) : null;
                 if (row && row.value != null && String(row.value).trim() !== '') {
                     const parsed = JSON.parse(row.value);
+                    const autoEnabled = parsed.auto_selection_enabled !== false;
+                    let manual = normalizeManualChatProviderFromConfig(parsed);
+                    if (!manual && typeof AIModels !== 'undefined') {
+                        await AIModels.ensureLoaded();
+                        manual = AIModels.defaultKey() || 'localai';
+                    }
+                    if (!manual) manual = 'localai';
                     return {
                         classifier_provider: parsed.classifier_provider || 'localai',
                         failover_enabled: parsed.failover_enabled !== false,
+                        auto_selection_enabled: autoEnabled,
+                        chat_provider: manual,
                     };
                 }
             }
         } catch (_) { /* fall through to default */ }
-        return { classifier_provider: 'localai', failover_enabled: true };
+        return {
+            classifier_provider: 'localai',
+            failover_enabled: true,
+            auto_selection_enabled: true,
+            chat_provider: 'localai',
+        };
     }
 
-    async function saveClassifierConfig(overrides) {
-        const current = await fetchClassifierConfig();
+    async function saveRoutingConfig(overrides) {
+        const current = await fetchRoutingConfig();
         const payload = { ...current, ...overrides };
+        if (payload.auto_selection_enabled !== false) {
+            payload.auto_selection_enabled = true;
+        }
+        let manual = String(payload.chat_provider || '').toLowerCase().trim();
+        if (manual === 'auto') manual = current.chat_provider || defaultChatProviderWhenNotAuto();
+        payload.chat_provider = manual;
         const res = await fetch('/api/configuration', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
             body: JSON.stringify({
-                key: CLASSIFIER_CONFIG_KEY,
-                value: JSON.stringify(payload),
-                description: 'Auto routing classifier provider, plus the error failover on/off toggle (provider order follows AI Models sort_order)',
+                key: ROUTING_CONFIG_KEY,
+                value: JSON.stringify({
+                    classifier_provider: payload.classifier_provider,
+                    failover_enabled: payload.failover_enabled,
+                    auto_selection_enabled: payload.auto_selection_enabled,
+                    chat_provider: payload.chat_provider,
+                }),
+                description: 'Auto routing settings: classifier provider, auto selection mode, chat provider, and error failover toggle (provider order follows AI Models sort_order)',
             }),
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || err.detail || `HTTP ${res.status}`);
         }
+        classifierProvider = payload.classifier_provider;
+        autoSelectionEnabled = payload.auto_selection_enabled;
+        manualChatProvider = payload.chat_provider;
         if (typeof Modals !== 'undefined' && Modals.AutoRoutingConfig && Modals.AutoRoutingConfig.ensureLoaded) {
             await Modals.AutoRoutingConfig.ensureLoaded();
         }
@@ -408,10 +505,28 @@ Modals.AIModelsConfig = (() => {
         if (failoverCheckbox) {
             failoverCheckbox.addEventListener('change', () => {
                 const enabled = failoverCheckbox.checked;
-                saveClassifierConfig({ failover_enabled: enabled }).catch((err) => {
+                saveRoutingConfig({ failover_enabled: enabled }).catch((err) => {
                     failoverCheckbox.checked = !enabled;
                     showStatus(err.message, true);
                 });
+            });
+        }
+        const autoSelectionCheckbox = getEl('ai-models-config-auto-selection-checkbox');
+        if (autoSelectionCheckbox) {
+            autoSelectionCheckbox.addEventListener('change', () => {
+                const enabled = autoSelectionCheckbox.checked;
+                saveRoutingConfig({ auto_selection_enabled: enabled })
+                    .then((payload) => {
+                        autoSelectionEnabled = payload.auto_selection_enabled;
+                        manualChatProvider = payload.chat_provider;
+                        showStatus(enabled ? 'Query classifier enabled.' : 'Query classifier disabled.', false);
+                        renderTable();
+                        invalidateCaches();
+                    })
+                    .catch((err) => {
+                        autoSelectionCheckbox.checked = !enabled;
+                        showStatus(err.message, true);
+                    });
             });
         }
     }

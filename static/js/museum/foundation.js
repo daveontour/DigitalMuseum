@@ -273,6 +273,8 @@ const DOM = {
     allowExplicitContentCheckbox: document.getElementById('allow-explicit-content'),
     enableSnarkinessCheckbox: document.getElementById('enable-snarkiness'),
     llmProviderSelect: document.getElementById('llm-provider-select'),
+    llmProviderOpenConfigBtn: document.getElementById('llm-provider-open-config-btn'),
+    llmProviderCurrentLabel: document.getElementById('llm-provider-current-label'),
     profilesLlmProviderSelect: document.getElementById('profiles-llm-provider-select'),
     voiceRadios: document.querySelectorAll('input[name="voice"]'),
     moodSelector: document.getElementById('mood-selector'),
@@ -945,15 +947,15 @@ const UI = (() => {
         // DOM.suggestionsBtn.disabled = !enabled;
     }
 
-    /** Label from the main chat AI Provider select (Gemini, Claude, …). */
+    /** Label from the main chat AI Provider control (Configuration → AI Models). */
     function syncLoadingIndicatorProvider() {
         const el = DOM.loadingIndicatorProvider;
         if (!el) return;
-        const sel = DOM.llmProviderSelect;
         let label = '';
-        if (sel && sel.options && sel.selectedIndex >= 0) {
-            const opt = sel.options[sel.selectedIndex];
-            if (opt && opt.textContent) label = opt.textContent.trim();
+        if (typeof App !== 'undefined' && App.getChatProviderDisplayLabel) {
+            label = App.getChatProviderDisplayLabel();
+        } else if (DOM.llmProviderCurrentLabel) {
+            label = DOM.llmProviderCurrentLabel.textContent.trim();
         }
         el.textContent = label;
     }

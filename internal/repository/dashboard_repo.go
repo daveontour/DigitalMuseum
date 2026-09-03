@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -343,9 +344,10 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 }
 
 // GetImportModalStats collects aggregate counts for the import/maintenance modals.
-// When includeEmbeddingProgress is false, embedding/searchable progress queries are skipped
-// (used by the Data Import dialog, which only needs entry counts per type).
-func (r *DashboardRepo) GetImportModalStats(ctx context.Context, includeEmbeddingProgress bool) (*model.ImportModalStatsResponse, error) {
+// Embedding/searchable progress is intentionally not included here — it is expensive
+// (see GetEmbeddingProgress) and is fetched separately so callers can render these
+// cheap counts immediately.
+func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportModalStatsResponse, error) {
 	uid := uidFromCtx(ctx)
 
 	makeUIDCond := func(baseArgs []any) (string, []any) {
@@ -508,66 +510,101 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context, includeEmbeddin
 		}
 	}
 
-	if includeEmbeddingProgress {
-	// Embedding progress (how much content still needs an AI embedding to be
-	// searchable). Mirrors the exact "missing embedding" predicates used by the
-	// backfill jobs themselves (see runEmailEmbeddingBackfill / runMessageContextEmbeddingBackfill
-	// in importer_handler.go, runFacebookPostEmbeddingBackfill / runFacebookAlbumEmbeddingBackfill
-	// and ListMediaItemsForTagEmbeddingBackfill in image_handler.go / image_repo.go).
-	{
-		out.EmbeddingProgress = make(map[string]model.EmbeddingProgressEntry)
-		sources := []struct {
-			key          string
-			totalQuery   string
-			pendingExtra string
-		}{
-			{
-				key:          "message_context_embeddings",
-				totalQuery:   `SELECT COUNT(id) FROM messages WHERE text IS NOT NULL`,
-				pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM message_embeddings me WHERE me.rowid = messages.id)`,
-			},
-			{
-				key:          "email_embeddings",
-				totalQuery:   `SELECT COUNT(id) FROM emails WHERE user_deleted = FALSE`,
-				pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM email_embeddings ee WHERE ee.rowid = emails.id)`,
-			},
-			{
-				key:          "facebook_post_text_embeddings",
-				totalQuery:   `SELECT COUNT(id) FROM facebook_posts WHERE TRIM(COALESCE(post_text, '')) != ''`,
-				pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM facebook_post_text_embeddings e WHERE e.rowid = facebook_posts.id)`,
-			},
-			{
-				key:          "facebook_album_description_embeddings",
-				totalQuery:   `SELECT COUNT(id) FROM facebook_albums WHERE TRIM(COALESCE(description, '')) != ''`,
-				pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM facebook_album_description_embeddings e WHERE e.rowid = facebook_albums.id)`,
-			},
-			{
-				key:          "image_tag_embeddings",
-				totalQuery:   `SELECT COUNT(id) FROM media_items WHERE tags IS NOT NULL AND TRIM(tags) != ''`,
-				pendingExtra: ` AND require_classification = TRUE`,
-			},
-		}
-		for _, s := range sources {
-			var entry model.EmbeddingProgressEntry
-			totalCond, totalArgs := makeUIDCond(nil)
-			if err := r.pool.QueryRowContext(ctx, s.totalQuery+totalCond, totalArgs...).Scan(&entry.Total); err != nil {
-				return nil, fmt.Errorf("%s total: %w", s.key, err)
-			}
-			pendingCond, pendingArgs := makeUIDCond(nil)
-			if err := r.pool.QueryRowContext(ctx, s.totalQuery+pendingCond+s.pendingExtra, pendingArgs...).Scan(&entry.Pending); err != nil {
-				return nil, fmt.Errorf("%s pending: %w", s.key, err)
-			}
-			out.EmbeddingProgress[s.key] = entry
-		}
-	}
+	return out, nil
+}
+
+// embeddingProgressSourceDef defines one embedding-progress source's "missing
+// embedding" predicate. Mirrors the exact predicates used by the backfill jobs
+// themselves (see runEmailEmbeddingBackfill / runMessageContextEmbeddingBackfill in
+// importer_handler.go, runFacebookPostEmbeddingBackfill / runFacebookAlbumEmbeddingBackfill
+// and ListMediaItemsForTagEmbeddingBackfill in image_handler.go / image_repo.go).
+type embeddingProgressSourceDef struct {
+	key          string
+	totalQuery   string
+	pendingExtra string
+}
+
+// EmbeddingProgressSourceKeys lists the valid `source` values for GetEmbeddingProgressForSource,
+// in display order.
+var EmbeddingProgressSourceKeys = []string{
+	"message_context_embeddings",
+	"email_embeddings",
+	"facebook_post_text_embeddings",
+	"facebook_album_description_embeddings",
+	"image_tag_embeddings",
+}
+
+var embeddingProgressSources = map[string]embeddingProgressSourceDef{
+	"message_context_embeddings": {
+		key:          "message_context_embeddings",
+		totalQuery:   `SELECT COUNT(id) FROM messages WHERE text IS NOT NULL`,
+		pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM message_embeddings me WHERE me.rowid = messages.id)`,
+	},
+	"email_embeddings": {
+		key:          "email_embeddings",
+		totalQuery:   `SELECT COUNT(id) FROM emails WHERE user_deleted = FALSE`,
+		pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM email_embeddings ee WHERE ee.rowid = emails.id)`,
+	},
+	"facebook_post_text_embeddings": {
+		key:          "facebook_post_text_embeddings",
+		totalQuery:   `SELECT COUNT(id) FROM facebook_posts WHERE TRIM(COALESCE(post_text, '')) != ''`,
+		pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM facebook_post_text_embeddings e WHERE e.rowid = facebook_posts.id)`,
+	},
+	"facebook_album_description_embeddings": {
+		key:          "facebook_album_description_embeddings",
+		totalQuery:   `SELECT COUNT(id) FROM facebook_albums WHERE TRIM(COALESCE(description, '')) != ''`,
+		pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM facebook_album_description_embeddings e WHERE e.rowid = facebook_albums.id)`,
+	},
+	"image_tag_embeddings": {
+		key:          "image_tag_embeddings",
+		totalQuery:   `SELECT COUNT(id) FROM media_items WHERE tags IS NOT NULL AND TRIM(tags) != ''`,
+		pendingExtra: ` AND require_classification = TRUE`,
+	},
+}
+
+// ErrUnknownEmbeddingSource is returned by GetEmbeddingProgressForSource when the
+// requested key isn't one of EmbeddingProgressSourceKeys.
+var ErrUnknownEmbeddingSource = errors.New("unknown embedding progress source")
+
+// GetEmbeddingProgressForSource reports how much content of one source still needs an
+// AI embedding to be searchable.
+//
+// This is expensive: the embedding tables are sqlite-vec vec0 virtual tables, and a
+// correlated NOT EXISTS predicate evaluated per row of the base table (messages,
+// emails, ...) against a vec0 table is effectively a per-row scan. Callers should
+// fetch each source independently (rather than in one batched call) so a single
+// slow or failing source doesn't hold up the others, and fetch separately from
+// GetImportModalStats so cheap counts can render first.
+func (r *DashboardRepo) GetEmbeddingProgressForSource(ctx context.Context, key string) (model.EmbeddingProgressEntry, error) {
+	s, ok := embeddingProgressSources[key]
+	if !ok {
+		return model.EmbeddingProgressEntry{}, ErrUnknownEmbeddingSource
 	}
 
-	return out, nil
+	uid := uidFromCtx(ctx)
+	makeUIDCond := func(baseArgs []any) (string, []any) {
+		if uid == 0 {
+			return "", baseArgs
+		}
+		baseArgs = append(baseArgs, uid)
+		return fmt.Sprintf(" AND user_id = ?%d", len(baseArgs)), baseArgs
+	}
+
+	var entry model.EmbeddingProgressEntry
+	totalCond, totalArgs := makeUIDCond(nil)
+	if err := r.pool.QueryRowContext(ctx, s.totalQuery+totalCond, totalArgs...).Scan(&entry.Total); err != nil {
+		return model.EmbeddingProgressEntry{}, fmt.Errorf("%s total: %w", s.key, err)
+	}
+	pendingCond, pendingArgs := makeUIDCond(nil)
+	if err := r.pool.QueryRowContext(ctx, s.totalQuery+pendingCond+s.pendingExtra, pendingArgs...).Scan(&entry.Pending); err != nil {
+		return model.EmbeddingProgressEntry{}, fmt.Errorf("%s pending: %w", s.key, err)
+	}
+	return entry, nil
 }
 
 // GetArchiveDataInventory returns entry counts per archive data type for conversational AI context.
 func (r *DashboardRepo) GetArchiveDataInventory(ctx context.Context) (*model.ArchiveDataInventory, error) {
-	stats, err := r.GetImportModalStats(ctx, false)
+	stats, err := r.GetImportModalStats(ctx)
 	if err != nil {
 		return nil, err
 	}

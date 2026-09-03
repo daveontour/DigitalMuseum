@@ -33,6 +33,9 @@ type GenerateRequest struct {
 	SubjectGender string
 	PsychProfile  *string
 	WritingStyle  *string
+	// OpenRouterModels, when len > 1 (max 3), is sent as OpenRouter's "models" fallback array
+	// (primary slug first). Empty means use the provider's configured model only.
+	OpenRouterModels []string
 }
 
 // LLMUsage summarises token usage for one completed generation (tool loop totals).

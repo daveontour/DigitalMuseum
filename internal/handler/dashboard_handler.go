@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/daveontour/aimuseum/internal/keystore"
+	"github.com/daveontour/aimuseum/internal/model"
+	"github.com/daveontour/aimuseum/internal/repository"
 	"github.com/daveontour/aimuseum/internal/service"
 	"github.com/go-chi/chi/v5"
 )
@@ -29,6 +31,7 @@ func NewDashboardHandler(dashSvc *service.DashboardService, subjectSvc *service.
 func (h *DashboardHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/dashboard", h.GetDashboard)
 	r.Get("/api/import-modal-stats", h.GetImportModalStats)
+	r.Get("/api/import-modal-embedding-progress", h.GetEmbeddingProgress)
 	r.Get("/api/subject-configuration", h.GetSubjectConfiguration)
 	r.Post("/api/subject-configuration", h.UpsertSubjectConfiguration)
 	r.Put("/api/subject-configuration/writing-style-ai", h.PutWritingStyleAI)
@@ -46,19 +49,38 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, resp)
 }
 
-// GetImportModalStats handles GET /api/import-modal-stats.
-// Query param embedding_progress=0 omits searchable/embedding progress (counts only).
+// GetImportModalStats handles GET /api/import-modal-stats. Returns cheap entry counts
+// only; searchable/embedding progress is fetched separately via GetEmbeddingProgress.
 func (h *DashboardHandler) GetImportModalStats(w http.ResponseWriter, r *http.Request) {
-	includeEmbeddingProgress := true
-	if v := strings.TrimSpace(r.URL.Query().Get("embedding_progress")); v == "0" || strings.EqualFold(v, "false") {
-		includeEmbeddingProgress = false
-	}
-	resp, err := h.dashSvc.GetImportModalStats(r.Context(), includeEmbeddingProgress)
+	resp, err := h.dashSvc.GetImportModalStats(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving import modal stats: %s", err))
 		return
 	}
 	writeJSON(w, resp)
+}
+
+// GetEmbeddingProgress handles GET /api/import-modal-embedding-progress?source=<key>.
+// Each of the five embedding-progress sources (see repository.EmbeddingProgressSourceKeys)
+// is fetched independently by the caller — one request per source — rather than in one
+// batched call, so a single slow source's query doesn't hold up the others and its
+// result can be rendered into the modal as soon as it's ready.
+func (h *DashboardHandler) GetEmbeddingProgress(w http.ResponseWriter, r *http.Request) {
+	key := strings.TrimSpace(r.URL.Query().Get("source"))
+	if key == "" {
+		writeError(w, http.StatusBadRequest, "missing required query param: source")
+		return
+	}
+	entry, err := h.dashSvc.GetEmbeddingProgressForSource(r.Context(), key)
+	if err != nil {
+		if errors.Is(err, repository.ErrUnknownEmbeddingSource) {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown embedding progress source: %s", key))
+			return
+		}
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error retrieving embedding progress: %s", err))
+		return
+	}
+	writeJSON(w, model.EmbeddingProgressSourceResponse{Key: key, Total: entry.Total, Pending: entry.Pending})
 }
 
 // UpsertSubjectConfiguration handles POST /api/subject-configuration.

@@ -3328,6 +3328,8 @@ Modals.AutoRoutingConfig = (() => {
     let cached = {
         classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
         failover_enabled: true,
+        auto_selection_enabled: true,
+        chat_provider: 'auto',
     };
 
     function isLocalAIAllowedForChat() {
@@ -3361,16 +3363,32 @@ Modals.AutoRoutingConfig = (() => {
     function parseSettingsFromRows(rows) {
         const row = Array.isArray(rows) ? rows.find((r) => r && r.key === CONFIG_KEY) : null;
         if (!row || row.value == null || String(row.value).trim() === '') {
-            return { classifier_provider: DEFAULT_CLASSIFIER_PROVIDER, failover_enabled: true };
+            return {
+                classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+                failover_enabled: true,
+                auto_selection_enabled: true,
+                chat_provider: 'auto',
+            };
         }
         try {
             const parsed = JSON.parse(row.value);
+            const autoEnabled = parsed.auto_selection_enabled !== false;
+            let manual = String(parsed.chat_provider || '').toLowerCase().trim();
+            if (manual === 'auto') manual = '';
+            if (!manual) manual = AIModels.defaultKey() || 'localai';
             return {
                 classifier_provider: normalizeClassifierProvider(parsed.classifier_provider),
                 failover_enabled: parsed.failover_enabled !== false,
+                auto_selection_enabled: autoEnabled,
+                chat_provider: manual,
             };
         } catch (_) {
-            return { classifier_provider: DEFAULT_CLASSIFIER_PROVIDER, failover_enabled: true };
+            return {
+                classifier_provider: DEFAULT_CLASSIFIER_PROVIDER,
+                failover_enabled: true,
+                auto_selection_enabled: true,
+                chat_provider: AIModels.defaultKey() || 'localai',
+            };
         }
     }
 
@@ -3406,6 +3424,15 @@ Modals.AutoRoutingConfig = (() => {
         return AIModels.cached().map((m) => m.key).filter((name) => name !== p);
     }
 
+    function isAutoSelectionEnabled() {
+        return cached.auto_selection_enabled !== false;
+    }
+
+    function getChatProvider() {
+        if (cached.auto_selection_enabled !== false) return 'auto';
+        return String(cached.chat_provider || 'localai').toLowerCase().trim();
+    }
+
     function isFailoverEnabled() {
         return cached.failover_enabled !== false;
     }
@@ -3414,6 +3441,8 @@ Modals.AutoRoutingConfig = (() => {
         ensureLoaded,
         getFailoverCandidates,
         isFailoverEnabled,
+        isAutoSelectionEnabled,
+        getChatProvider,
         getClassifierProvider,
         reconcileClassifierProvider,
     };

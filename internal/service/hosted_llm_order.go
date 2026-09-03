@@ -15,16 +15,21 @@ const DefaultClassifierProvider = "localai"
 
 // HostedLLMProviderOrderConfig is persisted under HostedLLMProviderOrderConfigKey. Hosted
 // provider try order for both Auto routing and error failover always follows the AI Models
-// tab's sort_order (see defaultHostedLLMProviderOrder) — only the classifier provider and
-// the failover on/off toggle are independently configurable.
+// tab's sort_order (see defaultHostedLLMProviderOrder) — only the classifier provider,
+// auto-selection mode, chat provider, and the failover on/off toggle are independently
+// configurable.
 type HostedLLMProviderOrderConfig struct {
-	ClassifierProvider string
-	FailoverEnabled    bool
+	ClassifierProvider   string
+	FailoverEnabled      bool
+	AutoSelectionEnabled bool
+	ChatProvider         string
 }
 
 type hostedLLMProviderOrderConfig struct {
-	ClassifierProvider string `json:"classifier_provider"`
-	FailoverEnabled    *bool  `json:"failover_enabled"`
+	ClassifierProvider   string `json:"classifier_provider"`
+	FailoverEnabled      *bool  `json:"failover_enabled"`
+	AutoSelectionEnabled *bool  `json:"auto_selection_enabled"`
+	ChatProvider         string `json:"chat_provider"`
 }
 
 // defaultHostedLLMProviderOrder returns every enabled AI Models row's key ordered by
@@ -105,10 +110,66 @@ func (s *ChatService) FailoverProviderTryOrder(ctx context.Context, primary stri
 	return out
 }
 
+// openRouterMaxModelsFallback is OpenRouter's limit on the "models" array size.
+const openRouterMaxModelsFallback = 3
+
+// openRouterModelSlugsForHosted returns OpenRouter model slugs for hosted execution.
+// When failover is enabled, primaryKey's slug is first, then up to two more enabled
+// hosted model slugs in AI Models table sort_order (OpenRouter allows at most three).
+// When failover is disabled, only the primary slug is returned (if known). localai is excluded.
+func (s *ChatService) openRouterModelSlugsForHosted(ctx context.Context, primaryKey string, failover bool) []string {
+	primaryKey = strings.ToLower(strings.TrimSpace(primaryKey))
+	if primaryKey == "" || primaryKey == "localai" || s.aiModelsSvc == nil {
+		return nil
+	}
+	models, err := s.aiModelsSvc.ListEnabledInTableOrder(ctx)
+	if err != nil {
+		return nil
+	}
+	keyToSlug := map[string]string{}
+	for _, m := range models {
+		k := strings.ToLower(strings.TrimSpace(m.Key))
+		if k == "localai" {
+			continue
+		}
+		slug := strings.TrimSpace(m.ModelSlug)
+		if slug == "" {
+			continue
+		}
+		keyToSlug[k] = slug
+	}
+	primarySlug, ok := keyToSlug[primaryKey]
+	if !ok {
+		return nil
+	}
+	if !failover {
+		return []string{primarySlug}
+	}
+	out := []string{primarySlug}
+	seen := map[string]bool{primarySlug: true}
+	for _, m := range models {
+		k := strings.ToLower(strings.TrimSpace(m.Key))
+		if k == "localai" {
+			continue
+		}
+		slug := strings.TrimSpace(m.ModelSlug)
+		if slug == "" || seen[slug] {
+			continue
+		}
+		out = append(out, slug)
+		seen[slug] = true
+		if len(out) >= openRouterMaxModelsFallback {
+			break
+		}
+	}
+	return out
+}
+
 func (s *ChatService) parseHostedLLMProviderOrderJSON(ctx context.Context, raw string) HostedLLMProviderOrderConfig {
 	out := HostedLLMProviderOrderConfig{
-		ClassifierProvider: DefaultClassifierProvider,
-		FailoverEnabled:    true,
+		ClassifierProvider:   DefaultClassifierProvider,
+		FailoverEnabled:      true,
+		AutoSelectionEnabled: true,
 	}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -122,13 +183,35 @@ func (s *ChatService) parseHostedLLMProviderOrderJSON(ctx context.Context, raw s
 	if cfg.FailoverEnabled != nil {
 		out.FailoverEnabled = *cfg.FailoverEnabled
 	}
+	if cfg.AutoSelectionEnabled != nil {
+		out.AutoSelectionEnabled = *cfg.AutoSelectionEnabled
+	}
+	out.ChatProvider = s.normalizeChatProvider(ctx, cfg.ChatProvider)
 	return out
+}
+
+func (s *ChatService) normalizeChatProvider(ctx context.Context, name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "auto" {
+		return ""
+	}
+	if name == "localai" {
+		if s.isValidHostedProviderName(ctx, "localai") {
+			return "localai"
+		}
+		return ""
+	}
+	if s.isValidHostedProviderName(ctx, name) {
+		return name
+	}
+	return ""
 }
 
 func (s *ChatService) loadHostedLLMProviderOrderConfig(ctx context.Context) HostedLLMProviderOrderConfig {
 	out := HostedLLMProviderOrderConfig{
-		ClassifierProvider: DefaultClassifierProvider,
-		FailoverEnabled:    true,
+		ClassifierProvider:   DefaultClassifierProvider,
+		FailoverEnabled:      true,
+		AutoSelectionEnabled: true,
 	}
 	if s.configRepo == nil {
 		return out
@@ -138,4 +221,26 @@ func (s *ChatService) loadHostedLLMProviderOrderConfig(ctx context.Context) Host
 		return out
 	}
 	return s.parseHostedLLMProviderOrderJSON(ctx, *raw)
+}
+
+// AutoSelectionEnabled reports whether Auto routing (with query classifier) is enabled.
+func (s *ChatService) AutoSelectionEnabled(ctx context.Context) bool {
+	return s.loadHostedLLMProviderOrderConfig(ctx).AutoSelectionEnabled
+}
+
+// ConfiguredChatProvider returns the effective main-chat provider key: "auto" when the
+// query classifier is enabled, otherwise the model key from the Chat column (chat_provider).
+func (s *ChatService) ConfiguredChatProvider(ctx context.Context) string {
+	cfg := s.loadHostedLLMProviderOrderConfig(ctx)
+	if cfg.AutoSelectionEnabled {
+		return "auto"
+	}
+	key := s.normalizeChatProvider(ctx, cfg.ChatProvider)
+	if key != "" {
+		return key
+	}
+	if dk, ok := s.DefaultAIModelKey(ctx); ok {
+		return dk
+	}
+	return "localai"
 }

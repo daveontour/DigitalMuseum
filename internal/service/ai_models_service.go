@@ -102,8 +102,8 @@ func (s *AIModelsService) ListAll(ctx context.Context) ([]AIModel, error) {
 // ListEnabled returns enabled hosted (OpenRouter-routed) models ordered by sort_order, for
 // runtime pickers such as chat provider dropdowns. Local AI is deliberately excluded — every
 // consumer of this list already handles Local AI as a separate, always-available option;
-// see defaultHostedLLMProviderOrder (internal/service/hosted_llm_order.go) for the Auto
-// routing/error-failover order, which does include Local AI at its own sort position.
+// see ListEnabledInTableOrder and defaultHostedLLMProviderOrder for the full table order
+// including Local AI at its sort position.
 func (s *AIModelsService) ListEnabled(ctx context.Context) ([]AIModel, error) {
 	all, err := s.cached(ctx)
 	if err != nil {
@@ -112,6 +112,22 @@ func (s *AIModelsService) ListEnabled(ctx context.Context) ([]AIModel, error) {
 	out := make([]AIModel, 0, len(all))
 	for _, m := range all {
 		if m.Enabled && strings.ToLower(m.Key) != localAIModelKey {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+// ListEnabledInTableOrder returns every enabled ai_models row in sort_order (including
+// the special "localai" row). This is the canonical order for provider pickers.
+func (s *AIModelsService) ListEnabledInTableOrder(ctx context.Context) ([]AIModel, error) {
+	all, err := s.cached(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]AIModel, 0, len(all))
+	for _, m := range all {
+		if m.Enabled {
 			out = append(out, m)
 		}
 	}

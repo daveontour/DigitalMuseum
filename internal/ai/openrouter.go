@@ -12,6 +12,7 @@ import (
 
 const openRouterChatCompletionsURL = "https://openrouter.ai/api/v1/chat/completions"
 const openRouterCreditsURL = "https://openrouter.ai/api/v1/credits"
+const openRouterMaxModelsFallback = 3
 
 // OpenRouterCredits reports an OpenRouter account's cumulative purchased credits and
 // usage, as returned by GET /api/v1/credits for the given API key.
@@ -98,7 +99,8 @@ func (p *OpenRouterProvider) SimpleGenerate(ctx context.Context, prompt string) 
 	if err != nil {
 		return "", nil, err
 	}
-	usage := p.usageFromResponse(resp)
+	model := openRouterModelFromResponse(resp, p.modelName)
+	usage := p.usageFromResponse(resp, model)
 	return strings.TrimSpace(openRouterExtractText(resp)), usage, nil
 }
 
@@ -109,7 +111,33 @@ func (p *OpenRouterProvider) providerLabelOrUnknown() string {
 	return p.providerKey
 }
 
-func (p *OpenRouterProvider) usageFromResponse(resp map[string]any) *LLMUsage {
+func openRouterModelFromResponse(resp map[string]any, fallback string) string {
+	if m, ok := resp["model"].(string); ok {
+		if trimmed := strings.TrimSpace(m); trimmed != "" {
+			return trimmed
+		}
+	}
+	return fallback
+}
+
+func openRouterApplyModelRouting(body map[string]any, defaultModel string, models []string) string {
+	if len(models) > openRouterMaxModelsFallback {
+		models = models[:openRouterMaxModelsFallback]
+	}
+	if len(models) > 1 {
+		body["models"] = models
+		body["model"] = models[0]
+		return models[0]
+	}
+	if len(models) == 1 {
+		body["model"] = models[0]
+		return models[0]
+	}
+	body["model"] = defaultModel
+	return defaultModel
+}
+
+func (p *OpenRouterProvider) usageFromResponse(resp map[string]any, model string) *LLMUsage {
 	in, out := 0, 0
 	if u, ok := resp["usage"].(map[string]any); ok {
 		if v, ok := u["prompt_tokens"].(float64); ok {
@@ -122,7 +150,10 @@ func (p *OpenRouterProvider) usageFromResponse(resp map[string]any) *LLMUsage {
 	if in == 0 && out == 0 {
 		return nil
 	}
-	return &LLMUsage{Provider: p.providerKey, Model: p.modelName, InputTokens: in, OutputTokens: out}
+	if model == "" {
+		model = p.modelName
+	}
+	return &LLMUsage{Provider: p.providerKey, Model: model, InputTokens: in, OutputTokens: out}
 }
 
 func openRouterExtractText(resp map[string]any) string {
@@ -201,13 +232,14 @@ func (p *OpenRouterProvider) GenerateResponse(
 	funcCallsMade := []map[string]any{}
 	inputTokens := 0
 	outputTokens := 0
+	responseModel := p.modelName
 
 	for iter := 0; iter < maxToolCallIterations; iter++ {
 		body := map[string]any{
-			"model":       p.modelName,
 			"messages":    messages,
 			"temperature": req.Temperature,
 		}
+		requestModel := openRouterApplyModelRouting(body, p.modelName, req.OpenRouterModels)
 		if len(tools) > 0 {
 			body["tools"] = tools
 		}
@@ -217,6 +249,7 @@ func (p *OpenRouterProvider) GenerateResponse(
 			return GenerateResult{}, fmt.Errorf("openrouter(%s): %w", p.providerKey, err)
 		}
 
+		responseModel = openRouterModelFromResponse(resp, requestModel)
 		if u, ok := resp["usage"].(map[string]any); ok {
 			if v, ok := u["prompt_tokens"].(float64); ok {
 				inputTokens += int(v)
@@ -240,7 +273,10 @@ func (p *OpenRouterProvider) GenerateResponse(
 				"output_tokens":    outputTokens,
 				"total_tokens":     inputTokens + outputTokens,
 				"provider":         p.providerKey,
-				"model":            p.modelName,
+				"model":            responseModel,
+			}
+			if len(req.OpenRouterModels) > 1 {
+				metadata["openrouter_models"] = req.OpenRouterModels
 			}
 			if len(embeddedElements) > 0 {
 				metadata["embedded_json"] = embeddedElements
@@ -252,7 +288,7 @@ func (p *OpenRouterProvider) GenerateResponse(
 				Voice:        req.Voice,
 				Usage: &LLMUsage{
 					Provider:     p.providerKey,
-					Model:        p.modelName,
+					Model:        responseModel,
 					InputTokens:  inputTokens,
 					OutputTokens: outputTokens,
 				},

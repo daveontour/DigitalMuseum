@@ -77,10 +77,10 @@ func (h *AIModelsHandler) ListAdmin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"models": out})
 }
 
-// ListAvailable handles GET /api/ai-models/available — enabled models, ordered,
-// for runtime provider pickers.
+// ListAvailable handles GET /api/ai-models/available — enabled models in table sort_order
+// (including localai when enabled), for runtime provider pickers.
 func (h *AIModelsHandler) ListAvailable(w http.ResponseWriter, r *http.Request) {
-	models, err := h.svc.ListEnabled(r.Context())
+	models, err := h.svc.ListEnabledInTableOrder(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error listing available ai models: %s", err))
 		return

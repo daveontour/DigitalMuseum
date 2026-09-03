@@ -48,21 +48,32 @@ type ContactCount struct {
 // ImportModalStatsResponse is the shape returned by GET /api/import-modal-stats.
 // Subset of dashboard counts used by the Import & Manage Data modal.
 type ImportModalStatsResponse struct {
-	MessageCounts                   map[string]int64                  `json:"message_counts"`
-	TotalImages                     int64                             `json:"total_images"`
-	FilesystemImagesEmbeddedCount   int64                             `json:"filesystem_images_embedded_count"`
-	FilesystemImagesReferencedCount int64                             `json:"filesystem_images_referenced_count"`
-	ImportedImages                  int64                             `json:"imported_images"`
-	ReferenceImages                 int64                             `json:"reference_images"`
-	ThumbnailCount                  int64                             `json:"thumbnail_count"`
-	FacebookAlbumsCount             int64                             `json:"facebook_albums_count"`
-	FacebookPostsCount              int64                             `json:"facebook_posts_count"`
-	LocationsCount                  int64                             `json:"locations_count"`
-	ContactsCount                   int64                             `json:"contacts_count"`
-	EmailsBySource                  map[string]int64                  `json:"emails_by_source"`
-	ReferenceDocsCount              int64                             `json:"reference_docs_count"`
-	GpsImagesCount                  int64                             `json:"gps_images_count"`
-	EmbeddingProgress               map[string]EmbeddingProgressEntry `json:"embedding_progress"`
+	MessageCounts                   map[string]int64 `json:"message_counts"`
+	TotalImages                     int64            `json:"total_images"`
+	FilesystemImagesEmbeddedCount   int64            `json:"filesystem_images_embedded_count"`
+	FilesystemImagesReferencedCount int64            `json:"filesystem_images_referenced_count"`
+	ImportedImages                  int64            `json:"imported_images"`
+	ReferenceImages                 int64            `json:"reference_images"`
+	ThumbnailCount                  int64            `json:"thumbnail_count"`
+	FacebookAlbumsCount             int64            `json:"facebook_albums_count"`
+	FacebookPostsCount              int64            `json:"facebook_posts_count"`
+	LocationsCount                  int64            `json:"locations_count"`
+	ContactsCount                   int64            `json:"contacts_count"`
+	EmailsBySource                  map[string]int64 `json:"emails_by_source"`
+	ReferenceDocsCount              int64            `json:"reference_docs_count"`
+	GpsImagesCount                  int64            `json:"gps_images_count"`
+	// EmbeddingProgress is always empty here — each source is fetched independently
+	// via GET /api/import-modal-embedding-progress?source=<key>, see
+	// EmbeddingProgressSourceResponse.
+	EmbeddingProgress map[string]EmbeddingProgressEntry `json:"embedding_progress"`
+}
+
+// EmbeddingProgressSourceResponse is the shape returned by
+// GET /api/import-modal-embedding-progress?source=<key>.
+type EmbeddingProgressSourceResponse struct {
+	Key     string `json:"key"`
+	Total   int64  `json:"total"`
+	Pending int64  `json:"pending"`
 }
 
 // EmbeddingProgressEntry reports how much of a source's content still needs an

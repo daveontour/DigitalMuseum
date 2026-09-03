@@ -173,8 +173,9 @@ func (s *DashboardService) GetDashboard(ctx context.Context) (*model.DashboardRe
 }
 
 // GetImportModalStats returns aggregate counts for the import/maintenance modals.
-func (s *DashboardService) GetImportModalStats(ctx context.Context, includeEmbeddingProgress bool) (*model.ImportModalStatsResponse, error) {
-	raw, err := s.repo.GetImportModalStats(ctx, includeEmbeddingProgress)
+// Embedding/searchable progress is not included — see GetEmbeddingProgress.
+func (s *DashboardService) GetImportModalStats(ctx context.Context) (*model.ImportModalStatsResponse, error) {
+	raw, err := s.repo.GetImportModalStats(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +189,14 @@ func (s *DashboardService) GetImportModalStats(ctx context.Context, includeEmbed
 		raw.EmbeddingProgress = map[string]model.EmbeddingProgressEntry{}
 	}
 	return raw, nil
+}
+
+// GetEmbeddingProgressForSource returns how much content of one source still needs an
+// AI embedding to be searchable. This is the expensive part of the import/maintenance
+// stats; callers fetch each source independently so the modal can render its cheap
+// counts immediately and fill in progress per source as each one resolves.
+func (s *DashboardService) GetEmbeddingProgressForSource(ctx context.Context, key string) (model.EmbeddingProgressEntry, error) {
+	return s.repo.GetEmbeddingProgressForSource(ctx, key)
 }
 
 // GetArchiveDataInventory returns entry counts per data type for conversational AI prompts.

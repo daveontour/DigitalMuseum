@@ -40,15 +40,12 @@
                 </div>
             
                 <div class="top-bar-llm" style="margin-left: 25px;">
-                    <label for="llm-provider-select" class="top-bar-label" style="margin-right: 10px;align-content: center;">AI Provider:</label>
-                    <select id="llm-provider-select">
-                        <option value="auto" selected>Auto</option>
-                        <option value="gemini">Gemini</option>
-                        <option value="claude">Claude</option>
-                        <option value="deepseek">DeepSeek</option>
-                        <option value="openai">ChatGPT</option>
-                        <option value="localai">Local AI</option>
-                    </select>
+                    <span class="top-bar-label" style="margin-right: 10px;align-content: center;">AI Provider:</span>
+                    <button type="button" id="llm-provider-open-config-btn" class="top-bar-llm-provider-btn" title="Open AI Models configuration" aria-haspopup="dialog">
+                        <span id="llm-provider-current-label">Auto</span>
+                        <!-- <i class="fas fa-chevron-down" aria-hidden="true"></i> -->
+                    </button>
+                    <input type="hidden" id="llm-provider-select" value="auto">
                 </div>
             </div>
 
@@ -376,10 +373,24 @@
                     <button type="button" class="more-options-btn" id="statistics-sidebar-btn">
                         <i class="fas fa-chart-bar"></i> Dashboard
                     </button>
+
+                    <button type="button" class="more-options-btn" id="have-a-chat-sidebar-btn">
+                        <i class="fas fa-comments"></i> Have a Chat
+                    </button>
+                    <button type="button" class="more-options-btn" id="random-question-sidebar-btn">
+                        <i class="fas fa-question-circle"></i> Random Question
+                    </button>
+                    <button type="button" class="more-options-btn" id="todays-thing-sidebar-btn">
+                        <i class="fas fa-star"></i> Today's Thing of Interest
+                    </button>
+                    <button type="button" class="more-options-btn" id="interviewer-sidebar-btn">
+                        <i class="fas fa-microphone-alt"></i> Interviewer
+                    </button>
+
                 </div>
                 <div class="sidebar-spacer" aria-hidden="true"></div>
                 <div class="sidebar-bottom-tile">
-                    <button type="button" class="more-options-btn sidebar-settings-btn" id="have-a-chat-sidebar-btn">
+                    <!-- <button type="button" class="more-options-btn sidebar-settings-btn" id="have-a-chat-sidebar-btn">
                         <i class="fas fa-comments"></i> Have a Chat
                     </button>
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="random-question-sidebar-btn">
@@ -390,9 +401,6 @@
                     </button>
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="interviewer-sidebar-btn">
                         <i class="fas fa-microphone-alt"></i> Interviewer
-                    </button>
-                    <!-- <button type="button" class="more-options-btn sidebar-settings-btn" id="email-catchup-sidebar-btn">
-                        <i class="fas fa-inbox"></i> Email Catchup
                     </button> -->
                 </div>
             </div>
@@ -1063,16 +1071,29 @@
                     <section class="section-config">
                         <h1>AI Models</h1>
                         <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body);">
-                            Manage the AI models available throughout the app (chat, Have-a-Chat, Interviews, Quiz, and Auto routing). Each hosted model is routed through OpenRouter using the model slug you provide — see <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a> for available slugs. Local AI is always listed below (it needs no slug) and can be enabled/disabled and reordered like any hosted model — its position here also sets where it's tried during Auto routing and error failover. Pick the <strong>Classifier</strong> radio button for the model that decides, when Auto routing is selected, whether a request needs a hosted model or can be handled locally. Changes take effect immediately, without a restart.
+                            Manage the AI models available throughout the app (chat, Have-a-Chat, Interviews, Quiz, and Auto routing). Each hosted model is routed through OpenRouter using the model slug you provide — see <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a> for available slugs. Local AI is always listed below (it needs no slug) and can be enabled/disabled and reordered like any hosted model — its position here also sets where it's tried during Auto routing. Open the top-bar <strong>AI Provider</strong> button to return here. When <strong>Enable Query Classifier</strong> is on, each main-chat message is classified and routed to Local AI or a hosted model automatically; when it is off, the model selected in the <strong>Chat</strong> column is used. Pick the <strong>Classifier</strong> model that runs that routing decision. When <strong>Enable error failover</strong> is on, hosted chat requests send OpenRouter up to three model slugs (primary first, then the next enabled models in table order). Changes take effect immediately, without a restart.
                         </p>
                     </section>
                     <section class="config-section">
+                        <div class="setting-group" style="margin-bottom: 0.75rem;">
+                            <label for="ai-models-config-auto-selection-checkbox" title="When enabled, each main-chat message is classified and routed to Local AI or a hosted model per request">
+                                <input type="checkbox" id="ai-models-config-auto-selection-checkbox" checked>
+                                Enable Query Classifier
+                            </label>
+                        </div>
+                        <div class="setting-group" style="margin-bottom: 0.75rem;">
+                            <label for="ai-models-config-failover-enabled-checkbox" title="When enabled, OpenRouter tries other enabled model slugs in table order if the primary fails">
+                                <input type="checkbox" id="ai-models-config-failover-enabled-checkbox" checked>
+                                Enable Error Failover
+                            </label>
+                        </div>
                         <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; justify-content:space-between; margin-bottom: 0.75rem;">
                             <h3 style="margin:0;">Models</h3>
                             <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
                                 <button type="button" class="modal-btn modal-btn-primary" id="ai-models-config-add-btn"><i class="fas fa-plus" aria-hidden="true"></i> Add model</button>
                             </div>
                         </div>
+
                         <div id="ai-models-config-loading" style="padding: 1rem; color: var(--color-text-muted);">Loading AI models…</div>
                         <div id="ai-models-config-table-wrap" style="display:none;">
                             <table class="manage-contacts-data-table contacts-table ai-models-config-table" style="width:100%;">
@@ -1082,7 +1103,8 @@
                                         <th>Display name</th>
                                         <th>OpenRouter model slug</th>
                                         <th style="text-align:center;">Enabled</th>
-                                        <th style="text-align:center;">Classifier</th>
+                                        <th style="text-align:center;" id="ai-models-config-chat-col-header">Chat</th>
+                                        <th style="text-align:center;" id="ai-models-config-classifier-col-header">Classifier</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -1091,18 +1113,6 @@
                             <p id="ai-models-config-empty" style="display:none; margin-top:0.75rem; color:var(--color-text-muted);">No hosted AI models added yet — Local AI is still available above. Click <strong>Add model</strong> to browse the catalog.</p>
                         </div>
                         <p id="ai-models-config-status" role="status" aria-live="polite" style="margin-top:0.75rem; min-height:1.35em; font-size:var(--text-md);"></p>
-                    </section>
-                    <section class="config-section">
-                        <h3 style="margin:0 0 0.5rem 0;">Error Failover</h3>
-                        <p class="config-tab-lead" style="max-width: none; margin: 0 0 0.75rem 0;">
-                            When a hosted request fails — and when Auto routes to a hosted model — the remaining enabled models above are tried in the order shown until one succeeds.
-                        </p>
-                        <div class="setting-group">
-                            <label for="ai-models-config-failover-enabled-checkbox" title="When unchecked, a hosted provider error is shown instead of trying other providers">
-                                <input type="checkbox" id="ai-models-config-failover-enabled-checkbox" checked>
-                                Enable error failover
-                            </label>
-                        </div>
                     </section>
                 </div>
                 <div class="config-tab-content" id="model-catalog-tab">

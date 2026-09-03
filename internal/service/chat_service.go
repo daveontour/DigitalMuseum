@@ -243,6 +243,26 @@ func (s *ChatService) effectiveProviderByKey(ctx context.Context, r *http.Reques
 	return appai.NewOpenRouterProvider(apiKey, m.ModelSlug, m.Key)
 }
 
+// applyOpenRouterModelRouting sets genReq.OpenRouterModels when error failover is enabled
+// for a hosted provider request (manual Chat selection or Auto routing to a hosted model).
+func (s *ChatService) applyOpenRouterModelRouting(ctx context.Context, genReq *appai.GenerateRequest, providerKey string) {
+	if genReq == nil {
+		return
+	}
+	providerKey = strings.ToLower(strings.TrimSpace(providerKey))
+	if providerKey == "" || providerKey == "localai" {
+		return
+	}
+	cfg := s.loadHostedLLMProviderOrderConfig(ctx)
+	if !cfg.FailoverEnabled {
+		return
+	}
+	slugs := s.openRouterModelSlugsForHosted(ctx, providerKey, true)
+	if len(slugs) > 1 {
+		genReq.OpenRouterModels = slugs
+	}
+}
+
 // OpenRouterCredits returns the OpenRouter account credit balance for this request's
 // effective key (server default, or user/visitor override), for display in the chat
 // status bar after each completion.
@@ -400,21 +420,28 @@ func (s *ChatService) ModelAvailable(ctx context.Context, r *http.Request, key s
 
 // AvailableAIModels returns every enabled AI model (key, display name, live availability) for this
 // request's user, ordered by sort_order — the data behind GET /chat/availability's "models" field.
+// Includes the "localai" row at its table position when enabled.
 func (s *ChatService) AvailableAIModels(ctx context.Context, r *http.Request) []map[string]any {
 	if s.aiModelsSvc == nil {
 		return []map[string]any{}
 	}
-	models, err := s.aiModelsSvc.ListEnabled(ctx)
+	models, err := s.aiModelsSvc.ListEnabledInTableOrder(ctx)
 	if err != nil {
 		return []map[string]any{}
 	}
 	out := make([]map[string]any, 0, len(models))
 	for _, m := range models {
+		var available bool
+		if strings.ToLower(m.Key) == "localai" {
+			available = s.LocalAIAvailable(ctx) && s.LocalAIUseEnabled(ctx)
+		} else {
+			available = s.ModelAvailable(ctx, r, m.Key)
+		}
 		out = append(out, map[string]any{
 			"key":          m.Key,
 			"display_name": m.DisplayName,
 			"enabled":      m.Enabled,
-			"available":    s.ModelAvailable(ctx, r, m.Key),
+			"available":    available,
 		})
 	}
 	return out
@@ -641,6 +668,8 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 		genReq.WritingStyle = writingStyle
 	}
 
+	s.applyOpenRouterModelRouting(ctx, &genReq, providerName)
+
 	result, err := provider.GenerateResponse(ctx, genReq, systemPrompt, history, executor, toolDecls)
 	if err != nil {
 		stub := result.Usage
@@ -695,6 +724,7 @@ func (s *ChatService) generateRequestOnlyResponse(ctx context.Context, r *http.R
 		voice = *req.Voice
 	}
 	genReq := appai.GenerateRequest{UserInput: req.Prompt}
+	s.applyOpenRouterModelRouting(ctx, &genReq, providerName)
 	noTools := []map[string]any{}
 	result, err := provider.GenerateResponse(ctx, genReq, "", nil, nil, &noTools)
 	if err != nil {
@@ -884,10 +914,7 @@ func (s *ChatService) GenerateRandomQuestion(ctx context.Context, r *http.Reques
 		SubjectGender: subjectGender,
 	}
 
-	// if voice == "owner" {
-	// 	genReq.PsychProfile = psychProfile
-	// 	genReq.WritingStyle = writingStyle
-	// }
+	s.applyOpenRouterModelRouting(ctx, &genReq, providerName)
 
 	result, err := provider.GenerateResponse(ctx, genReq, systemPrompt, history, executor, toolDecls)
 	if err != nil {

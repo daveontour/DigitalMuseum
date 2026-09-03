@@ -89,8 +89,7 @@ const App = (() => {
     }
 
     // availMap shape: { auto, localai, _order: [key,...], [key]: available }
-    // _order lists hosted AI model keys in server sort_order (the dynamic replacement
-    // for the old fixed gemini/claude/deepseek/openai set).
+    // _order lists enabled AI model keys in server sort_order (includes localai at its table position).
     function buildProviderAvailabilityMap(availability) {
         const models = Array.isArray(availability.models) ? availability.models : [];
         const map = {
@@ -100,8 +99,10 @@ const App = (() => {
         };
         models.forEach((m) => {
             if (!m || !m.key) return;
-            map[m.key] = !!m.available;
-            map._order.push(m.key);
+            const key = m.key;
+            const available = key === 'localai' ? map.localai : !!m.available;
+            map[key] = available;
+            map._order.push(key);
         });
         return map;
     }
@@ -111,7 +112,6 @@ const App = (() => {
     }
 
     const LLM_PROVIDER_SELECT_IDS = [
-        'llm-provider-select',
         'profiles-llm-provider-select',
         'interview-provider',
         'have-a-chat-provider-a',
@@ -199,10 +199,46 @@ const App = (() => {
     }
 
     function getChatProviderDisplayLabel() {
-        const sel = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
-        if (!sel || sel.selectedIndex < 0) return '';
-        const opt = sel.options[sel.selectedIndex];
-        return opt && opt.textContent ? opt.textContent.trim() : '';
+        const input = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
+        const key = input && input.value ? input.value : '';
+        if (key === 'auto') return 'Auto';
+        if (key === 'localai') return 'Local AI';
+        if (typeof AIModelLabels !== 'undefined') return AIModelLabels.get(key, key);
+        return key;
+    }
+
+    function updateTopBarProviderLabel(key) {
+        const el = document.getElementById('llm-provider-current-label');
+        if (!el) return;
+        el.textContent = getChatProviderDisplayLabelForKey(key);
+    }
+
+    function getChatProviderDisplayLabelForKey(key) {
+        if (key === 'auto') return 'Auto';
+        if (key === 'localai') return 'Local AI';
+        if (typeof AIModelLabels !== 'undefined') return AIModelLabels.get(key, key);
+        return key || 'Auto';
+    }
+
+    function resolveMainChatProviderKey(av, availMap) {
+        let key = String(av.chat_provider || '').toLowerCase().trim();
+        if (!key) key = availMap.auto ? 'auto' : firstAvailableProvider(availMap, false);
+        if (key === 'auto' && !availMap.auto) {
+            key = firstAvailableProvider(availMap, false);
+        } else if (key !== 'auto' && !availMap[key]) {
+            key = firstAvailableProvider(availMap, availMap.auto);
+        }
+        return key;
+    }
+
+    function syncMainChatProvider(av, availMap) {
+        const key = resolveMainChatProviderKey(av, availMap);
+        if (DOM.llmProviderSelect) DOM.llmProviderSelect.value = key;
+        updateTopBarProviderLabel(key);
+        if (key !== 'auto' && key !== 'localai') {
+            saveLastManualHostedProviderIfHosted(key);
+        }
+        return key;
     }
 
     function notifyChatRequestCancelled() {
@@ -250,9 +286,7 @@ const App = (() => {
         return { ok: true, data };
     }
 
-    /** On LLM error, retry once with the other provider if it is available; update AI Provider selector on success.
-     *  LocalAI is never used as an automatic failover target, and selecting it disables cloud failover
-     *  (the user explicitly chose a local model and should not be silently routed to a cloud provider). */
+    /** POST JSON to a chat endpoint; hosted model fallbacks are handled server-side via OpenRouter when enabled. */
     async function runChatWithProviderFailover(url, buildPayload, signal) {
         const select = typeof DOM !== 'undefined' ? DOM.llmProviderSelect : null;
         const primary = (select && select.value) ? select.value : '';
@@ -266,63 +300,7 @@ const App = (() => {
         if (first.ok) {
             return { ok: true, data: first.data, switched: false };
         }
-        // Auto routing is handled server-side; do not client-failover away from Auto.
-        if (primary === 'auto') {
-            return { ok: false, error: first.error || 'Auto routing request failed', data: first.data };
-        }
-        // Never failover away from an explicitly chosen local provider.
-        if (primary === 'localai') {
-            return { ok: false, error: first.error || 'Local AI request failed', data: first.data };
-        }
-        const failoverEnabled = (typeof Modals !== 'undefined'
-            && Modals.AutoRoutingConfig
-            && Modals.AutoRoutingConfig.isFailoverEnabled)
-            ? Modals.AutoRoutingConfig.isFailoverEnabled()
-            : true;
-        if (!failoverEnabled) {
-            return { ok: false, error: first.error || 'Request failed', data: first.data };
-        }
-        const av = await getLLMProviderAvailabilityPair();
-        if (signal && signal.aborted) {
-            return { ok: false, aborted: true, error: 'Cancelled' };
-        }
-        const candidates = getHostedFailoverCandidates(primary);
-        let lastError = first.error || 'Request failed';
-        for (const alt of candidates) {
-            if (alt === 'localai') continue;
-            if (!isHostedProviderAvailable(alt, av)) continue;
-            if (typeof UI !== 'undefined' && UI.setChatProviderFailoverNotice) {
-                UI.setChatProviderFailoverNotice(primary, alt);
-            }
-            if (select) select.value = alt;
-            if (typeof UI !== 'undefined' && UI.syncLoadingIndicatorProvider) {
-                UI.syncLoadingIndicatorProvider();
-            }
-            if (signal && signal.aborted) {
-                if (select) select.value = primary;
-                if (typeof UI !== 'undefined' && UI.clearChatProviderFailoverNotice) {
-                    UI.clearChatProviderFailoverNotice();
-                }
-                return { ok: false, aborted: true, error: 'Cancelled' };
-            }
-            const attempt = await postJsonChatEndpoint(url, buildPayload(alt), signal);
-            if (attempt.aborted) {
-                if (select) select.value = primary;
-                if (typeof UI !== 'undefined' && UI.clearChatProviderFailoverNotice) {
-                    UI.clearChatProviderFailoverNotice();
-                }
-                return { ok: false, aborted: true, error: 'Cancelled' };
-            }
-            if (attempt.ok) {
-                return { ok: true, data: attempt.data, switched: true };
-            }
-            lastError = attempt.error || lastError;
-        }
-        if (select) select.value = primary;
-        if (typeof UI !== 'undefined' && UI.clearChatProviderFailoverNotice) {
-            UI.clearChatProviderFailoverNotice();
-        }
-        return { ok: false, error: lastError, data: first.data };
+        return { ok: false, error: first.error || 'Request failed', data: first.data };
     }
 
     /** Shows the "API Key Required" warning modal; resolves true if the user clicked
@@ -375,7 +353,7 @@ const App = (() => {
         if (ready) return false;
         await showApiKeyRequiredDialog(
             'This action needs an OpenRouter API key, which hasn’t been configured yet. '
-            + 'Add one in Configuration → API Keys, or switch to Local AI in the provider list.'
+            + 'Add one in Configuration → API Keys, or choose Local AI in Configuration → AI Models.'
         );
         return true;
     }
@@ -1239,6 +1217,12 @@ const App = (() => {
         }
         window.openConfigurationToTab = openConfigurationToTab;
 
+        if (DOM.llmProviderOpenConfigBtn) {
+            DOM.llmProviderOpenConfigBtn.addEventListener('click', () => {
+                void openConfigurationToTab('ai-models-config');
+            });
+        }
+
         async function onChatStatusBarConfigClick(tabName) {
             if (!(await fetchMasterUnlockedForDataImport())) {
                 await ensureMasterKeyForDataImport();
@@ -1825,20 +1809,29 @@ const App = (() => {
             });
         }
 
+        // Shows a spinner placeholder on each embedding/searchable-progress line while
+        // the expensive GET /api/import-modal-embedding-progress request is in flight,
+        // so the dialog never looks "blank" or "done" before that data has loaded.
+        function showEmbeddingProgressLoading(modalRoot) {
+            if (!modalRoot) return;
+            modalRoot.querySelectorAll('[data-progress-key]').forEach((line) => {
+                line.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Checking…';
+                line.setAttribute('data-progress-state', 'loading');
+            });
+        }
+
+        // Applies the cheap counts response. Embedding/searchable progress is fetched and
+        // applied separately, one source at a time — see loadEmbeddingProgressAsync.
         function applyImportModalStats(d, options) {
             if (!d) return;
             const opts = options && typeof options === 'object' ? options : {};
             const modalId = opts.modalId || null;
-            const includeEmbeddingProgress = opts.includeEmbeddingProgress !== false;
             const targets = modalId
                 ? [document.getElementById(modalId)].filter(Boolean)
                 : dataImportModalRoots();
             targets.forEach((modalRoot) => {
                 applyImportModalCounts(modalRoot, d);
-                const isMaintenanceModal = modalRoot.id === 'data-import-modal';
-                if (includeEmbeddingProgress && isMaintenanceModal) {
-                    applyEmbeddingProgress(modalRoot, d);
-                } else if (modalRoot.id === 'data-sources-import-modal') {
+                if (modalRoot.id === 'data-sources-import-modal') {
                     clearEmbeddingProgress(modalRoot);
                 }
             });
@@ -1852,49 +1845,52 @@ const App = (() => {
             image_tag_embeddings: 'tagged photos',
         };
 
-        function applyEmbeddingProgress(modalRoot, d) {
-            const progress = d && d.embedding_progress && typeof d.embedding_progress === 'object' ? d.embedding_progress : {};
-            Object.keys(EMBEDDING_PROGRESS_LABELS).forEach((key) => {
-                const entry = progress[key] || { total: 0, pending: 0 };
-                const total = Number(entry.total) || 0;
-                const pending = Number(entry.pending) || 0;
-                const label = EMBEDDING_PROGRESS_LABELS[key];
-                const lines = modalRoot.querySelectorAll(`[data-progress-key="${key}"]`);
-                lines.forEach((line) => {
-                    if (total === 0) {
-                        line.textContent = '';
-                        line.removeAttribute('data-progress-state');
-                        return;
-                    }
-                    if (pending === 0) {
-                        line.textContent = `Searchable: all ${total} ${label}`;
-                        line.setAttribute('data-progress-state', 'done');
-                    } else {
-                        line.textContent = `Searchable: ${total - pending} of ${total} ${label}`;
-                        line.setAttribute('data-progress-state', 'pending');
-                    }
-                });
-                const nudgeBtn = modalRoot.querySelector(`.data-import-nudge-target[data-import-start="${key}"]`);
-                if (nudgeBtn) {
-                    nudgeBtn.classList.toggle('data-import-nudge', total > 0 && pending > 0);
+        // Applies one embedding-progress source's result to its line(s)/nudge button.
+        function applyEmbeddingProgressEntry(modalRoot, key, entry) {
+            const label = EMBEDDING_PROGRESS_LABELS[key];
+            if (!label) return;
+            const total = Number(entry && entry.total) || 0;
+            const pending = Number(entry && entry.pending) || 0;
+            const lines = modalRoot.querySelectorAll(`[data-progress-key="${key}"]`);
+            lines.forEach((line) => {
+                if (total === 0) {
+                    line.textContent = '';
+                    line.removeAttribute('data-progress-state');
+                    return;
                 }
+                if (pending === 0) {
+                    line.textContent = `Searchable: all ${total} ${label}`;
+                    line.setAttribute('data-progress-state', 'done');
+                } else {
+                    line.textContent = `Searchable: ${total - pending} of ${total} ${label}`;
+                    line.setAttribute('data-progress-state', 'pending');
+                }
+            });
+            const nudgeBtn = modalRoot.querySelector(`.data-import-nudge-target[data-import-start="${key}"]`);
+            if (nudgeBtn) {
+                nudgeBtn.classList.toggle('data-import-nudge', total > 0 && pending > 0);
+            }
+        }
+
+        function markEmbeddingProgressSourceError(modalRoot, key) {
+            modalRoot.querySelectorAll(`[data-progress-key="${key}"]`).forEach((line) => {
+                line.textContent = 'Unable to check';
+                line.setAttribute('data-progress-state', 'error');
             });
         }
 
+        // Fetches only the cheap entry counts (GET /api/import-modal-stats). Fast —
+        // safe to await before showing the dialog as ready.
         async function loadDataImportModalContent(options) {
             const opts = options && typeof options === 'object' ? options : {};
             const modalId = opts.modalId || null;
-            const includeEmbeddingProgress = opts.includeEmbeddingProgress !== false;
             const gen = ++importModalContentLoadGen;
             showDataImportModalLoading(true);
             try {
-                const url = includeEmbeddingProgress
-                    ? '/api/import-modal-stats'
-                    : '/api/import-modal-stats?embedding_progress=0';
-                const statsRes = await fetch(url, { credentials: 'same-origin' });
+                const statsRes = await fetch('/api/import-modal-stats', { credentials: 'same-origin' });
                 if (gen !== importModalContentLoadGen) return;
                 if (statsRes.ok) {
-                    applyImportModalStats(await statsRes.json(), { modalId, includeEmbeddingProgress });
+                    applyImportModalStats(await statsRes.json(), { modalId });
                 }
             } catch (e) {
                 console.warn('Failed to load import modal content:', e);
@@ -1903,14 +1899,51 @@ const App = (() => {
             }
         }
 
+        // Fetches one embedding-progress source (GET /api/import-modal-embedding-progress
+        // ?source=<key>) independently and applies it as soon as it resolves — does not
+        // wait on, or get blocked by, the other four sources.
+        async function loadEmbeddingProgressSource(modalId, key) {
+            const gen = importModalContentLoadGen;
+            try {
+                const res = await fetch(`/api/import-modal-embedding-progress?source=${encodeURIComponent(key)}`, { credentials: 'same-origin' });
+                if (gen !== importModalContentLoadGen) return;
+                const modalRoot = document.getElementById(modalId);
+                if (!modalRoot) return;
+                if (!res.ok) {
+                    markEmbeddingProgressSourceError(modalRoot, key);
+                    return;
+                }
+                const data = await res.json();
+                if (gen !== importModalContentLoadGen) return;
+                applyEmbeddingProgressEntry(modalRoot, key, data);
+            } catch (e) {
+                console.warn(`Failed to load embedding progress for ${key}:`, e);
+                const modalRoot = document.getElementById(modalId);
+                if (modalRoot) markEmbeddingProgressSourceError(modalRoot, key);
+            }
+        }
+
+        // Kicks off all five embedding-progress sources in parallel, each as its own
+        // independent request. Every source fills in its own line as soon as its query
+        // finishes, without blocking or re-showing the modal's main loading spinner, and
+        // without waiting for the other sources.
+        function loadEmbeddingProgressAsync(modalId) {
+            showEmbeddingProgressLoading(document.getElementById(modalId));
+            Object.keys(EMBEDDING_PROGRESS_LABELS).forEach((key) => {
+                void loadEmbeddingProgressSource(modalId, key);
+            });
+        }
+
         function reloadVisibleImportModalStats() {
             const sources = document.getElementById('data-sources-import-modal');
             const maintenance = document.getElementById('data-import-modal');
             if (sources && sources.style.display !== 'none') {
-                void loadDataImportModalContent({ modalId: 'data-sources-import-modal', includeEmbeddingProgress: false });
+                void loadDataImportModalContent({ modalId: 'data-sources-import-modal' });
             }
             if (maintenance && maintenance.style.display !== 'none') {
-                void loadDataImportModalContent({ modalId: 'data-import-modal', includeEmbeddingProgress: true });
+                void loadDataImportModalContent({ modalId: 'data-import-modal' }).then(() => {
+                    void loadEmbeddingProgressAsync('data-import-modal');
+                });
             }
         }
 
@@ -1918,9 +1951,12 @@ const App = (() => {
             const modal = document.getElementById('data-import-modal');
             if (!modal) return;
             modal.style.display = 'flex';
+            showEmbeddingProgressLoading(modal);
             if (typeof loadControlDefaults === 'function') void loadControlDefaults();
             if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();
-            void loadDataImportModalContent({ modalId: 'data-import-modal', includeEmbeddingProgress: true });
+            void loadDataImportModalContent({ modalId: 'data-import-modal' }).then(() => {
+                void loadEmbeddingProgressAsync('data-import-modal');
+            });
         }
 
         function openDataSourcesImportModalUI() {
@@ -1930,7 +1966,7 @@ const App = (() => {
             if (typeof markOnboardingChecklistStepDone === 'function') markOnboardingChecklistStepDone('import_data');
             if (typeof loadControlDefaults === 'function') void loadControlDefaults();
             if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();
-            void loadDataImportModalContent({ modalId: 'data-sources-import-modal', includeEmbeddingProgress: false });
+            void loadDataImportModalContent({ modalId: 'data-sources-import-modal' });
         }
 
         function openDataImportModalUI() {
@@ -5182,12 +5218,18 @@ const App = (() => {
 
         function applyProviderAvailabilityToSelect(sel, availMap, models) {
             if (!sel) return;
-            const includeAuto = sel.querySelector('option[value="auto"]') != null;
-            const providers = [
-                ...(includeAuto ? [{ value: 'auto', label: 'Auto' }] : []),
-                ...models.map((m) => ({ value: m.key, label: m.display_name || m.key })),
-                { value: 'localai', label: 'Local AI' },
-            ];
+            const includeAuto = sel.id !== 'profiles-llm-provider-select';
+            const providers = [];
+            if (includeAuto && availMap.auto) {
+                providers.push({ value: 'auto', label: 'Auto' });
+            }
+            models.forEach((m) => {
+                if (!m || !m.key) return;
+                providers.push({
+                    value: m.key,
+                    label: m.key === 'localai' ? 'Local AI' : (m.display_name || m.key),
+                });
+            });
 
             const previous = sel.value;
             const userSelected = sel.dataset.userSelectedProvider === 'true';
@@ -5205,17 +5247,20 @@ const App = (() => {
             });
 
             if (sel.options.length === 0 && providers.length > 0) {
-                const fallback = document.createElement('option');
-                fallback.value = providers[providers.length > 1 ? 1 : 0].value;
-                fallback.textContent = providers[providers.length > 1 ? 1 : 0].label;
-                sel.appendChild(fallback);
+                const fallbackKey = providers.find((p) => availMap[p.value])?.value
+                    || providers[0].value;
+                const fallback = providers.find((p) => p.value === fallbackKey) || providers[0];
+                const opt = document.createElement('option');
+                opt.value = fallback.value;
+                opt.textContent = fallback.label;
+                sel.appendChild(opt);
             }
 
             let next = previous;
             if (!availMap[previous]) {
-                next = firstAvailableProvider(availMap, includeAuto);
-            } else if (!userSelected && sel.id === 'llm-provider-select') {
-                next = firstAvailableProvider(availMap, true);
+                next = firstAvailableProvider(availMap, includeAuto && availMap.auto);
+            } else if (!userSelected && (sel.id === 'interview-provider' || sel.id.startsWith('have-a-chat-provider'))) {
+                next = firstAvailableProvider(availMap, includeAuto && availMap.auto);
             }
             if (availMap[next]) {
                 sel.value = next;
@@ -5235,6 +5280,7 @@ const App = (() => {
             const availMap = buildProviderAvailabilityMap(av);
             const models = Array.isArray(av.models) ? av.models : [];
             if (typeof AIModelLabels !== 'undefined') AIModelLabels.set(models);
+            syncMainChatProvider(av, availMap);
             selects.forEach((sel) => applyProviderAvailabilityToSelect(sel, availMap, models));
             if (typeof Modals !== 'undefined'
                 && Modals.AutoRoutingConfig
@@ -5743,17 +5789,6 @@ const App = (() => {
         } catch (e) {
             console.error('initEventListeners failed (some UI may be broken):', e);
         }
-        if (DOM.llmProviderSelect) {
-            DOM.llmProviderSelect.addEventListener('change', () => {
-                const val = DOM.llmProviderSelect.value;
-                if (val === 'gemini' || val === 'claude' || val === 'deepseek' || val === 'openai') {
-                    saveLastManualHostedProviderIfHosted(val);
-                    DOM.llmProviderSelect.dataset.userSelectedProvider = 'true';
-                } else if (val === 'auto' || val === 'localai') {
-                    DOM.llmProviderSelect.dataset.userSelectedProvider = 'true';
-                }
-            });
-        }
         void applyVisitorFeatureGatingFromSession();
         refreshDataImportMasterKeyAccessUI();
         (function observeConfigModalMasterUnlockRefresh() {
@@ -5925,6 +5960,10 @@ const App = (() => {
         processQuestionSubmit,
         processAnswerSubmit,
         refreshChatAvailability: loadLLMProviderAvailability,
+        getChatProviderDisplayLabel,
+        getChatProviderDisplayLabelForKey,
+        syncMainChatProvider,
+        updateTopBarProviderLabel,
         effectiveLocalAIAvailable,
         isLocalAIUseEnabledForChat,
         resolveLocalAIUseEnabled,
