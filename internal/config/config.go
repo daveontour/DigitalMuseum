@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/joho/godotenv"
 )
 
 // Config holds all application configuration.
@@ -426,26 +425,30 @@ func defaultTUSUploadDir() string {
 }
 
 // loadDotEnv merges .env files so file values override stale OS environment variables.
-// Later files win: executable dir, then APPDATA user config, then every .env found walking
-// up from the working directory (nested cwd .env first, project root last).
+// Later files win: executable dir, then legacy APPDATA\Digital Museum, then Electron's
+// APPDATA\digital-museum (must win — same folder Electron writes), then every .env found
+// walking up from the working directory (nested cwd .env first, project root last).
+// Each key's originating file (or "process environment") is recorded for SnapshotLoadedConfig.
 func loadDotEnv() {
-	tryLoadDotEnv := func(path string) {
-		if st, err := os.Stat(path); err != nil || st.IsDir() {
-			return
-		}
-		_ = godotenv.Overload(path)
-	}
+	resetEnvSources()
+	recordProcessEnvBaseline()
 
 	if exe, err := os.Executable(); err == nil {
-		tryLoadDotEnv(filepath.Join(filepath.Dir(exe), ".env"))
+		applyDotEnvFile(filepath.Join(filepath.Dir(exe), ".env"))
 	}
-	if appdata := strings.TrimSpace(os.Getenv("APPDATA")); appdata != "" {
-		tryLoadDotEnv(filepath.Join(appdata, "Digital Museum", ".env"))
+	// Prefer Electron's userData folder (%APPDATA%\digital-museum). Only fall back to the
+	// legacy "Digital Museum" folder when the Electron .env is missing — otherwise a stale
+	// ADMIN_SQLITE_PATH in the legacy file can overwrite the path Electron just injected.
+	userEnv := UserEnvFilePath()
+	if st, err := os.Stat(userEnv); err == nil && !st.IsDir() {
+		applyDotEnvFile(userEnv)
+	} else {
+		applyDotEnvFile(LegacyUserEnvFilePath())
 	}
 	if cwd, err := os.Getwd(); err == nil {
 		dir := cwd
 		for {
-			tryLoadDotEnv(filepath.Join(dir, ".env"))
+			applyDotEnvFile(filepath.Join(dir, ".env"))
 			parent := filepath.Dir(dir)
 			if parent == dir {
 				break

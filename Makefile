@@ -1,8 +1,12 @@
-.PHONY: check-go check-golangci-lint build build-exe build-exe-electron build-linux build-launcher test generate lint run clean tidy sqlitevec-demo sqlitevec-demo-seed message-search-cli image-tag-sync
+.PHONY: check-go check-golangci-lint build build-exe build-exe-electron build-mcp-exe build-mcp-exe-electron build-mcpquery build-linux build-launcher test generate lint run clean tidy sqlitevec-demo sqlitevec-demo-seed message-search-cli image-tag-sync
 
-MODULE := github.com/daveontour/aimuseum
-BINARY := digitalmuseum
-CMD     := ./cmd/server
+MODULE   := github.com/daveontour/aimuseum
+BINARY   := digitalmuseum
+CMD      := ./cmd/server
+MCP_BINARY := digitalmuseum-mcp
+MCP_CMD    := ./cmd/mcpserver
+MCPQUERY_BINARY := mcpquery
+MCPQUERY_CMD    := ./cmd/mcpquery
 
 # SQLite uses github.com/mattn/go-sqlite3 (CGO). You need a C compiler on PATH
 # (e.g. MSYS2 mingw-w64 gcc on Windows). CGO_ENABLED=1 is required.
@@ -48,6 +52,20 @@ build-exe: check-go
 # Windowsgui subsystem build — no console window when launched by Electron.
 build-exe-electron: check-go
 	go build -ldflags="$(strip $(WINDOWS_STRIP_LDF) -H windowsgui)" -o bin/$(BINARY).exe $(CMD)
+
+# Pilot MCP tools server (cmd/mcpserver) — see CLAUDE.md. Also links go-sqlite3/CGO, so it
+# needs the same CGO_CFLAGS as build-exe (set above from the module-relative sqlite3.h dirs).
+build-mcp-exe: check-go
+	go build $(if $(WINDOWS_STRIP_LDF),-ldflags="$(WINDOWS_STRIP_LDF)") -o bin/$(MCP_BINARY).exe $(MCP_CMD)
+
+build-mcp-exe-electron: check-go
+	go build -ldflags="$(strip $(WINDOWS_STRIP_LDF) -H windowsgui)" -o bin/$(MCP_BINARY).exe $(MCP_CMD)
+
+# Dev CLI for querying the MCP tools server directly (see cmd/mcpquery). Also links go-sqlite3/
+# CGO transitively (via internal/ai), so it needs WINDOWS_STRIP_LDF too — without it, Go 1.25's
+# CGO-on-Windows PE bug (see WINDOWS_STRIP_LDF comment above) makes the binary fail to launch.
+build-mcpquery: check-go
+	go build $(if $(WINDOWS_STRIP_LDF),-ldflags="$(WINDOWS_STRIP_LDF)") -o bin/$(MCPQUERY_BINARY).exe $(MCPQUERY_CMD)
 
 build-linux: check-go
 	@hostos="$$(go env GOOS)"; \
@@ -109,14 +127,15 @@ dev: build
 # Uses the console-subsystem binary (plain `go build`); spawning a WINDOWSGUI exe
 # with piped stdout/stderr can fail on some Windows setups with spawn UNKNOWN (-4094).
 # Packaged installers still use build-exe-electron (hidden console).
-electron-dev: build-exe
+electron-dev: build-exe build-mcp-exe
 	cd electron && npm install --prefer-offline && npx electron .
 
 # Package the Electron app into a distributable installer.
 # Produces dist/electron/Digital Museum Setup *.exe (config: electron/electron-builder.yml).
 # Cleans dist/electron first so a stale or locked *.nsis.7z does not break NSIS (mmap errors on Windows).
-electron-dist: build-exe-electron
+electron-dist: build-exe-electron build-mcp-exe-electron
 	@test -f bin/$(BINARY).exe || { echo >&2 "Missing bin/$(BINARY).exe — run from repo root after build-exe-electron."; exit 1; }
+	@test -f bin/$(MCP_BINARY).exe || { echo >&2 "Missing bin/$(MCP_BINARY).exe — run from repo root after build-mcp-exe-electron."; exit 1; }
 	rm -rf dist/electron
 	cd electron && npm install --prefer-offline && npx electron-builder
 

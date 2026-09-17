@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	appai "github.com/daveontour/aimuseum/internal/ai"
 	"github.com/daveontour/aimuseum/internal/api/router"
 	"github.com/daveontour/aimuseum/internal/config"
 	"github.com/daveontour/aimuseum/internal/database"
@@ -162,6 +163,9 @@ func run() error {
 		if err := database.SeedAIModelsFromFileIfMissing(migrateCtx, db.Std, cfg.App.AIModelsConfigFile()); err != nil {
 			return fmt.Errorf("seed ai models: %w", err)
 		}
+		if err := database.SeedBuiltinMCPServerIfMissing(migrateCtx, db.Std); err != nil {
+			return fmt.Errorf("seed builtin mcp server: %w", err)
+		}
 	}
 
 	// ── HTTP server ────────────────────────────────────────────────────────────
@@ -181,6 +185,22 @@ func run() error {
 	if bgJobsScheduler != nil {
 		go bgJobsScheduler.Run(bgJobsCtx)
 	}
+
+	// ── AI tool discovery ─────────────────────────────────────────────────────
+	// Every AI tool lives in the separate MCP tools server (cmd/mcpserver), discovered via
+	// tools/list into DefaultToolCatalog rather than hardcoded here. Electron only starts the
+	// MCP server *after* this process's own /health check passes (see electron/main.js), so it
+	// provably isn't up yet the instant we get here — retry with backoff instead of blocking
+	// startup on it. The AI Tool Access config tab's "Refresh Tools" button re-runs this on
+	// demand, so a failure here is not fatal — just means tools appear once refreshed.
+	go func() {
+		if err := appai.DefaultToolCatalog().RefreshWithRetry(bgJobsCtx, 10, 3*time.Second); err != nil {
+			slog.Warn("initial AI tool discovery did not complete", "err", err)
+		} else {
+			count, _, _ := appai.DefaultToolCatalog().Status()
+			slog.Info("AI tool discovery complete", "tool_count", count)
+		}
+	}()
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),

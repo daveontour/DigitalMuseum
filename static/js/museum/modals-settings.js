@@ -3484,11 +3484,31 @@ Modals.LLMToolsAccess = (() => {
                 const code = document.createElement('code');
                 code.textContent = name;
                 tdName.appendChild(code);
+                if (!t.configured) {
+                    const badge = document.createElement('span');
+                    badge.textContent = 'New';
+                    badge.title = 'Discovered from the MCP tools server but not yet configured — disabled for everyone until you tick a box and Save.';
+                    badge.style.marginLeft = '8px';
+                    badge.style.padding = '1px 6px';
+                    badge.style.borderRadius = '3px';
+                    badge.style.fontSize = '0.75em';
+                    badge.style.fontWeight = 'bold';
+                    badge.style.color = '#fff';
+                    badge.style.backgroundColor = '#0969da';
+                    tdName.appendChild(badge);
+                }
+                const colonIdx = name.indexOf(':');
+                const serverName = colonIdx > -1 ? name.slice(0, colonIdx) : 'Digital Museum';
+                const tdServer = document.createElement('td');
+                tdServer.style.fontSize = '0.9em';
+                tdServer.style.color = 'var(--color-text-muted)';
+                tdServer.textContent = serverName;
                 const tdDesc = document.createElement('td');
                 tdDesc.style.maxWidth = '320px';
                 tdDesc.style.fontSize = '0.9em';
                 tdDesc.textContent = t.description || '';
                 tr.appendChild(tdName);
+                tr.appendChild(tdServer);
                 tr.appendChild(tdDesc);
                 const tdMaster = document.createElement('td');
                 tdMaster.style.textAlign = 'center';
@@ -3567,12 +3587,42 @@ Modals.LLMToolsAccess = (() => {
         }
     }
 
+    async function refresh() {
+        const btn = document.getElementById('llm-tools-access-refresh');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Refreshing...';
+        }
+        try {
+            const res = await fetch('/api/settings/llm-tools-access/refresh-catalog', {
+                method: 'POST',
+                credentials: 'same-origin',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error) {
+                _status(data.detail || data.error || 'Refresh failed', true);
+                return;
+            }
+            _status(`Discovered ${data.tool_count} tool(s) from the MCP tools server.`, false);
+            await load();
+        } catch (e) {
+            _status(e.message || 'Refresh failed', true);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Refresh Tools';
+            }
+        }
+    }
+
     function init() {
         const btn = document.getElementById('llm-tools-access-save');
         if (btn) btn.addEventListener('click', () => void save());
+        const refreshBtn = document.getElementById('llm-tools-access-refresh');
+        if (refreshBtn) refreshBtn.addEventListener('click', () => void refresh());
     }
 
-    return { init, load, save };
+    return { init, load, save, refresh };
 })();
 
 

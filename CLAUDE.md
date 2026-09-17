@@ -20,47 +20,56 @@ Additional features beyond the core chat interface include:
 
 ## Tech Stack
 
-- **Desktop shell:** Electron (Node.js) — `electron/main.js` manages the Go server process, Ollama, system tray, and IPC
+- **Desktop shell:** Electron (Node.js) — `electron/main.js` manages the Go server, MCP tools server, and Ollama processes, system tray, and IPC
 - **Backend:** Go 1.25, Chi v5 router, `database/sql` with `github.com/mattn/go-sqlite3` (CGO)
 - **Frontend:** Vanilla JavaScript (no framework), marked.js, highlight.js, Font Awesome
 - **Database:** SQLite (two files — main app DB and billing DB); vector fields use `sqlite-vec`
 - **AI Providers:** A single OpenRouter adapter (`internal/ai/openrouter.go`) backs every admin-configured AI model (managed in Configuration → AI Models, seeded by default with Claude, Gemini, DeepSeek, and ChatGPT presets — any OpenRouter-supported model can be added), plus local Ollama (`gemma4`) via native Ollama API for fully offline use and embeddings
+- **AI Tooling:** every tool the LLM can call is discovered at runtime from one or more MCP
+  (Model Context Protocol) servers — the bundled `cmd/mcpserver` plus any owner-added additional
+  ones — rather than defined statically in the main app; see [MCP Tools Server & AI Tool Discovery](#mcp-tools-server--ai-tool-discovery)
 - **Module:** `github.com/daveontour/aimuseum`
 
 ## Project Layout
 
 ```
 electron/
-  main.js           ← Electron main process: spawns Go server + Ollama, IPC handlers, tray
+  main.js           ← Electron main process: spawns Go server + MCP server + Ollama, IPC handlers, tray
   preload.js        ← IPC bridge (contextBridge) exposed to renderer pages
   loading.html      ← Splash screen shown while Go server starts
 bin/
-  digitalmuseum.exe ← Compiled Go server
-  Ollama/           ← Bundled Ollama executable
-  ImageMagick/      ← Bundled ImageMagick for thumbnail generation
+  digitalmuseum.exe     ← Compiled Go server
+  digitalmuseum-mcp.exe ← Compiled MCP tools server (every AI tool)
+  Ollama/               ← Bundled Ollama executable
+  ImageMagick/          ← Bundled ImageMagick for thumbnail generation
 cmd/
   server/           ← HTTP server entry point (main.go)
-  launcher/         ← Windows GUI launcher (legacy)
+  mcpserver/        ← MCP tools server — every AI tool lives here, see [MCP Tools Server & AI Tool Discovery](#mcp-tools-server--ai-tool-discovery)
+  mcpquery/         ← Dev CLI for querying the MCP tools server directly (list tools / call one)
 internal/
-  ai/               ← Claude, Gemini, DeepSeek & LocalAI (Ollama) providers, tool definitions & executor
+  ai/               ← OpenRouter adapter (backs every admin-configured model) & LocalAI (Ollama)
+                       providers, MCP client/executor for tool-calling — tool schemas are
+                       discovered from cmd/mcpserver at runtime, not defined here
   api/router/       ← Route wiring (router.go)
   appctx/           ← Shared context key (ContextKeyUserID / UserIDFromCtx)
   config/           ← Env-var config loading
   crypto/           ← Encryption / key derivation (keyring scoped by user_id)
   database/         ← Connection pool, migrations
-  handler/          ← HTTP request handlers (~47 files)
+  handler/          ← HTTP request handlers (~59 files)
   keystore/         ← RAM master key (unlocks encrypted data per session)
   middleware/        ← Logger, Recoverer, AuthMiddleware
   model/            ← Shared data types / DTOs
-  repository/       ← Database access via database/sql (~32 repos, all user-scoped)
-  service/          ← Business logic (~36 services)
+  repository/       ← Database access via database/sql (~34 repos; most user-scoped — a few
+                       deployment-wide config tables, e.g. ai_models/guide_topics/suggestions/
+                       mcp_servers, are the exceptions)
+  service/          ← Business logic (~43 services)
   service/background_jobs/ ← Job definitions, registry, and scheduler
-  sqlutil/          ← SQLite dialect helpers: IsSQLite(), ParseSQLiteDatetime(), InClause()
+  sqlutil/          ← SQLite dialect helpers: IsSQLite(), ParseSQLiteDatetime(), Int64IN()
 static/
   css/              ← museum_of.css (all styles, ~8000 lines)
   data/             ← voice_instructions.json, seed JSON files
   images/           ← Voice persona images
-  js/museum/        ← Frontend modules (~22 JS files)
+  js/museum/        ← Frontend modules (~33 JS files)
 templates/          ← index.template.html (SPA), login.html, share.html, plus 3 others
 sqlc/               ← schema.sql (full DB schema reference), sqlc.yaml
 ```
@@ -73,8 +82,11 @@ make run                          # go run ./cmd/server
 
 # Build binaries
 make build-exe                    # bin/digitalmuseum.exe
+make build-mcp-exe                # bin/digitalmuseum-mcp.exe — the MCP tools server; required for
+                                   # tool-calling in dev (see MCP Tools Server & AI Tool Discovery)
 # Do not use bare `go build ./...` — CGO needs -I./cgo-compat (see Makefile); plain go build fails on sqlite3.h
 # Fix: `make build-exe`, `source scripts/cgo-env.sh`, or `./scripts/build-exe.sh` (see .cursor/rules/build-cgo.mdc)
+# (build-mcp-exe/build-mcp-exe-electron and build-mcpquery need the same CGO setup — they also link go-sqlite3)
 
 # Tests / lint
 make test
@@ -82,8 +94,45 @@ make lint                         # golangci-lint v2.4+ (Go 1.25): go install gi
 make tidy                         # go mod tidy
 ```
 
-To run the full Electron app in dev mode, open a terminal in `electron/` and run
-`npx electron .` (requires Node.js). The Go server is spawned automatically.
+To run the full Electron app in dev mode: `make electron-dev` (builds `bin/digitalmuseum.exe`
+and `bin/digitalmuseum-mcp.exe`, then `cd electron && npm install --prefer-offline && npx electron .`).
+Requires Node.js. The Go server and MCP server are spawned automatically.
+
+## Building the Installable Package (Electron Installer)
+
+```bash
+make electron-dist
+```
+
+Produces a Windows NSIS installer at `dist/electron/Digital Museum Setup *.exe`. This target
+(`Makefile`):
+1. Builds both Go executables in the console-hidden, Electron-packaging configuration:
+   `build-exe-electron` → `bin/digitalmuseum.exe`, `build-mcp-exe-electron` →
+   `bin/digitalmuseum-mcp.exe` (same CGO requirements as `build-exe`).
+2. Verifies both `.exe` files exist (fails fast with a clear message otherwise).
+3. Removes `dist/electron/` first — a stale/locked `*.nsis.7z` from a previous build otherwise
+   makes NSIS fail with `failed creating mmap` (this can also be caused by antivirus real-time
+   scanning; temporarily excluding the directory helps if the clean-first step alone doesn't).
+4. Runs `cd electron && npm install --prefer-offline && npx electron-builder`, driven by
+   `electron/electron-builder.yml`.
+
+**Prerequisite — bundled third-party binaries (`bin/` is entirely gitignored — untracked, so
+these must be placed there manually before packaging; they are not produced by any `make`
+target):**
+
+| Path | Binary | Used by |
+|------|--------|---------|
+| `bin/ImageMagick/` | Portable Windows ImageMagick build (needs `magick.exe`) | `internal/import/thumbnails` (thumbnail generation), invoked as the relative command `bin/ImageMagick/magick` from the app's working directory |
+| `bin/Ollama/` | Standalone Windows Ollama build (`ollama.exe`) | The two Ollama daemons Electron spawns — see [Local AI — Ollama / Gemma4](#local-ai--ollama--gemma4) |
+| `bin/exiftool/` | ExifTool's Windows "stand-alone executable" distribution (`exiftool.exe` + its `exiftool_files/` folder) | `internal/imagetagsync` (image tag read/write) |
+
+`electron/electron-builder.yml`'s `extraResources` bundles both compiled Go `.exe` files, the
+three third-party binary folders above, `templates/`, `static/` (excluding a few local/private
+data files — `email_classifications.json`, `email_matches.json`, `exclusions.json`,
+`identity_and_health.txt`), and `electron/.env.defaults` (packaged as `.env` — this is the file
+to edit for defaults shipped to end users, **not** the project-root `.env`, which is dev-only and
+never bundled). NSIS options (installable directory choice, desktop/start-menu shortcuts,
+installer/uninstaller icon) and the app icon (`electron/build/icon.ico`) are also set there.
 
 ## Configuration (`.env`)
 
@@ -111,6 +160,8 @@ the `users` table — see `internal/repository/user_llm.go`), with no server-wid
 | `GMAIL_CLIENT_ID` | No | Google OAuth 2.0 Desktop App client ID |
 | `GMAIL_CLIENT_SECRET` | No | Google OAuth 2.0 client secret |
 | `GMAIL_REDIRECT_URL` | No | Set automatically by Electron at startup |
+| `MCP_SERVER_URL` | No | MCP tools server endpoint, e.g. `http://127.0.0.1:8082/mcp` (see [MCP Tools Server & AI Tool Discovery](#mcp-tools-server--ai-tool-discovery)). Set automatically by Electron at startup. Unset means no tools are available at all — every AI tool lives in `cmd/mcpserver`, so `go run ./cmd/server` outside Electron needs `cmd/mcpserver` running too if you want tool-calling in dev. |
+| `MCP_AUTH_TOKEN` | No | Shared-secret bearer token required by the MCP server; must match between it and the Go server. Set automatically by Electron (a random token per launch); set manually only when running `cmd/mcpserver` standalone for development. |
 | `KEYRING_PEPPER` | No | Secret for encryption key derivation (optional in current build) |
 | `LOG_LEVEL` | No | Go server log level: `debug`, `info`, `warn` (default), `error` |
 | `SESSION_COOKIE_SECURE` | No | Set `true` for HTTPS deployments |
@@ -151,10 +202,14 @@ These env vars pre-fill import dialog fields and are not required:
 
 1. Finds a free port (currently hard-coded to 8081) and spawns `bin/digitalmuseum.exe`
 2. Injects `SQLITE_PATH`, `ADMIN_SQLITE_PATH`, `TEMPLATES_DIR`, `ASSET_STATIC_DIR`,
-   `GMAIL_REDIRECT_URL` (dynamic), and `LOG_LEVEL` into the Go server's environment
+   `GMAIL_REDIRECT_URL` (dynamic), `LOG_LEVEL`, and `MCP_SERVER_URL`/`MCP_AUTH_TOKEN`
+   (a random per-launch token, see below) into the Go server's environment
 3. Waits for `GET /health` to return 200 before showing the main `BrowserWindow`
 4. Manages the system tray, developer tools shortcut, and single-instance lock
 5. Manages the Ollama process (`ollama serve`) including health checks and shutdown
+6. Spawns and manages `bin/digitalmuseum-mcp.exe` (the MCP tools server, port 8082,
+   hard-coded like the Go server's) the same way — see
+   [MCP Tools Server & AI Tool Discovery](#mcp-tools-server--ai-tool-discovery)
 
 **IPC channels** (renderer ↔ main via `electron/preload.js`):
 
@@ -190,18 +245,25 @@ restarts the Go server via `restartGoServer()` in `electron/main.js`.
 
 ## No-Archive ("Minimal") Router Mode
 
-When `SQLITE_PATH` is not set or the file is absent, the router receives a `nil` pool.
-In this mode the server serves only a minimal set of routes: `/health`,
-`/api/resolved-main-sqlite-path`, `/api/profiles`, `/login`, `/`, and `/static/*`. All
-other routes return `503` with a JSON error. This allows the Electron shell to let the
+When `SQLITE_PATH` is not set or the file is absent, the router receives a `nil` pool
+(`internal/api/router/router.go`, `New()`). In this mode the server serves only: `/health`,
+`/api/resolved-main-sqlite-path`, `/api/local-ai/status`, `/login`, `/` (redirects to `/login`),
+`/static/*`, the full admin panel (`/admin`, `/admin/login`, `/admin/users`, …, still exempt from
+`AuthMiddleware` — the billing DB is always available even with no archive open), and archive
+profile management (`/profiles`, `/api/profiles/*`, see Multi-Archive Profile Management below).
+All other routes return `503` with a JSON error. This allows the Electron shell to let the
 user create or select an archive before the full application starts.
 
 ## Multi-Archive Profile Management
 
 The billing DB (`admin.sqlite`) stores a `profiles` table — one row per archive. Each
 profile holds a display name and the absolute path to its main SQLite file. The
-`ProfileHandler` (`internal/handler/profile_handler.go`) exposes CRUD routes under
-`/api/profiles` and a `/profiles` SPA page (served from `templates/non_user_init.template.html`).
+`ProfileHandler` (`internal/handler/profile_handler.go`) exposes `GET /profiles` (public JSON
+list of enabled profiles, no `db_path`), `POST /api/profiles` / `PATCH /api/profiles/{id}` /
+`GET /api/profiles/{id}/dbpath` (localhost-only — Electron calls these directly), and
+`GET/POST/PATCH/DELETE /admin/profiles*` (admin-panel CRUD). The profile-selection *page* itself
+is `GET /` rendering `templates/non_user_init.template.html` (via `TemplateHandler`) rather than
+a route on `ProfileHandler`.
 
 From the login screen users can switch between archives or create a new one; switching
 writes the new `SQLITE_PATH` to `%APPDATA%\Digital Museum\.env` and restarts the Go
@@ -241,6 +303,108 @@ Both daemons are started with `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_MAX_LOADED_MODELS=
 - `GET /api/local-ai/status` — auth-exempt; probes chat and embedding Ollama URLs separately for reachability and configured models. Works on the login page before sign-in (infrastructure fields only). When authenticated, also returns `use_enabled_for_chat` and `chat_available`. Includes `embedding_base_url`, `embedding_server_reachable`, and `embedding_server_error`.
 - Per-archive **`local_ai_use_enabled_v1`** in `app_configuration` (via `POST /api/configuration`) controls whether Local AI appears in provider menus and Auto routing; default enabled when unset. See `internal/service/local_ai_use.go`.
 - Configuration → **AI & Setup** and the login **Local AI Setup** panel use [`static/js/museum/local-ai-setup.js`](static/js/museum/local-ai-setup.js) and the status API. Browser mode shows server Ollama status; Electron additionally offers start/download via IPC.
+
+## MCP Tools Server & AI Tool Discovery
+
+**Every AI tool runs in a separate standalone MCP server** (`cmd/mcpserver`), not in the main
+app — this was originally built as a learning exercise in the Model Context Protocol using
+[`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk), then
+extended to the full tool set. `internal/ai/provider.go` and `internal/ai/tool_access.go` define
+**no static tool list**; the main app discovers what tools exist by calling the MCP server's
+`tools/list`.
+
+**Architecture:** Electron spawns `bin/digitalmuseum-mcp.exe` as a fourth managed child process
+(peer to the Go server and the two Ollama daemons — same spawn/health-poll/shutdown pattern),
+listening on `127.0.0.1:8082` (the MCP Streamable HTTP transport) behind a shared-secret bearer
+token Electron generates once per launch (`MCP_AUTH_TOKEN`) and injects into both processes. All
+tool query/decrypt logic still lives in `internal/ai/tools.go` (unchanged) — `cmd/mcpserver/main.go`
+calls it through exported wrapper functions (`ai.SearchChatMessagesGlobally`,
+`ai.GetSensitiveReferenceDocumentsWithPassword`, …), one `server.AddTool(...)` per tool, so there
+is exactly one copy of the SQL. The main Go server acts purely as the MCP *client*:
+`internal/ai/mcpclient.go`'s `MCPClient` connects lazily on first use, and
+`internal/ai/tools.go`'s `NewMCPToolExecutor` is the single `ToolExecutor` every provider's
+tool-call loop uses (`openrouter.go` / `localai.go` needed no changes — they've always called
+through the `ToolExecutor` interface).
+
+**Tool catalog & discovery (`internal/ai/tool_catalog.go`):** `DefaultToolCatalog()` is a
+process-wide, in-memory, refreshable cache of tool schemas — never persisted, since it should
+always reflect what the MCP server currently reports. `AllToolMetas()` / `FilterToolDefinitionsForTier()`
+(`tool_access.go`) and `GetToolDefinitions()` (`provider.go`) all read from it. It's populated:
+- **At startup** — `cmd/server/main.go` kicks off `RefreshWithRetry` in a background goroutine
+  (bounded retries, a few seconds apart) right after the background jobs scheduler starts. This
+  must not block `/health`: Electron waits for the Go server's `/health` *before* it resolves the
+  archive's SQLite path and starts the MCP server, so the MCP server provably isn't up yet the
+  instant `cmd/server` boots — the retry is what makes discovery actually converge once it comes
+  up moments later.
+- **On demand** — the AI Tool Access config tab (below) has a **Refresh Tools** button
+  (`POST /api/settings/llm-tools-access/refresh-catalog`).
+- Chat generation itself never triggers a refresh; it uses whatever's cached, same as before.
+
+**AI Tool Access tab (Configuration → AI Tool Access, `internal/handler/llm_tools_access_handler.go`,
+`static/js/museum/modals-settings.js` `Modals.LLMToolsAccess`):** lists every tool the catalog
+currently knows about with per-tier (master key / visitor key) enable checkboxes, saved as an
+encrypted `ToolAccessPolicy` (`internal/ai/tool_access.go`). Each row shows a **Server** column
+(the tool's name prefix — "Digital Museum" for the bundled server, or the additional server's
+configured name — see Additional MCP Servers below) so an admin can see where a tool comes from.
+**A tool with no saved policy row is denied by default** (`PolicyAllows` — unchanged) — so a
+newly discovered tool is never offered to the LLM until an admin explicitly ticks a box and
+saves; the UI marks such rows with a **New** badge (`GET`'s `configured` field, distinct from
+`enabled`/`visitor_enabled`, both false either way). A related **Tool Test** tab
+(`internal/handler/llm_tools_test_handler.go`, `static/js/museum/modals-tool-test.js`) lets an
+owner run any enabled tool directly with arbitrary arguments to see its raw result, for debugging.
+
+**Additional (user-added) MCP servers — `internal/ai/mcp_registry.go`, `internal/service/mcp_servers_service.go`,
+`internal/repository/mcp_servers_repo.go`, `internal/handler/mcp_servers_handler.go`:** beyond the
+bundled `cmd/mcpserver`, an owner can register arbitrary third-party MCP servers (any http(s)
+Streamable-HTTP endpoint + optional bearer token) from Configuration → **MCP Servers**
+(`static/js/museum/modals-mcp-servers-config.js`, owner-only — `POST/PATCH/DELETE /api/mcp-servers`,
+`POST /api/mcp-servers/test`). Rows live in the deployment-wide `mcp_servers` table (one reserved
+`is_builtin` row for the bundled server, seeded once by `database.SeedBuiltinMCPServerIfMissing`
+and never deletable — only disable-able; its `endpoint_url`/`auth_token` columns are unused since
+its real connection is Electron-managed). `MCPServersService` pushes the current row list into
+`ai.DefaultMCPRegistry()` on every load/write, which resolves each tool call to the right server:
+- The bundled server is **trusted** and its tools are unprefixed.
+- Every additional server is **untrusted** and its tools are namespaced `"<server_name>:<tool_name>"`
+  (`server_name` may not contain `:`) so the catalog, tool-access policy, and executor can tell
+  them apart — `MCPRegistry.Resolve()` strips the prefix before the real `tools/call`.
+- `NewMCPToolExecutor` (`internal/ai/tools.go`) attaches the secret hidden args
+  (`ArgMasterPassword`, `ArgTavilyKey`) **only** when the resolved server is trusted — an
+  additional server never receives them, regardless of what a tool there happens to be named.
+- `ToolCatalog.Refresh` discovers tools from every registered server independently, so one
+  unreachable additional server doesn't blank out the bundled server's tools (or vice versa).
+
+`cmd/mcpquery` is a small dev CLI (`MCPClient`-based, same client the app uses) for listing or
+calling tools directly against any MCP server — bundled or additional — without going through
+the app or an LLM; see its `-h` for usage.
+
+**Hidden per-call context (`internal/ai/mcp_args.go`):** since a `tools/call` crosses a process
+boundary, `NewMCPToolExecutor` attaches the caller context that Go's request `ctx` used to carry
+automatically, as extra `tools/call` arguments the LLM never sees, and `cmd/mcpserver`'s
+`withCallerContext` reconstructs `appctx.UserID` / `appctx.VisitorAccess` from them before calling
+into `internal/ai`. `ArgUID` and the `ArgVisitor*` flags are attached to **every** call (cheap, not
+secret). `ArgMasterPassword` (get_reference_document / get_sensitive_reference_document) and
+`ArgTavilyKey` (search_tavily) are attached **only** to the tool names that need them
+(`mcpSecretArgTools` in `tools.go`) — both are session/visitor-resolved values
+(`ChatService.effectiveOpenRouterConfig`, `keystore.SessionMasterStore`), not static env config,
+so unlike `LOCALAI_*` they can't just be read from the MCP server's own environment.
+
+**Security note (deliberate):** the sensitive-document tool decrypts data using the in-RAM session
+master password. Since it runs in a separate process, that password is sent as a `tools/call`
+argument over the local HTTP transport instead of staying purely in-process — mitigated by binding
+the MCP server to `127.0.0.1` only and requiring `MCP_AUTH_TOKEN` on every request. Never logged.
+
+**Multi-process SQLite:** the MCP server opens its own `*sql.DB` against the same `SQLITE_PATH`
+and sets `_journal_mode=WAL` on its DSN (the main server's pool, `internal/database/db.go`, is a
+single connection with no WAL pragma — safe on its own, but two processes touching the file
+concurrently need WAL to avoid "database is locked" errors under the default rollback journal).
+WAL is a property of the database file itself, so this needs no change on the main server's side.
+
+**Dev / build:** `make build-mcp-exe` / `build-mcp-exe-electron` build `bin/digitalmuseum-mcp.exe`
+the same way `build-exe` / `build-exe-electron` build the main server (same CGO requirements — it
+links `go-sqlite3` too); `electron-dev` and `electron-dist` depend on the relevant target.
+`electron/electron-builder.yml` bundles the binary via `extraResources`, same as
+`digitalmuseum.exe`. Electron also passes `LOCALAI_*` env vars into the MCP server's spawn env
+(needed by the two similarity-search tools' direct Ollama embedding calls).
 
 ## AI Models & the OpenRouter Adapter
 
@@ -306,7 +470,6 @@ model to the AI Models "Add model" form instead of typing a slug by hand.
   - `GET /admin/llm-usage/users/{id}/summary|events|timeseries|bill.pdf`
   - `GET /admin/llm-usage/error-events`
   - `GET/PUT /admin/system-instructions` — app-wide LLM system prompts
-  - `GET/PUT /admin/pambot-instructions` — Pam Bot companion persona
 
 The admin panel is intentionally **exempt from** `AuthMiddleware` — it uses its own session guard (`requireAdmin`).
 
@@ -330,16 +493,27 @@ The admin panel is intentionally **exempt from** `AuthMiddleware` — it uses it
 Unauthenticated requests to non-exempt paths receive a `302` redirect to `/login`
 (browser) or a `401 JSON` error (XHR/API calls detected via `Accept` header).
 
-**Exempt routes:**
+**Exempt routes** (`exemptPrefixes` / `exemptExact` in `internal/middleware/auth.go`):
 ```
-GET  /health
-GET  /static/*
-GET  /login
-POST /auth/login
-POST /auth/register
-GET  /share/*
-POST /share/*
-GET  /s/*
+# Prefix matches (any method)
+/static/
+/share/
+/s/
+/visitor/
+/admin           # has its own session-based auth (dm_admin_sid) — see Admin User Management
+/api/profiles    # localhost-only; isLocalhost() guards in the handler itself
+/api/quiz/       # unauthenticated "Take the Quiz" login-page feature
+
+# Exact matches
+/health
+/favicon.ico
+/auth/login
+/auth/register
+/login
+/quiz
+/profiles
+/api/resolved-main-sqlite-path
+/api/local-ai/status
 ```
 
 ### Context Key (`internal/appctx/appctx.go`)
@@ -394,11 +568,23 @@ The codebase targets SQLite exclusively (via `github.com/mattn/go-sqlite3`). Key
 
 ### Adding a New AI Tool
 
-1. Add the tool definition (JSON schema) in `internal/ai/provider.go` — `GetToolDefinitions()`
-2. Add the execution case in `internal/ai/tools.go` — `NewToolExecutor()` switch statement
-3. All SQL in `tools.go` must include `AND user_id = $N` via `toolsUIDFilter(ctx, q, args)`
-4. Optionally add access-tier controls in `internal/ai/tool_access.go`
-5. For Pam Bot's restricted tool set, also update `internal/ai/pambot_tools.go`
+Every AI tool lives in the MCP tools server (`cmd/mcpserver`), discovered by the main app rather
+than hardcoded there — see [MCP Tools Server & AI Tool Discovery](#mcp-tools-server--ai-tool-discovery).
+
+1. Add the query/decrypt implementation as a private function in `internal/ai/tools.go`, plus an
+   exported MCP-facing wrapper for it (same pattern as `SearchChatMessagesGlobally`,
+   `GetEmailsByContact`, …). All SQL must include `AND user_id = $N` via
+   `toolsUIDFilter(ctx, q, args)`.
+2. Register the tool in `cmd/mcpserver/main.go`'s `registerTools()` — one `server.AddTool(...)`
+   call with its JSON-Schema `InputSchema`, calling the exported wrapper from step 1.
+3. If the tool needs a secret (a master password, an API key) that's session/visitor-resolved
+   rather than static env config, add a hidden arg constant in `internal/ai/mcp_args.go`, attach
+   it in `NewMCPToolExecutor` only for that tool name (`mcpSecretArgTools`), and read it in the
+   MCP server's tool handler — never log it.
+4. Rebuild `cmd/mcpserver` (`make build-mcp-exe`) and restart it, then click **Refresh Tools** in
+   Configuration → AI Tool Access (or restart the whole app) to pick it up. **The tool is denied
+   to every session by default** until an admin ticks a box for it there and saves — no extra step
+   needed to gate it off.
 
 ### Database Migrations
 
@@ -425,32 +611,24 @@ Admin JSON/UI lives under `/admin/llm-usage/…`. Users can download their own P
 - **Provider selection:** `"auto"`, `"localai"`, or any `key` from the admin-managed AI Models table (default seed: `"claude"`, `"gemini"`, `"deepseek"`, `"openai"`) in request body
 - All AI tool SQL is scoped by `user_id` via `toolsUIDFilter(ctx, q, args)` in `internal/ai/tools.go`
 
-### Pam Bot (Dementia Companion)
-
-`PamBotService` (`internal/service/pambot_service.go`) runs a separate, simplified chat
-loop with a restricted tool set defined in `internal/ai/pambot_tools.go`. Sessions and
-turns are persisted to `pam_bot_sessions` / `pam_bot_turns` / `pam_bot_subjects` tables.
-The handler (`internal/handler/pambot_handler.go`) exposes routes under `/api/pambot/…`.
-App-wide Pam Bot instructions are stored alongside the main system instructions in
-`app_system_instructions.pam_bot_instructions` and managed via `GET/PUT /admin/pambot-instructions`.
-
 ### Have-a-Chat (Two-Voice Conversations)
 
 `HaveAChatHandler` (`internal/handler/have_a_chat_handler.go`) drives sessions where
 two AI personas converse with each other about the archive. Sessions are persisted to
 `have_a_chat_sessions`. The `ChatService` is reused for both turns; the handler sequences
-the turns and passes each response back as the next prompt. Routes under `/api/have-a-chat/…`.
+the turns and passes each response back as the next prompt. Routes: `POST /chat/have-a-chat/turn`
+(generate the next turn) and `/api/have-a-chat/sessions*` (save / list / get / export a session).
 
 ### Interviews
 
 `InterviewHandler` (`internal/handler/interview_handler.go`) manages structured Q&A
 sessions: the AI asks questions, the user answers, and the interview is saved for later
 review. State is persisted to `interviews` / `interview_turns` tables via
-`InterviewRepo`. Routes under `/api/interview/…`.
+`InterviewRepo`. Routes under `/interview/…` (not `/api/`-prefixed).
 
 ### Identity Profile Wizard
 
-`IdentityProfileHandler` (`internal/handler/identity_profile_wizard.go`) is a guided,
+`IdentityProfileHandler` (`internal/handler/identity_profile_handler.go`) is a guided,
 multi-step flow that uses `ChatService` to build a textual identity profile of the
 archive subject. It writes finished profiles to `complete_profiles` via `CompleteProfileRepo`.
 Routes under `/api/identity-profile/…`.
@@ -542,6 +720,8 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `openArtefacts` | Clicks the Artefacts sidebar button |
 | `openIdentityProfile` | Clicks the Identity Profile Wizard sidebar button |
 | `openDataImport` | Clicks the Import & Manage Data sidebar button |
+| `openDataSourcesImport` | Alias of `openDataImport` |
+| `openDataMaintenance` | Clicks the (separate) Data Import/Maintenance sidebar button |
 | `openDataImportImport` | Opens Import & Manage Data on the Import tab |
 | `openDataImportMaintenance` | Opens Import & Manage Data on the Maintenance tab |
 | `openDataImportBackgroundJobs` | Opens Import & Manage Data on the Background Jobs tab |
@@ -567,7 +747,9 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `openConfigGuideTopics` | Opens Configuration on the Guide Topics tab |
 | `openConfigCustomVoices` | Opens Configuration on the Custom Voices tab |
 | `openConfigManageVisitorKeys` | Opens Configuration on the Manage Visitor Keys tab |
-| `openConfigToolsAccess` | Opens Configuration on the Tools Access tab |
+| `openConfigMcpServers` | Opens Configuration on the MCP Servers tab |
+| `openConfigToolsAccess` | Opens Configuration on the AI Tool Access tab |
+| `openConfigToolTest` | Opens Configuration on the Tool Test tab |
 | `openSettingsManageKeys` | Alias for `openConfigManageVisitorKeys` |
 | `openReferenceDocuments` | Clicks the Ref Docs segment in the chat context bar, opening the Reference Documents manager |
 | `openToolCallsDialog` | Opens the tool calls log dialog from the chat context bar (last request) |
@@ -584,12 +766,18 @@ To add a new navigation action: (1) add an entry to `Guide.NavActions` in `guide
 
 ### Import Pipeline
 
-| Tier | Mechanism | Endpoint |
-|------|-----------|----------|
-| A | IMAP credentials | `POST /imap/process` |
-| B | ZIP file upload (Facebook, Instagram, WhatsApp, iMessage) | `POST /import/upload` |
-| C1 | Browser folder picker (photos) | `POST /import/photo-batch` |
-| D | Server-triggered (contacts, thumbnails, reference import) | various |
+Every import mechanism is desktop-native (Electron's file/folder picker hands the Go server a
+local filesystem path — there is no browser-side byte upload), and every one follows the same
+Start / `/stream` (SSE progress) / `/cancel` / `/status` quartet, backed by a per-mechanism
+`importer.ImportJob` singleton (one job of that kind at a time):
+
+| Mechanism | Trigger endpoint | Body |
+|-----------|------------------|------|
+| IMAP credentials | `POST /imap/process` (`internal/handler/imap_handler.go`) | host/user/password/folders |
+| ZIP or extracted-folder path — Facebook, Instagram, WhatsApp, or iMessage | `POST /import/from-path` (`internal/handler/upload_import_handler.go`) | `{file_path, type}`, `type` ∈ `facebook`/`instagram`/`whatsapp`/`imessage`; progress under `/import/upload/*` |
+| Filesystem/photo import by root directory | `POST /images/import` (`internal/handler/importer_handler.go` → `FilesystemStart`) | `{root_directory, …}` |
+| Per-source dedicated importer (already-exported directory) | `POST /whatsapp/import`, `/imessages/import`, `/instagram/import`, `/facebook/all/import`, `/emails/process`, `/contacts/extract`, … (`importer_handler.go`) | `{directory_path}` or similar |
+| Server-triggered maintenance (thumbnails, reference import, embedding backfills, region recalculation, tag QA, GPS-duplicate spread, exports) | various under `/images/*`, `/emails/embeddings/backfill`, `/messages/context-embeddings/backfill`, … (`importer_handler.go`) | job-specific |
 
 All import handlers capture `uid` before launching background goroutines and pass it via
 `context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)`.
@@ -668,6 +856,7 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 |------|-------|
 | Electron main process | `electron/main.js` |
 | Electron IPC bridge | `electron/preload.js` |
+| Electron installer / packaging config | `electron/electron-builder.yml` (see Building the Installable Package) |
 | Route wiring | `internal/api/router/router.go` |
 | Auth middleware | `internal/middleware/auth.go` |
 | Auth service | `internal/service/auth_service.go` |
@@ -686,18 +875,24 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | OpenRouter adapter (backs every admin-configured AI model) | `internal/ai/openrouter.go` |
 | AI Models CRUD (admin-managed model list) | `internal/service/ai_models_service.go`, `internal/repository/ai_models_repo.go`, `internal/handler/ai_models_handler.go` |
 | Local AI / Ollama provider | `internal/ai/localai.go` |
-| Tool definitions | `internal/ai/provider.go` → `GetToolDefinitions()` |
-| Tool execution | `internal/ai/tools.go` → `NewToolExecutor()` |
-| Pam Bot tool definitions | `internal/ai/pambot_tools.go` |
+| MCP tools server (every AI tool) | `cmd/mcpserver/main.go` |
+| Tool query/decrypt logic + MCP-facing wrappers | `internal/ai/tools.go` |
+| MCP client + executor | `internal/ai/mcpclient.go`, `internal/ai/tools.go` → `NewMCPToolExecutor()` |
+| Tool catalog (discovery cache) | `internal/ai/tool_catalog.go` → `DefaultToolCatalog()` |
+| Hidden per-call arg constants | `internal/ai/mcp_args.go` |
+| MCP server registry (multi-server tool routing) | `internal/ai/mcp_registry.go` → `DefaultMCPRegistry()` |
+| Additional MCP servers CRUD (admin-managed) | `internal/service/mcp_servers_service.go`, `internal/repository/mcp_servers_repo.go`, `internal/handler/mcp_servers_handler.go`, `internal/model/mcp_server_row.go` |
+| Builtin MCP server row seed | `internal/database/seed_mcp_servers.go` |
+| Dev CLI for querying an MCP server directly | `cmd/mcpquery/main.go` |
+| AI Tool Access handler (policy + catalog refresh) | `internal/handler/llm_tools_access_handler.go` |
 | Tool access tiers | `internal/ai/tool_access.go` |
+| Tool Test tab handler (owner diagnostics) | `internal/handler/llm_tools_test_handler.go` |
 | Chat orchestration | `internal/service/chat_service.go` |
 | Chat HTTP handler | `internal/handler/chat_handler.go` |
 | Reference doc system-prompt inlining | `internal/service/reference_prompt_inline.go` |
-| Pam Bot service | `internal/service/pambot_service.go` |
-| Pam Bot handler | `internal/handler/pambot_handler.go` |
 | Have-a-Chat handler | `internal/handler/have_a_chat_handler.go` |
 | Interview handler | `internal/handler/interview_handler.go` |
-| Identity Profile Wizard handler | `internal/handler/identity_profile_wizard.go` |
+| Identity Profile Wizard handler | `internal/handler/identity_profile_handler.go` |
 | Background jobs scheduler | `internal/service/background_jobs/scheduler.go` |
 | Background jobs runner (handler) | `internal/handler/background_jobs_runner.go` |
 | Embedding service | `internal/service/` (EmbeddingService) |
@@ -714,7 +909,6 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Frontend main | `static/js/museum/app.js` |
 | Frontend auth | `static/js/museum/auth.js` |
 | Frontend chat renderer | `static/js/museum/chat.js` |
-| Frontend Pam Bot UI | `static/js/museum/pam-bot.js` |
 | Frontend Have-a-Chat UI | `static/js/museum/have-a-chat.js` |
 | Frontend Interview UI | `static/js/museum/interviewer.js` |
 | Frontend Identity Wizard UI | `static/js/museum/identity-profile-wizard.js` |
@@ -725,10 +919,12 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Login / register page | `templates/login.html` |
 | Share visitor page | `templates/share.html` |
 | Profile selection / first-run page | `templates/non_user_init.template.html` |
-| Attachment viewer (standalone, legacy) | `templates/attachments_viewer.html` |
+| Login-page quiz (unauthenticated) | `templates/quiz.html`, `internal/handler/quiz_handler.go`, `ChatService.GenerateQuiz` in `internal/service/quiz_service.go` |
 | Email attachments grid (embedded in SPA modal) | `templates/index.template.html` (`#email-attachments-modal`) |
 | Suggestions (DB + seed JSON) | `static/data/suggestions.json`, `internal/service/suggestions_service.go`, `static/js/museum/modals-suggestions-config.js` |
 | Guide system (DB + seed JSON) | `static/data/guide_topics.json`, `internal/service/guide_topics_service.go`, `static/js/museum/guide.js`, `static/js/museum/modals-guide-topics-config.js` |
+| Frontend MCP Servers config UI | `static/js/museum/modals-mcp-servers-config.js` |
+| Frontend AI Tool Access / Tool Test UI | `static/js/museum/modals-settings.js` (`Modals.LLMToolsAccess`), `static/js/museum/modals-tool-test.js` |
 
 ## Security Notes
 
@@ -738,6 +934,12 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 - Tool access is tiered: Visitor / Master — controlled via `PUT /api/settings/llm-tools-access`
 - All archive data tables have `user_id` (nullable) — NULL means legacy/single-tenant data
 - Share visitor sessions are `dm_session` cookies scoped to the **owner's** `user_id`
+- The MCP tools server (`cmd/mcpserver`) binds to `127.0.0.1` only and requires the shared-secret
+  `MCP_AUTH_TOKEN` bearer header on every request — see [MCP Tools Server & AI Tool Discovery](#mcp-tools-server--ai-tool-discovery)
+- Additional (owner-added) MCP servers are treated as **untrusted third parties**: they never
+  receive the master password or Tavily key, but a tool call there still carries the archive
+  data the LLM chose to pass as arguments — registering one is a deliberate owner trust decision,
+  same tier as API Keys / AI Tool Access (owner-only, not just any authenticated session)
 
 ## What NOT to Do
 
@@ -748,4 +950,7 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 - Don't add `user_id` filtering to the `users`, `sessions`, or `archive_shares` tables — these are identity/auth tables
 - Don't use `context.Background()` in import background goroutines — always thread the `user_id` via `context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)`
 - Don't return nil slices from list handlers — always substitute an empty slice so JSON encodes as `[]` not `null`
+- Don't attach secret hidden args (`ArgMasterPassword`, `ArgTavilyKey`) to a non-builtin MCP
+  server call — `NewMCPToolExecutor` already gates this on `trusted`; never bypass that gate
+  when adding a tool or wiring a new secret
 - Don't write raw SQL with `pgx` — the codebase now uses `database/sql` with `github.com/mattn/go-sqlite3`

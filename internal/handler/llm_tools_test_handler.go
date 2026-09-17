@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -110,21 +109,6 @@ func (h *LLMToolsTestHandler) definitionsAllowed(w http.ResponseWriter, r *http.
 	return false
 }
 
-func (h *LLMToolsTestHandler) loadSubjectName(ctx context.Context) string {
-	subjectName := "the archive owner"
-	if h.subjectConfig == nil {
-		return subjectName
-	}
-	cfg, err := h.subjectConfig.GetFirst(ctx)
-	if err != nil || cfg == nil {
-		return subjectName
-	}
-	if s := strings.TrimSpace(cfg.SubjectName); s != "" {
-		return s
-	}
-	return subjectName
-}
-
 func (h *LLMToolsTestHandler) getRAM(r *http.Request) appai.RAMMasterGetter {
 	return func() (string, bool) {
 		if h.sessionStore == nil || r == nil {
@@ -185,12 +169,11 @@ func (h *LLMToolsTestHandler) TestTools(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	subjectName := h.loadSubjectName(ctx)
 	tavilyKey := ""
 	if h.chatSvc != nil {
 		tavilyKey = h.chatSvc.EffectiveTavilyKey(ctx, r)
 	}
-	executor := appai.NewToolExecutor(h.pool, subjectName, tavilyKey, h.pepper, h.getRAM(r))
+	executor := appai.NewMCPToolExecutor(h.getRAM(r), tavilyKey)
 
 	results := make([]map[string]any, 0, len(body.Tools))
 	for _, item := range body.Tools {

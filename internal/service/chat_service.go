@@ -378,7 +378,7 @@ func (s *ChatService) resolveToolAccessPolicy(ctx context.Context, unlockPasswor
 }
 
 // buildChatTools returns a policy-wrapped executor and filtered tool schemas for the current session tier.
-func (s *ChatService) buildChatTools(ctx context.Context, r *http.Request, subjectName string) (appai.ToolExecutor, *[]map[string]any) {
+func (s *ChatService) buildChatTools(ctx context.Context, r *http.Request) (appai.ToolExecutor, *[]map[string]any) {
 	getRAM := s.perRequestGetRAM(r)
 	tier := appai.UnlockTierFromSession(s.sessionStore, r)
 	pw, ok := getRAM()
@@ -388,16 +388,22 @@ func (s *ChatService) buildChatTools(ctx context.Context, r *http.Request, subje
 	} else if tier != appai.TierNone && s.privateStore != nil {
 		policy, _ = s.privateStore.LoadLLMToolsAccessPolicyMirror(ctx)
 	}
+	// filtered is already sourced from DefaultToolCatalog() (FilterToolDefinitionsForTier), which
+	// reflects the last successful discovery across every registered MCP server — bundled and
+	// additional (internal/ai/mcp_registry.go). A per-chat-request live tools/list re-fetch used
+	// to run here too, but once additional servers can be arbitrary remote endpoints, doing that
+	// on every chat turn risks real latency for no benefit over the already-current cache; the
+	// "Refresh Tools" button and the startup/on-write discovery hooks keep the cache fresh instead.
 	filtered := appai.FilterToolDefinitionsForTier(policy, tier)
 	_, tavily := s.effectiveOpenRouterConfig(ctx, r, "")
-	base := appai.NewToolExecutor(s.pool, subjectName, tavily, s.pepper, getRAM)
+	base := appai.NewMCPToolExecutor(getRAM, tavily)
 	wrapped := appai.WrapToolExecutorWithPolicy(base, policy, tier)
 	return wrapped, &filtered
 }
 
 // ChatContextStatus returns the number of LLM tools offered for this request (policy + unlock tier) and reference documents enabled for the AI (task tools and/or system prompt).
 func (s *ChatService) ChatContextStatus(ctx context.Context, r *http.Request) (toolCount int, refDocCount int64, err error) {
-	_, decls := s.buildChatTools(ctx, r, "")
+	_, decls := s.buildChatTools(ctx, r)
 	if decls != nil {
 		toolCount = len(*decls)
 	}
@@ -502,7 +508,7 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	switch req.Provider {
 	case "auto":
 		toolsCount := 0
-		_, decls := s.buildChatTools(ctx, r, "")
+		_, decls := s.buildChatTools(ctx, r)
 		if decls != nil {
 			toolsCount = len(*decls)
 		}
@@ -652,7 +658,7 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 	}
 
 	// Build tool executor and generation request
-	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
+	executor, toolDecls := s.buildChatTools(ctx, r)
 	genReq := appai.GenerateRequest{
 		UserInput:     userInput,
 		Temperature:   temperature,
@@ -902,7 +908,7 @@ func (s *ChatService) GenerateRandomQuestion(ctx context.Context, r *http.Reques
 		" Do not answer the question, just generate it."
 
 	// Build tool executor and generation request
-	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
+	executor, toolDecls := s.buildChatTools(ctx, r)
 	genReq := appai.GenerateRequest{
 		UserInput:     prompt,
 		Temperature:   temperature,
@@ -1126,20 +1132,17 @@ func (s *ChatService) ExtractIdentityProfile(ctx context.Context, r *http.Reques
 // GenerateCompleteProfile builds a multi-step relationship profile for a contact
 // from messages and emails, using the specified AI provider (gemini or claude) to summarize,
 // and saves it to complete_profiles. Mirrors the Python base_chat_service.get_complete_profile_by_name.
-func (s *ChatService) GenerateCompleteProfile(ctx context.Context, name string, provider string, getRAM appai.RAMMasterGetter, authSessionID string) error {
-	if getRAM == nil {
-		getRAM = func() (string, bool) { return "", false }
-	}
-	// Use the raw tool executor here, not WrapToolExecutorWithPolicy. The LLM Tools Access policy
-	// applies to in-chat tool calls; when policy is unset it denies every tool, which left profile
-	// generation with no messages/emails. Reading DB rows for an explicit profile job is not gated by that policy.
-	_, tavily := s.effectiveOpenRouterConfig(ctx, nil, authSessionID)
-	base := appai.NewToolExecutor(s.pool, "", tavily, s.pepper, getRAM)
+func (s *ChatService) GenerateCompleteProfile(ctx context.Context, name string, provider string, authSessionID string) error {
+	// This is a background batch job, not a chat tool call — it reads messages/emails directly
+	// via the exported ai.GetEmailsByContact wrapper rather than going through the (policy-gated,
+	// MCP-routed) chat tool executor: the LLM Tools Access policy applies to in-chat tool calls,
+	// and when policy is unset it denies every tool, which used to leave profile generation with
+	// no messages/emails. Reading DB rows for an explicit profile job isn't gated by that policy.
 	msgsRaw, err := appai.GetMessagesForContactProfile(ctx, s.pool, name)
 	if err != nil {
 		return fmt.Errorf("get messages: %w", err)
 	}
-	emailsRaw, err := base(ctx, "get_emails_by_contact", map[string]any{"name": name})
+	emailsRaw, err := appai.GetEmailsByContact(ctx, s.pool, name)
 	if err != nil {
 		return fmt.Errorf("get emails: %w", err)
 	}

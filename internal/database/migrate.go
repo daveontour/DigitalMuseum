@@ -831,6 +831,21 @@ func schemaDDL() []string {
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_models_key ON ai_models (key)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_models_sort ON ai_models (sort_order, id)`,
+
+		// ── MCP servers (deployment-wide; the AI's tool sources) ───────────────
+		`CREATE TABLE IF NOT EXISTS mcp_servers (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			name         TEXT NOT NULL,
+			endpoint_url TEXT NOT NULL,
+			auth_token   TEXT,
+			enabled      INTEGER NOT NULL DEFAULT 1,
+			is_builtin   INTEGER NOT NULL DEFAULT 0,
+			sort_order   INTEGER NOT NULL DEFAULT 0,
+			created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_mcp_servers_name ON mcp_servers (name)`,
+		`CREATE INDEX IF NOT EXISTS idx_mcp_servers_sort ON mcp_servers (sort_order, id)`,
 	}
 }
 

@@ -47,6 +47,7 @@ Modals.GuideTopicsConfig = (() => {
         'openConfigGuideTopics',
         'openConfigCustomVoices',
         'openConfigManageVisitorKeys',
+        'openConfigMcpServers',
         'openConfigToolsAccess',
         'openSettingsManageKeys',
         'openReferenceDocuments',

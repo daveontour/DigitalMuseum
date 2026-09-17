@@ -124,7 +124,7 @@ func (s *ChatService) StartInterview(
 	systemPrompt = s.enrichChatSystemPrompt(ctx, r, systemPrompt)
 	userPrompt := s.buildInterviewStartPrompt(subjectName, req.PurposeDetail)
 
-	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
+	executor, toolDecls := s.buildChatTools(ctx, r)
 	genReq := appai.GenerateRequest{
 		UserInput:     userPrompt,
 		Temperature:   0.7,
@@ -207,7 +207,7 @@ func (s *ChatService) GenerateInterviewTurn(
 
 	userPrompt := fmt.Sprintf("The interviewee just answered: \"%s\"\n\nBased on the conversation so far and the biographical material available, ask your next interview question. Remember your interviewer style and the purpose of this interview.", req.Answer)
 
-	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
+	executor, toolDecls := s.buildChatTools(ctx, r)
 	genReq := appai.GenerateRequest{
 		UserInput:     userPrompt,
 		Temperature:   0.7,
@@ -306,7 +306,7 @@ func (s *ChatService) ResumeInterview(
 
 	userPrompt := "The interview was paused and is now being resumed. Welcome the interviewee back warmly, briefly summarize where you left off, and continue with your next interview question."
 
-	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
+	executor, toolDecls := s.buildChatTools(ctx, r)
 	genReq := appai.GenerateRequest{
 		UserInput:     userPrompt,
 		Temperature:   0.7,

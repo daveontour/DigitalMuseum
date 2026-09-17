@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	appai "github.com/daveontour/aimuseum/internal/ai"
 	"github.com/daveontour/aimuseum/internal/appctx"
 	"github.com/daveontour/aimuseum/internal/keystore"
 	"github.com/daveontour/aimuseum/internal/model"
@@ -521,13 +520,6 @@ func (h *ChatHandler) CompleteProfileStart(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	provider := strings.TrimSpace(strings.ToLower(req.Provider))
-	var getRAM appai.RAMMasterGetter
-	if h.sessionStore != nil {
-		if p, ok := h.sessionStore.Get(r); ok {
-			pw := p
-			getRAM = func() (string, bool) { return pw, true }
-		}
-	}
 	authSid := ""
 	if c, err := r.Cookie(service.AuthSessionCookieName); err == nil && c != nil {
 		authSid = c.Value
@@ -542,7 +534,7 @@ func (h *ChatHandler) CompleteProfileStart(w http.ResponseWriter, r *http.Reques
 		}
 		ctx, cancel := context.WithTimeout(base, 10*time.Minute)
 		defer cancel()
-		if err := h.svc.GenerateCompleteProfile(ctx, name, provider, getRAM, authSid); err != nil {
+		if err := h.svc.GenerateCompleteProfile(ctx, name, provider, authSid); err != nil {
 			slog.Error("complete_profile failed", "name", name, "err", err)
 			if markErr := h.cpRepo.MarkGenerationFailed(ctx, name, err.Error()); markErr != nil {
 				slog.Error("complete_profile mark failed", "name", name, "err", markErr)

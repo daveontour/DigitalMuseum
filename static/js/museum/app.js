@@ -1155,6 +1155,9 @@ const App = (() => {
                 if (targetTab === 'custom-voices') {
                     if (Modals.CustomVoices && Modals.CustomVoices.load) Modals.CustomVoices.load();
                 }
+                if (targetTab === 'mcp-servers-config') {
+                    if (Modals.MCPServersConfig && Modals.MCPServersConfig.load) void Modals.MCPServersConfig.load();
+                }
                 if (targetTab === 'tools-access') {
                     if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.load) void Modals.LLMToolsAccess.load();
                 }

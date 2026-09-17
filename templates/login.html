@@ -221,6 +221,116 @@
         }
         #login-admin-login-btn:hover { background: #243358; border-color: #3b82f6; color: #fff; }
 
+        #login-loaded-config-btn {
+            position: fixed;
+            bottom: 14px;
+            left: 14px;
+            z-index: 100;
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid #3d5278;
+            background: #1a2540;
+            color: #cdd6e8;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            -webkit-app-region: no-drag;
+        }
+        #login-loaded-config-btn:hover { background: #243358; border-color: #3b82f6; color: #fff; }
+
+        #loaded-config-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.55);
+            padding: 24px;
+            box-sizing: border-box;
+            -webkit-app-region: no-drag;
+        }
+        #loaded-config-modal.open { display: flex; }
+        #loaded-config-dialog {
+            background: #1a2540;
+            border: 1px solid #3d5278;
+            border-radius: 10px;
+            width: min(960px, 100%);
+            max-height: min(85vh, 900px);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+        }
+        #loaded-config-dialog header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 18px;
+            border-bottom: 1px solid #2d3f63;
+        }
+        #loaded-config-dialog header h2 {
+            margin: 0;
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 650;
+        }
+        #loaded-config-close-btn {
+            background: transparent;
+            border: none;
+            color: #8fa4c8;
+            font-size: 1.25rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 4px 8px;
+        }
+        #loaded-config-close-btn:hover { color: #fff; }
+        #loaded-config-files {
+            padding: 10px 18px;
+            color: #8fa4c8;
+            font-size: 0.82rem;
+            border-bottom: 1px solid #2d3f63;
+            line-height: 1.45;
+            word-break: break-all;
+        }
+        #loaded-config-body {
+            overflow: auto;
+            padding: 0;
+        }
+        #loaded-config-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        #loaded-config-table th,
+        #loaded-config-table td {
+            text-align: left;
+            padding: 8px 14px;
+            border-bottom: 1px solid #243358;
+            vertical-align: top;
+        }
+        #loaded-config-table th {
+            position: sticky;
+            top: 0;
+            background: #152038;
+            color: #8fa4c8;
+            font-weight: 600;
+            z-index: 1;
+        }
+        #loaded-config-table td { color: #cdd6e8; }
+        #loaded-config-table td.key { color: #93c5fd; font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
+        #loaded-config-table td.value { word-break: break-word; max-width: 280px; }
+        #loaded-config-table td.source { color: #a5b4c8; word-break: break-all; }
+        #loaded-config-table tr.resolved td { background: rgba(59, 130, 246, 0.08); }
+        #loaded-config-error {
+            display: none;
+            padding: 16px 18px;
+            color: #f87171;
+            font-size: 0.9rem;
+        }
+
         #login-quiz-btn {
             position: fixed;
             top: calc(env(titlebar-area-height, 0px) + 14px);
@@ -250,7 +360,31 @@
 <body>
     <div class="titlebar-drag" aria-hidden="true"></div>
     <button type="button" id="login-admin-login-btn" style="display:none;">Admin Login</button>
+    <button type="button" id="login-loaded-config-btn" style="display:none;">Loaded Config</button>
     <button type="button" id="login-quiz-btn" style="display:none;"><i class="fas fa-gamepad" style="margin-right:6px;"></i>Take the Quiz</button>
+
+    <div id="loaded-config-modal" role="dialog" aria-modal="true" aria-labelledby="loaded-config-title">
+        <div id="loaded-config-dialog">
+            <header>
+                <h2 id="loaded-config-title">Loaded Configuration</h2>
+                <button type="button" id="loaded-config-close-btn" aria-label="Close">&times;</button>
+            </header>
+            <div id="loaded-config-files"></div>
+            <div id="loaded-config-error"></div>
+            <div id="loaded-config-body">
+                <table id="loaded-config-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Key</th>
+                            <th scope="col">Value</th>
+                            <th scope="col">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loaded-config-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <!-- First-run step indicator (shown by JS when HAS_REGISTERED_USER=false) -->
     <div id="step-indicator">
@@ -492,6 +626,8 @@
             // (Register tab) before any archive user exists.
             const adminBtn = document.getElementById('login-admin-login-btn');
             if (adminBtn) adminBtn.style.display = 'block';
+            const loadedCfgBtn = document.getElementById('login-loaded-config-btn');
+            if (loadedCfgBtn) loadedCfgBtn.style.display = 'block';
         }
         function showSuccess(msg) {
             const el = document.getElementById('success-msg');
@@ -559,6 +695,70 @@
         tabVisitor.addEventListener('click',  () => showTab('visitor'));
         document.getElementById('login-admin-login-btn').addEventListener('click', () => { window.location.href = '/admin'; });
         document.getElementById('login-quiz-btn').addEventListener('click', () => { window.location.href = '/quiz'; });
+
+        (function wireLoadedConfigDialog() {
+            const modal = document.getElementById('loaded-config-modal');
+            const openBtn = document.getElementById('login-loaded-config-btn');
+            const closeBtn = document.getElementById('loaded-config-close-btn');
+            const filesEl = document.getElementById('loaded-config-files');
+            const errEl = document.getElementById('loaded-config-error');
+            const tbody = document.getElementById('loaded-config-tbody');
+            if (!modal || !openBtn || !tbody) return;
+
+            function closeModal() {
+                modal.classList.remove('open');
+            }
+
+            function escapeHtml(s) {
+                return String(s == null ? '' : s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            async function openModal() {
+                modal.classList.add('open');
+                errEl.style.display = 'none';
+                errEl.textContent = '';
+                filesEl.textContent = 'Loading…';
+                tbody.innerHTML = '';
+                try {
+                    const res = await fetch('/api/loaded-config', { credentials: 'same-origin' });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        throw new Error(data.error || ('HTTP ' + res.status));
+                    }
+                    const files = Array.isArray(data.files_loaded) ? data.files_loaded : [];
+                    filesEl.innerHTML = files.length
+                        ? ('<strong style="color:#cdd6e8;">.env files loaded (later wins):</strong><br>' +
+                            files.map(escapeHtml).join('<br>'))
+                        : '<strong style="color:#cdd6e8;">.env files loaded:</strong> none (process environment / defaults only)';
+                    const items = Array.isArray(data.items) ? data.items : [];
+                    tbody.innerHTML = items.map((it) => {
+                        const cls = it.resolved ? ' class="resolved"' : '';
+                        return '<tr' + cls + '>' +
+                            '<td class="key">' + escapeHtml(it.key) + '</td>' +
+                            '<td class="value">' + escapeHtml(it.value) + '</td>' +
+                            '<td class="source">' + escapeHtml(it.source) + '</td>' +
+                            '</tr>';
+                    }).join('');
+                } catch (e) {
+                    filesEl.textContent = '';
+                    errEl.style.display = 'block';
+                    errEl.textContent = 'Could not load configuration: ' + (e && e.message ? e.message : String(e));
+                }
+            }
+
+            openBtn.addEventListener('click', openModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+            });
+        })();
 
         wireLoginPwToggle('login-password-toggle', 'login-password');
         wireLoginPwToggle('new-password-toggle', 'new-password');

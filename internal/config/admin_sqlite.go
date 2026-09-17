@@ -12,6 +12,8 @@ var archiveNonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 // ResolveAdminSQLitePath returns the billing/admin SQLite file path.
 // When ADMIN_SQLITE_PATH is unset, the default is <executableDir>/data/admin.sqlite.
 // Absolute env values are used as-is; relative values are resolved against the executable directory.
+// If the configured path is an existing directory (a common misconfiguration), admin.sqlite is
+// appended so SQLite is never pointed at a folder.
 func ResolveAdminSQLitePath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -19,13 +21,27 @@ func ResolveAdminSQLitePath() (string, error) {
 	}
 	exeDir := filepath.Dir(exe)
 	raw := strings.TrimSpace(os.Getenv("ADMIN_SQLITE_PATH"))
+	var p string
 	if raw == "" {
-		return filepath.Join(exeDir, "data", "admin.sqlite"), nil
+		p = filepath.Join(exeDir, "data", "admin.sqlite")
+	} else if filepath.IsAbs(raw) {
+		p = filepath.Clean(raw)
+	} else {
+		p = filepath.Clean(filepath.Join(exeDir, raw))
 	}
-	if filepath.IsAbs(raw) {
-		return filepath.Clean(raw), nil
+	return ensureAdminSQLiteFilePath(p), nil
+}
+
+func ensureAdminSQLiteFilePath(p string) string {
+	st, err := os.Stat(p)
+	if err == nil && st.IsDir() {
+		return filepath.Join(p, "admin.sqlite")
 	}
-	return filepath.Clean(filepath.Join(exeDir, raw)), nil
+	// Path does not exist yet: if it looks like a directory (no extension), still append.
+	if err != nil && filepath.Ext(p) == "" {
+		return filepath.Join(p, "admin.sqlite")
+	}
+	return p
 }
 
 // AdminDataDir returns the directory containing the admin/billing SQLite file.

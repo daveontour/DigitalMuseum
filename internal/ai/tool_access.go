@@ -141,9 +141,11 @@ func PolicyAllows(policy ToolAccessPolicy, toolName string, tier UnlockTier) boo
 	}
 }
 
-// FilterToolDefinitionsForTier returns tool schema entries allowed for this tier.
+// FilterToolDefinitionsForTier returns tool schema entries allowed for this tier, from the
+// live MCP-discovered catalog (DefaultToolCatalog) — not a static list. A tool the catalog
+// hasn't (yet) discovered, or one with no saved policy row, is excluded here regardless of tier.
 func FilterToolDefinitionsForTier(policy ToolAccessPolicy, tier UnlockTier) []map[string]any {
-	all := toolDefinitions()
+	all := DefaultToolCatalog().Definitions()
 	var out []map[string]any
 	for _, td := range all {
 		name, _ := td["name"].(string)
@@ -172,10 +174,12 @@ func AllToolsEnabledPolicy() ToolAccessPolicy {
 	return out
 }
 
-// AllToolMetas lists every tool with description (for settings UI).
+// AllToolMetas lists every tool currently discoverable from the MCP tools server (for the AI
+// Tool Access settings UI) — not a static list. Call DefaultToolCatalog().Refresh first (or via
+// the "Refresh Tools" UI action / the startup discovery goroutine) to pick up newly added tools.
 func AllToolMetas() []ToolMeta {
 	var out []ToolMeta
-	for _, td := range toolDefinitions() {
+	for _, td := range DefaultToolCatalog().Definitions() {
 		name, _ := td["name"].(string)
 		desc, _ := td["description"].(string)
 		if name != "" {

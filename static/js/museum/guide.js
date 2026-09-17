@@ -185,6 +185,7 @@ const Guide = {
         openConfigGuideTopics: () => Guide._openConfigurationTab('guide-topics-config'),
         openConfigCustomVoices: () => Guide._openConfigurationTab('custom-voices'),
         openConfigManageVisitorKeys: () => Guide._openConfigurationTab('manage-keys'),
+        openConfigMcpServers: () => Guide._openConfigurationTab('mcp-servers-config'),
         openConfigToolsAccess: () => Guide._openConfigurationTab('tools-access'),
         openConfigToolTest: () => Guide._openConfigurationTab('tool-test'),
         openSettingsManageKeys: () => Guide._openConfigurationTab('manage-keys'),

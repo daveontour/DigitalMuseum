@@ -9,19 +9,35 @@ import (
 	"strings"
 )
 
-// UserEnvFilePath returns the machine-wide user .env file (same location Electron uses on Windows).
+// electronUserDataDirName matches electron/package.json "name". Electron's
+// app.getPath('userData') is %APPDATA%\<name> on Windows (not productName).
+const electronUserDataDirName = "digital-museum"
+
+// legacyUserDataDirName is the older folder used by docs and early builds.
+const legacyUserDataDirName = "Digital Museum"
+
+// UserEnvFilePath returns the user .env file Electron reads/writes (digital-museum).
 func UserEnvFilePath() string {
+	return userEnvFilePathIn(electronUserDataDirName)
+}
+
+// LegacyUserEnvFilePath returns the older %APPDATA%\Digital Museum\.env path, if any.
+func LegacyUserEnvFilePath() string {
+	return userEnvFilePathIn(legacyUserDataDirName)
+}
+
+func userEnvFilePathIn(dirName string) string {
 	if appdata := strings.TrimSpace(os.Getenv("APPDATA")); appdata != "" {
-		return filepath.Join(appdata, "Digital Museum", ".env")
+		return filepath.Join(appdata, dirName, ".env")
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		if runtime.GOOS == "darwin" {
-			return filepath.Join(home, "Library", "Application Support", "Digital Museum", ".env")
+			return filepath.Join(home, "Library", "Application Support", dirName, ".env")
 		}
 		if xdg := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); xdg != "" {
-			return filepath.Join(xdg, "Digital Museum", ".env")
+			return filepath.Join(xdg, dirName, ".env")
 		}
-		return filepath.Join(home, ".config", "Digital Museum", ".env")
+		return filepath.Join(home, ".config", dirName, ".env")
 	}
 	return ".env"
 }

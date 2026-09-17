@@ -72,4 +72,17 @@ func TestResolveAdminSQLitePath(t *testing.T) {
 			t.Fatalf("got %q want %q", got, want)
 		}
 	})
+
+	t.Run("directory path appends admin.sqlite", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Setenv("ADMIN_SQLITE_PATH", dir)
+		got, err := ResolveAdminSQLitePath()
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := filepath.Join(dir, "admin.sqlite")
+		if got != want {
+			t.Fatalf("got %q want %q", got, want)
+		}
+	})
 }

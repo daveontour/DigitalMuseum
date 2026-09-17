@@ -31,131 +31,6 @@ const chatMessageNeighborCount = 20
 // chatMessageKeywordSearchLimit caps rows returned by global / per-session message content search tools.
 const chatMessageKeywordSearchLimit = 200
 
-// NewToolExecutor creates a ToolExecutor backed by the provided pool.
-// getRAM returns the sensitive keyring password for this HTTP request's session; used to decrypt encrypted reference documents for AI tools.
-func NewToolExecutor(pool *sql.DB, subjectName, tavilyKey, pepper string, getRAM RAMMasterGetter) ToolExecutor {
-	if getRAM == nil {
-		getRAM = func() (string, bool) { return "", false }
-	}
-	return func(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-		switch name {
-		case "get_current_time":
-			return map[string]any{
-				"current_time": time.Now().UTC().Format(time.RFC3339),
-				"timezone":     "UTC",
-			}, nil
-		case "get_imessages_by_chat_session":
-			chatSession, _ := args["chat_session"].(string)
-			return getMessagesByChatSession(ctx, pool, chatSession)
-		case "get_messages_around_in_chat":
-			chatSession, _ := args["chat_session"].(string)
-			var messageID int64
-			switch v := args["message_id"].(type) {
-			case float64:
-				messageID = int64(v)
-			case int64:
-				messageID = v
-			}
-			return getMessagesAroundInChat(ctx, pool, chatSession, messageID)
-
-		case "get_emails_by_contact":
-			n, _ := args["name"].(string)
-			return getEmailsByContact(ctx, pool, n)
-		case "get_subject_writing_examples":
-			return getSubjectWritingExamples(ctx, pool, subjectName)
-		case "search_tavily":
-			query, _ := args["query"].(string)
-			return searchTavily(tavilyKey, query)
-		case "get_all_messages_by_contact":
-			n, _ := args["name"].(string)
-			return getAllMessagesByContact(ctx, pool, n)
-		case "get_unique_tags_count":
-			return getUniqueTagsCount(ctx, pool)
-		case "search_facebook_albums":
-			keyword, _ := args["keyword"].(string)
-			return searchFacebookAlbums(ctx, pool, keyword)
-		case "get_album_images":
-			var albumID int64
-			switch v := args["album_id"].(type) {
-			case float64:
-				albumID = int64(v)
-			case int64:
-				albumID = v
-			}
-			return getAlbumImagesTool(ctx, pool, albumID)
-		case "search_facebook_posts":
-			desc, _ := args["description"].(string)
-			return searchFacebookPosts(ctx, pool, desc)
-		case "get_all_facebook_posts":
-			return getAllFacebookPosts(ctx, pool)
-		case "get_user_interests":
-			return getUserInterests(ctx, pool)
-		case "get_available_reference_documents":
-			return getAvailableReferenceDocuments(ctx, pool)
-		case "get_available_sensitive_reference_documents":
-			return getAvailableSensitiveReferenceDocuments(ctx, pool)
-		case "get_reference_document":
-			idsRaw, _ := args["document_ids"].([]any)
-			var ids []int64
-			for _, v := range idsRaw {
-				switch x := v.(type) {
-				case float64:
-					ids = append(ids, int64(x))
-				case int64:
-					ids = append(ids, x)
-				}
-			}
-			return getReferenceDocuments(ctx, pool, ids, pepper, getRAM)
-		case "get_sensitive_reference_document":
-			idsRaw, _ := args["document_ids"].([]any)
-			var ids []int64
-			for _, v := range idsRaw {
-				switch x := v.(type) {
-				case float64:
-					ids = append(ids, int64(x))
-				case int64:
-					ids = append(ids, x)
-				}
-			}
-			return getSensitiveReferenceDocuments(ctx, pool, ids, pepper, getRAM)
-		case "list_interviews":
-			stateFilter, _ := args["state"].(string)
-			return listInterviewsTool(ctx, pool, stateFilter)
-		case "get_interview":
-			var iid int64
-			switch v := args["interview_id"].(type) {
-			case float64:
-				iid = int64(v)
-			case int64:
-				iid = v
-			}
-			return getInterviewTool(ctx, pool, iid)
-		case "list_available_chat_sessions":
-			return listAvailableChatSessions(ctx, pool)
-		case "search_chat_messages_globally":
-			kw, _ := args["keyword"].(string)
-			return searchChatMessagesGlobally(ctx, pool, kw)
-		case "search_chat_messages_in_session":
-			ch, _ := args["chat_session"].(string)
-			kw, _ := args["keyword"].(string)
-			return searchChatMessagesInSession(ctx, pool, ch, kw)
-		case "search_messages_by_similarity":
-			text, _ := args["text"].(string)
-			return searchMessagesBySimilarity(ctx, pool, text)
-		case "search_emails_by_similarity":
-			text, _ := args["text"].(string)
-			return searchEmailsBySimilarity(ctx, pool, text)
-		case "list_complete_profiles":
-			return listCompleteProfilesTool(ctx, pool)
-		case "get_complete_profile":
-			n, _ := args["name"].(string)
-			return getCompleteProfileTool(ctx, pool, n)
-		default:
-			return nil, fmt.Errorf("unknown tool: %s", name)
-		}
-	}
-}
-
 // toolsSQLWhereRe detects an existing WHERE clause in the query prefix (before ORDER BY etc.).
 var toolsSQLWhereRe = regexp.MustCompile(`(?i)\bwhere\b`)
 
@@ -1425,6 +1300,208 @@ func getSensitiveReferenceDocuments(ctx context.Context, pool *sql.DB, ids []int
 		results = []map[string]any{}
 	}
 	return map[string]any{"documents": results}, nil
+}
+
+// ---------------------------------------------------------------------------
+// MCP-server-facing entry points. Every AI tool now runs in cmd/mcpserver; these exported
+// wrappers are the only thing it calls into this package for — the query/decrypt logic below
+// them is unchanged and otherwise unreferenced from this app. See NewMCPToolExecutor.
+// ---------------------------------------------------------------------------
+
+func GetCurrentTime() (map[string]any, error) {
+	return map[string]any{
+		"current_time": time.Now().UTC().Format(time.RFC3339),
+		"timezone":     "UTC",
+	}, nil
+}
+
+func GetMessagesByChatSession(ctx context.Context, pool *sql.DB, chatSession string) (map[string]any, error) {
+	return getMessagesByChatSession(ctx, pool, chatSession)
+}
+
+func GetMessagesAroundInChat(ctx context.Context, pool *sql.DB, chatSession string, messageID int64) (map[string]any, error) {
+	return getMessagesAroundInChat(ctx, pool, chatSession, messageID)
+}
+
+func ListAvailableChatSessions(ctx context.Context, pool *sql.DB) (map[string]any, error) {
+	return listAvailableChatSessions(ctx, pool)
+}
+
+func SearchChatMessagesGlobally(ctx context.Context, pool *sql.DB, keyword string) (map[string]any, error) {
+	return searchChatMessagesGlobally(ctx, pool, keyword)
+}
+
+func SearchChatMessagesInSession(ctx context.Context, pool *sql.DB, chatSession, keyword string) (map[string]any, error) {
+	return searchChatMessagesInSession(ctx, pool, chatSession, keyword)
+}
+
+func SearchMessagesBySimilarity(ctx context.Context, pool *sql.DB, text string) (map[string]any, error) {
+	return searchMessagesBySimilarity(ctx, pool, text)
+}
+
+func SearchEmailsBySimilarity(ctx context.Context, pool *sql.DB, text string) (map[string]any, error) {
+	return searchEmailsBySimilarity(ctx, pool, text)
+}
+
+func GetEmailsByContact(ctx context.Context, pool *sql.DB, name string) (map[string]any, error) {
+	return getEmailsByContact(ctx, pool, name)
+}
+
+func GetAllMessagesByContact(ctx context.Context, pool *sql.DB, name string) (map[string]any, error) {
+	return getAllMessagesByContact(ctx, pool, name)
+}
+
+// resolveSubjectName looks up the current tenant's subject_configuration.subject_name directly
+// (same row-selection logic as repository.SubjectConfigRepo.GetFirst) so
+// get_subject_writing_examples needs no extra hidden argument — subjectName was previously
+// threaded in from ChatService per request, but it's derivable from ctx's uid alone.
+func resolveSubjectName(ctx context.Context, pool *sql.DB) string {
+	uid := appctx.UserIDFromCtx(ctx)
+	q := `SELECT subject_name FROM subject_configuration WHERE TRUE`
+	args := []any{}
+	if uid > 0 {
+		args = append(args, uid)
+		q += " AND (user_id = ? OR user_id IS NULL)"
+	}
+	q += " ORDER BY CASE WHEN user_id IS NULL THEN 1 ELSE 0 END, id ASC LIMIT 1"
+	var name string
+	if err := pool.QueryRowContext(ctx, q, args...).Scan(&name); err != nil {
+		return ""
+	}
+	return name
+}
+
+func GetSubjectWritingExamples(ctx context.Context, pool *sql.DB) (map[string]any, error) {
+	return getSubjectWritingExamples(ctx, pool, resolveSubjectName(ctx, pool))
+}
+
+// SearchTavily is the MCP-server-facing entry point for "search_tavily". tavilyKey is resolved
+// server-side (owner/visitor-session precedence, see ChatService.effectiveOpenRouterConfig) and
+// passed as a tools/call argument — like the master password, it is session-derived, not a
+// static env value the MCP server process could read on its own.
+func SearchTavily(tavilyKey, query string) (map[string]any, error) {
+	return searchTavily(tavilyKey, query)
+}
+
+func SearchFacebookAlbums(ctx context.Context, pool *sql.DB, keyword string) (map[string]any, error) {
+	return searchFacebookAlbums(ctx, pool, keyword)
+}
+
+func GetAlbumImages(ctx context.Context, pool *sql.DB, albumID int64) (map[string]any, error) {
+	return getAlbumImagesTool(ctx, pool, albumID)
+}
+
+func SearchFacebookPosts(ctx context.Context, pool *sql.DB, description string) (map[string]any, error) {
+	return searchFacebookPosts(ctx, pool, description)
+}
+
+func GetAllFacebookPosts(ctx context.Context, pool *sql.DB) (map[string]any, error) {
+	return getAllFacebookPosts(ctx, pool)
+}
+
+func GetUniqueTagsCount(ctx context.Context, pool *sql.DB) (map[string]any, error) {
+	return getUniqueTagsCount(ctx, pool)
+}
+
+func GetUserInterests(ctx context.Context, pool *sql.DB) (map[string]any, error) {
+	return getUserInterests(ctx, pool)
+}
+
+func GetAvailableReferenceDocuments(ctx context.Context, pool *sql.DB) (map[string]any, error) {
+	return getAvailableReferenceDocuments(ctx, pool)
+}
+
+// GetReferenceDocumentsWithPassword mirrors GetSensitiveReferenceDocumentsWithPassword below,
+// for the non-sensitive reference-document tool (which also needs the master password — some
+// non-sensitive documents are still stored encrypted).
+func GetReferenceDocumentsWithPassword(ctx context.Context, pool *sql.DB, ids []int64, pepper, masterPassword string) (map[string]any, error) {
+	getRAM := func() (string, bool) { return masterPassword, strings.TrimSpace(masterPassword) != "" }
+	return getReferenceDocuments(ctx, pool, ids, pepper, getRAM)
+}
+
+func GetAvailableSensitiveReferenceDocuments(ctx context.Context, pool *sql.DB) (map[string]any, error) {
+	return getAvailableSensitiveReferenceDocuments(ctx, pool)
+}
+
+// GetSensitiveReferenceDocumentsWithPassword is the MCP-server-facing entry point for the
+// "get_sensitive_reference_document" tool. Unlike getSensitiveReferenceDocuments (which reads
+// the master password from a per-request RAMMasterGetter closure over keystore.SessionMasterStore),
+// the MCP server has no access to that in-process RAM store, so masterPassword is supplied
+// directly — it was resolved in the main server process and passed as a tools/call argument.
+func GetSensitiveReferenceDocumentsWithPassword(ctx context.Context, pool *sql.DB, ids []int64, pepper, masterPassword string) (map[string]any, error) {
+	getRAM := func() (string, bool) { return masterPassword, strings.TrimSpace(masterPassword) != "" }
+	return getSensitiveReferenceDocuments(ctx, pool, ids, pepper, getRAM)
+}
+
+func ListInterviews(ctx context.Context, pool *sql.DB, stateFilter string) (map[string]any, error) {
+	return listInterviewsTool(ctx, pool, stateFilter)
+}
+
+func GetInterview(ctx context.Context, pool *sql.DB, interviewID int64) (map[string]any, error) {
+	return getInterviewTool(ctx, pool, interviewID)
+}
+
+func ListCompleteProfiles(ctx context.Context, pool *sql.DB) (map[string]any, error) {
+	return listCompleteProfilesTool(ctx, pool)
+}
+
+func GetCompleteProfile(ctx context.Context, pool *sql.DB, name string) (map[string]any, error) {
+	return getCompleteProfileTool(ctx, pool, name)
+}
+
+// mcpSecretArgTools names the tools that need a secret (master password / Tavily key) attached
+// to their tools/call arguments. Every other migrated tool only ever gets the non-secret
+// caller-context fields (uid, visitor access) — see NewMCPToolExecutor.
+var mcpSecretArgTools = map[string]bool{
+	"get_reference_document":           true,
+	"get_sensitive_reference_document": true,
+	"search_tavily":                    true,
+}
+
+// NewMCPToolExecutor builds a ToolExecutor that resolves every call, via DefaultMCPRegistry, to
+// whichever registered MCP server currently serves that (possibly namespaced) tool name — the
+// bundled server (cmd/mcpserver) or a user-added additional one (see internal/ai/mcp_registry.go,
+// internal/service/mcp_servers_service.go). There is no local/in-process implementation left to
+// fall back to; every tool lives only in some MCP server.
+//
+// getRAM resolves the RAM session master password locally and tavilyKey is resolved server-side
+// (ChatService.effectiveOpenRouterConfig); both are secrets and are attached to tools/call
+// arguments only when the resolved server is trusted (i.e. it's the bundled server) AND the bare
+// tool name is one of mcpSecretArgTools — never for an additional server, regardless of what a
+// tool there happens to be named, and never logged.
+func NewMCPToolExecutor(getRAM RAMMasterGetter, tavilyKey string) ToolExecutor {
+	return func(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
+		client, bareName, trusted, ok := DefaultMCPRegistry().Resolve(name)
+		if !ok || client == nil {
+			return map[string]any{"error": "tool execution service unavailable: no MCP server registered for this tool"}, nil
+		}
+		callArgs := make(map[string]any, len(args)+7)
+		for k, v := range args {
+			callArgs[k] = v
+		}
+		callArgs[ArgUID] = appctx.UserIDFromCtx(ctx)
+		va := appctx.VisitorAccessFromCtx(ctx)
+		callArgs[ArgVisitorRestricted] = va.Restricted
+		callArgs[ArgVisitorCanMessagesChat] = va.CanMessagesChat
+		callArgs[ArgVisitorCanEmails] = va.CanEmails
+		callArgs[ArgVisitorCanContacts] = va.CanContacts
+		callArgs[ArgVisitorCanRelationships] = va.CanRelationships
+		callArgs[ArgVisitorCanSensitivePriv] = va.CanSensitivePrivate
+		if trusted && mcpSecretArgTools[bareName] {
+			if bareName == "search_tavily" {
+				callArgs[ArgTavilyKey] = tavilyKey
+			} else if getRAM != nil {
+				if pw, ok := getRAM(); ok {
+					callArgs[ArgMasterPassword] = pw
+				}
+			}
+		}
+		result, err := client.CallTool(ctx, bareName, callArgs)
+		if err != nil {
+			return map[string]any{"error": fmt.Sprintf("tool execution service unavailable: %v", err)}, nil
+		}
+		return result, nil
+	}
 }
 
 func searchTavily(tavilyKey, query string) (map[string]any, error) {

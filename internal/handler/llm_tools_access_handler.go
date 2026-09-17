@@ -32,10 +32,11 @@ func (h *LLMToolsAccessHandler) resolveLLMToolsMasterPassword(r *http.Request) s
 	return resolveMasterPassword(r.URL.Query().Get("master_password"), r, h.sessionStore)
 }
 
-// RegisterRoutes mounts GET/PUT /api/settings/llm-tools-access.
+// RegisterRoutes mounts GET/PUT /api/settings/llm-tools-access and the catalog refresh action.
 func (h *LLMToolsAccessHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/settings/llm-tools-access", h.Get)
 	r.Put("/api/settings/llm-tools-access", h.Put)
+	r.Post("/api/settings/llm-tools-access/refresh-catalog", h.RefreshCatalog)
 }
 
 func (h *LLMToolsAccessHandler) masterPassword(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -77,20 +78,45 @@ func (h *LLMToolsAccessHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0)
 	for _, meta := range appai.AllToolMetas() {
-		rule := appai.ToolAccessRule{}
-		if policy != nil {
-			if x, ok := policy[meta.Name]; ok {
-				rule = x
-			}
-		}
+		rule, configured := policy[meta.Name]
 		out = append(out, map[string]any{
 			"name":             meta.Name,
 			"description":      meta.Description,
 			"enabled":          rule.Enabled,
 			"visitor_enabled":  rule.VisitorEnabled,
+			// configured is false for a tool the MCP tools server has newly reported (via
+			// "Refresh Tools") that has no saved policy row yet — distinct from a tool an admin
+			// explicitly saved as disabled, which also renders enabled=false/visitor_enabled=false
+			// but is configured=true. Both are equally denied to the LLM either way (PolicyAllows
+			// treats "no policy row" and "explicitly disabled" the same) — this flag is purely so
+			// the UI can flag what still needs a decision.
+			"configured": configured,
 		})
 	}
 	writeJSON(w, map[string]any{"tools": out})
+}
+
+// RefreshCatalog re-fetches the tool list from every registered MCP server (tools/list — the
+// bundled server plus any additional ones, see internal/ai/mcp_registry.go) and replaces the
+// cached catalog on success. Owner-gated but does not need the master password — the tool
+// catalog (names/descriptions/schemas) is not encrypted policy, just live MCP server metadata.
+func (h *LLMToolsAccessHandler) RefreshCatalog(w http.ResponseWriter, r *http.Request) {
+	if !ArchiveOwnerAuthenticated(r, h.authSvc) {
+		writeError(w, http.StatusForbidden, "owner session required")
+		return
+	}
+	refreshErr := appai.DefaultToolCatalog().Refresh(r.Context())
+	toolCount, lastRefresh, _ := appai.DefaultToolCatalog().Status()
+	resp := map[string]any{
+		"tool_count":   toolCount,
+		"last_refresh": lastRefresh,
+	}
+	if refreshErr != nil {
+		resp["error"] = refreshErr.Error()
+		writeJSON(w, resp)
+		return
+	}
+	writeJSON(w, resp)
 }
 
 // PutBody is the JSON body for saving policy.

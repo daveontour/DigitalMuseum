@@ -2,6 +2,7 @@
 
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog, globalShortcut } = require('electron');
 const { spawn, execFile } = require('child_process');
+const crypto = require('crypto');
 const net = require('net');
 const path = require('path');
 const fs = require('fs');
@@ -20,6 +21,12 @@ let ollamaChatProcess = null;
 let ollamaEmbedProcess = null;
 let activeProfileId = null;
 
+// MCP tools server (cmd/mcpserver) — every AI tool runs here, see CLAUDE.md. Peer process to
+// the Go server and Ollama, managed the same way (spawn, health-poll, shutdown).
+let mcpProcess = null;
+let mcpPort = 8082;
+let mcpAuthToken = null;
+
 // ---------------------------------------------------------------------------
 // Resource path resolution
 // ---------------------------------------------------------------------------
@@ -36,12 +43,14 @@ function getPaths() {
 
   //userData = "C:/Users/dave_/OneDrive/Desktop/digitalmuseum"
   const goExe = path.join(res, 'bin', 'digitalmuseum.exe');
+  const mcpExe = path.join(res, 'bin', 'digitalmuseum-mcp.exe');
   return {
     // Install / project root (contains bin/, static/, templates/). The Go server
     // must run with this as cwd so relative paths like static/data/*.json in
     // cmd/server/main.go resolve correctly — same as cmd/launcher (cmd.Dir = root).
     appRoot:     res,
     goExe,
+    mcpExe,
     templatesDir: path.join(res, 'templates'),
     staticDir:   path.join(res, 'static'),
     userData,
@@ -53,12 +62,21 @@ function getPaths() {
   };
 }
 
-/** Resolve ADMIN_SQLITE_PATH the same way as Go (relative paths vs goExe dir). */
+/** Resolve ADMIN_SQLITE_PATH the same way as Go (relative paths vs goExe dir).
+ *  If the value is a directory, append admin.sqlite (common misconfiguration). */
 function resolveAdminSqlitePath(paths, dotenv) {
   const raw = (dotenv && dotenv.ADMIN_SQLITE_PATH) ? String(dotenv.ADMIN_SQLITE_PATH).trim() : '';
-  if (!raw) return paths.defaultAdminSqlitePath;
-  if (path.isAbsolute(raw)) return path.normalize(raw);
-  return path.normalize(path.join(path.dirname(paths.goExe), raw));
+  let p = !raw
+    ? paths.defaultAdminSqlitePath
+    : (path.isAbsolute(raw) ? path.normalize(raw) : path.normalize(path.join(path.dirname(paths.goExe), raw)));
+  try {
+    if (fs.existsSync(p) && fs.statSync(p).isDirectory()) {
+      p = path.join(p, 'admin.sqlite');
+    } else if (!fs.existsSync(p) && !path.extname(p)) {
+      p = path.join(p, 'admin.sqlite');
+    }
+  } catch (_) { /* keep p */ }
+  return p;
 }
 
 function getAdminDataDir(paths, dotenv) {
@@ -199,7 +217,7 @@ async function findFreePort(preferred = 8080) {
 // HTTP readiness polling
 // ---------------------------------------------------------------------------
 
-async function waitForHealth(port, maxMs = 30000) {
+async function waitForHealth(port, maxMs = 30000, serviceName = 'Go server') {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     try {
@@ -208,7 +226,7 @@ async function waitForHealth(port, maxMs = 30000) {
     } catch (_) { /* not ready yet */ }
     await new Promise(r => setTimeout(r, 300));
   }
-  throw new Error(`Go server did not become healthy within ${maxMs}ms`);
+  throw new Error(`${serviceName} did not become healthy within ${maxMs}ms`);
 }
 
 // ---------------------------------------------------------------------------
@@ -473,8 +491,12 @@ function sendStatus(msg) {
 }
 
 async function killZombies() {
-  return new Promise((resolve) => {
+  await new Promise((resolve) => {
     execFile('taskkill', ['/f', '/im', 'digitalmuseum.exe', '/t'],
+      { windowsHide: true }, () => resolve());
+  });
+  await new Promise((resolve) => {
+    execFile('taskkill', ['/f', '/im', 'digitalmuseum-mcp.exe', '/t'],
       { windowsHide: true }, () => resolve());
   });
 }
@@ -522,6 +544,19 @@ function forceKillDigitalMuseumWindows() {
   });
 }
 
+/** Best-effort: ensures digitalmuseum-mcp.exe is gone (covers shell-wrapped spawns on Windows). */
+function forceKillMcpServerWindows() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve();
+    execFile(
+      'taskkill',
+      ['/f', '/im', 'digitalmuseum-mcp.exe', '/t'],
+      { windowsHide: true },
+      () => resolve(),
+    );
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Go server lifecycle
 // ---------------------------------------------------------------------------
@@ -554,11 +589,16 @@ function startGoServer(port, paths, dotenv) {
     ...dotenv,
     HOST_PORT:             String(port),
     SQLITE_PATH:           '',
-    ADMIN_SQLITE_PATH:   dotenv.ADMIN_SQLITE_PATH || paths.defaultAdminSqlitePath,
+    ADMIN_SQLITE_PATH:   resolveAdminSqlitePath(paths, dotenv),
     TEMPLATES_DIR:         paths.templatesDir,
     ASSET_STATIC_DIR:      paths.staticDir,
     DEPLOYMENT_NATURE:     dotenv.DEPLOYMENT_NATURE  || 'local',
     SESSION_COOKIE_SECURE: 'false',
+    // MCP tools server (cmd/mcpserver) — every AI tool runs there, see CLAUDE.md. Static for
+    // the process lifetime; harmless if the MCP server isn't up yet, since the Go server only
+    // connects lazily on the first tool call / discovery attempt.
+    MCP_SERVER_URL:  `http://127.0.0.1:${mcpPort}/mcp`,
+    MCP_AUTH_TOKEN:  getOrCreateMcpAuthToken(),
   };
   const env = augmentPathWithMingwBin(rawEnv);
 
@@ -651,6 +691,139 @@ function startGoServer(port, paths, dotenv) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// MCP tools server lifecycle (all AI tools — see CLAUDE.md)
+// ---------------------------------------------------------------------------
+
+function getOrCreateMcpAuthToken() {
+  if (!mcpAuthToken) {
+    mcpAuthToken = crypto.randomBytes(32).toString('hex');
+  }
+  return mcpAuthToken;
+}
+
+/**
+ * Spawns bin/digitalmuseum-mcp.exe. sqlitePath must already be resolved (the MCP server,
+ * unlike the Go server, cannot resolve a blank SQLITE_PATH itself — see startMcpServerForArchive).
+ * Also links go-sqlite3/CGO, so it needs the same Windows spawn workarounds as startGoServer.
+ */
+function startMcpServer(port, paths, sqlitePath, pepper, authToken, dotenv) {
+  log(`Starting MCP tools server on port ${port}...`);
+
+  const mcpExeResolved = path.resolve(paths.mcpExe);
+  if (!fs.existsSync(mcpExeResolved)) {
+    log(`MCP server executable not found: ${mcpExeResolved} — run \`make build-mcp-exe\` (dev) or \`make build-mcp-exe-electron\` (installer). Continuing without it; tools will report an error and chat otherwise degrades gracefully.`);
+    return;
+  }
+
+  const env0 = dotenv || {};
+  const rawEnv = {
+    ...process.env,
+    HOST_PORT:       String(port),
+    SQLITE_PATH:     sqlitePath,
+    KEYRING_PEPPER:  pepper || '',
+    MCP_AUTH_TOKEN:  authToken,
+    // search_messages_by_similarity / search_emails_by_similarity call the Ollama embedding
+    // endpoint directly (internal/ai/tools.go toolEmbedText) — this process needs the same
+    // LOCALAI_* config the main Go server gets, since it isn't itself request/session-derived.
+    LOCALAI_BASE_URL:           env0.LOCALAI_BASE_URL || '',
+    LOCALAI_EMBEDDING_BASE_URL: env0.LOCALAI_EMBEDDING_BASE_URL || '',
+    LOCALAI_API_KEY:            env0.LOCALAI_API_KEY || '',
+    LOCALAI_MODEL_NAME:         env0.LOCALAI_MODEL_NAME || '',
+    LOCALAI_EMBEDDING_MODEL:    env0.LOCALAI_EMBEDDING_MODEL || '',
+  };
+  const env = augmentPathWithMingwBin(rawEnv);
+
+  const spawnBase = /** @type {const} */ ({
+    cwd: paths.appRoot,
+    env,
+    windowsHide: true,
+  });
+  const ignore3 = /** @type {const} */ (['ignore', 'ignore', 'ignore']);
+
+  if (process.platform === 'win32') {
+    const attempts = /** @type {const} */ ([
+      ['spawn+ignore', () => spawn(mcpExeResolved, [], { ...spawnBase, stdio: ignore3 })],
+      ['spawn+detached', () => spawn(mcpExeResolved, [], { ...spawnBase, stdio: ignore3, detached: true })],
+      ['execFile', () => execFile(mcpExeResolved, [], { ...spawnBase, stdio: ignore3 })],
+      ['spawn+shell', () => spawn(mcpExeResolved, [], { ...spawnBase, stdio: ignore3, shell: true })],
+    ]);
+    let started = false;
+    for (const [name, fn] of attempts) {
+      try {
+        mcpProcess = fn();
+        log(`MCP server process started (${name})`);
+        started = true;
+        break;
+      } catch (e) {
+        log(`MCP ${name} failed: ${e.code || e.errno || ''} ${e.message}`);
+      }
+    }
+    if (!started) {
+      log('Could not launch digitalmuseum-mcp.exe — chat tools will be unavailable; chat otherwise degrades gracefully.');
+      return;
+    }
+  } else {
+    try {
+      mcpProcess = spawn(mcpExeResolved, [], { ...spawnBase, stdio: ignore3 });
+    } catch (e) {
+      log(`MCP server spawn failed: ${e.message}`);
+      return;
+    }
+  }
+
+  mcpProcess.on('exit', (code, signal) => {
+    log(`MCP server exited (code=${code}, signal=${signal})`);
+  });
+  mcpProcess.on('error', (err) => {
+    log(`MCP server spawn error: ${err.message}`);
+  });
+}
+
+async function stopMcpServer() {
+  if (mcpProcess && !mcpProcess.killed) {
+    mcpProcess.kill('SIGTERM');
+    await new Promise((resolve) => {
+      const t = setTimeout(() => {
+        if (mcpProcess && !mcpProcess.killed) mcpProcess.kill('SIGKILL');
+        resolve();
+      }, 5000);
+      mcpProcess.once('exit', () => { clearTimeout(t); resolve(); });
+    });
+  }
+  mcpProcess = null;
+  await forceKillMcpServerWindows();
+}
+
+/**
+ * (Re)starts the MCP server for whichever archive the Go server currently has open, fetching
+ * the resolved SQLITE_PATH from the Go server's own API (Go resolves a blank SQLITE_PATH to
+ * the active profile's file — the MCP server has no equivalent resolution logic, so it must be
+ * told the concrete path). No-op if the Go server has no resolved path yet (no archive open).
+ */
+async function startMcpServerForCurrentArchive(paths, dotenv) {
+  await stopMcpServer();
+  let resolvedSqlitePath = '';
+  try {
+    const res = await fetch(`http://127.0.0.1:${appPort}/api/resolved-main-sqlite-path`);
+    if (res.ok) {
+      const d = await res.json();
+      resolvedSqlitePath = (d && d.sqlite_path) ? String(d.sqlite_path).trim() : '';
+    }
+  } catch (_) { /* Go server not reachable yet / no-archive mode */ }
+  if (!resolvedSqlitePath) {
+    log('No resolved SQLITE_PATH yet — skipping MCP server start (no archive open).');
+    return;
+  }
+  startMcpServer(mcpPort, paths, resolvedSqlitePath, dotenv.KEYRING_PEPPER, getOrCreateMcpAuthToken(), dotenv);
+  try {
+    await waitForHealth(mcpPort, 15000, 'MCP tools server');
+    log('MCP tools server is healthy');
+  } catch (err) {
+    log(`MCP tools server did not become healthy: ${err.message} — tools will report an error; chat otherwise degrades gracefully.`);
+  }
+}
+
 async function restartGoServer(logLevel) {
   if (goProcess && !goProcess.killed) {
     goProcess.kill('SIGTERM');
@@ -676,6 +849,7 @@ async function restartGoServer(logLevel) {
   if (logLevel) activeDotenv = { ...activeDotenv, LOG_LEVEL: logLevel };
   startGoServer(appPort, paths, activeDotenv);
   await waitForHealth(appPort, 30000);
+  await startMcpServerForCurrentArchive(paths, activeDotenv);
 }
 
 // ---------------------------------------------------------------------------
@@ -847,6 +1021,8 @@ async function shutdown() {
   }
   await forceKillDigitalMuseumWindows();
 
+  await stopMcpServer();
+
   await stopOllamaServer();
 
   log('Shutdown complete');
@@ -883,7 +1059,8 @@ app.whenReady().then(async () => {
   };
   dotenv = {
     ...dotenv,
-    ADMIN_SQLITE_PATH: dotenv.ADMIN_SQLITE_PATH || paths.defaultAdminSqlitePath,
+    // Always pass a file path (never a bare directory) into the Go process.
+    ADMIN_SQLITE_PATH: resolveAdminSqlitePath(paths, dotenv),
   };
   applyResolvedDataPaths(paths, dotenv);
 
@@ -933,6 +1110,9 @@ app.whenReady().then(async () => {
     } catch (_) {
       /* best-effort: keep dotenv SQLITE_PATH */
     }
+
+    sendStatus('Starting MCP tools server...');
+    await startMcpServerForCurrentArchive(paths, activeDotenv);
 
     sendStatus('Ready!');
     createMainWindow(appPort);

@@ -212,7 +212,7 @@ func (p *OpenRouterProvider) GenerateResponse(
 
 	var defs []map[string]any
 	if toolDecls == nil {
-		defs = toolDefinitions()
+		defs = DefaultToolCatalog().Definitions()
 	} else {
 		defs = *toolDecls
 	}
@@ -232,7 +232,6 @@ func (p *OpenRouterProvider) GenerateResponse(
 	funcCallsMade := []map[string]any{}
 	inputTokens := 0
 	outputTokens := 0
-	responseModel := p.modelName
 
 	for iter := 0; iter < maxToolCallIterations; iter++ {
 		body := map[string]any{
@@ -249,7 +248,7 @@ func (p *OpenRouterProvider) GenerateResponse(
 			return GenerateResult{}, fmt.Errorf("openrouter(%s): %w", p.providerKey, err)
 		}
 
-		responseModel = openRouterModelFromResponse(resp, requestModel)
+		responseModel := openRouterModelFromResponse(resp, requestModel)
 		if u, ok := resp["usage"].(map[string]any); ok {
 			if v, ok := u["prompt_tokens"].(float64); ok {
 				inputTokens += int(v)

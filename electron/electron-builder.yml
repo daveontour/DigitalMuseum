@@ -31,6 +31,8 @@ files:
 extraResources:
   - from: ../bin/digitalmuseum.exe
     to: bin/digitalmuseum.exe
+  - from: ../bin/digitalmuseum-mcp.exe
+    to: bin/digitalmuseum-mcp.exe
   - from: ../bin/ImageMagick
     to: bin/ImageMagick
     filter:

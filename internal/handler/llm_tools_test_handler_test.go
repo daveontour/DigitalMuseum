@@ -10,12 +10,49 @@ import (
 	"strings"
 	"testing"
 
+	appai "github.com/daveontour/aimuseum/internal/ai"
 	"github.com/daveontour/aimuseum/internal/appctx"
 	"github.com/daveontour/aimuseum/internal/keystore"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// seedTestToolCatalog seeds the tool catalog (normally populated by discovering the real MCP
+// server, see internal/ai/tool_catalog.go) with just what these tests need, so
+// validateToolTestNames/knownChatToolNames recognize "get_current_time" without a live server.
+func seedTestToolCatalog(t *testing.T) {
+	t.Helper()
+	appai.SeedCatalogForTests([]map[string]any{
+		{
+			"name":        "get_current_time",
+			"description": "Get the current date and time in ISO format.",
+			"parameters":  map[string]any{"type": "object", "properties": map[string]any{}, "required": []string{}},
+		},
+	})
+}
+
+// newFakeMCPServer spins up a minimal MCP server (get_current_time only) over HTTP for tests
+// that actually need to exercise a tool call end-to-end, and points DefaultMCPClient at it.
+func newFakeMCPServer(t *testing.T) {
+	t.Helper()
+	server := mcp.NewServer(&mcp.Implementation{Name: "fake-mcp-test", Version: "0.0.0"}, nil)
+	server.AddTool(&mcp.Tool{
+		Name:        "get_current_time",
+		Description: "test",
+		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}, "required": []string{}},
+	}, func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		result, _ := appai.GetCurrentTime()
+		b, _ := json.Marshal(result)
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(b)}}}, nil
+	})
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	ts := httptest.NewServer(handler)
+	t.Cleanup(ts.Close)
+	appai.SetDefaultMCPClientForTests(appai.NewMCPClient(ts.URL+"/mcp", ""))
+}
+
 func TestValidateToolTestNames(t *testing.T) {
+	seedTestToolCatalog(t)
 	invalid := validateToolTestNames([]string{"get_current_time", "not_a_real_tool"})
 	if len(invalid) != 1 || invalid[0] != "not_a_real_tool" {
 		t.Fatalf("validateToolTestNames() = %v; want [not_a_real_tool]", invalid)
@@ -86,6 +123,7 @@ func masterUnlockedRequest(t *testing.T, store *keystore.SessionMasterStore, met
 }
 
 func TestLLMToolsTestHandler_TestTools_rejectsUnknownTool(t *testing.T) {
+	seedTestToolCatalog(t)
 	store := keystore.NewSessionMasterStore(false)
 	pool := testSQLitePool(t)
 	defer func() { _ = pool.Close() }()
@@ -102,6 +140,8 @@ func TestLLMToolsTestHandler_TestTools_rejectsUnknownTool(t *testing.T) {
 }
 
 func TestLLMToolsTestHandler_TestTools_getCurrentTime(t *testing.T) {
+	seedTestToolCatalog(t)
+	newFakeMCPServer(t)
 	store := keystore.NewSessionMasterStore(false)
 	pool := testSQLitePool(t)
 	defer func() { _ = pool.Close() }()

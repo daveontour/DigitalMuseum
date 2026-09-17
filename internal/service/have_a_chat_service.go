@@ -197,7 +197,7 @@ Your goal is to:
 	userPrompt := sb.String()
 
 	// ── Generate ─────────────────────────────────────────────────────────────
-	executor, toolDecls := s.buildChatTools(ctx, r, subjectName)
+	executor, toolDecls := s.buildChatTools(ctx, r)
 	genReq := appai.GenerateRequest{
 		UserInput:     userPrompt,
 		Temperature:   temperature,

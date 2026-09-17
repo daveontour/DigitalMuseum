@@ -49,7 +49,7 @@ func TestLocalAIRuntimeApply(t *testing.T) {
 	if !rt.CudaCPUOnly() {
 		t.Fatal("expected cuda cpu only")
 	}
-	path := filepath.Join(dir, "Digital Museum", ".env")
+	path := filepath.Join(dir, "digital-museum", ".env")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

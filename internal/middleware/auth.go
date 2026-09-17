@@ -40,6 +40,7 @@ var exemptExact = map[string]bool{
 	"/quiz":                          true,
 	"/profiles":                      true,
 	"/api/resolved-main-sqlite-path": true,
+	"/api/loaded-config":             true,
 	"/api/local-ai/status":           true,
 }
 

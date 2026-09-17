@@ -244,7 +244,7 @@ var quizAllowedTools = map[string]bool{
 // content. onTool (may be nil) is invoked with the tool name just before each allowed
 // call runs, for progress reporting.
 func (s *ChatService) buildQuizToolExecutor(onTool func(toolName string)) appai.ToolExecutor {
-	base := appai.NewToolExecutor(s.pool, "", "", s.pepper, nil)
+	base := appai.NewMCPToolExecutor(nil, "")
 	return func(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
 		if !quizAllowedTools[name] {
 			return map[string]any{"error": "tool not available for quiz generation"}, nil

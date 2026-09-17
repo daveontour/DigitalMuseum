@@ -203,7 +203,7 @@ func (p *LocalAIProvider) GenerateResponse(
 
 	var defs []map[string]any
 	if toolDecls == nil {
-		defs = toolDefinitions()
+		defs = DefaultToolCatalog().Definitions()
 	} else {
 		defs = *toolDecls
 	}

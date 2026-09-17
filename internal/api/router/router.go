@@ -2,6 +2,7 @@
 package router
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -23,8 +24,8 @@ import (
 // The scheduler may be nil if construction fails non-fatally; callers should
 // nil-check before launching its goroutine.
 // When pool is nil (no main archive DB), a minimal router is returned that serves
-// /health, /, /login, /admin, /profiles, /static/*, /api/profiles, and /api/resolved-main-sqlite-path
-// (GET / redirects to /login).
+// /health, /, /login, /admin, /profiles, /static/*, /api/profiles,
+// /api/resolved-main-sqlite-path, and /api/loaded-config (GET / redirects to /login).
 func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *backgroundjobs.Scheduler, error) {
 	r := chi.NewRouter()
 
@@ -42,6 +43,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		// create the first archive before any user archive is opened at startup.
 		r.Get("/health", healthHandler)
 		r.Get("/api/resolved-main-sqlite-path", handler.ResolvedMainSQLitePath(cfg))
+		r.Get("/api/loaded-config", handler.LoadedConfigJSON(cfg))
 
 		billingRepo := repository.NewBillingRepo(billingPool)
 		adminUsersHandler := handler.NewAdminUsersHandler(
@@ -95,6 +97,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	// ── Health check ───────────────────────────────────────────────────────────
 	r.Get("/health", healthHandler)
 	r.Get("/api/resolved-main-sqlite-path", handler.ResolvedMainSQLitePath(cfg))
+	r.Get("/api/loaded-config", handler.LoadedConfigJSON(cfg))
 
 	sessionMasterStore := keystore.NewSessionMasterStore(cfg.Server.SessionCookieSecure)
 
@@ -176,6 +179,17 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	openRouterCatalogSvc := service.NewOpenRouterCatalogService()
 	aiModelsHandler := handler.NewAIModelsHandler(aiModelsSvc, openRouterCatalogSvc)
 	aiModelsHandler.RegisterRoutes(r)
+
+	// ── MCP servers (deployment-wide; every AI tool source, bundled + additional) ──
+	mcpServersRepo := repository.NewMCPServersRepo(pool)
+	mcpServersSvc := service.NewMCPServersService(mcpServersRepo)
+	mcpServersHandler := handler.NewMCPServersHandler(mcpServersSvc, authSvc)
+	mcpServersHandler.RegisterRoutes(r)
+	// Load the current server list into ai.DefaultMCPRegistry() synchronously at startup,
+	// before cmd/server/main.go's discovery goroutine runs — otherwise the first
+	// ToolCatalog.RefreshWithRetry would see the registry's stdlib zero value (falls back to
+	// just the bundled server) instead of whatever additional servers are configured.
+	mcpServersSvc.EnsureRegistryLoaded(context.Background())
 
 	// ── Templated endpoints (GET /, suggestions, JS files) ───────────────────
 	templateHandler := handler.NewTemplateHandler(subjectConfigRepo, userRepo, suggestionsSvc, cfg)
