@@ -140,12 +140,27 @@ func ImportIMessagesFromDirectory(ctx context.Context, storage *importstorage.Me
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	totalConversations := 0
+	var conversationDirs []string
 	for _, entry := range entries {
 		if entry.IsDir() {
-			totalConversations++
+			conversationDirs = append(conversationDirs, entry.Name())
 		}
 	}
+
+	// Normally each immediate subdirectory of directoryPath is one conversation,
+	// with its CSV file(s) directly inside it. If the user instead selected a
+	// single conversation folder (no subdirectories, but CSV files sitting
+	// directly in directoryPath), treat directoryPath itself as that one
+	// conversation rather than reporting zero conversations found.
+	singleConversationMode := false
+	if len(conversationDirs) == 0 {
+		if csvFiles, globErr := filepath.Glob(filepath.Join(directoryPath, "*.csv")); globErr == nil && len(csvFiles) > 0 {
+			singleConversationMode = true
+			conversationDirs = []string{filepath.Base(directoryPath)}
+		}
+	}
+
+	totalConversations := len(conversationDirs)
 
 	stats := &ImportStats{
 		TotalConversations:         totalConversations,
@@ -157,13 +172,6 @@ func ImportIMessagesFromDirectory(ctx context.Context, storage *importstorage.Me
 	var subjectFullNamePtr *string
 	if subjectFullName != "" {
 		subjectFullNamePtr = &subjectFullName
-	}
-
-	var conversationDirs []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			conversationDirs = append(conversationDirs, entry.Name())
-		}
 	}
 
 	numWorkers := runtime.NumCPU()
@@ -197,6 +205,9 @@ func ImportIMessagesFromDirectory(ctx context.Context, storage *importstorage.Me
 				stats.mu.Unlock()
 
 				subdirPath := filepath.Join(directoryPath, conversationName)
+				if singleConversationMode {
+					subdirPath = directoryPath
+				}
 
 				csvFiles, err := filepath.Glob(filepath.Join(subdirPath, "*.csv"))
 				if err != nil {

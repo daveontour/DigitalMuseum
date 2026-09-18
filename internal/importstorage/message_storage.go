@@ -315,13 +315,6 @@ func (s *MessageStorage) SaveMessagesBatch(ctx context.Context, messages []Messa
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	type messageKey struct {
-		chatSession string
-		messageDate time.Time
-		senderID    string
-		msgType     string
-	}
-
 	for i := range messages {
 		if messages[i].MessageData.Type != nil && *messages[i].MessageData.Type == "Outgoing" {
 			messages[i].MessageData.SenderID = &s.subjectFullName
@@ -329,46 +322,62 @@ func (s *MessageStorage) SaveMessagesBatch(ctx context.Context, messages []Messa
 		}
 	}
 
-	existingMap := make(map[messageKey]int64)
-	if len(messages) > 0 {
-		var checkQuery strings.Builder
-		checkQuery.WriteString(`SELECT id, chat_session, message_date, sender_id, type 
-			FROM messages 
-			WHERE (chat_session, message_date, sender_id, type) IN (`)
+	// existingByIndex maps a position in `messages` to the id of a messages
+	// row already in the database that represents the same message, so a
+	// re-import of the same folder updates existing rows instead of
+	// duplicating them.
+	//
+	// The matching runs entirely inside SQL (see lookupExistingMessageIDs)
+	// rather than by scanning message_date back into a Go time.Time and
+	// comparing in Go: messages.message_date is declared TIMESTAMP in the
+	// Postgres-style schema reference, but internal/database's SQLite DDL
+	// translation (pgDDLToSQLite) rewrites a bare TIMESTAMP column to TEXT.
+	// Because of that, the SQLite driver reports the column's declared type
+	// as TEXT, not a date/time type, so scanning it into a *time.Time
+	// destination fails. That failure was being silently swallowed (the
+	// scan error was checked but never logged or acted on), which meant the
+	// "does this message already exist" lookup silently matched nothing —
+	// every message, Incoming or Outgoing, was re-inserted as a duplicate on
+	// every re-import. Doing the comparison in SQL and scanning back only
+	// the integer idx/id columns avoids scanning message_date in Go at all.
+	//
+	// Outgoing messages match on chat_session+message_date only (sender_id
+	// excluded): the loop above rewrites an Outgoing message's sender_id to
+	// the archive owner's *current* Subject Configuration name, which can
+	// change between import runs (e.g. filled in after an initial import),
+	// so it isn't a stable part of the identity. Incoming (and any other
+	// non-Outgoing) messages match on chat_session+message_date+sender_id+type,
+	// since sender_id there comes straight from the CSV (a phone number or
+	// contact id) and is stable across re-imports.
+	existingByIndex := make(map[int]int64, len(messages))
 
-		args := make([]interface{}, 0, len(messages)*4)
-		placeholders := make([]string, 0, len(messages))
-		argIndex := 1
-
-		for _, msg := range messages {
-			if msg.MessageData.ChatSession != nil && msg.MessageData.MessageDate != nil &&
-				msg.MessageData.SenderID != nil && msg.MessageData.Type != nil {
-				placeholders = append(placeholders, fmt.Sprintf("(?%d, ?%d, ?%d, ?%d)",
-					argIndex, argIndex+1, argIndex+2, argIndex+3))
-				args = append(args, *msg.MessageData.ChatSession, *msg.MessageData.MessageDate,
-					*msg.MessageData.SenderID, *msg.MessageData.Type)
-				argIndex += 4
-			}
+	var outgoingLookups, otherLookups []messageLookupRow
+	for i, msg := range messages {
+		if msg.MessageData.ChatSession == nil || msg.MessageData.MessageDate == nil ||
+			msg.MessageData.SenderID == nil || msg.MessageData.Type == nil {
+			continue // reported as an error in the pass below
 		}
-
-		if len(placeholders) > 0 {
-			checkQuery.WriteString(strings.Join(placeholders, ", "))
-			checkQuery.WriteString(")")
-			rows, err := tx.QueryContext(ctx, checkQuery.String(), args...)
-			if err == nil {
-				defer func() { _ = rows.Close() }()
-				for rows.Next() {
-					var id int64
-					var chatSession string
-					var messageDate time.Time
-					var senderID string
-					var msgType string
-					if err := rows.Scan(&id, &chatSession, &messageDate, &senderID, &msgType); err == nil {
-						key := messageKey{chatSession: chatSession, messageDate: messageDate, senderID: senderID, msgType: msgType}
-						existingMap[key] = id
-					}
-				}
-			}
+		lr := messageLookupRow{
+			idx:         i,
+			chatSession: *msg.MessageData.ChatSession,
+			messageDate: *msg.MessageData.MessageDate,
+			senderID:    *msg.MessageData.SenderID,
+			msgType:     *msg.MessageData.Type,
+		}
+		if lr.msgType == "Outgoing" {
+			outgoingLookups = append(outgoingLookups, lr)
+		} else {
+			otherLookups = append(otherLookups, lr)
+		}
+	}
+	if len(outgoingLookups) > 0 {
+		if err := lookupExistingMessageIDs(ctx, tx, outgoingLookups, true, existingByIndex); err != nil {
+			slog.Error("checking for existing outgoing messages", "err", err)
+		}
+	}
+	if len(otherLookups) > 0 {
+		if err := lookupExistingMessageIDs(ctx, tx, otherLookups, false, existingByIndex); err != nil {
+			slog.Error("checking for existing messages", "err", err)
 		}
 	}
 
@@ -378,7 +387,7 @@ func (s *MessageStorage) SaveMessagesBatch(ctx context.Context, messages []Messa
 		id  int64
 	}
 
-	for _, msg := range messages {
+	for i, msg := range messages {
 		if msg.MessageData.ChatSession == nil || msg.MessageData.MessageDate == nil ||
 			msg.MessageData.SenderID == nil || msg.MessageData.Type == nil {
 			result.Errors++
@@ -401,14 +410,7 @@ func (s *MessageStorage) SaveMessagesBatch(ctx context.Context, messages []Messa
 			continue
 		}
 
-		key := messageKey{
-			chatSession: *msg.MessageData.ChatSession,
-			messageDate: *msg.MessageData.MessageDate,
-			senderID:    *msg.MessageData.SenderID,
-			msgType:     *msg.MessageData.Type,
-		}
-
-		if existingID, exists := existingMap[key]; exists {
+		if existingID, exists := existingByIndex[i]; exists {
 			toUpdate = append(toUpdate, struct {
 				msg MessageWithAttachment
 				id  int64
@@ -592,4 +594,90 @@ func (s *MessageStorage) batchUpdateMessages(ctx context.Context, tx *sql.Tx, up
 	}
 
 	return nil
+}
+
+// messageLookupRow is one candidate message to check for an existing match,
+// tagged with its position (idx) in the caller's []MessageWithAttachment
+// slice so a SQL-side match can be reported back without ever scanning
+// message_date into Go — see lookupExistingMessageIDs.
+type messageLookupRow struct {
+	idx         int
+	chatSession string
+	messageDate time.Time
+	senderID    string
+	msgType     string
+}
+
+// lookupExistingMessageIDs finds, for each row, the id of an existing
+// messages row representing the same message, recording row.idx -> id in
+// existingByIndex for each match.
+//
+// The match is expressed as a JOIN against a VALUES(...) CTE and evaluated
+// entirely by SQLite; only the integer idx and id columns are scanned back
+// into Go. This deliberately avoids scanning messages.message_date (a TEXT
+// column — see the comment in SaveMessagesBatch) into a Go time.Time, which
+// is what silently broke this check before: SQLite compares the TEXT value
+// it stored for message_date against the TEXT value it derives from binding
+// the same time.Time as a query parameter, so the comparison itself doesn't
+// depend on how (or whether) Go can scan a TEXT column back into time.Time.
+//
+// When outgoingOnly is true, identity is chat_session+message_date, matched
+// only against existing rows with type = 'Outgoing' (sender_id is excluded
+// — see SaveMessagesBatch). Otherwise identity is
+// chat_session+message_date+sender_id+type.
+func lookupExistingMessageIDs(ctx context.Context, tx *sql.Tx, rows []messageLookupRow, outgoingOnly bool, existingByIndex map[int]int64) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	var q strings.Builder
+	args := make([]interface{}, 0, len(rows)*5)
+	placeholders := make([]string, 0, len(rows))
+
+	if outgoingOnly {
+		q.WriteString(`WITH lookup(idx, chat_session, message_date) AS (VALUES `)
+		for _, r := range rows {
+			placeholders = append(placeholders, "(?, ?, ?)")
+			args = append(args, r.idx, r.chatSession, r.messageDate)
+		}
+		q.WriteString(strings.Join(placeholders, ", "))
+		q.WriteString(`)
+			SELECT lookup.idx, messages.id
+			FROM lookup
+			JOIN messages
+			  ON messages.chat_session = lookup.chat_session
+			 AND messages.message_date = lookup.message_date
+			 AND messages.type = 'Outgoing'`)
+	} else {
+		q.WriteString(`WITH lookup(idx, chat_session, message_date, sender_id, type) AS (VALUES `)
+		for _, r := range rows {
+			placeholders = append(placeholders, "(?, ?, ?, ?, ?)")
+			args = append(args, r.idx, r.chatSession, r.messageDate, r.senderID, r.msgType)
+		}
+		q.WriteString(strings.Join(placeholders, ", "))
+		q.WriteString(`)
+			SELECT lookup.idx, messages.id
+			FROM lookup
+			JOIN messages
+			  ON messages.chat_session = lookup.chat_session
+			 AND messages.message_date = lookup.message_date
+			 AND messages.sender_id    = lookup.sender_id
+			 AND messages.type         = lookup.type`)
+	}
+
+	dbRows, err := tx.QueryContext(ctx, q.String(), args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dbRows.Close() }()
+
+	for dbRows.Next() {
+		var idx int
+		var id int64
+		if err := dbRows.Scan(&idx, &id); err != nil {
+			return err
+		}
+		existingByIndex[idx] = id
+	}
+	return dbRows.Err()
 }
