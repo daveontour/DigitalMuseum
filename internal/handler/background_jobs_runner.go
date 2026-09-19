@@ -8,6 +8,7 @@ import (
 
 	"github.com/daveontour/aimuseum/internal/appctx"
 	"github.com/daveontour/aimuseum/internal/importer"
+	"github.com/daveontour/aimuseum/internal/repository"
 	"github.com/daveontour/aimuseum/internal/service"
 	backgroundjobs "github.com/daveontour/aimuseum/internal/service/background_jobs"
 )
@@ -20,16 +21,36 @@ type backgroundJobsRunner struct {
 	pool         *sql.DB
 	imageSvc     *service.ImageService
 	embeddingSvc *service.EmbeddingService
+
+	faceRepo          *repository.FaceRepo
+	faceSvc           *service.FaceService
+	faceEmbedHelper   *service.FaceEmbeddingHelper
+	recognizerExePath string
 }
 
 // NewBackgroundJobsRunner builds a runner over the existing import-job singletons
 // in this package. pool, imageSvc, and embeddingSvc may be nil — jobs requiring
-// a missing dependency report a clear error from Start().
-func NewBackgroundJobsRunner(pool *sql.DB, imageSvc *service.ImageService, embeddingSvc *service.EmbeddingService) backgroundjobs.JobRunner {
+// a missing dependency report a clear error from Start(). faceRepo, faceSvc, and
+// faceEmbedHelper may likewise be nil (face jobs then report a clear error);
+// recognizerExePath is the path to the bundled facerecognizer binary — it need
+// not exist yet, the detection job reports that clearly instead of running.
+func NewBackgroundJobsRunner(
+	pool *sql.DB,
+	imageSvc *service.ImageService,
+	embeddingSvc *service.EmbeddingService,
+	faceRepo *repository.FaceRepo,
+	faceSvc *service.FaceService,
+	faceEmbedHelper *service.FaceEmbeddingHelper,
+	recognizerExePath string,
+) backgroundjobs.JobRunner {
 	return &backgroundJobsRunner{
-		pool:         pool,
-		imageSvc:     imageSvc,
-		embeddingSvc: embeddingSvc,
+		pool:              pool,
+		imageSvc:          imageSvc,
+		embeddingSvc:      embeddingSvc,
+		faceRepo:          faceRepo,
+		faceSvc:           faceSvc,
+		faceEmbedHelper:   faceEmbedHelper,
+		recognizerExePath: recognizerExePath,
 	}
 }
 
@@ -51,6 +72,10 @@ func (r *backgroundJobsRunner) jobByName(name string) (*importer.ImportJob, bool
 		return messageContextEmbeddingBackfillJob, true
 	case backgroundjobs.JobEmailEmbeddings:
 		return emailEmbeddingBackfillJob, true
+	case backgroundjobs.JobFaceDetection:
+		return faceDetectionJob, true
+	case backgroundjobs.JobFaceClustering:
+		return faceClusteringJob, true
 	}
 	return nil, false
 }
@@ -116,6 +141,10 @@ func (r *backgroundJobsRunner) Start(ctx context.Context, jobName string, uid in
 		return r.startMessageContextEmbeddings(uid)
 	case backgroundjobs.JobEmailEmbeddings:
 		return r.startEmailEmbeddings(uid)
+	case backgroundjobs.JobFaceDetection:
+		return r.startFaceDetection(ctx, uid)
+	case backgroundjobs.JobFaceClustering:
+		return r.startFaceClustering(uid)
 	}
 	return fmt.Errorf("unknown background job %q", jobName)
 }
@@ -234,5 +263,50 @@ func (r *backgroundJobsRunner) startEmailEmbeddings(uid int64) error {
 	})
 	emailEmbeddingBackfillJob.Broadcast("status", map[string]any{"status_line": "Starting email embedding backfill (background scheduler)..."})
 	go runEmailEmbeddingBackfill(r.pool, r.embeddingSvc, emailEmbeddingBackfillJob, uid)
+	return nil
+}
+
+func (r *backgroundJobsRunner) startFaceDetection(ctx context.Context, uid int64) error {
+	if r.pool == nil {
+		return fmt.Errorf("face detection: database not configured")
+	}
+	if r.faceRepo == nil || r.faceEmbedHelper == nil || r.imageSvc == nil {
+		return fmt.Errorf("face detection: face services not configured")
+	}
+	if err := faceDetectionJob.AssertNotRunning(); err != nil {
+		return err
+	}
+	scopedCtx := context.WithValue(ctx, appctx.ContextKeyUserID, uid)
+	ids, err := r.faceRepo.ListImageIDsForFaceDetection(scopedCtx)
+	if err != nil {
+		return fmt.Errorf("face detection: list queued items: %w", err)
+	}
+	faceDetectionJob.Start()
+	faceDetectionJob.UpdateState(map[string]any{
+		"status":      "in_progress",
+		"status_line": fmt.Sprintf("Starting face detection for %d queued photo(s) (background scheduler)...", len(ids)),
+		"total":       len(ids), "processed": 0, "faces_found": 0, "errors": 0,
+	})
+	faceDetectionJob.Broadcast("status", map[string]any{
+		"status_line": fmt.Sprintf("Starting face detection for %d queued photo(s) (background scheduler)...", len(ids)),
+	})
+	go runFaceDetection(r.faceRepo, r.faceEmbedHelper, r.imageSvc, faceDetectionJob, r.recognizerExePath, uid, append([]int64(nil), ids...))
+	return nil
+}
+
+func (r *backgroundJobsRunner) startFaceClustering(uid int64) error {
+	if r.faceSvc == nil {
+		return fmt.Errorf("face clustering: face service not configured")
+	}
+	if err := faceClusteringJob.AssertNotRunning(); err != nil {
+		return err
+	}
+	faceClusteringJob.Start()
+	faceClusteringJob.UpdateState(map[string]any{
+		"status": "in_progress", "status_line": "Starting face clustering (background scheduler)...",
+		"processed": 0, "joined_named": 0, "joined_other": 0, "new_clusters": 0, "errors": 0,
+	})
+	faceClusteringJob.Broadcast("status", map[string]any{"status_line": "Starting face clustering (background scheduler)..."})
+	go runFaceClustering(r.faceSvc, faceClusteringJob, uid)
 	return nil
 }

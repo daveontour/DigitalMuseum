@@ -598,6 +598,7 @@ Modals.NewImageGallery = (() => {
             const filterInputs = [
                 DOM.newImageGalleryTitle,
                 DOM.newImageGalleryTags,
+                DOM.newImageGalleryPerson,
                 DOM.newImageGalleryAuthor,
                 DOM.newImageGallerySource,
                 DOM.newImageGalleryRegionFilter,
@@ -805,6 +806,7 @@ Modals.NewImageGallery = (() => {
         function _resetGallerySearchCriteria() {
             if (DOM.newImageGalleryTitle) DOM.newImageGalleryTitle.value = '';
             if (DOM.newImageGalleryTags) DOM.newImageGalleryTags.value = '';
+            if (DOM.newImageGalleryPerson) DOM.newImageGalleryPerson.value = '';
             if (DOM.newImageGallerySimilarTags) DOM.newImageGallerySimilarTags.value = '';
             if (DOM.newImageGallerySimilarN) DOM.newImageGallerySimilarN.value = '25';
             if (DOM.newImageGalleryAuthor) DOM.newImageGalleryAuthor.value = '';
@@ -944,6 +946,16 @@ Modals.NewImageGallery = (() => {
             await _loadImageData();
         }
 
+        async function openForPerson(name) {
+            const person = (name != null ? String(name).trim() : '');
+            if (!person) return;
+            await open();
+            if (DOM.newImageGalleryPerson) {
+                DOM.newImageGalleryPerson.value = person;
+            }
+            await _loadImageData();
+        }
+
         async function openImagesFromDate(year, month) {
             await open();
             if (DOM.newImageGalleryYearFilter) {
@@ -1027,6 +1039,30 @@ Modals.NewImageGallery = (() => {
                 // Continue without tags datalist if API call fails
             }
 
+            // Setup person datalist — contacts with face photos only
+            try {
+                const contactsResponse = await fetch('/contacts/names?with_faces=1');
+                if (!contactsResponse.ok) {
+                    throw new Error(`Failed to fetch contacts: ${contactsResponse.statusText}`);
+                }
+                const contactsData = await contactsResponse.json();
+                const contacts = contactsData.contacts || [];
+
+                const personDatalist = document.getElementById('new-image-gallery-person-list');
+                if (personDatalist) {
+                    personDatalist.innerHTML = '';
+                    contacts.forEach(c => {
+                        if (!c.name) return;
+                        const option = document.createElement('option');
+                        option.value = c.name;
+                        personDatalist.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading contacts for person filter:', error);
+                // Continue without person datalist if API call fails
+            }
+
             // Setup region filter — distinct regions from archive
             try {
                 const regionResponse = await fetch('/images/regions', { cache: 'no-store' });
@@ -1104,6 +1140,9 @@ Modals.NewImageGallery = (() => {
             }
             if (DOM.newImageGalleryTags && DOM.newImageGalleryTags.value.trim()) {
                 params.append('tags', DOM.newImageGalleryTags.value.trim());
+            }
+            if (DOM.newImageGalleryPerson && DOM.newImageGalleryPerson.value.trim()) {
+                params.append('person', DOM.newImageGalleryPerson.value.trim());
             }
             if (DOM.newImageGalleryAuthor && DOM.newImageGalleryAuthor.value.trim()) {
                 params.append('author', DOM.newImageGalleryAuthor.value.trim());
@@ -1204,6 +1243,7 @@ Modals.NewImageGallery = (() => {
             return (
                 (DOM.newImageGalleryTitle && DOM.newImageGalleryTitle.value.trim()) ||
                 (DOM.newImageGalleryTags && DOM.newImageGalleryTags.value.trim()) ||
+                (DOM.newImageGalleryPerson && DOM.newImageGalleryPerson.value.trim()) ||
                 (DOM.newImageGallerySimilarTags && DOM.newImageGallerySimilarTags.value.trim()) ||
                 (DOM.newImageGalleryAuthor && DOM.newImageGalleryAuthor.value.trim()) ||
                 (DOM.newImageGallerySource && (DOM.newImageGallerySource.value || '').trim()) ||
@@ -1720,7 +1760,7 @@ Modals.NewImageGallery = (() => {
         }
 
 
-        return { init, open, close, openTaggedImages, openImagesFromDate, openPickMode, showSimilarByTagsFromDetail };
+        return { init, open, close, openTaggedImages, openForPerson, openImagesFromDate, openPickMode, showSimilarByTagsFromDetail };
 })();
 
 
@@ -1972,6 +2012,7 @@ Modals.ImageDetailModal = (() => {
             // Set image source
             DOM.newImageGalleryDetailImage.src = `/images/${image.id}?type=metadata&convert_heic_to_jpg=true`;
             DOM.newImageGalleryDetailImage.alt = image.title || 'Image';
+            _loadFaceOverlay(image.id);
             
             // Remove GPS buttons left over from a previously shown image
             _clearGpsActionButtons();
@@ -2182,6 +2223,13 @@ Modals.ImageDetailModal = (() => {
             if (DOM.newImageGallerySaveBtn) {
                 DOM.newImageGallerySaveBtn.disabled = true;
             }
+            if (DOM.newImageGalleryDetailFaceOverlay) {
+                DOM.newImageGalleryDetailFaceOverlay.innerHTML = '';
+                DOM.newImageGalleryDetailFaceOverlay.style.display = '';
+            }
+            if (DOM.newImageGalleryDetailFaceToggleLabel) {
+                DOM.newImageGalleryDetailFaceToggleLabel.style.display = 'none';
+            }
         }
 
         function init() {
@@ -2195,6 +2243,14 @@ Modals.ImageDetailModal = (() => {
                 DOM.newImageGalleryDetailModal.addEventListener('click', (e) => {
                     if (e.target === DOM.newImageGalleryDetailModal) {
                         close();
+                    }
+                });
+            }
+
+            if (DOM.newImageGalleryDetailFaceToggle) {
+                DOM.newImageGalleryDetailFaceToggle.addEventListener('change', (e) => {
+                    if (DOM.newImageGalleryDetailFaceOverlay) {
+                        DOM.newImageGalleryDetailFaceOverlay.style.display = e.target.checked ? '' : 'none';
                     }
                 });
             }
@@ -2279,6 +2335,61 @@ Modals.ImageDetailModal = (() => {
                     e.stopPropagation();
                     await saveChanges();
                 });
+            }
+        }
+
+        // Fetches detected faces for this photo (see internal/handler/face_handler.go's
+        // ListFacesForMediaItem) and renders bounding-box overlays positioned as
+        // percentages of the image-wrap box (see .new-image-gallery-detail-image-wrap
+        // in museum_of.css), which stays sized exactly to the rendered <img> — so
+        // percentage positioning lines up with the image's own pixels responsively,
+        // with no JS resize recalculation needed. Purely informational (no click
+        // interaction) for this first pass.
+        let faceOverlayRequestToken = 0;
+        async function _loadFaceOverlay(mediaItemId) {
+            const container = DOM.newImageGalleryDetailFaceOverlay;
+            if (!container) return;
+            container.innerHTML = '';
+
+            const toggleLabel = DOM.newImageGalleryDetailFaceToggleLabel;
+            const toggle = DOM.newImageGalleryDetailFaceToggle;
+            if (toggleLabel) toggleLabel.style.display = 'none';
+
+            const thisRequest = ++faceOverlayRequestToken;
+            let faces = [];
+            try {
+                const resp = await fetch(`/api/media-items/${mediaItemId}/faces`);
+                if (resp.ok) faces = await resp.json();
+            } catch (err) {
+                console.error('Error loading face overlay:', err);
+            }
+            // A newer open() call started while this fetch was in flight — discard.
+            if (thisRequest !== faceOverlayRequestToken) return;
+
+            (faces || []).forEach(face => {
+                const box = document.createElement('div');
+                box.className = 'face-bbox-overlay';
+                box.style.left = (face.bbox.x * 100) + '%';
+                box.style.top = (face.bbox.y * 100) + '%';
+                box.style.width = (face.bbox.w * 100) + '%';
+                box.style.height = (face.bbox.h * 100) + '%';
+
+                if (face.contact_name) {
+                    const label = document.createElement('span');
+                    label.className = 'face-bbox-label';
+                    label.textContent = face.contact_name;
+                    box.appendChild(label);
+                }
+                container.appendChild(box);
+            });
+
+            // Only show the toggle when there's actually something to hide.
+            if ((faces || []).length > 0) {
+                if (toggle) {
+                    toggle.checked = true;
+                    container.style.display = '';
+                }
+                if (toggleLabel) toggleLabel.style.display = 'flex';
             }
         }
 

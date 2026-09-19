@@ -15,6 +15,7 @@ import (
 	"github.com/daveontour/aimuseum/internal/repository"
 	"github.com/daveontour/aimuseum/internal/service"
 	backgroundjobs "github.com/daveontour/aimuseum/internal/service/background_jobs"
+	"github.com/daveontour/aimuseum/internal/service/facerecognizer"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
@@ -374,9 +375,19 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	llmToolsTestHandler := handler.NewLLMToolsTestHandler(pool, sessionMasterStore, subjectConfigRepo, chatSvc, cfg.Crypto.KeyringPepper, authSvc)
 	llmToolsTestHandler.RegisterRoutes(r)
 
+	// ── Face recognition (detection + clustering; see internal/service/facerecognizer) ──
+	faceRepo := repository.NewFaceRepo(pool)
+	faceEmbedHelper := service.NewFaceEmbeddingHelper(pool)
+	faceSvc := service.NewFaceService(faceRepo, faceEmbedHelper)
+	faceHandler := handler.NewFaceHandler(faceRepo, faceSvc, imageSvc, contactRepo, faceEmbedHelper)
+	faceHandler.RegisterRoutes(r)
+
 	// ── Background jobs scheduler (per-user maintenance jobs) ─────────────────
 	backgroundJobsRepo := repository.NewBackgroundJobRepo(pool)
-	backgroundJobsRunner := handler.NewBackgroundJobsRunner(pool, imageSvc, embeddingSvc)
+	backgroundJobsRunner := handler.NewBackgroundJobsRunner(
+		pool, imageSvc, embeddingSvc,
+		faceRepo, faceSvc, faceEmbedHelper, facerecognizer.DefaultBundledPath(),
+	)
 	backgroundJobsScheduler := backgroundjobs.NewScheduler(backgroundJobsRepo, backgroundJobsRunner, 0)
 	backgroundJobsHandler := handler.NewBackgroundJobsHandler(backgroundJobsRepo, backgroundJobsRunner, backgroundJobsScheduler)
 	backgroundJobsHandler.RegisterRoutes(r)

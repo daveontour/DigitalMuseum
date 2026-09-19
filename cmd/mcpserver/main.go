@@ -225,6 +225,20 @@ func registerTools(server *mcp.Server, pool *sql.DB, pepper string) {
 	}))
 
 	server.AddTool(&mcp.Tool{
+		Name: "find_photos_of_person",
+		Description: "Find photos containing a specific named person, using face recognition results linked to a Contact. " +
+			"Accepts a name (matched against contacts.name and alternative_names) and returns the matching photos' " +
+			"media_item_id, title, and date. Only returns results for people whose detected face(s) have been linked " +
+			"to a Contact by the archive owner — a person not yet named this way will return no results.",
+		InputSchema: objSchema(map[string]any{
+			"name": strProp("Name of the person to search photos for (matches a Contact)"),
+		}, []string{"name"}),
+	}, wrapTool(func(ctx context.Context, args map[string]any) (map[string]any, error) {
+		name, _ := args["name"].(string)
+		return ai.FindPhotosOfPerson(ctx, pool, name)
+	}))
+
+	server.AddTool(&mcp.Tool{
 		Name:        "get_subject_writing_examples",
 		Description: "Get the subject's writing examples from their messages.",
 		InputSchema: objSchema(nil, nil),

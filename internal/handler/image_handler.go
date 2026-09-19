@@ -206,6 +206,9 @@ func (h *ImageHandler) Search(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("author"); v != "" {
 		p.Author = &v
 	}
+	if v := q.Get("person"); v != "" {
+		p.Person = &v
+	}
 	if v := q.Get("tags"); v != "" {
 		p.Tags = &v
 	}

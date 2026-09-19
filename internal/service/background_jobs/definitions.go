@@ -7,6 +7,8 @@ const (
 	JobImageAIClassification    = "image_ai_classification"
 	JobMessageContextEmbeddings = "message_context_embeddings"
 	JobEmailEmbeddings          = "email_embeddings"
+	JobFaceDetection            = "face_detection"
+	JobFaceClustering           = "face_clustering"
 )
 
 // DefaultDefinitions lists every maintenance job surfaced in Configuration > Background Jobs.
@@ -40,5 +42,17 @@ var DefaultDefinitions = []JobDef{
 		Title:                  "Make emails searchable",
 		Description:            "Lets the AI find relevant emails by meaning, not just exact words.",
 		DefaultIntervalSeconds: 600,
+	},
+	{
+		Name:                   JobFaceDetection,
+		Title:                  "Detect faces in photos",
+		Description:            "Finds faces in your photos so you can group them by person and search for someone by name.",
+		DefaultIntervalSeconds: 10 * 60,
+	},
+	{
+		Name:                   JobFaceClustering,
+		Title:                  "Group similar faces",
+		Description:            "Groups newly detected faces with people you've already named, and clusters the rest for you to review.",
+		DefaultIntervalSeconds: 10 * 60,
 	},
 }

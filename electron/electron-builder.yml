@@ -45,6 +45,10 @@ extraResources:
     to: bin/exiftool
     filter:
       - "**/*"
+  - from: ../bin/FaceRecognizer
+    to: bin/FaceRecognizer
+    filter:
+      - "**/*"
   - from: ../templates
     to: templates
     filter:

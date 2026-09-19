@@ -92,6 +92,7 @@ type ImageSearchParams struct {
 	Title            *string
 	Description      *string
 	Author           *string
+	Person           *string // matches a named face-recognition contact (contacts.name / alternative_names)
 	Tags             *string // comma-separated; each tag is OR'd
 	Categories       *string
 	Source           *string // case-insensitive exact

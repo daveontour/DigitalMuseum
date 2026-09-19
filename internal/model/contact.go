@@ -18,6 +18,7 @@ type Contact struct {
 	NumSMS       *int
 	InstagramID  *string
 	NumInstagram *int
+	NumPhotos    int // count of distinct photos this contact appears in (face recognition), never NULL
 }
 
 // ContactDetail is a contact row loaded by id (owner / admin helpers).

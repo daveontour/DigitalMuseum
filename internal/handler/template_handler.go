@@ -214,6 +214,13 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 	} else {
 		extras["static_modals_artefacts_js_cache_bust"] = "0"
 	}
+	// Bust cache for modals-faces.js (People in Photos — actively iterated on; see
+	// museum_of.css's .face-cluster-card-thumb-wrap comment for why this needed adding).
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "modals-faces.js")); err == nil {
+		extras["static_modals_faces_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		extras["static_modals_faces_js_cache_bust"] = "0"
+	}
 	// Bust cache for museum_of.css and images-grid.js (Email Attachments layout lives here).
 	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "css", "museum_of.css")); err == nil {
 		extras["static_museum_css_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())

@@ -1,4 +1,4 @@
-.PHONY: check-go check-golangci-lint build build-exe build-exe-electron build-mcp-exe build-mcp-exe-electron build-mcpquery build-linux build-launcher test generate lint run clean tidy sqlitevec-demo sqlitevec-demo-seed message-search-cli image-tag-sync
+.PHONY: check-go check-golangci-lint build build-exe build-exe-electron build-mcp-exe build-mcp-exe-electron build-mcpquery build-facerecognizer-exe build-facerecognizer-exe-electron build-linux build-launcher test generate lint run clean tidy sqlitevec-demo sqlitevec-demo-seed message-search-cli image-tag-sync
 
 MODULE   := github.com/daveontour/aimuseum
 BINARY   := digitalmuseum
@@ -7,6 +7,8 @@ MCP_BINARY := digitalmuseum-mcp
 MCP_CMD    := ./cmd/mcpserver
 MCPQUERY_BINARY := mcpquery
 MCPQUERY_CMD    := ./cmd/mcpquery
+FACERECOGNIZER_BINARY := facerecognizer
+FACERECOGNIZER_CMD    := ./cmd/facerecognizer
 
 # SQLite uses github.com/mattn/go-sqlite3 (CGO). You need a C compiler on PATH
 # (e.g. MSYS2 mingw-w64 gcc on Windows). CGO_ENABLED=1 is required.
@@ -66,6 +68,20 @@ build-mcp-exe-electron: check-go
 # CGO-on-Windows PE bug (see WINDOWS_STRIP_LDF comment above) makes the binary fail to launch.
 build-mcpquery: check-go
 	go build $(if $(WINDOWS_STRIP_LDF),-ldflags="$(WINDOWS_STRIP_LDF)") -o bin/$(MCPQUERY_BINARY).exe $(MCPQUERY_CMD)
+
+# Bundled face-detection/recognition subprocess (see cmd/facerecognizer and
+# internal/service/facerecognizer). Links onnxruntime_go's CGO bindings, so it hits the
+# same Go 1.25 CGO-on-Windows PE bug as every other binary here — WINDOWS_STRIP_LDF is not
+# optional for this one specifically: an unstripped build was confirmed to fail with
+# "not a valid Win32 application" on this exact toolchain (TDM-GCC/mingw) even though the
+# PE header parses as valid; stripping fixed it. Output goes directly under
+# bin/FaceRecognizer/ (not bin/), matching where internal/service/facerecognizer.DefaultBundledPath
+# looks and where the bundled onnxruntime.dll + models/ are staged (see CLAUDE.md).
+build-facerecognizer-exe: check-go
+	go build $(if $(WINDOWS_STRIP_LDF),-ldflags="$(WINDOWS_STRIP_LDF)") -o bin/FaceRecognizer/$(FACERECOGNIZER_BINARY).exe $(FACERECOGNIZER_CMD)
+
+build-facerecognizer-exe-electron: check-go
+	go build -ldflags="$(strip $(WINDOWS_STRIP_LDF) -H windowsgui)" -o bin/FaceRecognizer/$(FACERECOGNIZER_BINARY).exe $(FACERECOGNIZER_CMD)
 
 build-linux: check-go
 	@hostos="$$(go env GOOS)"; \

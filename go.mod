@@ -10,6 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/modelcontextprotocol/go-sdk v1.7.0
+	github.com/yalue/onnxruntime_go v1.36.0
 	golang.org/x/crypto v0.49.0
 	golang.org/x/image v0.36.0
 	golang.org/x/oauth2 v0.36.0

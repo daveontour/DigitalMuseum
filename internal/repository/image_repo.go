@@ -156,6 +156,23 @@ func (r *ImageRepo) Search(ctx context.Context, p model.ImageSearchParams) ([]*m
 	if p.Author != nil {
 		addLike("author", *p.Author)
 	}
+	if p.Person != nil {
+		// Matches face-recognition results (media_item_faces.contact_id, set
+		// once an owner links a detected-face cluster to a Contact — see
+		// internal/service/face_service.go), against both contacts.name and
+		// contacts.alternative_names — the same LIKE-matching convention as
+		// the find_photos_of_person AI tool (internal/ai/tools.go).
+		conds = append(conds, fmt.Sprintf(`EXISTS (
+			SELECT 1 FROM media_item_faces mif
+			JOIN contacts c ON c.id = mif.contact_id
+			WHERE mif.media_item_id = media_items.id
+			  AND mif.ignored = FALSE
+			  AND (c.name LIKE ?%d OR c.alternative_names LIKE ?%d)
+		)`, n, n+1))
+		pattern := "%" + *p.Person + "%"
+		args = append(args, pattern, pattern)
+		n += 2
+	}
 	if p.Tags != nil {
 		// Each comma-separated tag is OR'd: tag1 OR tag2 OR ...
 		tagList := splitTrim(*p.Tags, ',')

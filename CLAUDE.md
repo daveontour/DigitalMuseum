@@ -125,9 +125,10 @@ target):**
 | `bin/ImageMagick/` | Portable Windows ImageMagick build (needs `magick.exe`) | `internal/import/thumbnails` (thumbnail generation), invoked as the relative command `bin/ImageMagick/magick` from the app's working directory |
 | `bin/Ollama/` | Standalone Windows Ollama build (`ollama.exe`) | The two Ollama daemons Electron spawns — see [Local AI — Ollama / Gemma4](#local-ai--ollama--gemma4) |
 | `bin/exiftool/` | ExifTool's Windows "stand-alone executable" distribution (`exiftool.exe` + its `exiftool_files/` folder) | `internal/imagetagsync` (image tag read/write) |
+| `bin/FaceRecognizer/` | `onnxruntime.dll` (from [microsoft/onnxruntime releases](https://github.com/microsoft/onnxruntime/releases), `onnxruntime-win-x64-*.zip`) + `models/detection.onnx` and `models/recognition.onnx` (from [huggingface.co/immich-app/buffalo_l](https://huggingface.co/immich-app/buffalo_l) — `detection/model.onnx` and `recognition/model.onnx`; these are InsightFace's `buffalo_l` weights, **non-commercial-research-use only** unless separately licensed from InsightFace) | `cmd/facerecognizer` (built by `make build-facerecognizer-exe`, see below) |
 
 `electron/electron-builder.yml`'s `extraResources` bundles both compiled Go `.exe` files, the
-three third-party binary folders above, `templates/`, `static/` (excluding a few local/private
+four third-party binary folders above, `templates/`, `static/` (excluding a few local/private
 data files — `email_classifications.json`, `email_matches.json`, `exclusions.json`,
 `identity_and_health.txt`), and `electron/.env.defaults` (packaged as `.env` — this is the file
 to edit for defaults shipped to end users, **not** the project-root `.env`, which is dev-only and
@@ -656,6 +657,98 @@ columns (type `vector(2560)`) on `emails`, `messages`, `facebook_albums`, and
 `facebook_posts` tables using `sqlite-vec`. Metadata for context-window management is
 tracked in `message_embedding_meta`.
 
+### Facial Recognition
+
+Detects faces in photos, clusters likely-same-person faces, and lets the archive owner link a
+cluster to a `Contact` to name them — from Configuration → Background Jobs (detection/grouping)
+and the **People in Photos** sidebar button (review/naming UI, gallery lightbox bounding-box
+overlay, and the `find_photos_of_person` AI tool). Engine, background jobs, REST API, and
+frontend are all implemented and verified end-to-end against real bundled model files.
+
+**Review/naming REST API (`internal/handler/face_handler.go`, `FaceHandler`):**
+`GET /api/faces/clusters` (optional `?named=true|false`), `GET`/`PATCH /api/faces/clusters/{id}`
+(detail + link-to-contact, propagates to every member face via
+`FaceService.LinkClusterToContact`), `GET /api/faces/clusters/{id}/thumbnail` and
+`GET /api/faces/{id}/crop` (JPEG face crops generated on demand via
+`service.CropFaceJPEG` — ImageMagick `-crop`, same bundled-binary/subprocess pattern as
+`internal/import/thumbnails`, not a stored thumbnail), `PATCH /api/faces/{id}` (move to another
+cluster, or detach — `face_cluster_id: null` — as "not this person"), and
+`GET /api/media-items/{id}/faces` (per-photo face list consumed by the gallery lightbox
+overlay). Gated by `requireVisitorContacts` — the same visitor-tier permission as the Contacts
+API, since linking a face to a named Contact is equivalently sensitive identity information.
+
+**Frontend (`static/js/museum/modals-faces.js`, `Modals.Faces`):** a cluster grid (All/Named/
+Unnamed filter tabs) → cluster detail panel with a contact search-and-link picker (backed by
+`GET /contacts/names`) and live "possible match" suggestion chips for unnamed clusters, plus a
+member-face grid with a "not this person" (detach) control per face. The main photo gallery's
+lightbox (`Modals.ImageDetailModal` in `modals-media.js`) overlays bounding boxes (and linked
+contact names) on the displayed photo, positioned as CSS percentages of a wrapper div sized
+exactly to the rendered `<img>` (`.new-image-gallery-detail-image-wrap`), so overlays track the
+image responsively with no resize-recalculation JS needed.
+
+**AI tool:** `find_photos_of_person` (`internal/ai/tools.go`'s `findPhotosOfPerson` /
+`FindPhotosOfPerson`, registered in `cmd/mcpserver/main.go`) — matches a name against
+`contacts.name`/`alternative_names` and returns photos via `media_item_faces.contact_id`. Like
+every AI tool, denied to every session by default until an admin enables it in Configuration →
+AI Tool Access — a person must actually be named via the review UI before this tool can find
+anything for them.
+
+**Engine (`cmd/facerecognizer`):** a separate bundled subprocess (not linked into
+`digitalmuseum.exe`/`digitalmuseum-mcp.exe`), following the same "external bundled binary"
+principle as ImageMagick/exiftool/Ollama, but as a **long-lived process** rather than
+spawn-per-call: model load is not free like ImageMagick's near-instant startup, so
+`facerecognizer.exe --serve` starts once per background-job batch and stays resident,
+communicating over stdin/stdout via a 4-byte-length-prefixed framing protocol (`ReadFrame`/
+`WriteFrame` in `internal/service/facerecognizer/client.go`, shared by both the Go client and
+`cmd/facerecognizer`'s serve loop, so the wire format can't drift between the two sides).
+
+- Uses [`github.com/yalue/onnxruntime_go`](https://github.com/yalue/onnxruntime_go) (dlopens
+  the bundled `onnxruntime.dll` at runtime rather than static-linking) to run two ONNX models
+  under `bin/FaceRecognizer/models/`: `detection.onnx` (SCRFD face detector, buffalo_l's
+  `det_10g`) and `recognition.onnx` (ArcFace embedder, buffalo_l's `w600k_r50`, 512-d output —
+  see [Building the Installable Package](#building-the-installable-package-electron-installer)
+  for where to obtain these). Both models' actual input/output tensor names/shapes were
+  confirmed by loading them with `GetInputOutputInfo` before writing the decode logic — see the
+  comments atop `cmd/facerecognizer/scrfd.go` and `recognize.go` for the exact names depended on.
+- `cmd/facerecognizer/scrfd.go` implements SCRFD's preprocessing (aspect-preserving letterbox
+  resize to 640×640, top-left padding, bilinear resize), anchor decode (strides 8/16/32, 2
+  anchors/location), and NMS — matching the reference `insightface` `scrfd.py` algorithm.
+- `cmd/facerecognizer/align.go` aligns a detected face to ArcFace's fixed 112×112 landmark
+  template via a closed-form complex-number least-squares similarity transform (mathematically
+  equivalent to `skimage`'s Umeyama-based `SimilarityTransform.estimate` for the non-reflective
+  case, which always holds for face landmarks) and inverse-mapped bilinear sampling — matching
+  `cv2.warpAffine`'s behavior without depending on OpenCV.
+- **Build gotcha (do not skip `-ldflags="-s -w"` for this binary):** an unstripped build was
+  confirmed to fail to launch at all on Windows — `"...is not a valid Win32 application"` /
+  `"not a valid application for this OS platform"` — from every invocation path tested (Bash,
+  PowerShell, `os/exec`), *despite* a structurally valid PE header (correct machine type,
+  correct PE32+ magic), while the exact same code ran fine under `go run`. This is the known
+  Go 1.25 + CGO + Windows PE bug already documented by this Makefile's `WINDOWS_STRIP_LDF`
+  variable (see its comment, and https://go.dev/issue/75121) — `make build-facerecognizer-exe`
+  already applies it; never build this binary with a bare `go build` for a launchable artifact.
+
+**Schema (`internal/database/migrate.go`):** `face_clusters` (one row per believed-same-person
+group; `contact_id` set once a user links it), `media_item_faces` (one row per detected face —
+fractional `bbox_x/y/w/h`, `landmarks` JSON, `embedding_model`, `face_cluster_id`, denormalized
+`contact_id`), `media_items.faces_processed`, and a dedicated `face_embeddings` `sqlite-vec`
+table (**512-d, not the 768-d used by every other embedding table** — added via its own
+`ensureFaceEmbeddingsVecTable` function, deliberately not folded into
+`ensureSQLiteVecEmbeddingTables`'s hardcoded-768-d table list). Embeddings are L2-normalized
+before storage (`NormalizeFaceEmbedding` in `internal/service/face_embedding.go`) so vec0's
+built-in L2 "MATCH" distance behaves like cosine similarity.
+
+**Clustering (`internal/service/face_service.go`):** `decideClusterAssignment` is a pure,
+unit-tested function choosing, per face, whether to auto-join an already-named cluster (tight
+distance threshold), join any existing cluster (looser threshold), or start a new one — greedy/
+streaming, not full pairwise clustering, which is adequate at personal-archive scale.
+
+**Background jobs:** `JobFaceDetection` ("Detect faces in photos") and `JobFaceClustering`
+("Group similar faces"), registered like every other job in
+`internal/service/background_jobs/definitions.go` and dispatched from
+`internal/handler/background_jobs_runner.go` — they appear in Configuration → Background Jobs
+with no extra wiring needed. Face detection reports a clear "face recognition isn't set up yet"
+status (not a crash) if `bin/FaceRecognizer/facerecognizer.exe` isn't staged.
+
 ### Suggestions library (chat sidebar)
 
 - **`GET /api/suggestions`** — [`internal/handler/template_handler.go`](internal/handler/template_handler.go) assembles categories from the deployment-wide `suggestions` SQLite table via [`internal/service/suggestions_service.go`](internal/service/suggestions_service.go), then renders Jinja subject variables from `buildContext` (`owner`, `owners`, `full_name`, `he` / `him` / `his` / `himself`, `owner_gender`, `deployment_nature_local`, image tokens, etc.).
@@ -719,12 +812,12 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `openLocations` | Clicks the Locations sidebar button |
 | `openArtefacts` | Clicks the Artefacts sidebar button |
 | `openIdentityProfile` | Clicks the Identity Profile Wizard sidebar button |
-| `openDataImport` | Clicks the Import & Manage Data sidebar button |
+| `openDataImport` | Opens Data Maintenance on the Data Import tab |
 | `openDataSourcesImport` | Alias of `openDataImport` |
-| `openDataMaintenance` | Clicks the (separate) Data Import/Maintenance sidebar button |
-| `openDataImportImport` | Opens Import & Manage Data on the Import tab |
-| `openDataImportMaintenance` | Opens Import & Manage Data on the Maintenance tab |
-| `openDataImportBackgroundJobs` | Opens Import & Manage Data on the Background Jobs tab |
+| `openDataMaintenance` | Opens Data Maintenance on the Data Maintenance tab |
+| `openDataImportImport` | Opens Data Maintenance on the Data Import tab |
+| `openDataImportMaintenance` | Opens Data Maintenance on the Data Maintenance tab |
+| `openDataImportBackgroundJobs` | Opens Data Maintenance on the Scheduled Jobs tab |
 | `openConfiguration` | Clicks the Configuration sidebar button |
 | `openPreviousResponses` | Clicks the Previous Responses sidebar button |
 | `openSuggestions` | Clicks the Suggestions sidebar button |
@@ -898,6 +991,12 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Embedding service | `internal/service/` (EmbeddingService) |
 | Embedding handler | `internal/handler/embedding_handler.go` |
 | Message similarity handler | `internal/handler/message_similarity_handler.go` |
+| Face recognition subprocess (SCRFD detection + ArcFace embedding) | `cmd/facerecognizer/` |
+| Face recognition Go client + wire protocol | `internal/service/facerecognizer/client.go` |
+| Face detection/clustering data + business logic | `internal/repository/face_repo.go`, `internal/service/face_service.go`, `internal/service/face_embedding.go` |
+| Face detection/clustering background jobs + review/naming REST API | `internal/handler/face_handler.go` |
+| Face crop image generation | `internal/service/face_crop.go` |
+| Frontend People in Photos UI (cluster review/naming) | `static/js/museum/modals-faces.js` |
 | Archive profile handler | `internal/handler/profile_handler.go` |
 | Archive provision service | `internal/service/archive_provision.go` |
 | Config (key-value store) service | `internal/service/config_service.go` |

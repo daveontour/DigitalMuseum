@@ -584,16 +584,13 @@ const App = (() => {
 
     /** Sidebar Import button is only shown after refreshDataImportMasterKeyAccessUI confirms owner master unlock. */
     function isDataImportSidebarMasterUnlockVisible() {
-        const btns = [
-            document.getElementById('data-sources-import-sidebar-btn'),
-            document.getElementById('data-import-sidebar-btn'),
-        ].filter(Boolean);
-        if (!btns.length) return false;
-        return btns.some((btn) => window.getComputedStyle(btn).display !== 'none');
+        const btn = document.getElementById('data-import-sidebar-btn');
+        if (!btn) return false;
+        return window.getComputedStyle(btn).display !== 'none';
     }
 
     function dataImportModalRoots() {
-        return ['data-import-modal', 'data-sources-import-modal']
+        return ['data-import-modal']
             .map((id) => document.getElementById(id))
             .filter(Boolean);
     }
@@ -665,7 +662,6 @@ const App = (() => {
             ]);
             dataImportMasterUnlockedCached = masterOk;
             const sidebarBtns = [
-                document.getElementById('data-sources-import-sidebar-btn'),
                 document.getElementById('data-import-sidebar-btn'),
             ].filter(Boolean);
             const sensitiveSidebarBtn = document.getElementById('sensitive-data-sidebar-btn');
@@ -1733,13 +1729,11 @@ const App = (() => {
         let importModalContentLoadGen = 0;
 
         function showDataImportModalLoading(show) {
-            ['data-import-modal-loading', 'data-sources-import-modal-loading'].forEach((id) => {
-                const loadingEl = document.getElementById(id);
-                if (loadingEl) {
-                    loadingEl.hidden = !show;
-                    loadingEl.style.display = show ? 'flex' : 'none';
-                }
-            });
+            const loadingEl = document.getElementById('data-import-modal-loading');
+            if (loadingEl) {
+                loadingEl.hidden = !show;
+                loadingEl.style.display = show ? 'flex' : 'none';
+            }
             dataImportModalRoots().forEach((modal) => {
                 modal.setAttribute('aria-busy', show ? 'true' : 'false');
             });
@@ -1834,9 +1828,6 @@ const App = (() => {
                 : dataImportModalRoots();
             targets.forEach((modalRoot) => {
                 applyImportModalCounts(modalRoot, d);
-                if (modalRoot.id === 'data-sources-import-modal') {
-                    clearEmbeddingProgress(modalRoot);
-                }
             });
         }
 
@@ -1937,12 +1928,16 @@ const App = (() => {
             });
         }
 
+        function selectDataImportCategoryTab(tabName) {
+            const modal = document.getElementById('data-import-modal');
+            if (!modal || !tabName) return;
+            const strip = modal.querySelector('.data-import-category-tabstrip');
+            const btn = strip && strip.querySelector(`.data-import-category-tab[data-import-category-tab="${tabName}"]`);
+            if (btn) btn.click();
+        }
+
         function reloadVisibleImportModalStats() {
-            const sources = document.getElementById('data-sources-import-modal');
             const maintenance = document.getElementById('data-import-modal');
-            if (sources && sources.style.display !== 'none') {
-                void loadDataImportModalContent({ modalId: 'data-sources-import-modal' });
-            }
             if (maintenance && maintenance.style.display !== 'none') {
                 void loadDataImportModalContent({ modalId: 'data-import-modal' }).then(() => {
                     void loadEmbeddingProgressAsync('data-import-modal');
@@ -1950,30 +1945,26 @@ const App = (() => {
             }
         }
 
-        function openDataMaintenanceModalUI() {
+        function openDataMaintenanceModalUI(initialTab) {
             const modal = document.getElementById('data-import-modal');
             if (!modal) return;
             modal.style.display = 'flex';
             showEmbeddingProgressLoading(modal);
             if (typeof loadControlDefaults === 'function') void loadControlDefaults();
             if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();
+            selectDataImportCategoryTab(initialTab || 'import');
             void loadDataImportModalContent({ modalId: 'data-import-modal' }).then(() => {
                 void loadEmbeddingProgressAsync('data-import-modal');
             });
         }
 
         function openDataSourcesImportModalUI() {
-            const modal = document.getElementById('data-sources-import-modal');
-            if (!modal) return;
-            modal.style.display = 'flex';
+            openDataMaintenanceModalUI('import');
             if (typeof markOnboardingChecklistStepDone === 'function') markOnboardingChecklistStepDone('import_data');
-            if (typeof loadControlDefaults === 'function') void loadControlDefaults();
-            if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();
-            void loadDataImportModalContent({ modalId: 'data-sources-import-modal' });
         }
 
         function openDataImportModalUI() {
-            openDataMaintenanceModalUI();
+            openDataMaintenanceModalUI('import');
         }
 
         async function openDataSourcesImportModalAfterKeyCheck() {
@@ -2452,7 +2443,6 @@ const App = (() => {
         }
 
         function syncDataImportSidebarJobIndicator() {
-            syncOneDataImportSidebarJobIndicator('data-sources-import-sidebar-btn', 'fa-file-import');
             syncOneDataImportSidebarJobIndicator('data-import-sidebar-btn', 'fa-tools');
         }
 
@@ -2517,8 +2507,7 @@ const App = (() => {
         }
 
         function dataImportStatusEls() {
-            const modal = document.getElementById('data-import-modal')
-                || document.getElementById('data-sources-import-modal');
+            const modal = document.getElementById('data-import-modal');
             if (!modal) return { tabsStrip: null, logPre: null, idleWrap: null };
             return {
                 tabsStrip: modal.querySelector('.import-job-tabs-strip'),
@@ -4068,17 +4057,14 @@ const App = (() => {
             tile.addEventListener('click', (e) => {
                 const openModal = tile.getAttribute('data-open-modal');
                 if (openModal) {
-                    if (openModal === 'data-import-modal') {
+                    if (openModal === 'data-import-modal' || openModal === 'data-sources-import-modal') {
                         void (async () => {
                             if (DOM.configPage) DOM.configPage.style.display = 'none';
-                            await openDataImportModalAfterKeyCheck();
-                        })();
-                        return;
-                    }
-                    if (openModal === 'data-sources-import-modal') {
-                        void (async () => {
-                            if (DOM.configPage) DOM.configPage.style.display = 'none';
-                            await openDataSourcesImportModalAfterKeyCheck();
+                            if (openModal === 'data-sources-import-modal') {
+                                await openDataSourcesImportModalAfterKeyCheck();
+                            } else {
+                                await openDataImportModalAfterKeyCheck();
+                            }
                         })();
                         return;
                     }
@@ -4210,7 +4196,6 @@ const App = (() => {
                 }, true);
             }
             bindDataImportTableClicks(document.getElementById('data-import-modal'), { hideDataImportWhenOpeningRefModal: true });
-            bindDataImportTableClicks(document.getElementById('data-sources-import-modal'), { hideDataImportWhenOpeningRefModal: true });
         })();
 
         async function checkInitialImportStatus() {
@@ -4403,6 +4388,13 @@ const App = (() => {
         if (DOM.newImageGallerySidebarBtn) {
             DOM.newImageGallerySidebarBtn.addEventListener('click', () => {
                 void Modals.NewImageGallery.open({ resetCriteriaAndSearch: true });
+            });
+        }
+
+        const peopleInPhotosSidebarBtn = document.getElementById('people-in-photos-sidebar-btn');
+        if (peopleInPhotosSidebarBtn) {
+            peopleInPhotosSidebarBtn.addEventListener('click', () => {
+                Modals.Faces.open();
             });
         }
 
@@ -5041,31 +5033,6 @@ const App = (() => {
             });
         }
 
-        const dataSourcesImportSidebarBtn = document.getElementById('data-sources-import-sidebar-btn');
-        const dataSourcesImportModal = document.getElementById('data-sources-import-modal');
-        const closeDataSourcesImportModalBtn = document.getElementById('close-data-sources-import-modal');
-        if (dataSourcesImportSidebarBtn && dataSourcesImportModal) {
-            dataSourcesImportSidebarBtn.addEventListener('click', () => {
-                if (isDataImportSidebarMasterUnlockVisible()) {
-                    dataImportMasterUnlockedCached = true;
-                    openDataSourcesImportModalUI();
-                    return;
-                }
-                void openDataSourcesImportModalAfterKeyCheck();
-            });
-        }
-        const closeDataSourcesImportModal = () => {
-            if (dataSourcesImportModal) dataSourcesImportModal.style.display = 'none';
-        };
-        if (closeDataSourcesImportModalBtn && dataSourcesImportModal) {
-            closeDataSourcesImportModalBtn.addEventListener('click', closeDataSourcesImportModal);
-        }
-        if (dataSourcesImportModal) {
-            dataSourcesImportModal.addEventListener('click', (e) => {
-                if (e.target === dataSourcesImportModal) closeDataSourcesImportModal();
-            });
-        }
-
         const dataImportSidebarBtn = document.getElementById('data-import-sidebar-btn');
         const dataImportModal = document.getElementById('data-import-modal');
         const closeDataImportModalBtn = document.getElementById('close-data-import-modal');
@@ -5558,8 +5525,15 @@ const App = (() => {
         if (importBtn && !importBtn.dataset.onboardingWired) {
             importBtn.dataset.onboardingWired = '1';
             importBtn.addEventListener('click', () => {
-                const dataImportBtn = document.getElementById('data-sources-import-sidebar-btn');
-                if (dataImportBtn) dataImportBtn.click();
+                const dataImportBtn = document.getElementById('data-import-sidebar-btn');
+                if (dataImportBtn) {
+                    dataImportBtn.click();
+                    setTimeout(() => {
+                        document.querySelector('.data-import-category-tab[data-import-category-tab="import"]')?.click();
+                    }, 120);
+                } else if (typeof openDataSourcesImportModalAfterKeyCheck === 'function') {
+                    void openDataSourcesImportModalAfterKeyCheck();
+                }
             });
         }
 

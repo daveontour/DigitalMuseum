@@ -22,7 +22,7 @@ func NewContactRepo(pool *sql.DB) *ContactRepo {
 
 // ── Contacts ──────────────────────────────────────────────────────────────────
 
-const allowedContactOrderCols = "id name email numemails numsms numwhatsapp numimessages numinstagram numfacebook"
+const allowedContactOrderCols = "id name email numemails numsms numwhatsapp numimessages numinstagram numfacebook numphotos"
 
 // excludeNameLooksLikePhoneOnlySQL matches the intent of PostgreSQL's `name !~ '^[0-9\s+]+$'`
 // without regexp operators: after stripping digits and phone punctuation, the name must still
@@ -57,7 +57,9 @@ type ContactListParams struct {
 func (r *ContactRepo) ListShort(ctx context.Context, p ContactListParams) ([]*model.Contact, int, error) {
 	uid := uidFromCtx(ctx)
 	const cols = `id, name, email, numemails, facebookid, numfacebook, whatsappid,
-		numwhatsapp, imessageid, numimessages, smsid, numsms, instagramid, numinstagram`
+		numwhatsapp, imessageid, numimessages, smsid, numsms, instagramid, numinstagram,
+		(SELECT COUNT(DISTINCT mif.media_item_id) FROM media_item_faces mif
+		 WHERE mif.contact_id = contacts.id AND mif.ignored = FALSE) AS numphotos`
 
 	var args []any
 	var conds []string
@@ -142,7 +144,7 @@ func (r *ContactRepo) ListShort(ctx context.Context, p ContactListParams) ([]*mo
 		if err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.NumEmails,
 			&c.FacebookID, &c.NumFacebook, &c.WhatsAppID, &c.NumWhatsApp,
 			&c.IMessageID, &c.NumIMessages, &c.SMSID, &c.NumSMS,
-			&c.InstagramID, &c.NumInstagram); err != nil {
+			&c.InstagramID, &c.NumInstagram, &c.NumPhotos); err != nil {
 			return nil, 0, err
 		}
 		out = append(out, &c)
@@ -166,6 +168,32 @@ func (r *ContactRepo) ListNames(ctx context.Context) ([]struct {
 	args := []any{}
 	q, args = addUIDFilter(q, args, uid)
 	q += " ORDER BY name"
+	return r.scanContactNames(ctx, q, args)
+}
+
+// ListNamesWithFaces returns contacts that appear on at least one non-ignored
+// detected face (i.e. people who have a face-recognition picture in the archive).
+func (r *ContactRepo) ListNamesWithFaces(ctx context.Context) ([]struct {
+	ID   int64
+	Name string
+}, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT DISTINCT c.id, c.name
+	      FROM contacts c
+	      INNER JOIN media_item_faces mif
+	        ON mif.contact_id = c.id AND mif.ignored = FALSE
+	      WHERE TRIM(c.name) != ''`
+	args := []any{}
+	q, args = addUIDFilterQualified(q, args, uid, "c")
+	q, args = addUIDFilterQualified(q, args, uid, "mif")
+	q += " ORDER BY c.name"
+	return r.scanContactNames(ctx, q, args)
+}
+
+func (r *ContactRepo) scanContactNames(ctx context.Context, q string, args []any) ([]struct {
+	ID   int64
+	Name string
+}, error) {
 	rows, err := r.pool.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -248,6 +276,45 @@ func (r *ContactRepo) GetContact(ctx context.Context, id int64) (*model.ContactD
 		out.AlternativeNames = &s
 	}
 	return &out, nil
+}
+
+// NameExists reports whether a contact with the given name (case-insensitive)
+// already exists for the current user — used by CreateContact's caller to
+// avoid silently creating a duplicate person.
+func (r *ContactRepo) NameExists(ctx context.Context, name string) (bool, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT 1 FROM contacts WHERE LOWER(name) = LOWER(?)`
+	args := []any{name}
+	q, args = addUIDFilterNullableGlobal(q, args, uid)
+	q += " LIMIT 1"
+	var one int
+	err := r.pool.QueryRowContext(ctx, q, args...).Scan(&one)
+	if err != nil {
+		if isNoRows(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("contactNameExists: %w", err)
+	}
+	return true, nil
+}
+
+// CreateContact inserts a new, minimal contact (just a name) — used for
+// flows like linking an unnamed face-recognition cluster to a brand-new
+// person who isn't in Contacts yet (see FaceHandler.PatchCluster). Callers
+// should check NameExists first if they want to avoid creating a duplicate.
+func (r *ContactRepo) CreateContact(ctx context.Context, name string) (*model.ContactDetail, error) {
+	uid := uidFromCtx(ctx)
+	var id int64
+	err := r.pool.QueryRowContext(ctx, `
+		INSERT INTO contacts (name, rel_type, user_id, created_at, updated_at)
+		VALUES (?1, 'unknown', ?2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		RETURNING id`,
+		name, uidVal(uid),
+	).Scan(&id)
+	if err != nil {
+		return nil, fmt.Errorf("createContact: %w", err)
+	}
+	return &model.ContactDetail{ID: id, Name: name}, nil
 }
 
 const maxOwnerContactTokens = 32

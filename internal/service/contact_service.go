@@ -54,6 +54,30 @@ func (s *ContactService) ListNames(ctx context.Context) ([]struct {
 	return s.repo.ListNames(ctx)
 }
 
+// ListNamesWithFaces returns contacts linked to at least one detected face photo.
+func (s *ContactService) ListNamesWithFaces(ctx context.Context) ([]struct {
+	ID   int64
+	Name string
+}, error) {
+	return s.repo.ListNamesWithFaces(ctx)
+}
+
+// CreateContact creates a new, minimal contact (just a name), rejecting a
+// case-insensitive duplicate of an existing name so callers (e.g. naming an
+// unnamed face-recognition cluster) don't accidentally create a second
+// contact for someone already in the list — they should pick the existing
+// one instead.
+func (s *ContactService) CreateContact(ctx context.Context, name string) (*model.ContactDetail, error) {
+	exists, err := s.repo.NameExists(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, fmt.Errorf("conflict:a contact named %q already exists", name)
+	}
+	return s.repo.CreateContact(ctx, name)
+}
+
 func (s *ContactService) Delete(ctx context.Context, id int64) (bool, error) {
 	return s.repo.Delete(ctx, id)
 }

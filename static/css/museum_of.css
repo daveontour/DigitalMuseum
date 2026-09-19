@@ -3966,9 +3966,6 @@ body {
 
 /* Data Import modal: scroll card lists; keep job status footer visible */
 
-#data-sources-import-modal .data-import-sources-panel {
-    display: block;
-}
 #data-import-modal .data-import-modal-body, #data-sources-import-modal .data-import-modal-body {
     padding: 20px;
     flex: 1;
@@ -9320,6 +9317,14 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 
 
 /* New Image Gallery Detail Modal Styles */
+/* Bumped above #face-cluster-detail-modal (z-index 4150) so opening the full
+   image from a face thumbnail in the "People in Photos" review flow renders
+   on top of it rather than behind it — both share the base .modal z-index
+   (2000) otherwise, where document order (not open order) decides stacking. */
+#new-image-gallery-detail-modal.modal {
+    z-index: 4200;
+}
+
 .new-image-gallery-detail-modal-content {
     width: 95vw;
     max-width: 1400px;
@@ -9341,8 +9346,10 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 .new-image-gallery-detail-image-section {
     flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 10px;
     padding: 2em;
     background-color: var(--color-bg-alt);
     overflow: auto;
@@ -11525,6 +11532,14 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 .contacts-email-count-link:hover {
     text-decoration: underline;
 }
+.contacts-photo-count-link {
+    cursor: pointer;
+    color: var(--color-blue);
+    text-decoration: none;
+}
+.contacts-photo-count-link:hover {
+    text-decoration: underline;
+}
 
 /* Reference Documents manage modal — dark panels (reuses config-section markup) */
 #reference-documents-manage-modal .modal-content > div:not(.modal-header) {
@@ -12832,6 +12847,587 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
         width: 100%;
         max-height: 42vh;
         min-height: 180px;
+    }
+}
+
+/* ===== PEOPLE IN PHOTOS (FACE RECOGNITION) MODALS ===== */
+
+.faces-modal-content {
+    max-width: 80vw;
+    width: 80%;
+    max-height: 85vh;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+
+.faces-modal-header {
+    flex-shrink: 0;
+}
+
+.faces-header-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--color-bg-surface);
+    border-bottom: 2px solid rgba(79, 156, 249, 0.4);
+    color: var(--color-text);
+    padding: 12px 18px;
+    border-radius: 8px 8px 0 0;
+}
+
+.faces-header-title-row h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.faces-body-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 18px 0;
+    flex-shrink: 0;
+}
+
+.faces-filter-tabs {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.faces-filter-tab.active {
+    background: var(--color-accent-subtle);
+    color: var(--color-blue);
+    border-color: rgba(79, 156, 249, 0.5);
+}
+
+.faces-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--color-text-muted);
+    gap: 10px;
+}
+
+.faces-empty-state i {
+    font-size: 3rem;
+    color: var(--color-text-light);
+}
+
+.faces-cluster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    align-content: start;
+}
+
+.faces-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 10px 18px;
+    border-top: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.faces-pagination-info {
+    font-size: var(--text-sm);
+    color: var(--color-text-light);
+    min-width: 110px;
+    text-align: center;
+}
+
+.faces-pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.face-cluster-card {
+    position: relative;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    height:120px;
+    background: var(--color-bg-elevated);
+}
+
+.face-cluster-card-ignore-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+.face-cluster-card-ignore-btn:hover {
+    background: rgba(200, 40, 40, 0.85);
+}
+
+.faces-cluster-grid.select-mode .face-cluster-card-ignore-btn {
+    display: none;
+}
+
+.face-cluster-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.face-cluster-card-selected {
+    outline: 3px solid var(--color-primary, #4a90e2);
+    outline-offset: -3px;
+}
+
+.face-cluster-card-select-wrap {
+    display: none;
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 6px;
+    z-index: 2;
+}
+
+.faces-cluster-grid.select-mode .face-cluster-card-select-wrap {
+    display: flex;
+}
+
+.face-cluster-card-select-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--color-primary, #4a90e2);
+}
+
+#faces-select-mode-toggle.active {
+    background: var(--color-primary, #4a90e2);
+    color: #fff;
+}
+
+.faces-min-group-size-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    height: 34px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+}
+
+.faces-min-group-size-input {
+    width: 3.2rem;
+    padding: 2px 4px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-base);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    text-align: center;
+}
+
+.faces-bulk-toolbar {
+    align-items: center;
+    gap: 12px;
+    padding: 8px 18px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.faces-bulk-toolbar-count {
+    font-size: var(--text-sm);
+    color: var(--color-text-light);
+    margin-right: auto;
+}
+
+/* Padding-top aspect-ratio box (not the CSS aspect-ratio property — see the
+   comment in modals-faces.js's _loadClusters): percentage padding is always
+   resolved against the element's own width, so a 100% top padding on a box
+   with no other height forces height == width, reliably, in every browser. */
+.face-cluster-card-thumb-wrap {
+    position: relative;
+    width: 100%;
+    padding-top: 100%;
+    overflow: hidden;
+    background: var(--color-bg-base);
+}
+
+.face-cluster-card-thumb {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.face-cluster-card-body {
+    padding: 8px 10px 10px;
+    text-align: center;
+}
+
+.face-cluster-card-name {
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.face-cluster-card-name.face-cluster-card-unnamed {
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+
+.face-cluster-card-count {
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+/* Cluster detail / naming modal */
+#face-cluster-detail-modal.modal {
+    z-index: 4150;
+}
+
+.face-cluster-detail-content {
+    max-width: 90vw;
+    width: 70%;
+    height: min(85vh, 780px);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.face-cluster-detail-title-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--color-bg-surface);
+    border-bottom: 2px solid rgba(79, 156, 249, 0.4);
+    color: var(--color-text);
+    padding: 14px 18px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.face-cluster-detail-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+}
+
+.face-cluster-naming-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.face-cluster-naming-label {
+    font-weight: 600;
+    color: var(--color-text);
+    flex-shrink: 0;
+}
+
+.face-cluster-contact-picker {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 360px;
+}
+
+.face-cluster-contact-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    margin-top: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.face-cluster-contact-result-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+
+.face-cluster-contact-result-item:hover {
+    background: var(--color-accent-subtle);
+}
+
+.face-cluster-contact-result-item-new {
+    border-top: 1px solid var(--color-border);
+    color: var(--color-primary, #4a90e2);
+    font-weight: 600;
+}
+
+.face-cluster-contact-result-item-new i {
+    margin-right: 6px;
+}
+
+.face-cluster-suggestions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.face-cluster-suggestions-label {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.face-cluster-suggestion-chip {
+    background: var(--color-accent-subtle);
+    color: var(--color-blue);
+    border: 1px solid rgba(79, 156, 249, 0.35);
+    border-radius: 14px;
+    padding: 4px 12px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.face-cluster-suggestion-chip:hover {
+    background: rgba(79, 156, 249, 0.28);
+}
+
+.face-cluster-member-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 18px 0 10px;
+}
+
+.face-cluster-member-heading {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--color-text);
+}
+
+#face-cluster-member-select-mode-toggle.active {
+    background: var(--color-primary, #4a90e2);
+    color: #fff;
+}
+
+.face-cluster-member-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+}
+
+.face-cluster-member-cell {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-base);
+}
+
+.face-cluster-member-cell-clickable {
+    cursor: pointer;
+}
+
+.face-cluster-member-cell-selected {
+    outline: 3px solid var(--color-primary, #4a90e2);
+    outline-offset: -3px;
+}
+
+.face-cluster-member-grid.select-mode .face-cluster-member-detach-btn,
+.face-cluster-member-grid.select-mode .face-cluster-member-ignore-btn {
+    display: none;
+}
+
+.face-cluster-member-select-wrap {
+    display: none;
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 6px;
+    z-index: 2;
+}
+
+.face-cluster-member-grid.select-mode .face-cluster-member-select-wrap {
+    display: flex;
+}
+
+.face-cluster-member-select-checkbox {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: var(--color-primary, #4a90e2);
+}
+
+/* Padding-top aspect-ratio box — see .face-cluster-card-thumb-wrap's comment. */
+.face-cluster-member-thumb-wrap {
+    position: relative;
+    width: 100%;
+    padding-top: 100%;
+}
+
+.face-cluster-member-thumb {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.face-cluster-member-detach-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.face-cluster-member-detach-btn:hover {
+    background: rgba(200, 40, 40, 0.85);
+}
+
+.face-cluster-member-ignore-btn {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.face-cluster-member-ignore-btn:hover {
+    background: rgba(180, 120, 20, 0.9);
+}
+
+/* Lightbox face bounding-box overlay (see modals-media.js) */
+.face-bbox-overlay {
+    position: absolute;
+    border: 2px solid rgba(79, 156, 249, 0.9);
+    border-radius: 4px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+.new-image-gallery-detail-image-wrap {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.face-bbox-overlay-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.face-bbox-label {
+    position: absolute;
+    bottom: -1.6em;
+    left: -2px;
+    background: rgba(15, 23, 42, 0.85);
+    color: #fff;
+    font-size: 0.72rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.face-bbox-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.face-bbox-toggle-label input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--color-primary, #4a90e2);
+}
+
+@media (max-width: 640px) {
+    .face-cluster-detail-content {
+        height: min(92vh, 900px);
+        width: 92vw;
+    }
+    .face-cluster-naming-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .face-cluster-contact-picker {
+        max-width: none;
     }
 }
 

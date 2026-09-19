@@ -36,6 +36,7 @@ func (h *ContactHandler) RegisterRoutes(r chi.Router) {
 	// Contacts
 	r.Get("/contacts/names", h.ListNames)
 	r.Get("/contacts", h.List)
+	r.Post("/contacts", h.Create)
 	r.Post("/contacts/bulk-delete", h.BulkDelete)
 	r.Delete("/contacts/{contact_id}", h.Delete)
 	r.Patch("/contacts/update-classification", h.UpdateClassification)
@@ -159,7 +160,18 @@ func (h *ContactHandler) ListNames(w http.ResponseWriter, r *http.Request) {
 	if !requireVisitorContacts(w, r) {
 		return
 	}
-	names, err := h.svc.ListNames(r.Context())
+	var (
+		names []struct {
+			ID   int64
+			Name string
+		}
+		err error
+	)
+	if r.URL.Query().Get("with_faces") == "1" || strings.EqualFold(r.URL.Query().Get("with_faces"), "true") {
+		names, err = h.svc.ListNamesWithFaces(r.Context())
+	} else {
+		names, err = h.svc.ListNames(r.Context())
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error listing contacts: %s", err))
 		return
@@ -232,9 +244,45 @@ func (h *ContactHandler) List(w http.ResponseWriter, r *http.Request) {
 			"numsms":       c.NumSMS,
 			"instagramid":  c.InstagramID,
 			"numinstagram": c.NumInstagram,
+			"numphotos":    c.NumPhotos,
 		})
 	}
 	writeJSON(w, map[string]any{"contacts": out, "total": total})
+}
+
+// Create creates a new, minimal contact (just a name). Used by the "Unnamed
+// person" face-cluster naming flow to create a brand-new Contact inline when
+// the person isn't already in the list, as well as any other caller that
+// wants a plain new contact. No master-unlock requirement — matches the
+// lower-friction tier the rest of the face review API (PatchCluster et al.)
+// already uses, since this exists to serve that same flow.
+func (h *ContactHandler) Create(w http.ResponseWriter, r *http.Request) {
+	if !requireVisitorContacts(w, r) {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	c, err := h.svc.CreateContact(r.Context(), req.Name)
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "conflict:") {
+			writeError(w, http.StatusConflict, strings.TrimPrefix(err.Error(), "conflict:"))
+			return
+		}
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error creating contact: %s", err))
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, map[string]any{"id": c.ID, "name": c.Name})
 }
 
 func (h *ContactHandler) Delete(w http.ResponseWriter, r *http.Request) {

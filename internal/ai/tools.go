@@ -787,6 +787,64 @@ func getAllMessagesByContact(ctx context.Context, pool *sql.DB, name string) (ma
 	}, nil
 }
 
+// findPhotosOfPerson returns photos containing a specific named person, using
+// face-recognition results (media_item_faces.contact_id, set once an owner
+// links a detected-face cluster to a Contact — see internal/service/face_service.go).
+// Matches name against both contacts.name and contacts.alternative_names, the
+// same LIKE-matching convention as getEmailsByContact/getAllMessagesByContact
+// above (no separate "resolve contact" step exists elsewhere in this codebase).
+func findPhotosOfPerson(ctx context.Context, pool *sql.DB, name string) (map[string]any, error) {
+	pattern := "%" + name + "%"
+	q := `
+		SELECT DISTINCT mi.id, mi.title, mi.year, mi.month, mi.day, c.name
+		FROM media_item_faces f
+		JOIN contacts c ON c.id = f.contact_id
+		JOIN media_items mi ON mi.id = f.media_item_id
+		WHERE (c.name LIKE ? OR c.alternative_names LIKE ?)`
+	args := []any{pattern, pattern}
+	// media_items, contacts, and media_item_faces are each user-scoped tables
+	// joined together here, so the generic toolsUIDFilter (which assumes a
+	// single unqualified `user_id` column) can't be used — qualify explicitly
+	// against mi.user_id, the primary entity being searched for.
+	if uid := appctx.UserIDFromCtx(ctx); uid != 0 {
+		q += " AND mi.user_id = ?"
+		args = append(args, uid)
+	}
+	q += " ORDER BY mi.year DESC, mi.month DESC, mi.day DESC LIMIT 200"
+
+	rows, err := pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return map[string]any{"error": err.Error(), "person_name": name, "photo_count": 0, "photos": []any{}}, nil
+	}
+	defer func() { _ = rows.Close() }()
+
+	var photos []map[string]any
+	for rows.Next() {
+		var id int64
+		var title, contactName *string
+		var year, month, day *int
+		if err := rows.Scan(&id, &title, &year, &month, &day, &contactName); err != nil {
+			continue
+		}
+		photos = append(photos, map[string]any{
+			"media_item_id": id,
+			"title":         strVal(title, ""),
+			"year":          year,
+			"month":         month,
+			"day":           day,
+			"contact_name":  strVal(contactName, ""),
+		})
+	}
+	if photos == nil {
+		photos = []map[string]any{}
+	}
+	return map[string]any{
+		"person_name": name,
+		"photo_count": len(photos),
+		"photos":      photos,
+	}, nil
+}
+
 func getUniqueTagsCount(ctx context.Context, pool *sql.DB) (map[string]any, error) {
 	mediaTags := map[string]struct{}{}
 	q, args := toolsUIDFilter(ctx, `SELECT tags FROM media_items WHERE tags IS NOT NULL AND tags != ''`, nil)
@@ -1349,6 +1407,11 @@ func GetEmailsByContact(ctx context.Context, pool *sql.DB, name string) (map[str
 
 func GetAllMessagesByContact(ctx context.Context, pool *sql.DB, name string) (map[string]any, error) {
 	return getAllMessagesByContact(ctx, pool, name)
+}
+
+// FindPhotosOfPerson is the MCP-facing wrapper for findPhotosOfPerson.
+func FindPhotosOfPerson(ctx context.Context, pool *sql.DB, name string) (map[string]any, error) {
+	return findPhotosOfPerson(ctx, pool, name)
 }
 
 // resolveSubjectName looks up the current tenant's subject_configuration.subject_name directly

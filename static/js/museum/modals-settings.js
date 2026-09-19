@@ -3942,6 +3942,7 @@ Modals.initAll = () => {
         Modals.ConversationManager.init();
         Modals.SubjectConfiguration.init();
         Modals.Artefacts.init();
+        if (Modals.Faces && Modals.Faces.init) Modals.Faces.init();
         Modals.SensitiveData.init();
         Modals.ManageKeys.init();
         if (Modals.LLMToolsAccess && Modals.LLMToolsAccess.init) Modals.LLMToolsAccess.init();

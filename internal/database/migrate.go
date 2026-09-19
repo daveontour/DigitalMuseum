@@ -164,6 +164,7 @@ func schemaDDL() []string {
 			is_referenced      BOOLEAN NOT NULL DEFAULT FALSE,
 			source             VARCHAR(255),
 			source_reference   TEXT,
+			faces_processed    BOOLEAN NOT NULL DEFAULT FALSE,
 			user_id            BIGINT REFERENCES users(id) ON DELETE CASCADE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_items_processed   ON media_items (processed)`,
@@ -173,6 +174,51 @@ func schemaDDL() []string {
 		`CREATE INDEX IF NOT EXISTS idx_media_items_year_month  ON media_items (year, month)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_items_use_by_ai   ON media_items (use_by_ai)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_items_user_id     ON media_items (user_id)`,
+
+		// ── face_clusters ─────────────────────────────────────────────────────
+		// A cluster groups media_item_faces rows believed to be the same person.
+		// representative_face_id deliberately has no FK (it would be circular with
+		// media_item_faces, which references face_clusters); integrity is app-enforced.
+		`CREATE TABLE IF NOT EXISTS face_clusters (
+			id                     SERIAL PRIMARY KEY,
+			contact_id             INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+			representative_face_id INTEGER,
+			face_count             INTEGER NOT NULL DEFAULT 0,
+			created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			user_id                BIGINT REFERENCES users(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_face_clusters_contact_id ON face_clusters (contact_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_face_clusters_user_id    ON face_clusters (user_id)`,
+
+		// ── media_item_faces ──────────────────────────────────────────────────
+		// One row per detected face instance in a photo. bbox_* are fractions (0..1)
+		// of the source image's width/height, so they're resolution-independent.
+		// embedding_model records which recognizer produced the vector in the
+		// face_embeddings vec0 table (see ensureFaceEmbeddingsVecTable), guarding
+		// against silently comparing embeddings across a future model swap.
+		// contact_id is denormalized from face_clusters for fast filtering/joins.
+		`CREATE TABLE IF NOT EXISTS media_item_faces (
+			id                   SERIAL PRIMARY KEY,
+			media_item_id        INTEGER NOT NULL REFERENCES media_items(id) ON DELETE CASCADE,
+			bbox_x               DOUBLE PRECISION NOT NULL,
+			bbox_y               DOUBLE PRECISION NOT NULL,
+			bbox_w               DOUBLE PRECISION NOT NULL,
+			bbox_h               DOUBLE PRECISION NOT NULL,
+			detection_confidence DOUBLE PRECISION,
+			landmarks            TEXT,
+			embedding_model      VARCHAR(100) NOT NULL,
+			face_cluster_id      INTEGER REFERENCES face_clusters(id) ON DELETE SET NULL,
+			contact_id           INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+			ignored              BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			user_id              BIGINT REFERENCES users(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_media_item_faces_media_item_id ON media_item_faces (media_item_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_media_item_faces_cluster_id    ON media_item_faces (face_cluster_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_media_item_faces_contact_id    ON media_item_faces (contact_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_media_item_faces_user_id       ON media_item_faces (user_id)`,
 
 		// ── emails ────────────────────────────────────────────────────────────
 		// Unique constraint scoped per user so different users can hold the same message.
@@ -1071,6 +1117,15 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 	if err := addMediaItemsDayColumn(ctx, db); err != nil {
 		return err
 	}
+	if err := addMediaItemsFacesProcessedColumn(ctx, db); err != nil {
+		return err
+	}
+	if err := addMediaItemFacesIgnoredColumn(ctx, db); err != nil {
+		return err
+	}
+	if err := ensureFaceEmbeddingsVecTable(ctx, db); err != nil {
+		return err
+	}
 	if err := seedReservedUserSlot(ctx, db); err != nil {
 		return err
 	}
@@ -1222,6 +1277,70 @@ func addMediaItemsDayColumn(ctx context.Context, db *sql.DB) error {
 		}
 	}
 	slog.Info("sqlite migration: added media_items.day")
+	return nil
+}
+
+// addMediaItemsFacesProcessedColumn adds media_items.faces_processed for databases
+// created before face recognition was added. Fresh installs already get this column
+// from the canonical media_items CREATE TABLE in schemaDDL().
+func addMediaItemsFacesProcessedColumn(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_items'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master media_items: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	var has int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('media_items') WHERE name = 'faces_processed'`,
+	).Scan(&has); err != nil {
+		return fmt.Errorf("pragma_table_info media_items.faces_processed: %w", err)
+	}
+	if has > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE media_items ADD COLUMN faces_processed INTEGER NOT NULL DEFAULT 0`); err != nil {
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "duplicate column") && !strings.Contains(msg, "already exists") {
+			return fmt.Errorf("add media_items.faces_processed: %w", err)
+		}
+	}
+	slog.Info("sqlite migration: added media_items.faces_processed")
+	return nil
+}
+
+// addMediaItemFacesIgnoredColumn adds media_item_faces.ignored for databases
+// created before "ignore this face" was added. Fresh installs already get
+// this column from the canonical media_item_faces CREATE TABLE in schemaDDL().
+func addMediaItemFacesIgnoredColumn(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_item_faces'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master media_item_faces: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	var has int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('media_item_faces') WHERE name = 'ignored'`,
+	).Scan(&has); err != nil {
+		return fmt.Errorf("pragma_table_info media_item_faces.ignored: %w", err)
+	}
+	if has > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE media_item_faces ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0`); err != nil {
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "duplicate column") && !strings.Contains(msg, "already exists") {
+			return fmt.Errorf("add media_item_faces.ignored: %w", err)
+		}
+	}
+	slog.Info("sqlite migration: added media_item_faces.ignored")
 	return nil
 }
 
@@ -1427,6 +1546,41 @@ func ensureSQLiteVecEmbeddingTables(ctx context.Context, db *sql.DB) error {
 		}
 		slog.Info("sqlite migration: created sqlite-vec table", "table", table, "vec_version", vecVersion)
 	}
+	return nil
+}
+
+// ensureFaceEmbeddingsVecTable creates the face_embeddings sqlite-vec table.
+// It is deliberately separate from ensureSQLiteVecEmbeddingTables, whose table
+// list is hardcoded to float[768] (the local text-embedding model's dimension);
+// face embeddings use a different dimension (512, ArcFace-class recognizer
+// output) and would silently corrupt distance comparisons if stored in one of
+// those tables. rowid = media_item_faces.id (one embedding per face row, no
+// fan-out — unlike message_embeddings, a face embedding never needs to
+// represent more than one row, so int_ids is only ever a single-element array).
+func ensureFaceEmbeddingsVecTable(ctx context.Context, db *sql.DB) error {
+	const table = "face_embeddings"
+	const dims = 512
+
+	var vecVersion string
+	if err := db.QueryRowContext(ctx, `SELECT vec_version()`).Scan(&vecVersion); err != nil {
+		return fmt.Errorf("sqlite-vec not available (vec_version): %w", err)
+	}
+
+	var exists int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table,
+	).Scan(&exists); err != nil {
+		return fmt.Errorf("sqlite_master %s: %w", table, err)
+	}
+	if exists > 0 {
+		return nil
+	}
+
+	stmt := fmt.Sprintf(`CREATE VIRTUAL TABLE %s USING vec0(embedding float[%d], int_ids text)`, table, dims)
+	if _, err := db.ExecContext(ctx, stmt); err != nil {
+		return fmt.Errorf("create vec0 table %s: %w", table, err)
+	}
+	slog.Info("sqlite migration: created sqlite-vec table", "table", table, "vec_version", vecVersion, "dims", dims)
 	return nil
 }
 

@@ -98,6 +98,7 @@ Modals.Contacts = (() => {
                         <td class="contacts-col-count">${renderCountCell(c.numimessages, contactName)}</td>
                         <td class="contacts-col-count">${renderCountCell(c.numinstagram, contactName)}</td>
                         <td class="contacts-col-count">${renderCountCell(c.numfacebook, contactName)}</td>
+                        <td class="contacts-col-count">${renderPhotoCountCell(c.numphotos, contactName)}</td>
                         <td class="contacts-col-actions">${actionBtns}</td>
                     `;
                     DOM.contactsTableBody.appendChild(row);
@@ -190,6 +191,18 @@ Modals.Contacts = (() => {
             return escapeHtml(display);
         }
 
+        // Count of photos this contact appears in (face recognition — see
+        // People in Photos), clickable to open the Images gallery pre-filtered
+        // to that person, same convention as the message/email count cells.
+        function renderPhotoCountCell(value, contactName) {
+            const isClickable = typeof value === 'number' && value > 0;
+            const display = (typeof value === 'number' && value > 0) ? String(value) : '';
+            if (isClickable) {
+                return `<span class="contacts-photo-count-link" data-contact-name="${escapeHtml(contactName || '')}" title="View photos">${display}</span>`;
+            }
+            return escapeHtml(display);
+        }
+
         function onCountCellClick(e) {
             const link = e.target.closest('.contacts-count-link');
             if (link) {
@@ -206,6 +219,15 @@ Modals.Contacts = (() => {
                 if (contactName && Modals.EmailGallery && Modals.EmailGallery.openContact) {
                     Modals.Contacts.close();
                     Modals.EmailGallery.openContact(contactName);
+                }
+                return;
+            }
+            const photoLink = e.target.closest('.contacts-photo-count-link');
+            if (photoLink) {
+                const contactName = photoLink.dataset.contactName;
+                if (contactName && Modals.NewImageGallery && Modals.NewImageGallery.openForPerson) {
+                    Modals.Contacts.close();
+                    Modals.NewImageGallery.openForPerson(contactName);
                 }
             }
         }

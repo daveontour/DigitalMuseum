@@ -20,10 +20,6 @@ const Guide = {
     },
 
     _openDataImportTab(tabName) {
-        if (tabName === 'import') {
-            Guide._clickSidebarButton('data-sources-import-sidebar-btn');
-            return;
-        }
         Guide._clickSidebarButton('data-import-sidebar-btn');
         setTimeout(() => {
             document.querySelector(`.data-import-category-tab[data-import-category-tab="${tabName}"]`)?.click();
@@ -143,10 +139,10 @@ const Guide = {
         openArtefacts: () => Guide._clickSidebarButton('artefacts-sidebar-btn'),
         // Left sidebar — bottom
         openIdentityProfile: () => Guide._clickSidebarButton('identity-profile-wizard-btn'),
-        openDataImport: () => Guide._clickSidebarButton('data-sources-import-sidebar-btn'),
-        openDataSourcesImport: () => Guide._clickSidebarButton('data-sources-import-sidebar-btn'),
-        openDataMaintenance: () => Guide._clickSidebarButton('data-import-sidebar-btn'),
-        // Import & Manage Data — tabs
+        openDataImport: () => Guide._openDataImportTab('import'),
+        openDataSourcesImport: () => Guide._openDataImportTab('import'),
+        openDataMaintenance: () => Guide._openDataImportTab('maintenance'),
+        // Data Maintenance dialog — tabs
         openDataImportImport: () => Guide._openDataImportTab('import'),
         openDataImportMaintenance: () => Guide._openDataImportTab('maintenance'),
         openDataImportBackgroundJobs: () => Guide._openDataImportTab('background-jobs'),
