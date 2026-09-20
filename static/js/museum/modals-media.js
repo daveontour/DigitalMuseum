@@ -2742,8 +2742,22 @@ Modals.SingleImageDisplay = (() => {
             }
 
 
-            // Set the details
-            //DOM.singleImageDetails.innerHTML = `<p>${filename}</p><p>Taken: ${taken}</p><p>Latitude: ${lat}, Longitude: ${long}</p>`;
+            // Set the details — filename/title always, plus taken/lat-long only
+            // when the caller actually has them (most callers pass 0/null for
+            // fields they don't track, so those are skipped rather than shown
+            // as "Taken: 0" / "Latitude: 0, Longitude: 0").
+            if (DOM.singleImageDetails) {
+                DOM.singleImageDetails.innerHTML = '';
+                const addDetailLine = (text) => {
+                    const p = document.createElement('p');
+                    p.textContent = text;
+                    DOM.singleImageDetails.appendChild(p);
+                };
+                if (filename) addDetailLine(filename);
+                if (taken) addDetailLine(`Taken: ${taken}`);
+                if (lat && long) addDetailLine(`Latitude: ${lat}, Longitude: ${long}`);
+                DOM.singleImageDetails.style.display = DOM.singleImageDetails.children.length ? 'block' : 'none';
+            }
 
             // Show the modal
             Modals._openModal(DOM.singleImageModal);

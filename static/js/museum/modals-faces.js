@@ -9,7 +9,6 @@ Modals.Faces = (() => {
     let currentFilter = 'all';       // 'all' | 'named' | 'unnamed'
     let minGroupSize = 1;            // 1 = no filter; >1 = only clusters with at least this many faces
     let currentClusterId = null;
-    let allContactNames = null;      // [{id, name}], loaded lazily and cached for the session
 
     const PAGE_SIZE = 48;            // matches defaultFaceClustersPageSize in face_handler.go
     let currentOffset = 0;
@@ -639,18 +638,21 @@ Modals.Faces = (() => {
         }
     }
 
-    async function _ensureContactNames() {
-        if (allContactNames) return allContactNames;
+    // Fetched fresh on every call rather than cached — a contact can be
+    // created at any time via the Contacts & Relationships dialog (or the
+    // "Add ... as a new person" flow below) while this dialog stays open, and
+    // a stale session-long cache would hide it from the "Link to contact"
+    // search indefinitely (the exact bug this used to have).
+    async function _fetchContactNames() {
         try {
             const resp = await fetch('/contacts/names');
             if (!resp.ok) throw new Error('Failed to load contacts');
             const data = await resp.json();
-            allContactNames = data.contacts || [];
+            return data.contacts || [];
         } catch (err) {
             console.error('Error loading contact names:', err);
-            allContactNames = [];
+            return [];
         }
-        return allContactNames;
     }
 
     async function _onContactInput(evt) {
@@ -662,7 +664,7 @@ Modals.Faces = (() => {
             _hideContactResults();
             return;
         }
-        const names = await _ensureContactNames();
+        const names = await _fetchContactNames();
         const matches = names.filter(c => c.name && c.name.toLowerCase().includes(term)).slice(0, 8);
         const exactMatch = names.some(c => c.name && c.name.toLowerCase() === term);
 
@@ -726,8 +728,8 @@ Modals.Faces = (() => {
     // Creates a brand-new Contact (just a name) and links this cluster to it
     // in one step, for naming an "Unnamed person" who isn't in Contacts yet.
     // Rejected with a 409 if a contact with this name already exists (a race
-    // with another tab, or the cached name list being stale) — the user is
-    // told to search for and pick the existing one instead.
+    // with another tab) — the user is told to search for and pick the
+    // existing one instead.
     async function _createAndLinkContact(name) {
         if (!currentClusterId) return;
         let contact;
@@ -747,9 +749,6 @@ Modals.Faces = (() => {
         } catch (err) {
             console.error('Error creating contact:', err);
             return;
-        }
-        if (allContactNames) {
-            allContactNames.push({ id: contact.id, name: contact.name });
         }
         await _linkContact(contact.id);
     }

@@ -382,6 +382,12 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	faceHandler := handler.NewFaceHandler(faceRepo, faceSvc, imageSvc, contactRepo, faceEmbedHelper)
 	faceHandler.RegisterRoutes(r)
 
+	// ── Filesystem import path-equivalence rules (user-scoped) ────────────────
+	pathEquivalenceRepo := repository.NewPathEquivalenceRepo(pool)
+	pathEquivalenceSvc := service.NewPathEquivalenceService(pathEquivalenceRepo)
+	pathEquivalenceHandler := handler.NewPathEquivalenceHandler(pathEquivalenceSvc)
+	pathEquivalenceHandler.RegisterRoutes(r)
+
 	// ── Background jobs scheduler (per-user maintenance jobs) ─────────────────
 	backgroundJobsRepo := repository.NewBackgroundJobRepo(pool)
 	backgroundJobsRunner := handler.NewBackgroundJobsRunner(

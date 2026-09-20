@@ -3558,29 +3558,92 @@ body {
 }
 
 #config-modal-overlay .contacts-table,
-#config-modal-overlay table.manage-contacts-data-table.contacts-table {
+#config-modal-overlay table.manage-contacts-data-table.contacts-table,
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table {
     color: var(--color-text);
 }
 
 #config-modal-overlay .contacts-table thead th,
-#config-modal-overlay table.manage-contacts-data-table.contacts-table thead th {
+#config-modal-overlay table.manage-contacts-data-table.contacts-table thead th,
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table thead th {
     background: var(--color-bg-surface) !important;
     color: var(--color-text-muted) !important;
 }
 
 #config-modal-overlay .contacts-table tbody td,
-#config-modal-overlay table.manage-contacts-data-table.contacts-table tbody td {
+#config-modal-overlay table.manage-contacts-data-table.contacts-table tbody td,
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table tbody td {
     color: var(--color-text);
     background: transparent;
 }
 
 #config-modal-overlay .contacts-table tbody tr:hover,
-#config-modal-overlay table.manage-contacts-data-table.contacts-table tbody tr:hover {
+#config-modal-overlay table.manage-contacts-data-table.contacts-table tbody tr:hover,
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table tbody tr:hover {
     background: var(--color-bg-hover);
 }
 
 #config-modal-overlay .config-content {
     background: var(--color-bg-alt);
+}
+
+/* Path Equivalences modal — same compact action-button chrome as the
+   Regions/Suggestions/Guide Topics config tables (see that block above). */
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table tbody td:last-child {
+    text-align: center;
+    vertical-align: middle;
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .manage-contacts-actions-cell {
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: nowrap;
+    width: auto;
+    min-height: calc(1.5 * 1.25rem);
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn.modal-btn {
+    padding: 2px 5px;
+    min-width: calc(1.5 * 1.15rem);
+    line-height: 1;
+    font-size: calc(1.5 * 0.65rem);
+    font-weight: 500;
+    vertical-align: middle;
+    margin: 0;
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn i {
+    font-size: 0.85em;
+    vertical-align: -0.06em;
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .path-equivalence-edit-btn.modal-btn {
+    background: rgba(79, 156, 249, 0.18);
+    color: var(--color-blue);
+    border: 1px solid rgba(79, 156, 249, 0.35);
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .path-equivalence-edit-btn.modal-btn:hover {
+    background: rgba(79, 156, 249, 0.28);
+    color: var(--color-blue-dark);
+    border-color: rgba(79, 156, 249, 0.55);
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .path-equivalence-edit-btn.modal-btn i {
+    color: var(--color-blue);
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn {
+    background: rgba(248, 113, 113, 0.10);
+    color: var(--color-danger);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn:hover {
+    background: rgba(248, 113, 113, 0.18);
+    color: var(--color-danger-dark);
+    border-color: rgba(248, 113, 113, 0.40);
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn i {
+    color: var(--color-danger);
+}
+#path-equivalences-modal table.manage-contacts-data-table.contacts-table .manage-contacts-icon-btn--delete.modal-btn:hover i {
+    color: var(--color-danger-dark);
 }
 
 #subject-configuration-tab .subject-config-details-grid {
@@ -14242,12 +14305,17 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
 }
 
 .upload-photos-subfolder-option,
-.upload-photos-overwrite-option {
+.upload-photos-overwrite-option,
+.upload-photos-path-equivalence-option {
     margin-bottom: 16px;
     padding: 12px 14px;
     border-radius: 8px;
     border: 1px solid var(--color-border);
     background: var(--color-bg-base);
+}
+
+.upload-photos-path-equivalence-option .upload-photos-subfolder-hint {
+    padding-left: 0;
 }
 
 .upload-photos-subfolder-label {

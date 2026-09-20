@@ -1941,6 +1941,22 @@
                                         </div>
                                     </div>
                                 </article>
+                                <article class="data-import-card data-import-row" data-import="upload_photos">
+                                    <div class="data-import-card-header">
+                                        <h3 class="data-import-card-title"><i class="fas fa-cloud-upload-alt"></i> Upload Photos from Device</h3>
+                                    </div>
+                                    <div class="data-import-card-metrics-source">
+                                        <span class="data-import-count" data-import-count-key="upload_photos">—</span>
+                                    </div>
+                                    <div class="data-import-card-detail-body" hidden aria-hidden="true"><p>Select a folder of photos and copy them into the archive's database (unlike <strong>Link to Images on Disk</strong>, which only stores the file paths). Options let you include or skip nested subfolders and choose whether already-imported photos are skipped or overwritten.</p><p>Use <strong>Manage Path Equivalences</strong> inside this dialog if you've moved a photo folder to a different drive or path, so it's recognized as the same location and already-imported photos aren't duplicated.</p><p><strong>Clear Data</strong> on the <strong>Link to Images on Disk</strong> card above also removes photos uploaded here (both share the same filesystem-sourced library).</p></div>
+                                    <div class="data-import-actions-td">
+                                        <div class="data-import-card-actions-row">
+                                            <div class="data-import-action-group">
+                                                <button id="data-import-open-upload-photos-modal-btn" type="button" class="modal-btn modal-btn-primary data-import-open-modal-btn" data-open-modal="upload-photos-modal"><i class="fas fa-cloud-upload-alt"></i> Upload</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
                                 <article class="data-import-card data-import-row" data-import="reference_modal">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-book"></i> Import and Manage Reference Documents</h3>
@@ -4002,6 +4018,12 @@
                         </label>
                         <p class="upload-photos-subfolder-hint">When unchecked, images that already exist (same relative path as a previous upload) are skipped.</p>
                     </div>
+                    <div class="upload-photos-path-equivalence-option">
+                        <button type="button" class="modal-btn modal-btn-secondary" id="upload-photos-manage-path-equivalences-btn">
+                            <i class="fas fa-code-branch"></i> Manage Path Equivalences
+                        </button>
+                        <p class="upload-photos-subfolder-hint">If you've moved a photo folder to a different drive or path, add a rule here so it's recognized as the same location — already-imported photos won't be duplicated when you re-import from the new path.</p>
+                    </div>
                     <div id="upload-photos-progress-wrap" style="display: none;">
                         <div class="upload-import-label" style="margin-bottom: 6px;" id="upload-photos-progress-label">Uploading…</div>
                         <div class="upload-import-progress-bar-track">
@@ -4015,6 +4037,71 @@
                     <button type="button" class="modal-btn modal-btn-secondary" id="upload-photos-cancel-btn">Cancel</button>
                     <button type="button" class="modal-btn modal-btn-secondary" id="upload-photos-background-btn" style="display: none;"><i class="fas fa-window-minimize" style="margin-right: 6px;"></i>Run in Background</button>
                     <button type="button" class="modal-btn modal-btn-primary" id="upload-photos-start-btn"><i class="fas fa-upload"></i> Upload Photos</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Path Equivalences Modal (filesystem import dedup across moved drives/folders) -->
+        <div id="path-equivalences-modal" class="modal" style="display: none; z-index: 4110;">
+            <div class="modal-content" style="max-width: 640px; width: 92vw; padding: 0; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-code-branch"></i> Path Equivalences</h2>
+                    <button class="modal-close-btn" id="close-path-equivalences-modal">&times;</button>
+                </div>
+                <div style="padding: 20px; overflow-y: auto; flex: 1;">
+                    <p style="margin: 0 0 16px 0; font-size: var(--text-md); color: #64748b; line-height: 1.5;">
+                        Rules here tell Filesystem Import that two folder paths are the same location — e.g. after
+                        moving photos to a new drive letter. A rule applies at any depth, so photos already imported
+                        from one path won't be re-imported when found under the equivalent path.
+                    </p>
+                    <div id="path-equivalences-loading" style="color: var(--color-text-muted);">Loading…</div>
+                    <div id="path-equivalences-empty" style="display:none; color: var(--color-text-muted); padding: 12px 0;">No path equivalence rules yet.</div>
+                    <table id="path-equivalences-table" class="manage-contacts-data-table contacts-table" style="width:100%; display:none;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">Path A</th>
+                                <th style="text-align:left;">Path B</th>
+                                <th style="width:90px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="path-equivalences-tbody"></tbody>
+                    </table>
+                </div>
+                <div style="padding: 12px 20px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; flex-shrink: 0; background: var(--color-bg-base);">
+                    <button type="button" class="modal-btn modal-btn-primary" id="path-equivalences-add-btn">
+                        <i class="fas fa-plus"></i> Add Rule
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Path Equivalence Edit Modal -->
+        <div id="path-equivalence-edit-modal" class="modal" style="display: none; z-index: 4120;">
+            <div class="modal-content" style="max-width: 520px; width: 92vw;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-code-branch"></i> <span id="path-equivalence-edit-title">Add Rule</span></h2>
+                    <button type="button" class="modal-close-btn" id="path-equivalence-edit-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="path-equivalence-edit-error" style="display: none; padding: 0.5rem; margin-bottom: 0.5rem; background: rgba(248,113,113,0.12); border: 1px solid var(--color-danger); border-radius: 4px; color: var(--color-danger);"></div>
+                    <div class="setting-group">
+                        <label for="path-equivalence-edit-path-a" class="artefact-field-label">Path A</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="path-equivalence-edit-path-a" class="form-control" placeholder="C:\NonOneDrive\iCloud Sorted" style="flex:1;">
+                            <button type="button" class="modal-btn modal-btn-secondary" id="path-equivalence-edit-browse-a">Browse…</button>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="path-equivalence-edit-path-b" class="artefact-field-label">Path B</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="path-equivalence-edit-path-b" class="form-control" placeholder="D:\NonOneDrive\iCloud Sorted" style="flex:1;">
+                            <button type="button" class="modal-btn modal-btn-secondary" id="path-equivalence-edit-browse-b">Browse…</button>
+                        </div>
+                    </div>
+                </div>
+                <div style="padding: 12px 20px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="modal-btn modal-btn-secondary" id="path-equivalence-edit-cancel">Cancel</button>
+                    <button type="button" class="modal-btn modal-btn-primary" id="path-equivalence-edit-save">Save</button>
                 </div>
             </div>
         </div>
@@ -4878,6 +4965,7 @@
     <script src="/static/js/museum/have-a-chat.js" defer></script>
     <script src="/static/js/museum/auth.js" defer></script>
     <script src="/static/js/museum/upload-import.js" defer></script>
+    <script src="/static/js/museum/modals-path-equivalences.js" defer></script>
     <script src="/static/js/museum/images-grid.js?v={{ static_images_grid_js_cache_bust }}" defer></script>
     <script>
     window.__uploadImportSelectedPath = '';

@@ -72,6 +72,44 @@ func (s *ImageStorage) LoadFilesystemSourceRefSet(ctx context.Context) (map[stri
 	return out, rows.Err()
 }
 
+// PathEquivalenceRule is one user-defined "these two directories are the same
+// content" rule (see filesystem_path_equivalences) — e.g. after moving a
+// photo tree from one drive letter to another, so a re-import against the
+// new location doesn't duplicate files already imported from the old one.
+type PathEquivalenceRule struct {
+	PathA string
+	PathB string
+}
+
+// LoadPathEquivalenceRules returns every path-equivalence rule for the
+// current user (or every rule, for an unauthenticated/single-tenant caller).
+// Used once per filesystem import run, alongside LoadFilesystemSourceRefSet.
+func (s *ImageStorage) LoadPathEquivalenceRules(ctx context.Context) ([]PathEquivalenceRule, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT path_a, path_b FROM filesystem_path_equivalences`
+	args := []any{}
+	if uid > 0 {
+		q += ` WHERE user_id = ?1`
+		args = append(args, uid)
+	}
+
+	rows, err := s.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("load path equivalence rules: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []PathEquivalenceRule
+	for rows.Next() {
+		var rule PathEquivalenceRule
+		if err := rows.Scan(&rule.PathA, &rule.PathB); err != nil {
+			return nil, fmt.Errorf("scan path equivalence rule: %w", err)
+		}
+		out = append(out, rule)
+	}
+	return out, rows.Err()
+}
+
 func resolveMediaItemCreatedAt(sourceRef string, fileCreatedAt time.Time) time.Time {
 	if !fileCreatedAt.IsZero() {
 		return fileCreatedAt

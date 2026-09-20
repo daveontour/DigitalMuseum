@@ -892,6 +892,17 @@ func schemaDDL() []string {
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_mcp_servers_name ON mcp_servers (name)`,
 		`CREATE INDEX IF NOT EXISTS idx_mcp_servers_sort ON mcp_servers (sort_order, id)`,
+
+		// ── Filesystem path equivalences (user-scoped; import dedup across moved drives/folders) ──
+		`CREATE TABLE IF NOT EXISTS filesystem_path_equivalences (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			path_a     TEXT NOT NULL,
+			path_b     TEXT NOT NULL,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_filesystem_path_equivalences_user_id ON filesystem_path_equivalences (user_id)`,
 	}
 }
 

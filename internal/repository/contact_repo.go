@@ -156,15 +156,19 @@ func (r *ContactRepo) ListShort(ctx context.Context, p ContactListParams) ([]*mo
 	return out, total, nil
 }
 
-// ListNames returns all contacts as (id, name) pairs for the light endpoint.
+// ListNames returns all contacts as (id, name) pairs for the light endpoint —
+// every named contact, not just ones with message/email history: this backs
+// several "pick any contact" pickers (linking a face-recognition cluster,
+// selecting contacts for a Profile) where a contact legitimately has zero
+// messages (e.g. one created solely to name a face). Only excludes
+// phone-number-only names, same as the Contacts table's optional filter.
 func (r *ContactRepo) ListNames(ctx context.Context) ([]struct {
 	ID   int64
 	Name string
 }, error) {
 	uid := uidFromCtx(ctx)
 	q := `SELECT id, name FROM contacts
-	      WHERE (` + excludeNameLooksLikePhoneOnlySQL() + `)
-	        AND (COALESCE(numemails,0)+COALESCE(numfacebook,0)+COALESCE(numwhatsapp,0)+COALESCE(numsms,0)+COALESCE(numimessages,0)+COALESCE(numinstagram,0)) > 0`
+	      WHERE (` + excludeNameLooksLikePhoneOnlySQL() + `)`
 	args := []any{}
 	q, args = addUIDFilter(q, args, uid)
 	q += " ORDER BY name"

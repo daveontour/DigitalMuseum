@@ -112,7 +112,15 @@ type imageWork struct {
 	Name     string
 }
 
-// ImportImagesFromDirectories imports images from one or more directory trees
+// ImportImagesFromDirectories imports images from one or more directory trees.
+//
+// Note on path-equivalence rules (see ExpandEquivalentPaths): they only apply
+// to the skip-existing check below (overwriteExisting=false, the default —
+// "don't re-import what I already have"). The separate exact-match check
+// inside storage.SaveImage/SaveImagesBatch (used when overwriteExisting=true,
+// to decide insert-vs-update) is not equivalence-aware — that's a narrower
+// "refresh metadata of a known file" flow, not the duplicate-import problem
+// these rules solve.
 func ImportImagesFromDirectories(
 	ctx context.Context,
 	storage *importstorage.ImageStorage,
@@ -194,12 +202,18 @@ func ImportImagesFromDirectories(
 	}
 
 	var existingRefs map[string]struct{}
+	var equivalenceRules []importstorage.PathEquivalenceRule
 	if !overwriteExisting {
 		var err error
 		existingRefs, err = storage.LoadFilesystemSourceRefSet(ctx)
 		if err != nil {
 			return nil, err
 		}
+		rawRules, err := storage.LoadPathEquivalenceRules(ctx)
+		if err != nil {
+			return nil, err
+		}
+		equivalenceRules = CleanPathEquivalenceRules(rawRules)
 	}
 
 	// Single writer: SQLite uses one connection; parallel batch commits contend on the DB lock.
@@ -273,7 +287,14 @@ func ImportImagesFromDirectories(
 				absPath, _ := filepath.Abs(work.Path)
 
 				if existingRefs != nil {
-					if _, ok := existingRefs[absPath]; ok {
+					skip := false
+					for _, candidate := range ExpandEquivalentPaths(absPath, equivalenceRules) {
+						if _, ok := existingRefs[candidate]; ok {
+							skip = true
+							break
+						}
+					}
+					if skip {
 						continue
 					}
 				}
