@@ -1,24 +1,30 @@
 /**
  * People in Photos (Face Recognition) Modal
  * Browse face clusters detected by the "Detect faces in photos" background job,
- * link a cluster to a Contact to name it, review member photos, and detach a
- * face that was grouped wrong ("not this person").
+ * link a cluster to a Contact to name it, review member photos, detach a face
+ * that was grouped wrong ("not this person"), ignore a single bad detection,
+ * or ignore an entire person (cluster) so they stop being tracked in every
+ * photo they appear in.
  */
 
 Modals.Faces = (() => {
-    let currentFilter = 'all';       // 'all' | 'named' | 'unnamed'
+    let currentFilter = 'all';       // 'all' | 'named' | 'unnamed' | 'suggested'
+    let clustersRequestToken = 0;    // bumped per _loadClusters call; stale responses are dropped
     let minGroupSize = 1;            // 1 = no filter; >1 = only clusters with at least this many faces
+    let maxGroupSize = 0;            // 0 = no filter; >0 = only clusters with at most this many faces
+    let contactNameFilter = '';      // '' = no filter; only applies (and only shown) when currentFilter === 'named'
     let currentClusterId = null;
 
-    const PAGE_SIZE = 48;            // matches defaultFaceClustersPageSize in face_handler.go
+    let pageSize = 50;                // user-selectable via the "Per page" control; capped at maxFaceClustersPageSize (200) server-side
     let currentOffset = 0;
     let currentTotal = 0;
 
     let selectMode = false;
-    let selectedFaceIds = new Set();  // representative_face_id set, persists across pages/filters
+    let selectedClusterIds = new Set();  // cluster id set, persists across pages/filters
 
     let memberSelectMode = false;
     let selectedMemberFaceIds = new Set();  // face id set, scoped to the currently open cluster detail
+    let currentClusterFaceCount = 0;  // face_count of the currently open detail cluster, for the ignore confirm prompt
 
     // -------------------------------------------------------------------------
     // Gallery Modal
@@ -45,18 +51,30 @@ Modals.Faces = (() => {
         const params = new URLSearchParams();
         if (currentFilter === 'named') params.set('named', 'true');
         if (currentFilter === 'unnamed') params.set('named', 'false');
+        if (currentFilter === 'suggested') params.set('suggested', 'true');
         if (minGroupSize > 1) params.set('min_face_count', String(minGroupSize));
-        params.set('limit', String(PAGE_SIZE));
+        if (maxGroupSize > 0) params.set('max_face_count', String(maxGroupSize));
+        if (currentFilter === 'named' && contactNameFilter) params.set('contact_name', contactNameFilter);
+        params.set('limit', String(pageSize));
         params.set('offset', String(currentOffset));
+
+        // Clear immediately so the previous filter's cards are never mistaken
+        // for this one's results while the request is in flight, and drop
+        // any response that arrives after a newer request was started.
+        const thisRequest = ++clustersRequestToken;
+        grid.innerHTML = '<div class="faces-grid-loading"><i class="fas fa-spinner fa-spin"></i> Loading…</div>';
+        if (empty) empty.style.display = 'none';
 
         let clusters = [];
         try {
             const resp = await fetch('/api/faces/clusters?' + params.toString());
             if (!resp.ok) throw new Error('Failed to load face clusters');
             const data = await resp.json();
+            if (thisRequest !== clustersRequestToken) return;
             clusters = data.clusters || [];
             currentTotal = data.total || 0;
         } catch (err) {
+            if (thisRequest !== clustersRequestToken) return;
             console.error('Error loading face clusters:', err);
             currentTotal = 0;
         }
@@ -64,6 +82,12 @@ Modals.Faces = (() => {
         grid.innerHTML = '';
         _renderPagination();
         if (clusters.length === 0) {
+            const emptyText = document.getElementById('faces-empty-state-text');
+            if (emptyText) {
+                emptyText.textContent = currentFilter === 'suggested'
+                    ? 'No possible matches yet. They are found by the "Find possible matches for unnamed people" job in Configuration → Background Jobs, which runs hourly — run it now after naming more people.'
+                    : emptyText.dataset.defaultText || emptyText.textContent;
+            }
             if (empty) empty.style.display = 'flex';
             return;
         }
@@ -72,7 +96,7 @@ Modals.Faces = (() => {
         clusters.forEach(cluster => {
             const card = document.createElement('div');
             card.className = 'face-cluster-card';
-            if (cluster.representative_face_id && selectedFaceIds.has(cluster.representative_face_id)) {
+            if (selectedClusterIds.has(cluster.id)) {
                 card.classList.add('face-cluster-card-selected');
             }
             card.addEventListener('click', () => {
@@ -108,7 +132,7 @@ Modals.Faces = (() => {
                 checkbox.type = 'checkbox';
                 checkbox.className = 'face-cluster-card-select-checkbox';
                 checkbox.tabIndex = -1;
-                checkbox.checked = selectedFaceIds.has(cluster.representative_face_id);
+                checkbox.checked = selectedClusterIds.has(cluster.id);
                 selectWrap.appendChild(checkbox);
                 selectWrap.addEventListener('click', (evt) => {
                     evt.preventDefault();
@@ -118,18 +142,16 @@ Modals.Faces = (() => {
                 thumbWrap.appendChild(selectWrap);
             }
 
-            if (cluster.representative_face_id) {
-                const ignoreBtn = document.createElement('button');
-                ignoreBtn.type = 'button';
-                ignoreBtn.className = 'face-cluster-card-ignore-btn';
-                ignoreBtn.title = 'Ignore this face';
-                ignoreBtn.innerHTML = '<i class="fas fa-times"></i>';
-                ignoreBtn.addEventListener('click', (evt) => {
-                    evt.stopPropagation();
-                    _ignoreFace(cluster.representative_face_id);
-                });
-                thumbWrap.appendChild(ignoreBtn);
-            }
+            const ignoreBtn = document.createElement('button');
+            ignoreBtn.type = 'button';
+            ignoreBtn.className = 'face-cluster-card-ignore-btn';
+            ignoreBtn.title = 'Ignore this person (excludes them from every photo)';
+            ignoreBtn.innerHTML = '<i class="fas fa-times"></i>';
+            ignoreBtn.addEventListener('click', (evt) => {
+                evt.stopPropagation();
+                void _confirmAndIgnoreCluster(cluster.id, cluster.face_count);
+            });
+            thumbWrap.appendChild(ignoreBtn);
 
             card.appendChild(thumbWrap);
 
@@ -146,6 +168,20 @@ Modals.Faces = (() => {
             }
             body.appendChild(name);
 
+            // An unnamed cluster's stored "possible match" (written by the
+            // "Find possible matches" background job) — shown in every tab,
+            // not just Possible Matches, so the guess is visible wherever the
+            // cluster appears.
+            if (Array.isArray(cluster.suggestions) && cluster.suggestions.length > 0) {
+                const guess = document.createElement('div');
+                guess.className = 'face-cluster-card-suggestion';
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-lightbulb';
+                guess.appendChild(icon);
+                guess.appendChild(document.createTextNode(' Possibly: ' + (cluster.suggestions[0].contact_name || 'Unknown')));
+                body.appendChild(guess);
+            }
+
             const count = document.createElement('div');
             count.className = 'face-cluster-card-count';
             count.textContent = cluster.face_count + (cluster.face_count === 1 ? ' photo' : ' photos');
@@ -159,12 +195,34 @@ Modals.Faces = (() => {
     function _setFilter(filter) {
         currentFilter = filter;
         currentOffset = 0;
-        selectedFaceIds.clear();
+        selectedClusterIds.clear();
         _updateBulkCount();
         document.querySelectorAll('.faces-filter-tab').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.filter === filter);
         });
+
+        const contactNameControl = document.getElementById('faces-contact-name-control');
+        if (contactNameControl) contactNameControl.style.display = filter === 'named' ? 'flex' : 'none';
+        if (filter !== 'named' && contactNameFilter) {
+            contactNameFilter = '';
+            const input = document.getElementById('faces-contact-name-filter');
+            if (input) input.value = '';
+        }
+
         _loadClusters();
+    }
+
+    let contactNameFilterDebounceTimer = null;
+
+    function _onContactNameFilterInput(evt) {
+        if (contactNameFilterDebounceTimer) clearTimeout(contactNameFilterDebounceTimer);
+        contactNameFilterDebounceTimer = setTimeout(() => {
+            contactNameFilter = evt.target.value.trim();
+            currentOffset = 0;
+            selectedClusterIds.clear();
+            _updateBulkCount();
+            _loadClusters();
+        }, 400);
     }
 
     let minGroupSizeDebounceTimer = null;
@@ -177,7 +235,23 @@ Modals.Faces = (() => {
             if (!raw || isNaN(n) || n < 1) n = 1;
             minGroupSize = n;
             currentOffset = 0;
-            selectedFaceIds.clear();
+            selectedClusterIds.clear();
+            _updateBulkCount();
+            _loadClusters();
+        }, 400);
+    }
+
+    let maxGroupSizeDebounceTimer = null;
+
+    function _onMaxGroupSizeInput(evt) {
+        if (maxGroupSizeDebounceTimer) clearTimeout(maxGroupSizeDebounceTimer);
+        maxGroupSizeDebounceTimer = setTimeout(() => {
+            const raw = evt.target.value.trim();
+            let n = parseInt(raw, 10);
+            if (!raw || isNaN(n) || n < 1) n = 0; // 0 = no upper bound ("Any")
+            maxGroupSize = n;
+            currentOffset = 0;
+            selectedClusterIds.clear();
             _updateBulkCount();
             _loadClusters();
         }, 400);
@@ -192,14 +266,14 @@ Modals.Faces = (() => {
             _exitSelectMode();
         } else {
             selectMode = true;
-            selectedFaceIds.clear();
+            selectedClusterIds.clear();
             _updateSelectModeUI();
         }
     }
 
     function _exitSelectMode() {
         selectMode = false;
-        selectedFaceIds.clear();
+        selectedClusterIds.clear();
         _updateSelectModeUI();
     }
 
@@ -228,13 +302,11 @@ Modals.Faces = (() => {
     }
 
     function _toggleCardSelection(card, cluster) {
-        const faceId = cluster.representative_face_id;
-        if (!faceId) return;
-        const willSelect = !selectedFaceIds.has(faceId);
+        const willSelect = !selectedClusterIds.has(cluster.id);
         if (willSelect) {
-            selectedFaceIds.add(faceId);
+            selectedClusterIds.add(cluster.id);
         } else {
-            selectedFaceIds.delete(faceId);
+            selectedClusterIds.delete(cluster.id);
         }
         card.classList.toggle('face-cluster-card-selected', willSelect);
         const cb = card.querySelector('.face-cluster-card-select-checkbox');
@@ -244,9 +316,9 @@ Modals.Faces = (() => {
 
     function _updateBulkCount() {
         const countEl = document.getElementById('faces-bulk-count');
-        if (countEl) countEl.textContent = selectedFaceIds.size;
+        if (countEl) countEl.textContent = selectedClusterIds.size;
         const ignoreBtn = document.getElementById('faces-bulk-ignore-btn');
-        if (ignoreBtn) ignoreBtn.disabled = selectedFaceIds.size === 0;
+        if (ignoreBtn) ignoreBtn.disabled = selectedClusterIds.size === 0;
     }
 
     function _selectAllOnPage() {
@@ -258,7 +330,7 @@ Modals.Faces = (() => {
     }
 
     function _clearSelection() {
-        selectedFaceIds.clear();
+        selectedClusterIds.clear();
         document.querySelectorAll('.face-cluster-card').forEach(card => {
             card.classList.remove('face-cluster-card-selected');
             const cb = card.querySelector('.face-cluster-card-select-checkbox');
@@ -267,14 +339,19 @@ Modals.Faces = (() => {
         _updateBulkCount();
     }
 
+    // Ignores every selected person's whole cluster in one go — each
+    // selected card represents a person, not a single detection, so this
+    // excludes them from every photo they appear in, not just their card's
+    // representative face. See _ignoreCluster / PatchCluster's
+    // {"ignored": true} handling.
     async function _ignoreSelected() {
-        if (selectedFaceIds.size === 0) return;
-        const faceIds = Array.from(selectedFaceIds);
-        const count = faceIds.length;
+        if (selectedClusterIds.size === 0) return;
+        const clusterIds = Array.from(selectedClusterIds);
+        const count = clusterIds.length;
 
         const ok = await AppDialogs.showAppConfirm(
-            'Ignore faces',
-            `Ignore ${count} selected face(s)? They will no longer be shown or re-grouped.`,
+            'Ignore people',
+            `Ignore ${count} selected ${count === 1 ? 'person' : 'people'}? They will no longer be tracked in any of their photos.`,
             { danger: true }
         );
         if (!ok) return;
@@ -286,21 +363,21 @@ Modals.Faces = (() => {
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ignoring…';
         }
         try {
-            const results = await Promise.all(faceIds.map(faceId =>
-                fetch('/api/faces/' + faceId, {
+            const results = await Promise.all(clusterIds.map(clusterId =>
+                fetch('/api/faces/clusters/' + clusterId, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ignored: true })
-                }).then(resp => ({ faceId, ok: resp.ok }))
+                }).then(resp => ({ clusterId, ok: resp.ok }))
                   .catch(err => {
-                      console.error('Error ignoring face', faceId, err);
-                      return { faceId, ok: false };
+                      console.error('Error ignoring cluster', clusterId, err);
+                      return { clusterId, ok: false };
                   })
             ));
             const failed = results.filter(r => !r.ok);
             if (failed.length > 0) {
-                console.error('Failed to ignore faces:', failed.map(f => f.faceId));
-                await AppDialogs.showAppAlert('Ignore faces', `${failed.length} of ${count} could not be ignored. Please try again.`);
+                console.error('Failed to ignore clusters:', failed.map(f => f.clusterId));
+                await AppDialogs.showAppAlert('Ignore people', `${failed.length} of ${count} could not be ignored. Please try again.`);
             }
         } finally {
             if (btn) btn.innerHTML = originalHTML;
@@ -314,14 +391,14 @@ Modals.Faces = (() => {
         const bar = document.getElementById('faces-pagination');
         if (!bar) return;
 
-        if (currentTotal <= PAGE_SIZE) {
+        if (currentTotal <= pageSize) {
             bar.style.display = 'none';
             return;
         }
         bar.style.display = 'flex';
 
         const pageStart = currentTotal === 0 ? 0 : currentOffset + 1;
-        const pageEnd = Math.min(currentOffset + PAGE_SIZE, currentTotal);
+        const pageEnd = Math.min(currentOffset + pageSize, currentTotal);
 
         const info = document.getElementById('faces-pagination-info');
         if (info) info.textContent = pageStart + '–' + pageEnd + ' of ' + currentTotal;
@@ -330,22 +407,32 @@ Modals.Faces = (() => {
         if (prevBtn) prevBtn.disabled = currentOffset <= 0;
 
         const nextBtn = document.getElementById('faces-pagination-next');
-        if (nextBtn) nextBtn.disabled = currentOffset + PAGE_SIZE >= currentTotal;
+        if (nextBtn) nextBtn.disabled = currentOffset + pageSize >= currentTotal;
     }
 
     function _prevPage() {
         if (currentOffset <= 0) return;
-        currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
+        currentOffset = Math.max(0, currentOffset - pageSize);
         const grid = document.getElementById('faces-cluster-grid');
         if (grid) grid.scrollTop = 0;
         _loadClusters();
     }
 
     function _nextPage() {
-        if (currentOffset + PAGE_SIZE >= currentTotal) return;
-        currentOffset += PAGE_SIZE;
+        if (currentOffset + pageSize >= currentTotal) return;
+        currentOffset += pageSize;
         const grid = document.getElementById('faces-cluster-grid');
         if (grid) grid.scrollTop = 0;
+        _loadClusters();
+    }
+
+    function _onPageSizeChange(evt) {
+        const n = parseInt(evt.target.value, 10);
+        if (isNaN(n) || n < 1) return;
+        pageSize = n;
+        currentOffset = 0;
+        selectedClusterIds.clear();
+        _updateBulkCount();
         _loadClusters();
     }
 
@@ -367,6 +454,33 @@ Modals.Faces = (() => {
         currentClusterId = null;
         _hideContactResults();
         _exitMemberSelectMode();
+        _resetDetailView();
+    }
+
+    // Clears every piece of the previous cluster's data out of the detail
+    // dialog so, if it's reopened before the next fetch resolves (or that
+    // fetch fails), it shows an empty state rather than a stale flash of
+    // whichever cluster was last viewed.
+    function _resetDetailView() {
+        currentClusterFaceCount = 0;
+
+        const titleEl = document.getElementById('face-cluster-detail-title-text');
+        if (titleEl) titleEl.textContent = '';
+
+        const input = document.getElementById('face-cluster-contact-input');
+        if (input) input.value = '';
+
+        const unlinkBtn = document.getElementById('face-cluster-unlink-btn');
+        if (unlinkBtn) {
+            unlinkBtn.style.display = 'none';
+            unlinkBtn.onclick = null;
+        }
+
+        const suggestBox = document.getElementById('face-cluster-suggestions');
+        if (suggestBox) suggestBox.innerHTML = '';
+
+        const grid = document.getElementById('face-cluster-member-grid');
+        if (grid) grid.innerHTML = '';
     }
 
     async function _loadDetail() {
@@ -384,6 +498,8 @@ Modals.Faces = (() => {
     }
 
     function _renderDetail(data) {
+        currentClusterFaceCount = data.face_count || 0;
+
         const titleEl = document.getElementById('face-cluster-detail-title-text');
         if (titleEl) titleEl.textContent = data.contact_name || 'Unnamed person';
 
@@ -392,7 +508,9 @@ Modals.Faces = (() => {
 
         const unlinkBtn = document.getElementById('face-cluster-unlink-btn');
         if (unlinkBtn) {
-            unlinkBtn.style.display = data.contact_id ? 'inline-flex' : 'none';
+            // contact_id 0 is the archive subject's reserved sentinel id, not
+            // "unset" — must not use a falsy check here.
+            unlinkBtn.style.display = (data.contact_id !== null && data.contact_id !== undefined) ? 'inline-flex' : 'none';
             unlinkBtn.onclick = () => _linkContact(null);
         }
 
@@ -798,6 +916,45 @@ Modals.Faces = (() => {
         await _loadClusters();
     }
 
+    // Ignores every face belonging to a cluster in one action ("ignore this
+    // person") — unlike _ignoreFace, this excludes that person from every
+    // photo they were grouped into, not just the one instance clicked. See
+    // PatchCluster's {"ignored": true} handling. Callable both from the
+    // top-level cluster grid card and from inside the open detail modal
+    // (closed afterward, since the cluster it was showing no longer has any
+    // faces left to display).
+    async function _ignoreCluster(clusterId) {
+        try {
+            const resp = await fetch('/api/faces/clusters/' + clusterId, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ignored: true })
+            });
+            if (!resp.ok) {
+                console.error('Failed to ignore cluster', await resp.text());
+                return;
+            }
+        } catch (err) {
+            console.error('Error ignoring cluster:', err);
+            return;
+        }
+        if (currentClusterId === clusterId) {
+            _closeDetail();
+        }
+        await _loadClusters();
+    }
+
+    async function _confirmAndIgnoreCluster(clusterId, faceCount) {
+        const count = faceCount || 1;
+        const ok = await AppDialogs.showAppConfirm(
+            'Ignore this person',
+            `Ignore this person? They will no longer be tracked in any of their ${count} photo(s).`,
+            { danger: true }
+        );
+        if (!ok) return;
+        await _ignoreCluster(clusterId);
+    }
+
     // -------------------------------------------------------------------------
     // Init
     // -------------------------------------------------------------------------
@@ -820,6 +977,12 @@ Modals.Faces = (() => {
         const minGroupSizeInput = document.getElementById('faces-min-group-size');
         if (minGroupSizeInput) minGroupSizeInput.addEventListener('input', _onMinGroupSizeInput);
 
+        const maxGroupSizeInput = document.getElementById('faces-max-group-size');
+        if (maxGroupSizeInput) maxGroupSizeInput.addEventListener('input', _onMaxGroupSizeInput);
+
+        const contactNameFilterInput = document.getElementById('faces-contact-name-filter');
+        if (contactNameFilterInput) contactNameFilterInput.addEventListener('input', _onContactNameFilterInput);
+
         const selectModeToggle = document.getElementById('faces-select-mode-toggle');
         if (selectModeToggle) selectModeToggle.addEventListener('click', _toggleSelectMode);
 
@@ -838,8 +1001,22 @@ Modals.Faces = (() => {
         const nextBtn = document.getElementById('faces-pagination-next');
         if (nextBtn) nextBtn.addEventListener('click', _nextPage);
 
+        const pageSizeSelect = document.getElementById('faces-page-size');
+        if (pageSizeSelect) {
+            pageSizeSelect.value = String(pageSize);
+            pageSizeSelect.addEventListener('change', _onPageSizeChange);
+        }
+
         const closeDetailBtn = document.getElementById('close-face-cluster-detail');
         if (closeDetailBtn) closeDetailBtn.addEventListener('click', _closeDetail);
+
+        const ignorePersonBtn = document.getElementById('face-cluster-ignore-person-btn');
+        if (ignorePersonBtn) {
+            ignorePersonBtn.addEventListener('click', () => {
+                if (!currentClusterId) return;
+                void _confirmAndIgnoreCluster(currentClusterId, currentClusterFaceCount);
+            });
+        }
 
         const detailModal = document.getElementById('face-cluster-detail-modal');
         if (detailModal) {

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -87,6 +88,40 @@ func (h *FaceEmbeddingHelper) Delete(ctx context.Context, faceID int64) {
 	if _, err := h.pool.ExecContext(ctx, `DELETE FROM `+faceEmbeddingsVecTable+` WHERE rowid = ?`, faceID); err != nil {
 		slog.Warn("face embedding delete", "face_id", faceID, "err", err)
 	}
+}
+
+// LoadEmbeddings returns the stored (already normalized) embedding for every
+// face id in wanted that has one, in a single pass over face_embeddings —
+// for bulk in-memory comparison (RefreshClusterSuggestions) where issuing one
+// vec0 KNN query per face would mean one brute-force scan of the whole table
+// per face.
+func (h *FaceEmbeddingHelper) LoadEmbeddings(ctx context.Context, wanted map[int64]struct{}) (map[int64][]float32, error) {
+	if h == nil || h.pool == nil {
+		return nil, fmt.Errorf("load face embeddings: helper not configured")
+	}
+	rows, err := h.pool.QueryContext(ctx, `SELECT rowid, embedding FROM `+faceEmbeddingsVecTable)
+	if err != nil {
+		return nil, fmt.Errorf("load face embeddings: query: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[int64][]float32, len(wanted))
+	for rows.Next() {
+		var id int64
+		var blob []byte
+		if err := rows.Scan(&id, &blob); err != nil {
+			return nil, fmt.Errorf("load face embeddings: scan: %w", err)
+		}
+		if _, ok := wanted[id]; !ok || len(blob)%4 != 0 {
+			continue
+		}
+		vec := make([]float32, len(blob)/4)
+		for i := range vec {
+			vec[i] = math.Float32frombits(binary.LittleEndian.Uint32(blob[i*4:]))
+		}
+		out[id] = vec
+	}
+	return out, rows.Err()
 }
 
 // FaceMatch is one nearest-neighbor result from a face_embeddings similarity query.

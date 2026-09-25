@@ -541,6 +541,7 @@ const DOM = {
     newImageGalleryTitle: document.getElementById('new-image-gallery-title'),
     newImageGalleryTags: document.getElementById('new-image-gallery-tags'),
     newImageGalleryPerson: document.getElementById('new-image-gallery-person'),
+    newImageGalleryMinPeople: document.getElementById('new-image-gallery-min-people'),
     newImageGallerySimilarTags: document.getElementById('new-image-gallery-similar-tags'),
     newImageGallerySimilarBtn: document.getElementById('new-image-gallery-similar-btn'),
     newImageGallerySimilarN: document.getElementById('new-image-gallery-similar-n'),
@@ -568,6 +569,7 @@ const DOM = {
     newImageGallerySetGpsBtn: document.getElementById('new-image-gallery-set-gps-btn'),
     newImageGalleryApplyTagsBtn: document.getElementById('new-image-gallery-apply-tags-btn'),
     newImageGalleryAIClassificationBtn: document.getElementById('new-image-gallery-ai-classification-btn'),
+    newImageGalleryRescanFacesBtn: document.getElementById('new-image-gallery-rescan-faces-btn'),
     newImageGalleryDeleteSelectedBtn: document.getElementById('new-image-gallery-delete-selected-btn'),
     newImageGalleryClearSelectionBtn: document.getElementById('new-image-gallery-clear-selection-btn'),
     // New Image Gallery Detail Modal Elements
@@ -577,6 +579,13 @@ const DOM = {
     newImageGalleryDetailFaceOverlay: document.getElementById('new-image-gallery-detail-face-overlay'),
     newImageGalleryDetailFaceToggleLabel: document.getElementById('new-image-gallery-detail-face-toggle-label'),
     newImageGalleryDetailFaceToggle: document.getElementById('new-image-gallery-detail-face-toggle'),
+    newImageGalleryDetailIgnoreUnnamedBtn: document.getElementById('new-image-gallery-detail-ignore-unnamed-btn'),
+    newImageGalleryDetailIgnoreUnnamedAllBtn: document.getElementById('new-image-gallery-detail-ignore-unnamed-all-btn'),
+    newImageGalleryDetailRescanFacesBtn: document.getElementById('new-image-gallery-detail-rescan-faces-btn'),
+    newImageGalleryDetailIdentifyPopover: document.getElementById('new-image-gallery-detail-identify-popover'),
+    newImageGalleryDetailIdentifyClose: document.getElementById('new-image-gallery-detail-identify-close'),
+    newImageGalleryDetailIdentifyInput: document.getElementById('new-image-gallery-detail-identify-input'),
+    newImageGalleryDetailIdentifyResults: document.getElementById('new-image-gallery-detail-identify-results'),
     newImageDetailTitle: document.getElementById('new-image-detail-title'),
     newImageDetailAuthor: document.getElementById('new-image-detail-author'),
     newImageDetailTagsEdit: document.getElementById('new-image-detail-tags-edit'),
@@ -870,7 +879,34 @@ const UI = (() => {
         if (lastAutoRoute.needs_reference_documents === false) notes.push('Reference documents were omitted from the request.');
         if (lastAutoRoute.needs_user_profile === false) notes.push('User profile context was omitted from the request.');
         textEl.textContent = notes.length ? `${reason}\n\n${notes.join(' ')}` : reason;
+        const timeEl = document.getElementById('chat-auto-routing-reason-time');
+        const requestEl = document.getElementById('chat-auto-routing-reason-request');
+        const responseEl = document.getElementById('chat-auto-routing-reason-response');
+        if (timeEl) {
+            const ms = lastAutoRoute.classifier_duration_ms;
+            timeEl.textContent = ms == null || ms === ''
+                ? 'Classifier response time was not recorded.'
+                : `Classifier response time: ${formatClassifierDuration(ms)}`;
+        }
+        if (requestEl) {
+            requestEl.textContent = lastAutoRoute.classifier_request_json
+                ? String(lastAutoRoute.classifier_request_json)
+                : 'No classifier input was recorded.';
+        }
+        if (responseEl) {
+            responseEl.textContent = lastAutoRoute.classifier_response_json
+                ? String(lastAutoRoute.classifier_response_json)
+                : 'No classifier output was recorded.';
+        }
         modal.style.display = 'flex';
+    }
+
+    function formatClassifierDuration(ms) {
+        const n = Number(ms);
+        if (!Number.isFinite(n) || n < 0) return 'not recorded';
+        if (n < 1000) return `${Math.round(n)} ms`;
+        const seconds = n / 1000;
+        return `${seconds < 10 ? seconds.toFixed(2) : seconds.toFixed(1)} s`;
     }
 
     function closeChatAutoRoutingReasonModal() {

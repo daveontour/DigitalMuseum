@@ -3,58 +3,79 @@ package service
 import (
 	"strings"
 	"testing"
+
+	appai "github.com/daveontour/aimuseum/internal/ai"
 )
 
-func TestParseAutoClassifierResponse(t *testing.T) {
-	t.Run("valid local", func(t *testing.T) {
-		dec, err := parseAutoClassifierResponse(`{"route":"local","reason":"simple time query","confidence":0.95,"needs_reference_documents":false,"needs_user_profile":false}`)
-		if err != nil {
-			t.Fatal(err)
+func TestBuildJevModelCriteria(t *testing.T) {
+	models := []AIModel{
+		{Key: "localai", DisplayName: "Local AI", Enabled: true},
+		{Key: "gemini", DisplayName: "Gemini", ModelSlug: "google/gemini-2.5-flash", Enabled: true},
+		{Key: "claude", DisplayName: "Claude", ModelSlug: "anthropic/claude-sonnet-4.5", Enabled: true},
+	}
+	catalog := []appai.OpenRouterCatalogModel{
+		{
+			ID:            "google/gemini-2.5-flash",
+			Name:          "Gemini 2.5 Flash",
+			Description:   "Fast general model",
+			ContextLength: 1000000,
+			Pricing: appai.OpenRouterPricing{
+				Prompt:     "0.0000003",
+				Completion: "0.0000025",
+			},
+		},
+	}
+	got := buildJevModelCriteria(models, catalog)
+	if !strings.Contains(got["localai"], "no per-token API cost") {
+		t.Fatalf("local criterion: %q", got["localai"])
+	}
+	gemini := got["gemini"]
+	for _, want := range []string{"Gemini", "google/gemini-2.5-flash", "Fast general model", "1000000", "$0.3 per 1M tokens", "$2.5 per 1M tokens"} {
+		if !strings.Contains(gemini, want) {
+			t.Fatalf("gemini criterion missing %q: %q", want, gemini)
 		}
-		if dec.Decision != "local" {
-			t.Fatalf("decision=%q want local", dec.Decision)
-		}
-		if dec.Reason != "simple time query" {
-			t.Fatalf("reason=%q", dec.Reason)
-		}
-		if dec.Confidence != 0.95 {
-			t.Fatalf("confidence=%v", dec.Confidence)
-		}
-		if dec.NeedsReferenceDocuments {
-			t.Fatal("expected needs_reference_documents false")
-		}
-		if dec.NeedsUserProfile {
-			t.Fatal("expected needs_user_profile false")
-		}
-	})
+	}
+	if strings.Contains(got["claude"], "per 1M tokens") {
+		t.Fatalf("claude should omit price when the catalog has no match: %q", got["claude"])
+	}
+	if !strings.Contains(got["claude"], "anthropic/claude-sonnet-4.5") {
+		t.Fatalf("claude criterion: %q", got["claude"])
+	}
+}
 
-	t.Run("valid hosted with fences", func(t *testing.T) {
-		raw := "```json\n{\"route\":\"hosted\",\"reason\":\"needs narrative synthesis\",\"confidence\":0.8}\n```"
-		dec, err := parseAutoClassifierResponse(raw)
-		if err != nil {
-			t.Fatal(err)
+func TestParseJevDecision(t *testing.T) {
+	allowed := map[string]struct{}{"gemini": {}, "claude": {}}
+	raw := []byte(`{
+		"model": "typesafe/jev-1.13-20260917",
+		"answers": {
+			"model": {"type": "choice", "choice": "gemini", "confidence": 0.81, "probabilities": {"gemini": 0.9, "claude": 0.1}},
+			"needs_reference_documents": {"type": "noul", "noul": 0.2},
+			"needs_user_profile": {"type": "noul", "noul": 0.9}
 		}
-		if dec.Decision != "hosted" {
-			t.Fatalf("decision=%q want hosted", dec.Decision)
-		}
-	})
-
-	t.Run("invalid route", func(t *testing.T) {
-		_, err := parseAutoClassifierResponse(`{"route":"cloud","reason":"x"}`)
-		if err == nil {
-			t.Fatal("expected error for invalid route")
-		}
-	})
-
-	t.Run("invalid json", func(t *testing.T) {
-		_, err := parseAutoClassifierResponse(`not json`)
-		if err == nil {
-			t.Fatal("expected error")
-		}
-	})
+	}`)
+	dec, err := parseJevDecision(raw, allowed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dec.Decision != "gemini" {
+		t.Fatalf("decision=%q", dec.Decision)
+	}
+	if dec.Confidence != 0.81 {
+		t.Fatalf("confidence=%v", dec.Confidence)
+	}
+	if dec.NeedsReferenceDocuments {
+		t.Fatal("expected needs_reference_documents false")
+	}
+	if !dec.NeedsUserProfile {
+		t.Fatal("expected needs_user_profile true")
+	}
+	if dec.ClassifierProvider != jevClassifierProvider {
+		t.Fatalf("provider=%q", dec.ClassifierProvider)
+	}
 
 	t.Run("missing context flags default true", func(t *testing.T) {
-		dec, err := parseAutoClassifierResponse(`{"route":"local","reason":"lookup"}`)
+		body := []byte(`{"answers":{"model":{"choice":"claude","confidence":0.4}}}`)
+		dec, err := parseJevDecision(body, allowed)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,23 +84,18 @@ func TestParseAutoClassifierResponse(t *testing.T) {
 		}
 	})
 
-	t.Run("json embedded in prose", func(t *testing.T) {
-		raw := `Here is the routing decision: {"route":"local","reason":"count query","confidence":0.9,"needs_reference_documents":false,"needs_user_profile":false} end`
-		dec, err := parseAutoClassifierResponse(raw)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if dec.Decision != "local" {
-			t.Fatalf("decision=%q want local", dec.Decision)
+	t.Run("unknown choice", func(t *testing.T) {
+		body := []byte(`{"answers":{"model":{"choice":"openai","confidence":0.9}}}`)
+		if _, err := parseJevDecision(body, allowed); err == nil {
+			t.Fatal("expected error for unknown choice")
 		}
 	})
-}
 
-func TestExtractJSONObject(t *testing.T) {
-	got := extractJSONObject(`prefix {"route":"hosted","reason":"x"} suffix`)
-	if got != `{"route":"hosted","reason":"x"}` {
-		t.Fatalf("got %q", got)
-	}
+	t.Run("invalid json", func(t *testing.T) {
+		if _, err := parseJevDecision([]byte(`not json`), allowed); err == nil {
+			t.Fatal("expected error")
+		}
+	})
 }
 
 func TestHostedProviderTryOrderLegacy(t *testing.T) {
@@ -104,15 +120,5 @@ func TestHostedProviderTryOrderLegacy(t *testing.T) {
 				t.Fatalf("lastManual=%q: got %v want %v", tc.lastManual, got, tc.want)
 			}
 		}
-	}
-}
-
-func TestBuildAutoClassifierPrompt(t *testing.T) {
-	p := buildAutoClassifierPrompt("What time is it?", 12, 3, true)
-	if p == "" {
-		t.Fatal("empty prompt")
-	}
-	if !strings.Contains(p, "12") || !strings.Contains(p, "3 reference") || !strings.Contains(p, "What time is it?") || !strings.Contains(p, `"route"`) || !strings.Contains(p, "needs_reference_documents") {
-		t.Fatalf("prompt missing expected content: %q", p)
 	}
 }

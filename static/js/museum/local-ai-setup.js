@@ -356,8 +356,9 @@ const LocalAiSetup = (() => {
         setUseStatus('');
     }
 
-    async function fetchServerStatus() {
-        const res = await fetch(STATUS_URL, { credentials: 'same-origin' });
+    async function fetchServerStatus(probeChat) {
+        const url = probeChat === false ? `${STATUS_URL}?probe_chat=0` : STATUS_URL;
+        const res = await fetch(url, { credentials: 'same-origin' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
     }
@@ -394,8 +395,11 @@ const LocalAiSetup = (() => {
 
         setPanelMsg(panel, '');
 
+        const chatDeferred = hasElectron() && !status.server_reachable;
         if (status.server_reachable) {
             setStatusValue(panel.serverValueEl, 'Running', 'var(--color-success)');
+        } else if (chatDeferred) {
+            setStatusValue(panel.serverValueEl, 'Starts on first local chat', 'var(--color-text-muted)');
         } else {
             setStatusValue(panel.serverValueEl, 'Not running', 'var(--color-danger)');
             if (status.server_error) {
@@ -415,13 +419,24 @@ const LocalAiSetup = (() => {
             }
         }
 
-        const chat = modelAvailabilityLabel(status.chat_model_available, '');
-        setStatusValue(panel.chatValueEl, chat.text.replace(' ()', ''), chat.color);
+        if (!chatDeferred) {
+            const chat = modelAvailabilityLabel(status.chat_model_available, '');
+            setStatusValue(panel.chatValueEl, chat.text.replace(' ()', ''), chat.color);
+        } else if (status.chat_model_installed === false) {
+            setStatusValue(panel.chatValueEl, 'Not installed', 'var(--color-warning)');
+        } else if (status.chat_model_installed === true) {
+            setStatusValue(panel.chatValueEl, 'Installed', 'var(--color-success)');
+        } else {
+            setStatusValue(panel.chatValueEl, '—', 'var(--color-text-muted)');
+        }
         const embed = modelAvailabilityLabel(status.embedding_model_available, '');
         setStatusValue(panel.embedValueEl, embed.text.replace(' ()', ''), embed.color);
 
         if (hasElectron() && panel.downloadBtn) {
-            const needDownload = !status.chat_model_available || !status.embedding_model_available;
+            const chatMissing = chatDeferred
+                ? status.chat_model_installed === false
+                : !status.chat_model_available;
+            const needDownload = chatMissing || !status.embedding_model_available;
             panel.downloadBtn.style.display = needDownload ? 'inline-flex' : 'none';
         }
     }
@@ -429,13 +444,26 @@ const LocalAiSetup = (() => {
     function statusNeedsAttention(status) {
         if (!status) return true;
         if (!status.base_url_configured) return true;
-        if (!status.server_reachable) return true;
         if (status.embedding_base_url !== undefined && !status.embedding_server_reachable) return true;
-        if (!status.chat_model_available || !status.embedding_model_available) return true;
+        if (!status.embedding_model_available) return true;
+        if (hasElectron() && !status.server_reachable) {
+            return status.chat_model_installed === false;
+        }
+        if (!status.server_reachable || !status.chat_model_available) return true;
         return false;
     }
 
-    async function refreshStatusFromServer(panel) {
+    async function attachInstalledChatModel(status) {
+        if (!status || status.server_reachable) return status;
+        if (!hasElectron() || !window.electronAPI.checkOllamaModel) return status;
+        try {
+            const check = await window.electronAPI.checkOllamaModel();
+            if (check && check.ok) status.chat_model_installed = !!check.hasChatModel;
+        } catch (_) { /* live status still applies once the chat server is up */ }
+        return status;
+    }
+
+    async function refreshStatusFromServer(panel, opts) {
         if (!panel || !panel.root) return null;
         syncElectronOnlyVisibility(panel);
         setStatusValue(panel.serverValueEl, 'Checking…', 'var(--color-text-muted)');
@@ -454,7 +482,8 @@ const LocalAiSetup = (() => {
         }
 
         try {
-            const status = await fetchServerStatus();
+            const probeChat = !(opts && opts.probeChat === false);
+            const status = await attachInstalledChatModel(await fetchServerStatus(probeChat));
             lastServerStatus = status;
             applyStatusToPanel(panel, status);
             if (typeof App !== 'undefined' && App.refreshChatAvailability) {
@@ -663,12 +692,12 @@ const LocalAiSetup = (() => {
         await loadModelSettingsAndModels();
     }
 
-    async function refreshLoginAdvanced() {
+    async function refreshLoginAdvanced(opts) {
         ensureUseEnabledToggleWired();
         const panel = loginPanel();
         if (!panel.root) return null;
         syncElectronOnlyVisibility(panel);
-        return refreshStatusFromServer(panel);
+        return refreshStatusFromServer(panel, opts);
     }
 
     function getLastServerStatus() {

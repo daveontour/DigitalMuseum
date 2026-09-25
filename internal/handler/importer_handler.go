@@ -24,7 +24,6 @@ import (
 	contactsimport "github.com/daveontour/aimuseum/internal/import/contacts"
 	facebookimport "github.com/daveontour/aimuseum/internal/import/facebook"
 	facebookalbumsimport "github.com/daveontour/aimuseum/internal/import/facebookalbums"
-	facebookallimport "github.com/daveontour/aimuseum/internal/import/facebookall"
 	facebookplacesimport "github.com/daveontour/aimuseum/internal/import/facebookplaces"
 	facebookpostsimport "github.com/daveontour/aimuseum/internal/import/facebookposts"
 	filesystemimport "github.com/daveontour/aimuseum/internal/import/filesystem"
@@ -2279,16 +2278,16 @@ func runFacebookAllInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfig
 	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)
 	defer job.Finish()
 
-	// Clear all existing Facebook data before re-importing
-	job.UpdateState(map[string]any{"status_line": "Clearing existing Facebook data..."})
-	job.Broadcast("progress", job.GetState())
-	if err := facebookallimport.ClearFacebookAllDataForUser(ctx, pool, uid); err != nil {
-		msg := fmt.Sprintf("failed to clear Facebook data: %s", err)
-		job.UpdateState(map[string]any{"status": "error", "status_line": msg, "error_message": msg})
-		job.Broadcast("error", job.GetState())
-		return
-	}
-
+	// Import additively — each sub-importer below matches existing rows
+	// (by album name, post timestamp+title, message natural key, or
+	// source_reference for photos/attachments) and only inserts what's
+	// genuinely new, so previously-detected/named faces on unchanged
+	// photos survive a reimport. A prior version of this handler called
+	// ClearFacebookAllDataForUser here first, wiping
+	// every Facebook media_items row (which cascade-deleted
+	// media_item_faces) before every reimport; that's now only reachable
+	// via the explicit "Clear Facebook Data" purge action for anyone who
+	// deliberately wants to wipe and start over.
 	job.UpdateState(map[string]any{"status_line": "Running parallel imports (Messenger, Albums, Places, Posts)..."})
 	job.Broadcast("progress", job.GetState())
 

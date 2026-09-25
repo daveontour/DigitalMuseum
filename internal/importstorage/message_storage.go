@@ -3,6 +3,7 @@ package importstorage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -74,127 +75,54 @@ type BatchSaveResult struct {
 	AttachmentErrorsJunctionInsert int
 }
 
-// SaveIMessage saves a message to the database.
-// Returns the message ID and whether it was an update (true) or create (false)
-func (s *MessageStorage) SaveIMessage(ctx context.Context, data MessageData, attachmentData []byte, attachmentFilename, attachmentType, source string) (int64, bool, error) {
-	uid := uidFromCtx(ctx)
-
-	tx, err := s.pool.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to begin transaction: %w", err)
+// attachmentSourceRef returns a unique key for one message's attachment so
+// re-imports can skip duplicates instead of recreating media_items/
+// media_blobs (and orphaning the previous run's rows) on every reimport —
+// same pattern as albumPhotoSourceRef/postPhotoSourceRef. messageID alone
+// collides across every attachment on the same multi-attachment message.
+func attachmentSourceRef(messageID int64, filename string) string {
+	s := fmt.Sprintf("%d", messageID) + ":" + strings.TrimSpace(filename)
+	if len(s) > maxSourceRefLen {
+		return s[:maxSourceRefLen]
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	var existingID int64
-	var isUpdate bool
-
-	checkQuery := `SELECT id FROM messages 
-		WHERE chat_session = ? 
-		AND message_date = ? 
-		AND sender_id = ? 
-		AND type = ? 
-		LIMIT 1`
-
-	err = tx.QueryRowContext(ctx, checkQuery,
-		data.ChatSession,
-		data.MessageDate,
-		data.SenderID,
-		data.Type,
-	).Scan(&existingID)
-
-	switch err {
-	case nil:
-		isUpdate = true
-		updateQuery := `UPDATE messages SET
-			delivered_date = ?,
-			read_date = ?,
-			edited_date = ?,
-			service = ?,
-			sender_name = ?,
-			status = ?,
-			replying_to = ?,
-			subject = ?,
-			text = ?,
-			is_group_chat = ?,
-			updated_at = CURRENT_TIMESTAMP
-			WHERE id = ?`
-
-		_, err = tx.ExecContext(ctx, updateQuery,
-			data.DeliveredDate,
-			data.ReadDate,
-			data.EditedDate,
-			data.Service,
-			data.SenderName,
-			data.Status,
-			data.ReplyingTo,
-			data.Subject,
-			data.Text,
-			data.IsGroupChat,
-			existingID,
-		)
-		if err != nil {
-			return 0, false, fmt.Errorf("failed to update message: %w", err)
-		}
-
-		_, err = tx.ExecContext(ctx, "DELETE FROM message_attachments WHERE message_id = ?", existingID)
-		if err != nil {
-			return 0, false, fmt.Errorf("failed to delete existing attachments: %w", err)
-		}
-
-	case sql.ErrNoRows:
-		isUpdate = false
-		insertQuery := `INSERT INTO messages (
-			chat_session, message_date, delivered_date, read_date, edited_date,
-			service, type, sender_id, sender_name, status, replying_to,
-			subject, text, is_group_chat, processed, user_id, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		RETURNING id`
-
-		err = tx.QueryRowContext(ctx, insertQuery,
-			data.ChatSession,
-			data.MessageDate,
-			data.DeliveredDate,
-			data.ReadDate,
-			data.EditedDate,
-			data.Service,
-			data.Type,
-			data.SenderID,
-			data.SenderName,
-			data.Status,
-			data.ReplyingTo,
-			data.Subject,
-			data.Text,
-			data.IsGroupChat,
-			false,
-			uidVal(uid),
-		).Scan(&existingID)
-		if err != nil {
-			return 0, false, fmt.Errorf("failed to insert message: %w", err)
-		}
-	default:
-		return 0, false, fmt.Errorf("failed to check for existing message: %w", err)
-	}
-
-	if len(attachmentData) > 0 {
-		err = s.saveAttachment(ctx, tx, existingID, attachmentData, attachmentFilename, attachmentType, source, data, uid)
-		if err != nil {
-			slog.Warn("could not save attachment", "err", err)
-		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return 0, false, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return existingID, isUpdate, nil
+	return s
 }
 
 func (s *MessageStorage) saveAttachment(ctx context.Context, tx *sql.Tx, messageID int64, attachmentData []byte, attachmentFilename, attachmentType, source string, messageData MessageData, uid int64) error {
+	if source == "" {
+		source = "message_attachment"
+	}
+	sourceRef := attachmentSourceRef(messageID, attachmentFilename)
+
+	var existingMediaItemID int64
+	err := tx.QueryRowContext(ctx, `SELECT id FROM media_items WHERE source = ? AND source_reference = ? LIMIT 1`,
+		source, sourceRef).Scan(&existingMediaItemID)
+	if err == nil {
+		// Attachment already exists from a previous import; ensure the
+		// message_attachments junction row exists and skip recreating it.
+		var linkCount int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM message_attachments WHERE message_id = ? AND media_item_id = ?`,
+			messageID, existingMediaItemID).Scan(&linkCount); err != nil {
+			return fmt.Errorf("failed to check message_attachments for %s: %w", attachmentFilename, err)
+		}
+		if linkCount == 0 {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO message_attachments (message_id, media_item_id) VALUES (?, ?)`,
+				messageID, existingMediaItemID); err != nil {
+				return fmt.Errorf("failed to link existing attachment to message (message_id: %d, filename: %s): %w",
+					messageID, attachmentFilename, err)
+			}
+		}
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("failed to check existing attachment for %s: %w", attachmentFilename, err)
+	}
+
 	var thumbnailData []byte
 
 	var blobID int64
 	insertBlobQuery := `INSERT INTO media_blobs (image_data, thumbnail_data, user_id) VALUES (?, ?, ?) RETURNING id`
-	err := tx.QueryRowContext(ctx, insertBlobQuery, attachmentData, thumbnailData, uidVal(uid)).Scan(&blobID)
+	err = tx.QueryRowContext(ctx, insertBlobQuery, attachmentData, thumbnailData, uidVal(uid)).Scan(&blobID)
 	if err != nil {
 		return fmt.Errorf("failed to insert media blob (filename: %s, size: %d bytes, type: %s): %w",
 			attachmentFilename, len(attachmentData), attachmentType, err)
@@ -208,15 +136,10 @@ func (s *MessageStorage) saveAttachment(ctx context.Context, tx *sql.Tx, message
 		month = &m
 	}
 
-	if source == "" {
-		source = "message_attachment"
-	}
-
 	chatSessionStr := ""
 	if messageData.ChatSession != nil {
 		chatSessionStr = *messageData.ChatSession
 	}
-	messageIDStr := fmt.Sprintf("%d", messageID)
 
 	insertMetaQuery := `INSERT INTO media_items (
 		media_blob_id, tags, source, source_reference, title, description,
@@ -231,7 +154,7 @@ func (s *MessageStorage) saveAttachment(ctx context.Context, tx *sql.Tx, message
 		blobID,
 		chatSessionStr,
 		source,
-		messageIDStr,
+		sourceRef,
 		attachmentFilename,
 		nil,
 		attachmentType,
@@ -457,8 +380,12 @@ func (s *MessageStorage) SaveMessagesBatch(ctx context.Context, messages []Messa
 		}
 
 		for _, item := range toUpdate {
-			_, _ = tx.ExecContext(ctx, "DELETE FROM message_attachments WHERE message_id = ?", item.id)
-
+			// saveAttachment now matches on (source, source_reference) and
+			// only inserts the message_attachments junction row if it's
+			// missing, so no pre-delete is needed here — deleting first
+			// would just force every reimport to recreate the media_items/
+			// media_blobs rows (and lose any face-recognition/tag data on
+			// them) instead of reusing the existing ones.
 			if len(item.msg.AttachmentData) > 0 {
 				if err := s.saveAttachment(ctx, tx, item.id, item.msg.AttachmentData,
 					item.msg.AttachmentFilename, item.msg.AttachmentType, item.msg.Source, item.msg.MessageData, uid); err != nil {

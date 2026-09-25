@@ -53,6 +53,19 @@ func TestProbeOllamaTagsEmptyBaseURL(t *testing.T) {
 	}
 }
 
+func TestProbeOllamaEmbeddingOnlyLeavesChatUnchecked(t *testing.T) {
+	r := ProbeOllamaEmbeddingOnly(t.Context(), "http://127.0.0.1:11434", "", "gemma4", "embeddinggemma")
+	if !r.BaseURLConfigured || r.BaseURL != "http://127.0.0.1:11434" {
+		t.Fatalf("chat url: %+v", r)
+	}
+	if r.ServerReachable || r.ServerError != "" || r.ChatModelAvailable {
+		t.Fatalf("chat server should be unchecked: %+v", r)
+	}
+	if r.ChatModel != "gemma4" || r.EmbeddingModel != "embeddinggemma" {
+		t.Fatalf("model names: %+v", r)
+	}
+}
+
 func TestProbeOllamaDualEmptyURLs(t *testing.T) {
 	r := ProbeOllamaDual(t.Context(), "", "", "gemma4", "embeddinggemma")
 	if r.BaseURLConfigured || r.EmbeddingBaseURLConfigured {

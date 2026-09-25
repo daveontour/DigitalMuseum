@@ -347,6 +347,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		dashboardSvc,
 		configRepo,
 	)
+	chatSvc.SetOpenRouterCatalog(openRouterCatalogSvc)
 	emailSvc.WithSummarizer(chatSvc)
 	messageSvc.WithSummarizer(chatSvc)
 	adminHandler.WithSummarizer(chatSvc)
@@ -379,7 +380,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	faceRepo := repository.NewFaceRepo(pool)
 	faceEmbedHelper := service.NewFaceEmbeddingHelper(pool)
 	faceSvc := service.NewFaceService(faceRepo, faceEmbedHelper)
-	faceHandler := handler.NewFaceHandler(faceRepo, faceSvc, imageSvc, contactRepo, faceEmbedHelper)
+	faceHandler := handler.NewFaceHandler(faceRepo, faceSvc, imageSvc, contactRepo, faceEmbedHelper, facerecognizer.DefaultBundledPath())
 	faceHandler.RegisterRoutes(r)
 
 	// ── Filesystem import path-equivalence rules (user-scoped) ────────────────

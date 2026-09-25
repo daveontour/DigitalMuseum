@@ -36,8 +36,13 @@ func (s *ChatService) LocalAIUseEnabled(ctx context.Context) bool {
 	return parseLocalAIUseEnabled(raw)
 }
 
-// LocalAIInfrastructureAvailable reports whether Ollama is configured, reachable, and has the chat model.
+// LocalAIInfrastructureAvailable reports whether Local AI can take a chat request.
+// When the desktop app starts the chat server on demand, a configured chat URL is enough:
+// the first request starts the daemon. Otherwise the chat server must already be up and have the model.
 func (s *ChatService) LocalAIInfrastructureAvailable(ctx context.Context) bool {
+	if ollamaChatStartsOnDemand() && strings.TrimSpace(s.defaultLocalAIURL) != "" {
+		return true
+	}
 	probe := s.probeOllamaCached(ctx)
 	return probe.BaseURLConfigured && probe.ServerReachable && probe.ChatModelAvailable
 }

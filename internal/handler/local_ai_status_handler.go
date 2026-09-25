@@ -20,6 +20,7 @@ func LocalAIStatusFromConfig(ai config.AIConfig) http.HandlerFunc {
 			ai.LocalAIEmbeddingBaseURL,
 			chatModel,
 			ai.LocalAIEmbeddingModel,
+			r.URL.Query().Get("probe_chat") != "0",
 		))
 	}
 }

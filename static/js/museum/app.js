@@ -1554,9 +1554,20 @@ const App = (() => {
                 const models = Array.isArray(av.models) ? av.models : [];
                 const lOk = effectiveLocalAIAvailable(av);
                 const anyHostedOk = models.some((m) => m && m.available);
-                const localVal = lOk
+                let localVal = lOk
                     ? '<strong style="color:#15803d;">Ready</strong>'
                     : '<strong style="color:#b91c1c;">Not Available</strong>';
+                if (!lOk && window.electronAPI) {
+                    try {
+                        const stRes = await fetch('/api/local-ai/status?probe_chat=0', { credentials: 'same-origin' });
+                        if (stRes.ok) {
+                            const st = await stRes.json();
+                            if (st && st.base_url_configured && !st.server_reachable && st.embedding_server_reachable) {
+                                localVal = '<span style="color:#64748b;">Starts on first local chat</span>';
+                            }
+                        }
+                    } catch (_) { /* keep the availability result */ }
+                }
                 const parts = [];
                 models.forEach((m) => {
                     if (!m || !m.key) return;
@@ -1739,6 +1750,15 @@ const App = (() => {
             });
         }
 
+        function resetImportModalCounts(modalRoot) {
+            if (!modalRoot) return;
+            modalRoot.querySelectorAll('[data-import-count-key]').forEach((el) => {
+                el.textContent = '—';
+                const row = el.closest('.data-import-row');
+                if (row) row.classList.remove('data-import-row-zero-count');
+            });
+        }
+
         function applyImportModalCounts(modalRoot, d) {
             if (!modalRoot || !d) return;
             const mc = d.message_counts || {};
@@ -1873,13 +1893,17 @@ const App = (() => {
             });
         }
 
-        // Fetches only the cheap entry counts (GET /api/import-modal-stats). Fast —
-        // safe to await before showing the dialog as ready.
+        // Fetches entry counts (GET /api/import-modal-stats) and fills them in place.
+        // The dialog stays usable while this runs; tabs are not covered by a loading overlay.
         async function loadDataImportModalContent(options) {
             const opts = options && typeof options === 'object' ? options : {};
             const modalId = opts.modalId || null;
             const gen = ++importModalContentLoadGen;
-            showDataImportModalLoading(true);
+            showDataImportModalLoading(false);
+            const targets = modalId
+                ? [document.getElementById(modalId)].filter(Boolean)
+                : dataImportModalRoots();
+            targets.forEach(resetImportModalCounts);
             try {
                 const statsRes = await fetch('/api/import-modal-stats', { credentials: 'same-origin' });
                 if (gen !== importModalContentLoadGen) return;
@@ -1888,8 +1912,6 @@ const App = (() => {
                 }
             } catch (e) {
                 console.warn('Failed to load import modal content:', e);
-            } finally {
-                if (gen === importModalContentLoadGen) showDataImportModalLoading(false);
             }
         }
 
@@ -1949,6 +1971,7 @@ const App = (() => {
             const modal = document.getElementById('data-import-modal');
             if (!modal) return;
             modal.style.display = 'flex';
+            showDataImportModalLoading(false);
             showEmbeddingProgressLoading(modal);
             if (typeof loadControlDefaults === 'function') void loadControlDefaults();
             if (typeof resetDataImportDetailSidebar === 'function') resetDataImportDetailSidebar();

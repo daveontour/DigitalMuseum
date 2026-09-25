@@ -6,18 +6,19 @@ import (
 	"strings"
 )
 
-// HostedLLMProviderOrderConfigKey is the app_configuration key for the Auto-routing
-// classifier provider and the error-failover on/off toggle.
+// HostedLLMProviderOrderConfigKey is the app_configuration key for Auto-routing
+// settings and the error-failover on/off toggle. Classification always uses Jev;
+// classifier_provider is still stored so older rows keep loading.
 const HostedLLMProviderOrderConfigKey = "hosted_llm_provider_order_v1"
 
-// DefaultClassifierProvider is the default AI provider for Auto routing classification.
+// DefaultClassifierProvider remains the fallback name used when an unknown provider
+// key is normalized. Auto classification itself always calls Jev.
 const DefaultClassifierProvider = "localai"
 
 // HostedLLMProviderOrderConfig is persisted under HostedLLMProviderOrderConfigKey. Hosted
 // provider try order for both Auto routing and error failover always follows the AI Models
-// tab's sort_order (see defaultHostedLLMProviderOrder) — only the classifier provider,
-// auto-selection mode, chat provider, and the failover on/off toggle are independently
-// configurable.
+// tab's sort_order (see defaultHostedLLMProviderOrder). Auto-selection mode, the fixed chat
+// provider, and the failover on/off toggle are configurable. The classifier is always Jev.
 type HostedLLMProviderOrderConfig struct {
 	ClassifierProvider   string
 	FailoverEnabled      bool

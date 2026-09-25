@@ -173,6 +173,19 @@ func (r *ImageRepo) Search(ctx context.Context, p model.ImageSearchParams) ([]*m
 		args = append(args, pattern, pattern)
 		n += 2
 	}
+	if p.MinPeopleCount != nil {
+		// Counts detected faces (media_item_faces rows), named or not — "how
+		// many people are in this photo" per the face-detection results, not
+		// just how many have been named. Excludes ignored faces (false
+		// detections / faces the user chose not to track), same convention
+		// as the Person filter above.
+		conds = append(conds, fmt.Sprintf(`(
+			SELECT COUNT(*) FROM media_item_faces mif
+			WHERE mif.media_item_id = media_items.id AND mif.ignored = FALSE
+		) >= ?%d`, n))
+		args = append(args, *p.MinPeopleCount)
+		n++
+	}
 	if p.Tags != nil {
 		// Each comma-separated tag is OR'd: tag1 OR tag2 OR ...
 		tagList := splitTrim(*p.Tags, ',')

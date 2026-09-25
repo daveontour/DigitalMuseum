@@ -2,17 +2,36 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"maps"
 	"math"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/daveontour/aimuseum/internal/appctx"
 	"github.com/daveontour/aimuseum/internal/model"
 	"github.com/daveontour/aimuseum/internal/repository"
 )
 
+const importModalCacheTTL = 30 * time.Second
+
+type importModalStatsCacheEntry struct {
+	value     *model.ImportModalStatsResponse
+	expiresAt time.Time
+}
+
+type embeddingProgressCacheEntry struct {
+	value     model.EmbeddingProgressEntry
+	expiresAt time.Time
+}
+
 // DashboardService assembles the GET /api/dashboard response.
 type DashboardService struct {
-	repo        *repository.DashboardRepo
-	subjectRepo *repository.SubjectConfigRepo
+	repo             *repository.DashboardRepo
+	subjectRepo      *repository.SubjectConfigRepo
+	importStatsCache sync.Map
+	progressCache    sync.Map
 }
 
 // NewDashboardService creates a DashboardService.
@@ -173,8 +192,17 @@ func (s *DashboardService) GetDashboard(ctx context.Context) (*model.DashboardRe
 }
 
 // GetImportModalStats returns aggregate counts for the import/maintenance modals.
-// Embedding/searchable progress is not included — see GetEmbeddingProgress.
+// Embedding/searchable progress is not included — see GetEmbeddingProgressForSource.
+// Results are cached per user for a short window so reopening the dialog does not
+// repeat the scans.
 func (s *DashboardService) GetImportModalStats(ctx context.Context) (*model.ImportModalStatsResponse, error) {
+	key := appctx.UserIDFromCtx(ctx)
+	now := time.Now()
+	if v, ok := s.importStatsCache.Load(key); ok {
+		if entry, ok := v.(importModalStatsCacheEntry); ok && entry.value != nil && now.Before(entry.expiresAt) {
+			return cloneImportModalStats(entry.value), nil
+		}
+	}
 	raw, err := s.repo.GetImportModalStats(ctx)
 	if err != nil {
 		return nil, err
@@ -188,15 +216,46 @@ func (s *DashboardService) GetImportModalStats(ctx context.Context) (*model.Impo
 	if raw.EmbeddingProgress == nil {
 		raw.EmbeddingProgress = map[string]model.EmbeddingProgressEntry{}
 	}
-	return raw, nil
+	stored := cloneImportModalStats(raw)
+	s.importStatsCache.Store(key, importModalStatsCacheEntry{
+		value:     stored,
+		expiresAt: now.Add(importModalCacheTTL),
+	})
+	return cloneImportModalStats(stored), nil
+}
+
+func cloneImportModalStats(in *model.ImportModalStatsResponse) *model.ImportModalStatsResponse {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.MessageCounts = maps.Clone(in.MessageCounts)
+	out.EmailsBySource = maps.Clone(in.EmailsBySource)
+	out.EmbeddingProgress = maps.Clone(in.EmbeddingProgress)
+	return &out
 }
 
 // GetEmbeddingProgressForSource returns how much content of one source still needs an
-// AI embedding to be searchable. This is the expensive part of the import/maintenance
-// stats; callers fetch each source independently so the modal can render its cheap
-// counts immediately and fill in progress per source as each one resolves.
+// AI embedding to be searchable. Callers fetch each source independently so the modal
+// can fill progress per source as each one resolves. Results are cached per user and
+// source for a short window.
 func (s *DashboardService) GetEmbeddingProgressForSource(ctx context.Context, key string) (model.EmbeddingProgressEntry, error) {
-	return s.repo.GetEmbeddingProgressForSource(ctx, key)
+	cacheKey := fmt.Sprintf("%d|%s", appctx.UserIDFromCtx(ctx), key)
+	now := time.Now()
+	if v, ok := s.progressCache.Load(cacheKey); ok {
+		if entry, ok := v.(embeddingProgressCacheEntry); ok && now.Before(entry.expiresAt) {
+			return entry.value, nil
+		}
+	}
+	entry, err := s.repo.GetEmbeddingProgressForSource(ctx, key)
+	if err != nil {
+		return model.EmbeddingProgressEntry{}, err
+	}
+	s.progressCache.Store(cacheKey, embeddingProgressCacheEntry{
+		value:     entry,
+		expiresAt: now.Add(importModalCacheTTL),
+	})
+	return entry, nil
 }
 
 // GetArchiveDataInventory returns entry counts per data type for conversational AI prompts.

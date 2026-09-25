@@ -209,6 +209,14 @@ func (h *ImageHandler) Search(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("person"); v != "" {
 		p.Person = &v
 	}
+	if v := q.Get("min_people_count"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			writeError(w, http.StatusBadRequest, "min_people_count must be a positive integer")
+			return
+		}
+		p.MinPeopleCount = &n
+	}
 	if v := q.Get("tags"); v != "" {
 		p.Tags = &v
 	}

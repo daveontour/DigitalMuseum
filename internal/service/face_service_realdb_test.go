@@ -167,3 +167,154 @@ func TestClusterUnassignedFaces_RealDB(t *testing.T) {
 		t.Fatalf("want personA's third face to inherit the linked contact, got %v", faceA3.ContactID)
 	}
 }
+
+// TestIdentifyFace_RealDB covers FaceService.IdentifyFace's two paths — a
+// face that already belongs to a cluster (just links that cluster, same as
+// LinkClusterToContact) and a face detected but not yet run through
+// ClusterUnassignedFaces (no face_cluster_id yet), which must get a new
+// singleton cluster created for it first. This is what backs the Image
+// Details dialog's "identify unnamed people" flow.
+func TestIdentifyFace_RealDB(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "archive.sqlite")
+
+	ctx := context.Background()
+	db, err := database.New(ctx, config.DatabaseConfig{SQLitePath: dbPath})
+	if err != nil {
+		t.Fatalf("open real db: %v", err)
+	}
+	if db == nil {
+		t.Fatal("database.New returned nil db")
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	if err := database.MigrateSQLite(ctx, db.Std); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	uid := int64(2)
+	ctx = context.WithValue(ctx, appctx.ContextKeyUserID, uid)
+	if _, err := db.Std.ExecContext(ctx,
+		`INSERT INTO users (id, email, password_hash, display_name, is_active, is_admin) VALUES (?1, 'a@b.c', 'x', 'Test', 1, 0)`,
+		uid,
+	); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	var blobID int64
+	if err := db.Std.QueryRowContext(ctx, `INSERT INTO media_blobs (image_data, user_id) VALUES (x'00', ?1) RETURNING id`, uid).Scan(&blobID); err != nil {
+		t.Fatalf("seed media_blob: %v", err)
+	}
+	newMediaItem := func() int64 {
+		var id int64
+		if err := db.Std.QueryRowContext(ctx,
+			`INSERT INTO media_items (media_blob_id, media_type, user_id) VALUES (?1, 'image/jpeg', ?2) RETURNING id`,
+			blobID, uid,
+		).Scan(&id); err != nil {
+			t.Fatalf("seed media_item: %v", err)
+		}
+		return id
+	}
+	var aliceID, bobID int64
+	if err := db.Std.QueryRowContext(ctx, `INSERT INTO contacts (name, user_id) VALUES ('Alice', ?1) RETURNING id`, uid).Scan(&aliceID); err != nil {
+		t.Fatalf("seed contact Alice: %v", err)
+	}
+	if err := db.Std.QueryRowContext(ctx, `INSERT INTO contacts (name, user_id) VALUES ('Bob', ?1) RETURNING id`, uid).Scan(&bobID); err != nil {
+		t.Fatalf("seed contact Bob: %v", err)
+	}
+
+	faceRepo := repository.NewFaceRepo(db.Std)
+	faceSvc := NewFaceService(faceRepo, nil)
+	confidence := 0.9
+
+	// Case 1: a face with NO cluster yet (fresh detection, clustering job
+	// hasn't run). IdentifyFace must create a singleton cluster for it.
+	unclusteredFaceID, err := faceRepo.InsertFace(ctx, &model.Face{
+		MediaItemID: newMediaItem(),
+		BBoxX:       0.1, BBoxY: 0.1, BBoxW: 0.2, BBoxH: 0.2,
+		DetectionConfidence: &confidence,
+		EmbeddingModel:      "test-model",
+	})
+	if err != nil {
+		t.Fatalf("InsertFace (unclustered): %v", err)
+	}
+	beforeFace, err := faceRepo.GetFace(ctx, unclusteredFaceID)
+	if err != nil {
+		t.Fatalf("GetFace (before identify): %v", err)
+	}
+	if beforeFace.FaceClusterID != nil {
+		t.Fatalf("want no cluster before IdentifyFace, got %v", beforeFace.FaceClusterID)
+	}
+
+	newClusterID, err := faceSvc.IdentifyFace(ctx, unclusteredFaceID, aliceID)
+	if err != nil {
+		t.Fatalf("IdentifyFace (unclustered): %v", err)
+	}
+	afterFace, err := faceRepo.GetFace(ctx, unclusteredFaceID)
+	if err != nil {
+		t.Fatalf("GetFace (after identify): %v", err)
+	}
+	if afterFace.FaceClusterID == nil || *afterFace.FaceClusterID != newClusterID {
+		t.Fatalf("want face assigned to new cluster %d, got %v", newClusterID, afterFace.FaceClusterID)
+	}
+	if afterFace.ContactID == nil || *afterFace.ContactID != aliceID {
+		t.Fatalf("want face linked to Alice (%d), got %v", aliceID, afterFace.ContactID)
+	}
+	cluster, err := faceRepo.GetCluster(ctx, newClusterID)
+	if err != nil {
+		t.Fatalf("GetCluster: %v", err)
+	}
+	if cluster == nil || cluster.ContactID == nil || *cluster.ContactID != aliceID {
+		t.Fatalf("want new cluster linked to Alice, got %+v", cluster)
+	}
+	if cluster.RepresentativeFaceID == nil || *cluster.RepresentativeFaceID != unclusteredFaceID {
+		t.Fatalf("want the identified face set as the new cluster's representative, got %v", cluster.RepresentativeFaceID)
+	}
+
+	// Case 2: a face that ALREADY belongs to a cluster (e.g. an unnamed
+	// cluster with several faces already grouped by the clustering job).
+	// IdentifyFace must link that existing cluster, not create a new one,
+	// and the link must propagate to every member face.
+	clusteredFace1ID, err := faceRepo.InsertFace(ctx, &model.Face{
+		MediaItemID: newMediaItem(),
+		BBoxX:       0.1, BBoxY: 0.1, BBoxW: 0.2, BBoxH: 0.2,
+		DetectionConfidence: &confidence,
+		EmbeddingModel:      "test-model",
+	})
+	if err != nil {
+		t.Fatalf("InsertFace (clustered 1): %v", err)
+	}
+	existingClusterID, err := faceRepo.CreateCluster(ctx, clusteredFace1ID)
+	if err != nil {
+		t.Fatalf("CreateCluster: %v", err)
+	}
+	if err := faceRepo.SetNewClusterRepresentativeFace(ctx, clusteredFace1ID, existingClusterID); err != nil {
+		t.Fatalf("SetNewClusterRepresentativeFace: %v", err)
+	}
+	clusteredFace2ID, err := faceRepo.InsertFace(ctx, &model.Face{
+		MediaItemID: newMediaItem(),
+		BBoxX:       0.1, BBoxY: 0.1, BBoxW: 0.2, BBoxH: 0.2,
+		DetectionConfidence: &confidence,
+		EmbeddingModel:      "test-model",
+	})
+	if err != nil {
+		t.Fatalf("InsertFace (clustered 2): %v", err)
+	}
+	if err := faceRepo.AssignFaceToCluster(ctx, clusteredFace2ID, existingClusterID); err != nil {
+		t.Fatalf("AssignFaceToCluster: %v", err)
+	}
+
+	gotClusterID, err := faceSvc.IdentifyFace(ctx, clusteredFace1ID, bobID)
+	if err != nil {
+		t.Fatalf("IdentifyFace (clustered): %v", err)
+	}
+	if gotClusterID != existingClusterID {
+		t.Fatalf("want the existing cluster %d reused, got %d", existingClusterID, gotClusterID)
+	}
+	member2, err := faceRepo.GetFace(ctx, clusteredFace2ID)
+	if err != nil {
+		t.Fatalf("GetFace (member 2): %v", err)
+	}
+	if member2.ContactID == nil || *member2.ContactID != bobID {
+		t.Fatalf("want the contact link to propagate to every member face, got %v", member2.ContactID)
+	}
+}

@@ -169,17 +169,17 @@
                     <button type="button" class="more-options-btn" id="email-gallery-sidebar-btn">
                         <i class="fas fa-envelope"></i> Emails
                     </button>
-                    <button type="button" class="more-options-btn" id="new-image-gallery-sidebar-btn">
-                        <i class="fas fa-images"></i>Images
-                    </button>
                     <button type="button" class="more-options-btn" id="fb-albums-sidebar-btn">
                         <i class="fas fa-images"></i> Facebook Albums
                     </button>
                     <button type="button" class="more-options-btn" id="fb-posts-sidebar-btn">
                         <i class="fas fa-newspaper"></i> Facebook Posts
                     </button>
-                    <button type="button" class="more-options-btn" id="message-similarity-sidebar-btn">
-                        <i class="fas fa-search"></i> Multi Source Search
+                    <button type="button" class="more-options-btn" id="new-image-gallery-sidebar-btn">
+                        <i class="fas fa-images"></i>Images
+                    </button>
+                    <button type="button" class="more-options-btn" id="people-in-photos-sidebar-btn">
+                        <i class="fas fa-users"></i> People in Photos
                     </button>
                     <button type="button" class="more-options-btn" id="locations-sidebar-btn">
                         <i class="fas fa-map-marker-alt"></i> Locations
@@ -187,9 +187,10 @@
                     <button type="button" class="more-options-btn" id="artefacts-sidebar-btn">
                         <i class="fas fa-box-open"></i> Artefacts
                     </button>
-                    <button type="button" class="more-options-btn" id="people-in-photos-sidebar-btn">
-                        <i class="fas fa-users"></i> People in Photos
+                    <button type="button" class="more-options-btn" id="message-similarity-sidebar-btn">
+                        <i class="fas fa-search"></i> Multi Source Search
                     </button>
+
 
                     <!-- <button type="button" class="more-options-btn" id="identity-profile-wizard-btn-legacy" title="Create or edit your identity profile" style="margin-top:4px;">
                         <i class="fas fa-id-card"></i> Identity Profile
@@ -370,12 +371,11 @@
                     <button type="button" class="more-options-btn" id="sensitive-data-sidebar-btn">
                         <i class="fas fa-lock"></i> Sensitive &amp; Private Data
                     </button>
-                    <button type="button" class="more-options-btn" id="statistics-sidebar-btn">
-                        <i class="fas fa-chart-bar"></i> Dashboard
-                    </button>
-
                     <button type="button" class="more-options-btn" id="have-a-chat-sidebar-btn">
                         <i class="fas fa-comments"></i> Have a Chat
+                    </button>
+                    <button type="button" class="more-options-btn" id="interviewer-sidebar-btn">
+                        <i class="fas fa-microphone-alt"></i> Interviewer
                     </button>
                     <button type="button" class="more-options-btn" id="random-question-sidebar-btn">
                         <i class="fas fa-question-circle"></i> Random Question
@@ -383,8 +383,8 @@
                     <button type="button" class="more-options-btn" id="todays-thing-sidebar-btn">
                         <i class="fas fa-star"></i> Today's Thing of Interest
                     </button>
-                    <button type="button" class="more-options-btn" id="interviewer-sidebar-btn">
-                        <i class="fas fa-microphone-alt"></i> Interviewer
+                    <button type="button" class="more-options-btn" id="statistics-sidebar-btn">
+                        <i class="fas fa-chart-bar"></i> Dashboard
                     </button>
 
                 </div>
@@ -588,14 +588,23 @@
 
         <!-- Auto routing reason (last request) -->
         <div id="chat-auto-routing-reason-modal" class="modal" style="display:none;">
-            <div class="modal-content chat-auto-routing-reason-content" style="max-width:640px; width:92vw;" onclick="event.stopPropagation()">
+            <div class="modal-content chat-auto-routing-reason-content" style="max-width:920px; width:92vw;" onclick="event.stopPropagation()">
                 <div class="modal-header">
                     <h2><i class="fas fa-route"></i> Auto routing</h2>
                     <button type="button" class="modal-close-btn" id="close-chat-auto-routing-reason-modal">&times;</button>
                 </div>
                 <div class="modal-body chat-auto-routing-reason-body-wrap">
                     <p id="chat-auto-routing-reason-route" class="chat-auto-routing-reason-route"></p>
+                    <p id="chat-auto-routing-reason-time" class="chat-auto-routing-reason-time"></p>
                     <p id="chat-auto-routing-reason-text" class="chat-auto-routing-reason-text"></p>
+                    <div class="chat-auto-routing-reason-json-block">
+                        <h3 id="chat-auto-routing-reason-request-label" class="chat-auto-routing-reason-json-label">Classifier input</h3>
+                        <pre id="chat-auto-routing-reason-request" class="chat-auto-routing-reason-json"></pre>
+                    </div>
+                    <div class="chat-auto-routing-reason-json-block">
+                        <h3 id="chat-auto-routing-reason-response-label" class="chat-auto-routing-reason-json-label">Classifier output</h3>
+                        <pre id="chat-auto-routing-reason-response" class="chat-auto-routing-reason-json"></pre>
+                    </div>
                     <div class="chat-auto-routing-reason-actions">
                         <button type="button" class="modal-btn modal-btn-secondary" id="chat-auto-routing-reason-close-btn">Close</button>
                     </div>
@@ -1001,7 +1010,7 @@
                         <div class="local-ai-setup-ollama-block" data-local-ai-ollama-block>
                             <h3 class="local-ai-setup-heading">Local AI</h3>
                             <p class="local-ai-setup-lead" data-local-ai-lead>
-                                Local AI runs via Ollama at the address configured on the server. In the desktop app, Digital Museum can start Ollama and download models on this computer.
+                                Local AI runs via Ollama at the address configured on the server. The desktop app starts the embedding server at launch. The chat server starts the first time you use Local AI.
                             </p>
                             <div class="local-ai-setup-use-toggle setting-group">
                                 <label class="local-ai-setup-use-label" for="local-ai-use-enabled-checkbox">
@@ -1019,7 +1028,7 @@
                                     <option value="">Loading models…</option>
                                 </select>
                                 <p id="local-ai-chat-model-hint" class="local-ai-setup-use-hint">
-                                    Used for chat, Auto routing classifier, and image classification. Embedding model stays configured via <code>LOCALAI_EMBEDDING_MODEL</code> in .env.
+                                    Used for chat and image classification. Embedding model stays configured via <code>LOCALAI_EMBEDDING_MODEL</code> in .env.
                                 </p>
                                 <label class="local-ai-setup-use-label" for="local-ai-cuda-cpu-only-checkbox">
                                     <input type="checkbox" id="local-ai-cuda-cpu-only-checkbox">
@@ -1074,12 +1083,12 @@
                     <section class="section-config">
                         <h1>AI Models</h1>
                         <p style="margin: 0 0 1rem 0; color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-body);">
-                            Manage the AI models available throughout the app (chat, Have-a-Chat, Interviews, Quiz, and Auto routing). Each hosted model is routed through OpenRouter using the model slug you provide — see <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a> for available slugs. Local AI is always listed below (it needs no slug) and can be enabled/disabled and reordered like any hosted model — its position here also sets where it's tried during Auto routing. Open the top-bar <strong>AI Provider</strong> button to return here. When <strong>Enable Query Classifier</strong> is on, each main-chat message is classified and routed to Local AI or a hosted model automatically; when it is off, the model selected in the <strong>Chat</strong> column is used. Pick the <strong>Classifier</strong> model that runs that routing decision. When <strong>Enable error failover</strong> is on, hosted chat requests send OpenRouter up to three model slugs (primary first, then the next enabled models in table order). Changes take effect immediately, without a restart.
+                            Manage the AI models available throughout the app (chat, Have-a-Chat, Interviews, Quiz, and Auto routing). Each hosted model is routed through OpenRouter using the model slug you provide — see <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a> for available slugs. Local AI is always listed below (it needs no slug) and can be enabled/disabled and reordered like any hosted model — its position here also sets where it's tried during Auto routing. Open the top-bar <strong>AI Provider</strong> button to return here. When <strong>Enable Query Classifier</strong> is on, each main-chat message is classified by Jev (via OpenRouter) and routed to one of the enabled models; when it is off, the model selected in the <strong>Chat</strong> column is used. When <strong>Enable error failover</strong> is on, hosted chat requests send OpenRouter up to three model slugs (primary first, then the next enabled models in table order). Changes take effect immediately, without a restart.
                         </p>
                     </section>
                     <section class="config-section">
                         <div class="setting-group" style="margin-bottom: 0.75rem;">
-                            <label for="ai-models-config-auto-selection-checkbox" title="When enabled, each main-chat message is classified and routed to Local AI or a hosted model per request">
+                            <label for="ai-models-config-auto-selection-checkbox" title="When enabled, Jev classifies each main-chat message and routes it to an enabled model">
                                 <input type="checkbox" id="ai-models-config-auto-selection-checkbox" checked>
                                 Enable Query Classifier
                             </label>
@@ -1107,7 +1116,6 @@
                                         <th>OpenRouter model slug</th>
                                         <th style="text-align:center;">Enabled</th>
                                         <th style="text-align:center;" id="ai-models-config-chat-col-header">Chat</th>
-                                        <th style="text-align:center;" id="ai-models-config-classifier-col-header">Classifier</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -3256,6 +3264,9 @@
                                     <datalist id="new-image-gallery-person-list"></datalist>
                                 </div>
                                 <div class="new-image-gallery-search-row email-gallery-search-row">
+                                    <input type="number" id="new-image-gallery-min-people" placeholder="Min people in photo..." class="new-image-gallery-input email-gallery-input" title="Only show photos with at least this many people detected" min="1" step="1">
+                                </div>
+                                <div class="new-image-gallery-search-row email-gallery-search-row">
                                     <select id="new-image-gallery-source" class="new-image-gallery-select email-gallery-select" aria-label="Source">
                                         <option value="" selected>All sources</option>
                                         <option value="filesystem">Filesystem</option>
@@ -3337,6 +3348,7 @@
                                 </div>
                             </div>
                         </div>
+
                         </div>
 
                         <!-- Bulk Actions — pinned to bottom of sidebar -->
@@ -3356,6 +3368,9 @@
                                     </button>
                                     <button id="new-image-gallery-ai-classification-btn" class="modal-btn modal-btn-secondary" disabled type="button">
                                         <i class="fas fa-robot"></i> AI Classification
+                                    </button>
+                                    <button id="new-image-gallery-rescan-faces-btn" class="modal-btn modal-btn-secondary" disabled type="button" title="Clear and redetect faces in every selected photo from scratch">
+                                        <i class="fas fa-sync-alt"></i> Rescan for Faces
                                     </button>
                                     <button id="new-image-gallery-delete-selected-btn" class="modal-btn modal-btn-danger" disabled>
                                         <i class="fas fa-trash-alt"></i> Delete Selected
@@ -3391,11 +3406,30 @@
                         <div class="new-image-gallery-detail-image-wrap">
                             <img id="new-image-gallery-detail-image" class="new-image-gallery-detail-full-image" src="" alt="Image">
                             <div id="new-image-gallery-detail-face-overlay" class="face-bbox-overlay-container"></div>
+                            <div id="new-image-gallery-detail-identify-popover" class="face-identify-popover" style="display:none;">
+                                <div class="face-identify-popover-header">
+                                    <span>Who is this?</span>
+                                    <button type="button" id="new-image-gallery-detail-identify-close" class="face-identify-popover-close" aria-label="Close">&times;</button>
+                                </div>
+                                <input type="text" id="new-image-gallery-detail-identify-input" class="form-control" placeholder="Search contacts by name..." autocomplete="off">
+                                <div id="new-image-gallery-detail-identify-results" class="face-identify-popover-results"></div>
+                            </div>
                         </div>
-                        <label id="new-image-gallery-detail-face-toggle-label" class="face-bbox-toggle-label" style="display:none;">
-                            <input type="checkbox" id="new-image-gallery-detail-face-toggle" checked>
-                            Show identified people
-                        </label>
+                        <div class="face-bbox-controls-row">
+                            <label id="new-image-gallery-detail-face-toggle-label" class="face-bbox-toggle-label" style="display:none;">
+                                <input type="checkbox" id="new-image-gallery-detail-face-toggle" checked>
+                                Show identified people
+                            </label>
+                            <button type="button" id="new-image-gallery-detail-ignore-unnamed-btn" class="modal-btn modal-btn-secondary" style="display:none;" title="Ignore every unnamed person detected in this photo (this photo only)">
+                                <i class="fas fa-user-slash"></i> Ignore Unnamed People in This Image
+                            </button>
+                            <button type="button" id="new-image-gallery-detail-ignore-unnamed-all-btn" class="modal-btn modal-btn-secondary" style="display:none;" title="Ignore every unnamed person detected in this photo, in every other photo they appear in too">
+                                <i class="fas fa-user-slash"></i> Ignore Unnamed People in All Images
+                            </button>
+                            <button type="button" id="new-image-gallery-detail-rescan-faces-btn" class="modal-btn modal-btn-secondary" title="Clear and redetect faces in this photo from scratch">
+                                <i class="fas fa-sync-alt"></i> Rescan for Faces
+                            </button>
+                        </div>
                     </div>
                     <!-- Metadata Section -->
                     <div class="new-image-gallery-detail-metadata-section">
@@ -5673,10 +5707,20 @@
                     <button type="button" class="modal-btn modal-btn-secondary faces-filter-tab active" data-filter="all">All</button>
                     <button type="button" class="modal-btn modal-btn-secondary faces-filter-tab" data-filter="named">Named</button>
                     <button type="button" class="modal-btn modal-btn-secondary faces-filter-tab" data-filter="unnamed">Unnamed</button>
+                    <button type="button" class="modal-btn modal-btn-secondary faces-filter-tab" data-filter="suggested" title="Unnamed groups where a likely match was found among your already-named people">Possible Matches</button>
+                    <label id="faces-contact-name-control" class="faces-min-group-size-control" title="Filter named groups by contact name" style="display:none;">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="faces-contact-name-filter" class="faces-contact-name-input" placeholder="Filter by name...">
+                    </label>
                     <label class="faces-min-group-size-control" title="Only show groups with at least this many photos">
                         <i class="fas fa-layer-group"></i>
                         <span>Min size</span>
                         <input type="number" id="faces-min-group-size" class="faces-min-group-size-input" min="1" step="1" placeholder="1">
+                    </label>
+                    <label class="faces-min-group-size-control" title="Only show groups with at most this many photos">
+                        <i class="fas fa-layer-group"></i>
+                        <span>Max size</span>
+                        <input type="number" id="faces-max-group-size" class="faces-min-group-size-input" min="1" step="1" placeholder="Any">
                     </label>
                     <button type="button" id="faces-select-mode-toggle" class="modal-btn modal-btn-secondary" title="Select multiple to ignore">
                         <i class="fas fa-check-square"></i> Select
@@ -5687,23 +5731,34 @@
                 <span class="faces-bulk-toolbar-count"><span id="faces-bulk-count">0</span> selected</span>
                 <button type="button" id="faces-bulk-select-all-btn" class="modal-btn modal-btn-secondary">Select All On Page</button>
                 <button type="button" id="faces-bulk-clear-btn" class="modal-btn modal-btn-secondary">Clear</button>
-                <button type="button" id="faces-bulk-ignore-btn" class="modal-btn modal-btn-danger" disabled>
+                <button type="button" id="faces-bulk-ignore-btn" class="modal-btn modal-btn-danger" disabled title="Ignore selected people (excludes them from every photo)">
                     <i class="fas fa-eye-slash"></i> Ignore Selected
                 </button>
             </div>
             <div id="faces-empty-state" class="faces-empty-state" style="display:none;">
                 <i class="fas fa-users"></i>
-                <span>No faces detected yet. Run "Detect faces in photos" (and then "Group similar faces") from Configuration &rarr; Background Jobs.</span>
+                <span id="faces-empty-state-text" data-default-text="No faces detected yet. Run &quot;Detect faces in photos&quot; (and then &quot;Group similar faces&quot;) from Configuration → Background Jobs.">No faces detected yet. Run "Detect faces in photos" (and then "Group similar faces") from Configuration &rarr; Background Jobs.</span>
             </div>
             <div id="faces-cluster-grid" class="faces-cluster-grid"></div>
-            <div id="faces-pagination" class="faces-pagination" style="display:none;">
-                <button type="button" id="faces-pagination-prev" class="modal-btn modal-btn-secondary" aria-label="Previous page">
-                    <i class="fas fa-chevron-left"></i> Previous
-                </button>
-                <span id="faces-pagination-info" class="faces-pagination-info"></span>
-                <button type="button" id="faces-pagination-next" class="modal-btn modal-btn-secondary" aria-label="Next page">
-                    Next <i class="fas fa-chevron-right"></i>
-                </button>
+            <div class="faces-pagination-footer">
+                <label class="faces-page-size-control" title="Number of groups to show per page">
+                    <span>Per page</span>
+                    <select id="faces-page-size" class="faces-page-size-select">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                </label>
+                <div id="faces-pagination" class="faces-pagination" style="display:none;">
+                    <button type="button" id="faces-pagination-prev" class="modal-btn modal-btn-secondary" aria-label="Previous page">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <span id="faces-pagination-info" class="faces-pagination-info"></span>
+                    <button type="button" id="faces-pagination-next" class="modal-btn modal-btn-secondary" aria-label="Next page">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -5723,6 +5778,9 @@
                         <div id="face-cluster-contact-results" class="face-cluster-contact-results" style="display:none;"></div>
                     </div>
                     <button type="button" class="modal-btn modal-btn-secondary" id="face-cluster-unlink-btn" style="display:none;">Unlink</button>
+                    <button type="button" class="modal-btn modal-btn-danger" id="face-cluster-ignore-person-btn" title="Ignore this person (excludes them from every photo)">
+                        <i class="fas fa-eye-slash"></i> Ignore This Person
+                    </button>
                 </div>
                 <div id="face-cluster-suggestions" class="face-cluster-suggestions"></div>
                 <div class="face-cluster-member-heading-row">

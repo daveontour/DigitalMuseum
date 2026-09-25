@@ -66,29 +66,30 @@ type voiceEntry struct {
 
 // ChatService orchestrates AI generation, tool calling, and conversation persistence.
 type ChatService struct {
-	chatRepo             *repository.ChatRepo
-	subjectRepo          *repository.SubjectConfigRepo
-	appInstrRepo         *repository.AppSystemInstructionsRepo
-	cpRepo               *repository.CompleteProfileRepo
-	docRepo              *repository.DocumentRepo
-	pool                 *sql.DB
-	userRepo             *repository.UserRepo
-	aiModelsSvc          *AIModelsService
-	defaultLocalAIURL           string
-	defaultLocalAIEmbeddingURL  string
-	defaultLocalAIKey           string
-	defaultLocalAIModel  string
+	chatRepo                     *repository.ChatRepo
+	subjectRepo                  *repository.SubjectConfigRepo
+	appInstrRepo                 *repository.AppSystemInstructionsRepo
+	cpRepo                       *repository.CompleteProfileRepo
+	docRepo                      *repository.DocumentRepo
+	pool                         *sql.DB
+	userRepo                     *repository.UserRepo
+	aiModelsSvc                  *AIModelsService
+	defaultLocalAIURL            string
+	defaultLocalAIEmbeddingURL   string
+	defaultLocalAIKey            string
+	defaultLocalAIModel          string
 	defaultLocalAIEmbeddingModel string
-	defaultLocalAINumCtx int
-	pythonStaticDir      string
-	pepper               string
-	sessionStore         *keystore.SessionMasterStore
-	privateStore         *PrivateStoreService
-	billing              *repository.BillingRepo
-	dashSvc              *DashboardService
-	configRepo           *repository.ConfigRepo
-	localAIProbeCache    sync.Map
-	archiveInventoryCache sync.Map
+	defaultLocalAINumCtx         int
+	pythonStaticDir              string
+	pepper                       string
+	sessionStore                 *keystore.SessionMasterStore
+	privateStore                 *PrivateStoreService
+	billing                      *repository.BillingRepo
+	dashSvc                      *DashboardService
+	configRepo                   *repository.ConfigRepo
+	openRouterCatalog            *OpenRouterCatalogService
+	localAIProbeCache            sync.Map
+	archiveInventoryCache        sync.Map
 }
 
 // NewChatService creates a ChatService. OpenRouter/Tavily/RunPod API keys are configured
@@ -115,28 +116,37 @@ func NewChatService(
 	configRepo *repository.ConfigRepo,
 ) *ChatService {
 	return &ChatService{
-		chatRepo:             chatRepo,
-		subjectRepo:          subjectRepo,
-		appInstrRepo:         appInstrRepo,
-		cpRepo:               cpRepo,
-		docRepo:              docRepo,
-		pool:                 pool,
-		userRepo:             userRepo,
-		aiModelsSvc:          aiModelsSvc,
-		defaultLocalAIURL:           defaultLocalAIURL,
-		defaultLocalAIEmbeddingURL:  defaultLocalAIEmbeddingURL,
-		defaultLocalAIKey:           defaultLocalAIKey,
-		defaultLocalAIModel:  defaultLocalAIModel,
+		chatRepo:                     chatRepo,
+		subjectRepo:                  subjectRepo,
+		appInstrRepo:                 appInstrRepo,
+		cpRepo:                       cpRepo,
+		docRepo:                      docRepo,
+		pool:                         pool,
+		userRepo:                     userRepo,
+		aiModelsSvc:                  aiModelsSvc,
+		defaultLocalAIURL:            defaultLocalAIURL,
+		defaultLocalAIEmbeddingURL:   defaultLocalAIEmbeddingURL,
+		defaultLocalAIKey:            defaultLocalAIKey,
+		defaultLocalAIModel:          defaultLocalAIModel,
 		defaultLocalAIEmbeddingModel: defaultLocalAIEmbeddingModel,
-		defaultLocalAINumCtx: defaultLocalAINumCtx,
-		pythonStaticDir:      pythonStaticDir,
-		pepper:               pepper,
-		sessionStore:         sessionStore,
-		privateStore:         privateStore,
-		billing:              billing,
-		dashSvc:              dashSvc,
-		configRepo:           configRepo,
+		defaultLocalAINumCtx:         defaultLocalAINumCtx,
+		pythonStaticDir:              pythonStaticDir,
+		pepper:                       pepper,
+		sessionStore:                 sessionStore,
+		privateStore:                 privateStore,
+		billing:                      billing,
+		dashSvc:                      dashSvc,
+		configRepo:                   configRepo,
 	}
+}
+
+// SetOpenRouterCatalog attaches the cached OpenRouter catalog used to describe
+// models (and their prices) to the Jev classifier.
+func (s *ChatService) SetOpenRouterCatalog(catalog *OpenRouterCatalogService) {
+	if s == nil {
+		return
+	}
+	s.openRouterCatalog = catalog
 }
 
 func (s *ChatService) loadAppSystemInstructions(ctx context.Context) (chat, core, question string, err error) {

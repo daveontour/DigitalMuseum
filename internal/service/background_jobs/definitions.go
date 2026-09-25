@@ -9,6 +9,8 @@ const (
 	JobEmailEmbeddings          = "email_embeddings"
 	JobFaceDetection            = "face_detection"
 	JobFaceClustering           = "face_clustering"
+	JobFaceCropBackfill         = "face_crop_backfill"
+	JobFaceSuggestions          = "face_suggestions"
 )
 
 // DefaultDefinitions lists every maintenance job surfaced in Configuration > Background Jobs.
@@ -54,5 +56,17 @@ var DefaultDefinitions = []JobDef{
 		Title:                  "Group similar faces",
 		Description:            "Groups newly detected faces with people you've already named, and clusters the rest for you to review.",
 		DefaultIntervalSeconds: 10 * 60,
+	},
+	{
+		Name:                   JobFaceSuggestions,
+		Title:                  "Find possible matches for unnamed people",
+		Description:            "Compares each unnamed group of faces with the people you've already named, so People in Photos can show a \"Possible Matches\" list. Re-run after naming more people.",
+		DefaultIntervalSeconds: 60 * 60,
+	},
+	{
+		Name:                   JobFaceCropBackfill,
+		Title:                  "Backfill face crop thumbnails",
+		Description:            "Pre-generates and stores a thumbnail for every detected face found before this was done automatically, so People in Photos loads instantly instead of re-cropping each photo on every view.",
+		DefaultIntervalSeconds: 0,
 	},
 }

@@ -98,7 +98,8 @@ func (h *ChatHandler) GetOpenRouterCredits(w http.ResponseWriter, r *http.Reques
 
 // GET /api/local-ai/status — auth-exempt; infrastructure probe works before sign-in.
 func (h *ChatHandler) GetLocalAIStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, h.svc.LocalAIStatus(r.Context()))
+	probeChat := r.URL.Query().Get("probe_chat") != "0"
+	writeJSON(w, h.svc.LocalAIStatusProbe(r.Context(), probeChat))
 }
 
 // POST /chat/generate

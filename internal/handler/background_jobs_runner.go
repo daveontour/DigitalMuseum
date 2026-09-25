@@ -76,6 +76,10 @@ func (r *backgroundJobsRunner) jobByName(name string) (*importer.ImportJob, bool
 		return faceDetectionJob, true
 	case backgroundjobs.JobFaceClustering:
 		return faceClusteringJob, true
+	case backgroundjobs.JobFaceCropBackfill:
+		return faceCropBackfillJob, true
+	case backgroundjobs.JobFaceSuggestions:
+		return faceSuggestionsJob, true
 	}
 	return nil, false
 }
@@ -145,6 +149,10 @@ func (r *backgroundJobsRunner) Start(ctx context.Context, jobName string, uid in
 		return r.startFaceDetection(ctx, uid)
 	case backgroundjobs.JobFaceClustering:
 		return r.startFaceClustering(uid)
+	case backgroundjobs.JobFaceCropBackfill:
+		return r.startFaceCropBackfill(uid)
+	case backgroundjobs.JobFaceSuggestions:
+		return r.startFaceSuggestions(uid)
 	}
 	return fmt.Errorf("unknown background job %q", jobName)
 }
@@ -308,5 +316,39 @@ func (r *backgroundJobsRunner) startFaceClustering(uid int64) error {
 	})
 	faceClusteringJob.Broadcast("status", map[string]any{"status_line": "Starting face clustering (background scheduler)..."})
 	go runFaceClustering(r.faceSvc, faceClusteringJob, uid)
+	return nil
+}
+
+func (r *backgroundJobsRunner) startFaceCropBackfill(uid int64) error {
+	if r.faceRepo == nil || r.imageSvc == nil {
+		return fmt.Errorf("face crop backfill: face services not configured")
+	}
+	if err := faceCropBackfillJob.AssertNotRunning(); err != nil {
+		return err
+	}
+	faceCropBackfillJob.Start()
+	faceCropBackfillJob.UpdateState(map[string]any{
+		"status": "in_progress", "status_line": "Starting face crop thumbnail backfill (background scheduler)...",
+		"total": 0, "processed": 0, "generated": 0, "errors": 0,
+	})
+	faceCropBackfillJob.Broadcast("status", map[string]any{"status_line": "Starting face crop thumbnail backfill (background scheduler)..."})
+	go runFaceCropBackfill(r.faceRepo, r.imageSvc, faceCropBackfillJob, uid)
+	return nil
+}
+
+func (r *backgroundJobsRunner) startFaceSuggestions(uid int64) error {
+	if r.faceSvc == nil {
+		return fmt.Errorf("face suggestions: face services not configured")
+	}
+	if err := faceSuggestionsJob.AssertNotRunning(); err != nil {
+		return err
+	}
+	faceSuggestionsJob.Start()
+	faceSuggestionsJob.UpdateState(map[string]any{
+		"status": "in_progress", "status_line": "Finding possible matches for unnamed people (background scheduler)...",
+		"total": 0, "processed": 0, "suggested": 0,
+	})
+	faceSuggestionsJob.Broadcast("status", map[string]any{"status_line": "Finding possible matches for unnamed people (background scheduler)..."})
+	go runFaceSuggestions(r.faceSvc, faceSuggestionsJob, uid)
 	return nil
 }

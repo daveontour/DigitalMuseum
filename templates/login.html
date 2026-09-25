@@ -420,7 +420,7 @@
             <div id="adv-ollama-block">
                 <div style="color:#cdd6e8; font-size:0.88rem; font-weight:600; margin-bottom:4px;">Local AI</div>
                 <div style="color:#8fa4c8; font-size:0.82rem; margin-bottom:10px;">
-                    Local AI runs via Ollama at the address configured on the server. In the desktop app, Digital Museum can start Ollama and download models on this computer.
+                    Local AI runs via Ollama at the address configured on the server. The desktop app starts the embedding server at launch. The chat server starts the first time you use Local AI.
                 </div>
                 <div id="adv-local-ai-rows" style="margin-top:4px;">
                     <div class="adv-status-row">
@@ -1270,9 +1270,9 @@
                 });
             }
 
-            async function refreshLocalAiStatus() {
+            async function refreshLocalAiStatus(probeChat) {
                 if (typeof LocalAiSetup === 'undefined' || !LocalAiSetup.refreshLoginAdvanced) return null;
-                const status = await LocalAiSetup.refreshLoginAdvanced();
+                const status = await LocalAiSetup.refreshLoginAdvanced({ probeChat: probeChat !== false });
                 syncAiSetupTriggerAlertFromStatus();
                 if (status && status.infrastructure_available && typeof setStep === 'function') {
                     setStep(3);
@@ -1320,7 +1320,7 @@
             });
 
             (async function() {
-                await refreshLocalAiStatus();
+                await refreshLocalAiStatus(false);
                 if (!HAS_REGISTERED_USER && advBtn.classList.contains('advanced-btn-needs-attention')) {
                     await openSetupPanel();
                 }

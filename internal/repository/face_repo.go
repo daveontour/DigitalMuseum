@@ -40,23 +40,101 @@ func scanFace(row interface{ Scan(...any) error }) (*model.Face, error) {
 }
 
 // InsertFace stores one detected face for a photo. face_cluster_id and
-// contact_id start unset — clustering assigns them later.
+// contact_id start unset — clustering assigns them later. f.CropData is
+// optional (nil is stored as SQL NULL) — see model.Face's doc comment;
+// runFaceDetection passes the crop it already generated from the
+// in-memory source photo, so viewing this face later never needs to
+// re-fetch/re-crop the original.
 func (r *FaceRepo) InsertFace(ctx context.Context, f *model.Face) (int64, error) {
 	uid := uidFromCtx(ctx)
 	var id int64
 	err := r.pool.QueryRowContext(ctx, `
 		INSERT INTO media_item_faces (
 			media_item_id, bbox_x, bbox_y, bbox_w, bbox_h,
-			detection_confidence, landmarks, embedding_model, user_id, created_at, updated_at
-		) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			detection_confidence, landmarks, embedding_model, crop_data, user_id, created_at, updated_at
+		) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id`,
 		f.MediaItemID, f.BBoxX, f.BBoxY, f.BBoxW, f.BBoxH,
-		f.DetectionConfidence, f.Landmarks, f.EmbeddingModel, uidVal(uid),
+		f.DetectionConfidence, f.Landmarks, f.EmbeddingModel, f.CropData, uidVal(uid),
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("insert face: %w", err)
 	}
 	return id, nil
+}
+
+// GetFaceCropData returns the stored crop JPEG for a face, or nil if it
+// hasn't been generated yet (a face detected before crop storage was added —
+// callers should fall back to generating one on demand, see
+// FaceHandler.serveFaceCrop).
+func (r *FaceRepo) GetFaceCropData(ctx context.Context, id int64) ([]byte, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT crop_data FROM media_item_faces WHERE id = ?1`
+	args := []any{id}
+	q, args = addUIDFilter(q, args, uid)
+	var data []byte
+	err := r.pool.QueryRowContext(ctx, q, args...).Scan(&data)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get face crop data: %w", err)
+	}
+	return data, nil
+}
+
+// SetFaceCropData stores a generated crop JPEG for an existing face — used
+// by the "Backfill face crop thumbnails" job to populate faces detected
+// before crop storage was added.
+func (r *FaceRepo) SetFaceCropData(ctx context.Context, id int64, data []byte) error {
+	uid := uidFromCtx(ctx)
+	q := `UPDATE media_item_faces SET crop_data = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2`
+	args := []any{data, id}
+	q, args = addUIDFilterDollar(q, args, uid)
+	if _, err := r.pool.ExecContext(ctx, q, args...); err != nil {
+		return fmt.Errorf("set face crop data: %w", err)
+	}
+	return nil
+}
+
+// FaceCropBackfillRow is one face still missing a stored crop (see
+// SetFaceCropData), enough to regenerate it without a second GetFace call.
+type FaceCropBackfillRow struct {
+	ID          int64
+	MediaItemID int64
+	BBoxX       float64
+	BBoxY       float64
+	BBoxW       float64
+	BBoxH       float64
+}
+
+// ListFacesMissingCropData returns every non-ignored face without a stored
+// crop yet, ordered by media_item_id so the backfill job can fetch each
+// source photo once and crop every one of its faces from that single fetch.
+func (r *FaceRepo) ListFacesMissingCropData(ctx context.Context) ([]FaceCropBackfillRow, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT id, media_item_id, bbox_x, bbox_y, bbox_w, bbox_h
+	      FROM media_item_faces
+	      WHERE crop_data IS NULL AND ignored = FALSE`
+	args := []any{}
+	q, args = addUIDFilter(q, args, uid)
+	q += " ORDER BY media_item_id ASC, id ASC"
+
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list faces missing crop data: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []FaceCropBackfillRow
+	for rows.Next() {
+		var row FaceCropBackfillRow
+		if err := rows.Scan(&row.ID, &row.MediaItemID, &row.BBoxX, &row.BBoxY, &row.BBoxW, &row.BBoxH); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }
 
 // GetFace returns one face row by id.
@@ -218,6 +296,39 @@ func (r *FaceRepo) IgnoreFace(ctx context.Context, faceID int64) error {
 	return nil
 }
 
+// IgnoreCluster ignores every member face of a cluster in one action — the
+// "ignore this person" action, as opposed to IgnoreFace's single-detection
+// scope: every photo this person was grouped into stops being tracked, not
+// just whichever face triggered the action. Like IgnoreFace, ignored faces
+// are never re-homed by a later clustering run. The cluster row itself is
+// left in place with face_count reset to 0, so it simply stops appearing in
+// ListClusters (same "face_count > 0" convention as a cluster emptied one
+// face at a time via DetachFace/IgnoreFace — see removeFaceFromItsCluster).
+func (r *FaceRepo) IgnoreCluster(ctx context.Context, clusterID int64) error {
+	uid := uidFromCtx(ctx)
+	tx, err := r.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("ignore cluster: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	facesQ := `UPDATE media_item_faces SET ignored = TRUE, face_cluster_id = NULL, contact_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE face_cluster_id = ?1`
+	facesArgs := []any{clusterID}
+	facesQ, facesArgs = addUIDFilterDollar(facesQ, facesArgs, uid)
+	if _, err := tx.ExecContext(ctx, facesQ, facesArgs...); err != nil {
+		return fmt.Errorf("ignore cluster: update member faces: %w", err)
+	}
+
+	clusterQ := `UPDATE face_clusters SET face_count = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?1`
+	clusterArgs := []any{clusterID}
+	clusterQ, clusterArgs = addUIDFilterDollar(clusterQ, clusterArgs, uid)
+	if _, err := tx.ExecContext(ctx, clusterQ, clusterArgs...); err != nil {
+		return fmt.Errorf("ignore cluster: update cluster: %w", err)
+	}
+
+	return tx.Commit()
+}
+
 // CreateCluster creates a new cluster with the given face as its first
 // (and, for now, only) member and representative face.
 func (r *FaceRepo) CreateCluster(ctx context.Context, representativeFaceID int64) (int64, error) {
@@ -311,23 +422,36 @@ func (r *FaceRepo) SetClusterContact(ctx context.Context, clusterID int64, conta
 	return tx.Commit()
 }
 
+// faceClusterListColumns is the SELECT list for FaceClusterWithContact rows;
+// callers must alias face_clusters as fc and LEFT JOIN contacts as c (on
+// contact_id) and sc (on suggested_contact_id).
+const faceClusterListColumns = `fc.id, fc.contact_id, fc.representative_face_id, fc.face_count,
+		       fc.created_at, fc.updated_at, fc.suggested_contact_id, fc.suggested_distance,
+		       c.name, sc.name`
+
+func scanFaceClusterWithContact(row interface{ Scan(dest ...any) error }) (*model.FaceClusterWithContact, error) {
+	c := &model.FaceClusterWithContact{}
+	err := row.Scan(
+		&c.ID, &c.ContactID, &c.RepresentativeFaceID, &c.FaceCount,
+		&c.CreatedAt, &c.UpdatedAt, &c.SuggestedContactID, &c.SuggestedDistance,
+		&c.ContactName, &c.SuggestedContactName,
+	)
+	return c, err
+}
+
 // GetCluster returns one cluster by id, joined with its contact's name if linked.
 func (r *FaceRepo) GetCluster(ctx context.Context, id int64) (*model.FaceClusterWithContact, error) {
 	uid := uidFromCtx(ctx)
 	q := `
-		SELECT fc.id, fc.contact_id, fc.representative_face_id, fc.face_count,
-		       fc.created_at, fc.updated_at, c.name
+		SELECT ` + faceClusterListColumns + `
 		FROM face_clusters fc
 		LEFT JOIN contacts c ON c.id = fc.contact_id
+		LEFT JOIN contacts sc ON sc.id = fc.suggested_contact_id
 		WHERE fc.id = ?1`
 	args := []any{id}
 	q, args = addUIDFilterQualified(q, args, uid, "fc")
 
-	c := &model.FaceClusterWithContact{}
-	err := r.pool.QueryRowContext(ctx, q, args...).Scan(
-		&c.ID, &c.ContactID, &c.RepresentativeFaceID, &c.FaceCount,
-		&c.CreatedAt, &c.UpdatedAt, &c.ContactName,
-	)
+	c, err := scanFaceClusterWithContact(r.pool.QueryRowContext(ctx, q, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -339,9 +463,9 @@ func (r *FaceRepo) GetCluster(ctx context.Context, id int64) (*model.FaceCluster
 
 // ListClusters returns one page of clusters ordered by most faces first,
 // optionally filtered to only named (contact_id set) or only unnamed
-// clusters and/or to clusters with more than one member face (minFaceCount),
-// plus the total count matching the filter (for page-count UI). A cluster
-// whose faces were all detached/ignored (face_count reaching 0 — see
+// clusters and/or to a face_count range (minFaceCount/maxFaceCount), plus
+// the total count matching the filter (for page-count UI). A cluster whose
+// faces were all detached/ignored (face_count reaching 0 — see
 // removeFaceFromItsCluster) is excluded rather than shown as an empty card.
 //
 // Pagination is server-side (not just client-side render batching, unlike
@@ -350,9 +474,11 @@ func (r *FaceRepo) GetCluster(ctx context.Context, id int64) (*model.FaceCluster
 // than a stored, cheap-to-serve file — fetching every cluster at once would
 // mean firing that subprocess once per cluster in the whole archive.
 // limit<=0 means "no limit" (every matching cluster, offset still applied),
-// matching ContactRepo.ListShort's convention. minFaceCount<=1 applies no
-// extra filter beyond the always-on face_count > 0.
-func (r *FaceRepo) ListClusters(ctx context.Context, namedOnly, unnamedOnly bool, minFaceCount, limit, offset int) ([]*model.FaceClusterWithContact, int, error) {
+// matching ContactRepo.ListShort's convention. minFaceCount<=1 and
+// maxFaceCount<=0 apply no extra filter beyond the always-on face_count > 0.
+// suggestedOnly restricts to unnamed clusters that have a stored "possible
+// match" (see FaceService.RefreshClusterSuggestions), best guesses first.
+func (r *FaceRepo) ListClusters(ctx context.Context, namedOnly, unnamedOnly, suggestedOnly bool, minFaceCount, maxFaceCount int, contactName string, limit, offset int) ([]*model.FaceClusterWithContact, int, error) {
 	uid := uidFromCtx(ctx)
 	var conds []string
 	var args []any
@@ -360,16 +486,37 @@ func (r *FaceRepo) ListClusters(ctx context.Context, namedOnly, unnamedOnly bool
 	if namedOnly {
 		conds = append(conds, "fc.contact_id IS NOT NULL")
 	}
-	if unnamedOnly {
+	if unnamedOnly || suggestedOnly {
 		conds = append(conds, "fc.contact_id IS NULL")
+	}
+	if suggestedOnly {
+		conds = append(conds, "fc.suggested_contact_id IS NOT NULL")
 	}
 	if minFaceCount > 1 {
 		conds = append(conds, "fc.face_count >= ?")
 		args = append(args, minFaceCount)
 	}
+	if maxFaceCount > 0 {
+		conds = append(conds, "fc.face_count <= ?")
+		args = append(args, maxFaceCount)
+	}
+	if contactName != "" {
+		// c.name/alternative_names are NULL for unnamed clusters (LEFT JOIN),
+		// so this naturally excludes them without needing namedOnly set too —
+		// same LIKE-matching convention as findPhotosOfPerson/getEmailsByContact.
+		pattern := "%" + contactName + "%"
+		conds = append(conds, "(c.name LIKE ? OR c.alternative_names LIKE ?)")
+		args = append(args, pattern, pattern)
+	}
 	where := " WHERE " + strings.Join(conds, " AND ")
 
-	countQ := `SELECT COUNT(*) FROM face_clusters fc` + where
+	// The count query doesn't join contacts, so a contactName filter (which
+	// references c.name/c.alternative_names) needs its own join there too.
+	countFrom := "FROM face_clusters fc"
+	if contactName != "" {
+		countFrom += " LEFT JOIN contacts c ON c.id = fc.contact_id"
+	}
+	countQ := `SELECT COUNT(*) ` + countFrom + where
 	countQ, countArgs := addUIDFilterQualified(countQ, args, uid, "fc")
 	var total int
 	if err := r.pool.QueryRowContext(ctx, countQ, countArgs...).Scan(&total); err != nil {
@@ -377,12 +524,16 @@ func (r *FaceRepo) ListClusters(ctx context.Context, namedOnly, unnamedOnly bool
 	}
 
 	q := `
-		SELECT fc.id, fc.contact_id, fc.representative_face_id, fc.face_count,
-		       fc.created_at, fc.updated_at, c.name
+		SELECT ` + faceClusterListColumns + `
 		FROM face_clusters fc
-		LEFT JOIN contacts c ON c.id = fc.contact_id` + where
+		LEFT JOIN contacts c ON c.id = fc.contact_id
+		LEFT JOIN contacts sc ON sc.id = fc.suggested_contact_id` + where
 	q, args = addUIDFilterQualified(q, args, uid, "fc")
-	q += " ORDER BY fc.face_count DESC, fc.id ASC"
+	if suggestedOnly {
+		q += " ORDER BY fc.suggested_distance ASC, fc.id ASC"
+	} else {
+		q += " ORDER BY fc.face_count DESC, fc.id ASC"
+	}
 	if limit > 0 {
 		args = append(args, limit)
 		q += " LIMIT ?"
@@ -400,11 +551,8 @@ func (r *FaceRepo) ListClusters(ctx context.Context, namedOnly, unnamedOnly bool
 
 	var out []*model.FaceClusterWithContact
 	for rows.Next() {
-		c := &model.FaceClusterWithContact{}
-		if err := rows.Scan(
-			&c.ID, &c.ContactID, &c.RepresentativeFaceID, &c.FaceCount,
-			&c.CreatedAt, &c.UpdatedAt, &c.ContactName,
-		); err != nil {
+		c, err := scanFaceClusterWithContact(rows)
+		if err != nil {
 			return nil, 0, err
 		}
 		out = append(out, c)
@@ -413,6 +561,66 @@ func (r *FaceRepo) ListClusters(ctx context.Context, namedOnly, unnamedOnly bool
 		return nil, 0, err
 	}
 	return out, total, nil
+}
+
+// ListNamedFaceContacts maps every non-ignored face that's linked to a
+// contact (its face id) to that contact id — the reference set
+// FaceService.RefreshClusterSuggestions matches unnamed clusters against.
+func (r *FaceRepo) ListNamedFaceContacts(ctx context.Context) (map[int64]int64, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT id, contact_id FROM media_item_faces WHERE contact_id IS NOT NULL AND ignored = FALSE`
+	q, args := addUIDFilter(q, nil, uid)
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list named face contacts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[int64]int64{}
+	for rows.Next() {
+		var faceID, contactID int64
+		if err := rows.Scan(&faceID, &contactID); err != nil {
+			return nil, err
+		}
+		out[faceID] = contactID
+	}
+	return out, rows.Err()
+}
+
+// ReplaceClusterSuggestions clears every stored "possible match" for the
+// current user and writes suggestions in its place, in one transaction — so a
+// cluster that no longer has a close enough named match (or has since been
+// named) doesn't keep a stale guess.
+func (r *FaceRepo) ReplaceClusterSuggestions(ctx context.Context, suggestions []model.ClusterSuggestion) error {
+	uid := uidFromCtx(ctx)
+	tx, err := r.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("replace cluster suggestions: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	clearQ := `UPDATE face_clusters SET suggested_contact_id = NULL, suggested_distance = NULL WHERE suggested_contact_id IS NOT NULL`
+	clearQ, clearArgs := addUIDFilter(clearQ, nil, uid)
+	if _, err := tx.ExecContext(ctx, clearQ, clearArgs...); err != nil {
+		return fmt.Errorf("replace cluster suggestions: clear: %w", err)
+	}
+
+	setQ := `UPDATE face_clusters SET suggested_contact_id = ?1, suggested_distance = ?2 WHERE id = ?3 AND contact_id IS NULL`
+	setQ, _ = addUIDFilterDollar(setQ, []any{nil, nil, nil}, uid)
+	stmt, err := tx.PrepareContext(ctx, setQ)
+	if err != nil {
+		return fmt.Errorf("replace cluster suggestions: prepare: %w", err)
+	}
+	defer func() { _ = stmt.Close() }()
+	for _, s := range suggestions {
+		args := []any{s.ContactID, s.Distance, s.ClusterID}
+		if uid != 0 {
+			args = append(args, uid)
+		}
+		if _, err := stmt.ExecContext(ctx, args...); err != nil {
+			return fmt.Errorf("replace cluster suggestions: set cluster %d: %w", s.ClusterID, err)
+		}
+	}
+	return tx.Commit()
 }
 
 // ListImageIDsForFaceDetection returns image media_items IDs not yet scanned
@@ -457,4 +665,73 @@ func (r *FaceRepo) MarkMediaItemFacesProcessed(ctx context.Context, mediaItemID 
 		return fmt.Errorf("mark media item faces processed: %w", err)
 	}
 	return nil
+}
+
+// DeleteFacesForMediaItem permanently removes every detected face for one
+// photo (ignored or not) — the "clear previous detections" step of a
+// rescan, so a fresh detection pass can insert a clean set of rows instead
+// of duplicating whatever was already there. Any cluster a deleted face
+// belonged to has its face_count decremented so it doesn't drift out of
+// sync (same bookkeeping as removeFaceFromItsCluster, applied in bulk here
+// since a rescan can touch faces from several different clusters at once).
+// Returns the deleted face ids so the caller can also drop their
+// face_embeddings vec0 rows via FaceEmbeddingHelper.Delete — FaceRepo has
+// no handle on that helper, and vec0 rows aren't covered by a SQL foreign
+// key (SQLite virtual tables don't support cascading deletes).
+func (r *FaceRepo) DeleteFacesForMediaItem(ctx context.Context, mediaItemID int64) ([]int64, error) {
+	uid := uidFromCtx(ctx)
+	tx, err := r.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("delete faces for media item: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	selQ := `SELECT id, face_cluster_id FROM media_item_faces WHERE media_item_id = ?1`
+	selArgs := []any{mediaItemID}
+	selQ, selArgs = addUIDFilterDollar(selQ, selArgs, uid)
+	rows, err := tx.QueryContext(ctx, selQ, selArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("delete faces for media item: list: %w", err)
+	}
+	var faceIDs []int64
+	clusterCounts := map[int64]int{}
+	for rows.Next() {
+		var id int64
+		var clusterID sql.NullInt64
+		if err := rows.Scan(&id, &clusterID); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("delete faces for media item: scan: %w", err)
+		}
+		faceIDs = append(faceIDs, id)
+		if clusterID.Valid {
+			clusterCounts[clusterID.Int64]++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	_ = rows.Close()
+
+	if len(faceIDs) == 0 {
+		return nil, tx.Commit()
+	}
+
+	delQ := `DELETE FROM media_item_faces WHERE media_item_id = ?1`
+	delArgs := []any{mediaItemID}
+	delQ, delArgs = addUIDFilterDollar(delQ, delArgs, uid)
+	if _, err := tx.ExecContext(ctx, delQ, delArgs...); err != nil {
+		return nil, fmt.Errorf("delete faces for media item: delete: %w", err)
+	}
+
+	for clusterID, n := range clusterCounts {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE face_clusters SET face_count = MAX(face_count - ?1, 0), updated_at = CURRENT_TIMESTAMP WHERE id = ?2`,
+			n, clusterID,
+		); err != nil {
+			return nil, fmt.Errorf("delete faces for media item: decrement cluster %d: %w", clusterID, err)
+		}
+	}
+
+	return faceIDs, tx.Commit()
 }

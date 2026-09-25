@@ -3,13 +3,12 @@ package contacts
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/daveontour/aimuseum/internal/appctx"
-	"github.com/daveontour/aimuseum/internal/sqlutil"
 )
 
 // activeEmailsWhere returns a WHERE clause that excludes soft-deleted emails and scopes by user_id when set in ctx.
@@ -150,19 +149,145 @@ func ReadRelationshipsFromDatabase(ctx context.Context, db *sql.DB, query string
 	return relationships, nil
 }
 
-// SubjectIdentifiers holds the subject's (id=0) identifiers for directional message queries.
-type SubjectIdentifiers struct {
-	WhatsAppID  *string
-	IMessageID  *string
-	SMSID       *string
-	FacebookID  *string
-	InstagramID *string
+// existingContactRow is one row loaded from contacts before an extraction
+// write, used to match freshly computed records against already-present
+// contacts instead of blindly overwriting the table.
+type existingContactRow struct {
+	ID               int64
+	Name             string
+	AlternativeNames string
+	Email            string
+	Used             bool
 }
 
-// WriteContactsToDatabase writes formatted contact records to the contacts table.
-// Maps: id->id, primary_name->name, alternative_names->alternative_names, emails->email.
-// Truncates the contacts table (and dependent relationships) before inserting.
-// Preserves and restores subject (id=0) identifiers (whatsappid, imessageid, smsid, facebookid, instagramid).
+// splitTrimmed splits a comma-joined string into trimmed, non-empty parts.
+func splitTrimmed(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// mergeCommaSets unions two comma-joined lists, case-insensitively deduped,
+// preserving each kept entry's original casing and returning them sorted.
+func mergeCommaSets(existing, newVal string) string {
+	seen := map[string]struct{}{}
+	var out []string
+	add := func(s string) {
+		key := strings.ToLower(s)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, s)
+	}
+	for _, s := range splitTrimmed(existing) {
+		add(s)
+	}
+	for _, s := range splitTrimmed(newVal) {
+		add(s)
+	}
+	sort.Strings(out)
+	return strings.Join(out, ", ")
+}
+
+// matchExistingContact finds the best still-unused existing contact for a
+// freshly computed record, in priority order: exact normalized email, exact
+// case-insensitive name (either direction between primary/alternative
+// names), then fuzzy name similarity (same scorer/threshold runMerge uses
+// to cluster raw records in the first place). Returns nil when nothing
+// clears the bar, so the caller inserts a new contact instead of guessing.
+func matchExistingContact(r FormattedOutputRecord, existing []*existingContactRow) *existingContactRow {
+	for _, e := range splitTrimmed(r.Emails) {
+		norm := NormalizeEmailForMatching(e)
+		if norm == "" {
+			continue
+		}
+		for _, ex := range existing {
+			if ex.Used {
+				continue
+			}
+			for _, exEmail := range splitTrimmed(ex.Email) {
+				if NormalizeEmailForMatching(exEmail) == norm {
+					return ex
+				}
+			}
+		}
+	}
+
+	primaryLower := strings.ToLower(strings.TrimSpace(r.PrimaryName))
+	altLowerSet := map[string]struct{}{}
+	for _, a := range splitTrimmed(r.AlternativeNames) {
+		altLowerSet[strings.ToLower(a)] = struct{}{}
+	}
+	for _, ex := range existing {
+		if ex.Used {
+			continue
+		}
+		exNameLower := strings.ToLower(strings.TrimSpace(ex.Name))
+		if exNameLower != "" && exNameLower == primaryLower {
+			return ex
+		}
+		if _, ok := altLowerSet[exNameLower]; ok {
+			return ex
+		}
+		for _, exAlt := range splitTrimmed(ex.AlternativeNames) {
+			if strings.ToLower(exAlt) == primaryLower {
+				return ex
+			}
+		}
+	}
+
+	rNorm := normalizeName(r.PrimaryName)
+	if rNorm == "" {
+		return nil
+	}
+	var best *existingContactRow
+	bestScore := 0.0
+	for _, ex := range existing {
+		if ex.Used {
+			continue
+		}
+		if score := fuzzySimilarity(rNorm, normalizeName(ex.Name)); score > bestScore {
+			bestScore = score
+			best = ex
+		}
+	}
+	if best != nil && bestScore >= FuzzyMergeThreshold {
+		return best
+	}
+	return nil
+}
+
+func clampNonNegative(n int64) int64 {
+	if n < 0 {
+		return 0
+	}
+	return n
+}
+
+// WriteContactsToDatabase upserts formatted contact records into the
+// contacts table instead of rebuilding it from scratch: each record is
+// matched against already-present contacts (see matchExistingContact) and,
+// on a match, only extraction-derived columns (message counts, merged
+// alternative_names/email, is_group, total) are updated — name, rel_type,
+// description, use_by_ai and the whatsappid/imessageid/smsid/facebookid/
+// instagramid columns are left exactly as they were, since they're either
+// user-edited (a manual rename, a rel_type/description set from the
+// Contacts UI) or set by a different mechanism entirely (rel_type is also
+// separately reapplied by ApplyClassificationsToContacts after this
+// returns). Unmatched existing contacts — including ones created purely to
+// name a face, which have no message history to ever match against — are
+// never touched or deleted, so ids stay stable and every FK that points at
+// a contact (media_item_faces.contact_id, face_clusters.contact_id,
+// relationships, subject_configuration.subject_contact_id) survives a rerun.
 func WriteContactsToDatabase(ctx context.Context, db *sql.DB, records []FormattedOutputRecord, ownerUserID int64) error {
 	totalRecords := len(records)
 	fmt.Fprintf(os.Stderr, "Starting contacts transaction (%d records)\n", totalRecords)
@@ -171,231 +296,114 @@ func WriteContactsToDatabase(ctx context.Context, db *sql.DB, records []Formatte
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	fmt.Fprintf(os.Stderr, "Contacts transaction begun\n")
 
-	var subjectIds SubjectIdentifiers
-	err = tx.QueryRowContext(ctx, "SELECT whatsappid, imessageid, smsid, facebookid, instagramid FROM contacts WHERE id = 0").Scan(
-		&subjectIds.WhatsAppID, &subjectIds.IMessageID, &subjectIds.SMSID, &subjectIds.FacebookID, &subjectIds.InstagramID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("read subject identifiers: %w", err)
-	}
-	fmt.Fprintf(os.Stderr, "Subject identifiers loaded\n")
-
-	if sqlutil.IsSQLite(ctx, db) {
-		// SQLite has no TRUNCATE; FKs from relationships ON DELETE CASCADE clear dependent rows.
-		_, err = tx.ExecContext(ctx, "DELETE FROM contacts")
-		fmt.Fprintf(os.Stderr, "SQLite contacts table cleared\n")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error clearing SQLite contacts table: %v\n", err)
-		}
-	} else {
-		_, err = tx.ExecContext(ctx, "TRUNCATE contacts CASCADE")
-		fmt.Fprintf(os.Stderr, "PostgreSQL contacts table cleared\n")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error clearing PostgreSQL contacts table: %v\n", err)
-		}
-	}
+	rows, err := tx.QueryContext(ctx, `SELECT id, COALESCE(name, ''), COALESCE(alternative_names, ''), COALESCE(email, '') FROM contacts`)
 	if err != nil {
-		return fmt.Errorf("truncate contacts: %w", err)
+		return fmt.Errorf("load existing contacts: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "Contacts table cleared, inserting records\n")
+	var existing []*existingContactRow
+	for rows.Next() {
+		ec := &existingContactRow{}
+		if err := rows.Scan(&ec.ID, &ec.Name, &ec.AlternativeNames, &ec.Email); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan existing contact: %w", err)
+		}
+		existing = append(existing, ec)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("iterate existing contacts: %w", err)
+	}
+	_ = rows.Close()
+	fmt.Fprintf(os.Stderr, "Loaded %d existing contacts for matching\n", len(existing))
+
+	existingByID := make(map[int64]*existingContactRow, len(existing))
+	for _, ec := range existing {
+		existingByID[ec.ID] = ec
+	}
+
+	var userIDArg any
+	if ownerUserID > 0 {
+		userIDArg = ownerUserID
+	}
 
 	const progressInterval = 1000
+	matched, inserted := 0, 0
 	for i, r := range records {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("write contacts cancelled: %w", ctx.Err())
 		default:
 		}
-		nemails := r.NumEmails
-		nw, ni, nf, ns, ninst := r.NumWhatsApp, r.NumIMessage, r.NumFacebook, r.NumSMS, r.NumInstagram
-		if nemails < 0 {
-			nemails = 0
-		}
-		if nw < 0 {
-			nw = 0
-		}
-		if ni < 0 {
-			ni = 0
-		}
-		if nf < 0 {
-			nf = 0
-		}
-		if ns < 0 {
-			ns = 0
-		}
-		if ninst < 0 {
-			ninst = 0
-		}
+
+		nemails := clampNonNegative(r.NumEmails)
+		nw := clampNonNegative(r.NumWhatsApp)
+		ni := clampNonNegative(r.NumIMessage)
+		nf := clampNonNegative(r.NumFacebook)
+		ns := clampNonNegative(r.NumSMS)
+		ninst := clampNonNegative(r.NumInstagram)
 		total := nemails + nw + ni + nf + ns + ninst
-		var userIDArg any
-		if ownerUserID > 0 {
-			userIDArg = ownerUserID
+
+		// r.ID == 0 is formatOutput's exclusive marker for the one record
+		// matching the archive subject's configured name (see its
+		// assignedZero bookkeeping) — check the reserved id=0 row first so
+		// the subject's contact is preferred over an email/name/fuzzy
+		// match that might otherwise fire for the same person.
+		isSubject := r.ID == 0
+		var match *existingContactRow
+		if isSubject {
+			if ec, ok := existingByID[0]; ok && !ec.Used {
+				match = ec
+			}
 		}
-		_, err = tx.ExecContext(ctx,
-			`INSERT INTO contacts (id, name, alternative_names, email, numemails, numwhatsapp, numimessages, numfacebook, numsms, numinstagram, is_group, total, user_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
-			r.ID, r.PrimaryName, r.AlternativeNames, r.Emails,
-			nemails, nw, ni, nf, ns, ninst, r.IsGroupChat, total, userIDArg)
-		if err != nil {
-			return fmt.Errorf("insert contact id=%d: %w", r.ID, err)
+		if match == nil {
+			match = matchExistingContact(r, existing)
 		}
+
+		if match != nil {
+			match.Used = true
+			mergedAlt := mergeCommaSets(match.AlternativeNames, r.AlternativeNames)
+			mergedEmail := mergeCommaSets(match.Email, r.Emails)
+			_, err = tx.ExecContext(ctx, `UPDATE contacts SET
+				alternative_names = ?1, email = ?2,
+				numemails = ?3, numwhatsapp = ?4, numimessages = ?5, numfacebook = ?6, numsms = ?7, numinstagram = ?8,
+				is_group = ?9, total = ?10, updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?11`,
+				mergedAlt, mergedEmail,
+				nemails, nw, ni, nf, ns, ninst, r.IsGroupChat, total, match.ID)
+			if err != nil {
+				return fmt.Errorf("update contact id=%d: %w", match.ID, err)
+			}
+			matched++
+		} else if isSubject {
+			_, err = tx.ExecContext(ctx,
+				`INSERT INTO contacts (id, name, alternative_names, email, numemails, numwhatsapp, numimessages, numfacebook, numsms, numinstagram, is_group, total, user_id) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+				r.PrimaryName, r.AlternativeNames, r.Emails,
+				nemails, nw, ni, nf, ns, ninst, r.IsGroupChat, total, userIDArg)
+			if err != nil {
+				return fmt.Errorf("insert subject contact %q: %w", r.PrimaryName, err)
+			}
+			inserted++
+		} else {
+			_, err = tx.ExecContext(ctx,
+				`INSERT INTO contacts (name, alternative_names, email, numemails, numwhatsapp, numimessages, numfacebook, numsms, numinstagram, is_group, total, user_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+				r.PrimaryName, r.AlternativeNames, r.Emails,
+				nemails, nw, ni, nf, ns, ninst, r.IsGroupChat, total, userIDArg)
+			if err != nil {
+				return fmt.Errorf("insert contact %q: %w", r.PrimaryName, err)
+			}
+			inserted++
+		}
+
 		if (i+1)%progressInterval == 0 || i+1 == totalRecords {
-			fmt.Fprintf(os.Stderr, "Inserted %d/%d contacts records\n", i+1, totalRecords)
+			fmt.Fprintf(os.Stderr, "Processed %d/%d contacts records (%d matched, %d new)\n", i+1, totalRecords, matched, inserted)
 		}
-	}
-
-	// Restore subject (id=0) identifiers if we had them before truncate
-	if subjectIds.WhatsAppID != nil || subjectIds.IMessageID != nil || subjectIds.SMSID != nil ||
-		subjectIds.FacebookID != nil || subjectIds.InstagramID != nil {
-		_, err = tx.ExecContext(ctx,
-			`UPDATE contacts SET whatsappid = ?1, imessageid = ?2, smsid = ?3, facebookid = ?4, instagramid = ?5 WHERE id = 0`,
-			subjectIds.WhatsAppID, subjectIds.IMessageID, subjectIds.SMSID, subjectIds.FacebookID, subjectIds.InstagramID)
-		if err != nil {
-			return fmt.Errorf("restore subject identifiers: %w", err)
-		}
-	}
-
-	// Reset sequence so future auto-inserts get correct next id
-	if sqlutil.IsSQLite(ctx, db) {
-		err = resetSQLiteContactsSequence(ctx, tx)
-	} else {
-		_, err = tx.ExecContext(ctx, "SELECT setval(pg_get_serial_sequence('contacts', 'id'), COALESCE((SELECT MAX(id) FROM contacts), 1))")
-	}
-	if err != nil {
-		return fmt.Errorf("reset contacts sequence: %w", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "Committing contacts transaction\n")
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit contacts transaction: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "Contacts transaction committed\n")
+	fmt.Fprintf(os.Stderr, "Contacts transaction committed (%d matched, %d new)\n", matched, inserted)
 	return nil
-}
-
-// ownerContactLink captures subject_configuration.subject_contact_id before contacts are rebuilt.
-// Deleting contacts triggers ON DELETE SET NULL on subject_contact_id; restore after rewrite.
-type ownerContactLink struct {
-	active      bool
-	configRowID int64
-	contactID   int64
-	name        string
-	email       string
-}
-
-func loadOwnerContactLink(ctx context.Context, db *sql.DB) (ownerContactLink, error) {
-	if db == nil {
-		return ownerContactLink{}, nil
-	}
-	uid := appctx.UserIDFromCtx(ctx)
-	q := `
-		SELECT sc.id, sc.subject_contact_id, COALESCE(c.name, ''), COALESCE(c.email, '')
-		FROM subject_configuration sc
-		LEFT JOIN contacts c ON c.id = sc.subject_contact_id
-		WHERE sc.subject_contact_id IS NOT NULL`
-	args := []any{}
-	if uid > 0 {
-		q += ` AND (sc.user_id = ? OR sc.user_id IS NULL)`
-		args = append(args, uid)
-	}
-	q += ` ORDER BY CASE WHEN sc.user_id IS NULL THEN 1 ELSE 0 END, sc.id ASC LIMIT 1`
-
-	var link ownerContactLink
-	var contactID sql.NullInt64
-	err := db.QueryRowContext(ctx, q, args...).Scan(&link.configRowID, &contactID, &link.name, &link.email)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ownerContactLink{}, nil
-	}
-	if err != nil {
-		return ownerContactLink{}, fmt.Errorf("load owner contact link: %w", err)
-	}
-	if !contactID.Valid {
-		return ownerContactLink{}, nil
-	}
-	link.active = true
-	link.contactID = contactID.Int64
-	return link, nil
-}
-
-func resolveContactIDAfterRebuild(ctx context.Context, db *sql.DB, link ownerContactLink) (int64, bool) {
-	if !link.active {
-		return 0, false
-	}
-	if link.contactID == 0 {
-		var one int
-		if err := db.QueryRowContext(ctx, `SELECT 1 FROM contacts WHERE id = 0 LIMIT 1`).Scan(&one); err == nil {
-			return 0, true
-		}
-	} else {
-		var one int
-		if err := db.QueryRowContext(ctx, `SELECT 1 FROM contacts WHERE id = ? LIMIT 1`, link.contactID).Scan(&one); err == nil {
-			return link.contactID, true
-		}
-	}
-	name := strings.TrimSpace(link.name)
-	if name != "" {
-		var id int64
-		if err := db.QueryRowContext(ctx,
-			`SELECT id FROM contacts WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) ORDER BY id LIMIT 1`,
-			name).Scan(&id); err == nil {
-			return id, true
-		}
-	}
-	for _, part := range strings.Split(link.email, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		email, _ := ParseEmailEntry(part)
-		if email == "" {
-			email = strings.ToLower(part)
-		}
-		norm := NormalizeEmailForMatching(email)
-		if norm == "" {
-			continue
-		}
-		var id int64
-		pat := "%" + norm + "%"
-		if err := db.QueryRowContext(ctx,
-			`SELECT id FROM contacts WHERE LOWER(COALESCE(email, '')) LIKE ? ORDER BY id LIMIT 1`,
-			pat).Scan(&id); err == nil {
-			return id, true
-		}
-	}
-	return 0, false
-}
-
-func restoreOwnerContactLink(ctx context.Context, db *sql.DB, link ownerContactLink) error {
-	if db == nil || !link.active {
-		return nil
-	}
-	newID, ok := resolveContactIDAfterRebuild(ctx, db, link)
-	if !ok {
-		fmt.Fprintf(os.Stderr, "warning: could not remap archive owner contact %q after contacts rebuild\n", link.name)
-		return nil
-	}
-	_, err := db.ExecContext(ctx,
-		`UPDATE subject_configuration SET subject_contact_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-		newID, link.configRowID)
-	if err != nil {
-		return fmt.Errorf("restore owner contact link: %w", err)
-	}
-	fmt.Fprintf(os.Stderr, "Restored archive owner contact link (contact id=%d)\n", newID)
-	return nil
-}
-
-func resetSQLiteContactsSequence(ctx context.Context, tx *sql.Tx) error {
-	var maxID sql.NullInt64
-	if err := tx.QueryRowContext(ctx, "SELECT MAX(id) FROM contacts").Scan(&maxID); err != nil {
-		return err
-	}
-	n := int64(1)
-	if maxID.Valid && maxID.Int64 > 0 {
-		n = maxID.Int64
-	}
-	if _, err := tx.ExecContext(ctx, "DELETE FROM sqlite_sequence WHERE name = 'contacts'"); err != nil {
-		return err
-	}
-	_, err := tx.ExecContext(ctx, "INSERT INTO sqlite_sequence (name, seq) VALUES ('contacts', ?)", n)
-	return err
 }

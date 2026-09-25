@@ -344,9 +344,8 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*model.DashboardRaw, erro
 }
 
 // GetImportModalStats collects aggregate counts for the import/maintenance modals.
-// Embedding/searchable progress is intentionally not included here — it is expensive
-// (see GetEmbeddingProgress) and is fetched separately so callers can render these
-// cheap counts immediately.
+// Searchable/embedding progress is fetched separately (see GetEmbeddingProgressForSource)
+// so these counts can render first.
 func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportModalStatsResponse, error) {
 	uid := uidFromCtx(ctx)
 
@@ -397,45 +396,28 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportM
 		}
 	}
 
-	// Image counts
+	// Image counts in one pass. The thumbnail count stays a separate query so the
+	// media_blobs join does not stretch this scan.
 	{
 		uidCond, args := makeUIDCond(nil)
 		if err := r.pool.QueryRowContext(ctx,
-			`SELECT COUNT(id) FROM media_items WHERE media_type LIKE 'image/%'`+uidCond, args...,
-		).Scan(&out.TotalImages); err != nil {
-			return nil, fmt.Errorf("total images: %w", err)
-		}
-	}
-	{
-		uidCond, args := makeUIDCond(nil)
-		if err := r.pool.QueryRowContext(ctx,
-			`SELECT COUNT(id) FROM media_items WHERE source = 'filesystem' AND is_referenced = FALSE`+uidCond, args...,
-		).Scan(&out.FilesystemImagesEmbeddedCount); err != nil {
-			return nil, fmt.Errorf("filesystem embedded images: %w", err)
-		}
-	}
-	{
-		uidCond, args := makeUIDCond(nil)
-		if err := r.pool.QueryRowContext(ctx,
-			`SELECT COUNT(id) FROM media_items WHERE source = 'filesystem' AND is_referenced = TRUE`+uidCond, args...,
-		).Scan(&out.FilesystemImagesReferencedCount); err != nil {
-			return nil, fmt.Errorf("filesystem referenced images: %w", err)
-		}
-	}
-	{
-		uidCond, args := makeUIDCond(nil)
-		if err := r.pool.QueryRowContext(ctx,
-			`SELECT COUNT(id) FROM media_items WHERE media_type LIKE 'image/%' AND is_referenced = FALSE`+uidCond, args...,
-		).Scan(&out.ImportedImages); err != nil {
-			return nil, fmt.Errorf("imported images: %w", err)
-		}
-	}
-	{
-		uidCond, args := makeUIDCond(nil)
-		if err := r.pool.QueryRowContext(ctx,
-			`SELECT COUNT(id) FROM media_items WHERE media_type LIKE 'image/%' AND is_referenced = TRUE`+uidCond, args...,
-		).Scan(&out.ReferenceImages); err != nil {
-			return nil, fmt.Errorf("reference images: %w", err)
+			`SELECT
+				CAST(COALESCE(SUM(CASE WHEN media_type LIKE 'image/%' THEN 1 ELSE 0 END), 0) AS INTEGER),
+				CAST(COALESCE(SUM(CASE WHEN source = 'filesystem' AND is_referenced = FALSE THEN 1 ELSE 0 END), 0) AS INTEGER),
+				CAST(COALESCE(SUM(CASE WHEN source = 'filesystem' AND is_referenced = TRUE THEN 1 ELSE 0 END), 0) AS INTEGER),
+				CAST(COALESCE(SUM(CASE WHEN media_type LIKE 'image/%' AND is_referenced = FALSE THEN 1 ELSE 0 END), 0) AS INTEGER),
+				CAST(COALESCE(SUM(CASE WHEN media_type LIKE 'image/%' AND is_referenced = TRUE THEN 1 ELSE 0 END), 0) AS INTEGER),
+				CAST(COALESCE(SUM(CASE WHEN media_type LIKE 'image/%' AND latitude IS NOT NULL AND longitude IS NOT NULL THEN 1 ELSE 0 END), 0) AS INTEGER)
+			 FROM media_items WHERE TRUE`+uidCond, args...,
+		).Scan(
+			&out.TotalImages,
+			&out.FilesystemImagesEmbeddedCount,
+			&out.FilesystemImagesReferencedCount,
+			&out.ImportedImages,
+			&out.ReferenceImages,
+			&out.GpsImagesCount,
+		); err != nil {
+			return nil, fmt.Errorf("media item counts: %w", err)
 		}
 	}
 	{
@@ -453,16 +435,6 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportM
 			   AND mb.thumbnail_data IS NOT NULL`+uidCond, args...,
 		).Scan(&out.ThumbnailCount); err != nil {
 			return nil, fmt.Errorf("thumbnail count: %w", err)
-		}
-	}
-	{
-		uidCond, args := makeUIDCond(nil)
-		if err := r.pool.QueryRowContext(ctx,
-			`SELECT COUNT(id) FROM media_items
-			 WHERE media_type LIKE 'image/%'
-			   AND latitude IS NOT NULL AND longitude IS NOT NULL`+uidCond, args...,
-		).Scan(&out.GpsImagesCount); err != nil {
-			return nil, fmt.Errorf("gps images count: %w", err)
 		}
 	}
 
@@ -513,14 +485,15 @@ func (r *DashboardRepo) GetImportModalStats(ctx context.Context) (*model.ImportM
 	return out, nil
 }
 
-// embeddingProgressSourceDef defines one embedding-progress source's "missing
-// embedding" predicate. Mirrors the exact predicates used by the backfill jobs
-// themselves (see runEmailEmbeddingBackfill / runMessageContextEmbeddingBackfill in
-// importer_handler.go, runFacebookPostEmbeddingBackfill / runFacebookAlbumEmbeddingBackfill
-// and ListMediaItemsForTagEmbeddingBackfill in image_handler.go / image_repo.go).
+// embeddingProgressSourceDef defines one embedding-progress source.
+// Sources with embedTable estimate pending as total minus one COUNT(*) on that
+// table. Image tags keep a same-table predicate (require_classification) because
+// that flag already records the missing-embedding state without touching vec0.
+// Backfill jobs still use their exact NOT EXISTS predicates.
 type embeddingProgressSourceDef struct {
 	key          string
 	totalQuery   string
+	embedTable   string
 	pendingExtra string
 }
 
@@ -536,30 +509,39 @@ var EmbeddingProgressSourceKeys = []string{
 
 var embeddingProgressSources = map[string]embeddingProgressSourceDef{
 	"message_context_embeddings": {
-		key:          "message_context_embeddings",
-		totalQuery:   `SELECT COUNT(id) FROM messages WHERE text IS NOT NULL`,
-		pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM message_embeddings me WHERE me.rowid = messages.id)`,
+		key:        "message_context_embeddings",
+		totalQuery: `SELECT COUNT(id) FROM messages WHERE text IS NOT NULL`,
+		embedTable: "message_embeddings",
 	},
 	"email_embeddings": {
-		key:          "email_embeddings",
-		totalQuery:   `SELECT COUNT(id) FROM emails WHERE user_deleted = FALSE`,
-		pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM email_embeddings ee WHERE ee.rowid = emails.id)`,
+		key:        "email_embeddings",
+		totalQuery: `SELECT COUNT(id) FROM emails WHERE user_deleted = FALSE`,
+		embedTable: "email_embeddings",
 	},
 	"facebook_post_text_embeddings": {
-		key:          "facebook_post_text_embeddings",
-		totalQuery:   `SELECT COUNT(id) FROM facebook_posts WHERE TRIM(COALESCE(post_text, '')) != ''`,
-		pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM facebook_post_text_embeddings e WHERE e.rowid = facebook_posts.id)`,
+		key:        "facebook_post_text_embeddings",
+		totalQuery: `SELECT COUNT(id) FROM facebook_posts WHERE TRIM(COALESCE(post_text, '')) != ''`,
+		embedTable: "facebook_post_text_embeddings",
 	},
 	"facebook_album_description_embeddings": {
-		key:          "facebook_album_description_embeddings",
-		totalQuery:   `SELECT COUNT(id) FROM facebook_albums WHERE TRIM(COALESCE(description, '')) != ''`,
-		pendingExtra: ` AND NOT EXISTS (SELECT 1 FROM facebook_album_description_embeddings e WHERE e.rowid = facebook_albums.id)`,
+		key:        "facebook_album_description_embeddings",
+		totalQuery: `SELECT COUNT(id) FROM facebook_albums WHERE TRIM(COALESCE(description, '')) != ''`,
+		embedTable: "facebook_album_description_embeddings",
 	},
 	"image_tag_embeddings": {
 		key:          "image_tag_embeddings",
 		totalQuery:   `SELECT COUNT(id) FROM media_items WHERE tags IS NOT NULL AND TRIM(tags) != ''`,
 		pendingExtra: ` AND require_classification = TRUE`,
 	},
+}
+
+// pendingFromEmbeddedCount is total rows minus embedding rows, never negative.
+// An embedding row that outlives its source row makes pending slightly low.
+func pendingFromEmbeddedCount(total, embedded int64) int64 {
+	if embedded >= total {
+		return 0
+	}
+	return total - embedded
 }
 
 // ErrUnknownEmbeddingSource is returned by GetEmbeddingProgressForSource when the
@@ -569,12 +551,9 @@ var ErrUnknownEmbeddingSource = errors.New("unknown embedding progress source")
 // GetEmbeddingProgressForSource reports how much content of one source still needs an
 // AI embedding to be searchable.
 //
-// This is expensive: the embedding tables are sqlite-vec vec0 virtual tables, and a
-// correlated NOT EXISTS predicate evaluated per row of the base table (messages,
-// emails, ...) against a vec0 table is effectively a per-row scan. Callers should
-// fetch each source independently (rather than in one batched call) so a single
-// slow or failing source doesn't hold up the others, and fetch separately from
-// GetImportModalStats so cheap counts can render first.
+// Vec-backed sources count the embedding table once and subtract from the source
+// total. A correlated NOT EXISTS against sqlite-vec is a per-row scan and used to
+// hold the single SQLite connection long enough to stall the rest of this dialog.
 func (r *DashboardRepo) GetEmbeddingProgressForSource(ctx context.Context, key string) (model.EmbeddingProgressEntry, error) {
 	s, ok := embeddingProgressSources[key]
 	if !ok {
@@ -594,6 +573,15 @@ func (r *DashboardRepo) GetEmbeddingProgressForSource(ctx context.Context, key s
 	totalCond, totalArgs := makeUIDCond(nil)
 	if err := r.pool.QueryRowContext(ctx, s.totalQuery+totalCond, totalArgs...).Scan(&entry.Total); err != nil {
 		return model.EmbeddingProgressEntry{}, fmt.Errorf("%s total: %w", s.key, err)
+	}
+	if s.embedTable != "" {
+		var embedded int64
+		q := "SELECT COUNT(*) FROM " + s.embedTable
+		if err := r.pool.QueryRowContext(ctx, q).Scan(&embedded); err != nil {
+			return model.EmbeddingProgressEntry{}, fmt.Errorf("%s embedded: %w", s.key, err)
+		}
+		entry.Pending = pendingFromEmbeddedCount(entry.Total, embedded)
+		return entry, nil
 	}
 	pendingCond, pendingArgs := makeUIDCond(nil)
 	if err := r.pool.QueryRowContext(ctx, s.totalQuery+pendingCond+s.pendingExtra, pendingArgs...).Scan(&entry.Pending); err != nil {

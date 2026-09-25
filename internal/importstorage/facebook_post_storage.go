@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -98,6 +100,34 @@ func (s *FacebookPostStorage) SavePostImagesBatch(ctx context.Context, items []B
 
 	imported := 0
 	for _, item := range items {
+		// Unique key per photo so re-imports do not duplicate (post_id:uri) —
+		// mirrors albumPhotoSourceRef; PostID alone collides across every
+		// photo in the same multi-photo post.
+		sourceRef := postPhotoSourceRef(item.PostID, item.URI)
+
+		var existingMediaItemID int64
+		err = tx.QueryRowContext(ctx, `SELECT id FROM media_items WHERE source = ?1 AND source_reference = ?2 LIMIT 1`,
+			facebookPostSource, sourceRef).Scan(&existingMediaItemID)
+		if err == nil {
+			// Photo already exists from a previous import; ensure post_media link exists.
+			var linkCount int
+			if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM post_media WHERE post_id = ?1 AND media_item_id = ?2`,
+				item.PostID, existingMediaItemID).Scan(&linkCount); err != nil {
+				return imported, fmt.Errorf("failed to check post_media for %s: %w", item.URI, err)
+			}
+			if linkCount == 0 {
+				_, err = tx.ExecContext(ctx, `INSERT INTO post_media (post_id, media_item_id) VALUES (?1, ?2)`, item.PostID, existingMediaItemID)
+				if err != nil {
+					return imported, fmt.Errorf("failed to link existing media item to post for %s: %w", item.URI, err)
+				}
+			}
+			imported++
+			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return imported, fmt.Errorf("failed to check existing media item for %s: %w", item.URI, err)
+		}
+
 		var blobID int64
 		if len(item.ImageData) > 0 {
 			err = tx.QueryRowContext(ctx,
@@ -138,7 +168,7 @@ func (s *FacebookPostStorage) SavePostImagesBatch(ctx context.Context, items []B
 			blobID,
 			nullIfEmpty(item.PostTitle),
 			facebookPostSource,
-			fmt.Sprintf("%d", item.PostID),
+			sourceRef,
 			nullIfEmpty(displayTitle),
 			nullIfEmpty(item.Description),
 			nullIfEmpty(item.ImageType),
@@ -166,4 +196,16 @@ func (s *FacebookPostStorage) SavePostImagesBatch(ctx context.Context, items []B
 		return 0, fmt.Errorf("failed to commit: %w", err)
 	}
 	return imported, nil
+}
+
+// postPhotoSourceRef returns a unique key for a Facebook post photo so
+// re-imports can skip duplicates — mirrors albumPhotoSourceRef in
+// facebook_album_storage.go. PostID is stable across reimports since
+// SaveOrUpdatePost reuses an existing post's id by timestamp+title match.
+func postPhotoSourceRef(postID int64, uri string) string {
+	s := strconv.FormatInt(postID, 10) + ":" + strings.TrimSpace(uri)
+	if len(s) > maxSourceRefLen {
+		return s[:maxSourceRefLen]
+	}
+	return s
 }

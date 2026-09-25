@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
 // LocalAIProvider calls an Ollama server via the native /api/chat and /api/embed endpoints.
@@ -427,8 +430,65 @@ func (p *LocalAIProvider) Embed(ctx context.Context, text, embeddingModel string
 	return vec, nil
 }
 
+var (
+	ollamaChatStartMu sync.Mutex
+)
+
+// ensureOllamaChatServer starts the chat Ollama daemon on the first local-AI chat call
+// when Electron is managing it. If the server is already up, or this process was not
+// started by Electron, it returns without doing anything.
+func ensureOllamaChatServer(ctx context.Context, baseURL string) error {
+	if ollamaReachable(ctx, baseURL) {
+		return nil
+	}
+	control := strings.TrimSpace(os.Getenv("OLLAMA_CHAT_CONTROL_URL"))
+	if control == "" {
+		return nil
+	}
+	ollamaChatStartMu.Lock()
+	defer ollamaChatStartMu.Unlock()
+	if ollamaReachable(ctx, baseURL) {
+		return nil
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+	httpReq, err := http.NewRequestWithContext(reqCtx, http.MethodPost, control, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("start ollama chat server: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("start ollama chat server: %s", strings.TrimSpace(string(data)))
+	}
+	return nil
+}
+
+func ollamaReachable(ctx context.Context, baseURL string) bool {
+	probeCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(probeCtx, http.MethodGet, strings.TrimRight(baseURL, "/")+"/", nil)
+	if err != nil {
+		return false
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp.StatusCode < 500
+}
+
 // ollamaPost sends a request to POST /api/chat and decodes the response.
 func ollamaPost(ctx context.Context, baseURL string, body ollamaRequest) (*ollamaResponse, error) {
+	if err := ensureOllamaChatServer(ctx, baseURL); err != nil {
+		return nil, err
+	}
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err

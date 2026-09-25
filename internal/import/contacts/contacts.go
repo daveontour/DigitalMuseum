@@ -7,8 +7,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-
-	"github.com/daveontour/aimuseum/internal/sqlutil"
 )
 
 // RunContactsNormalise runs the contact normalisation process
@@ -122,24 +120,11 @@ func RunContactsNormalise(ctx context.Context, opts RunOptions) error {
 		return fmt.Errorf("compute email counts: %w", err)
 	}
 
-	ownerLink, err := loadOwnerContactLink(ctx, opts.ContactsDB)
-	if err != nil {
-		return err
-	}
-
-	progress("Truncating contacts table")
-	if err := TruncateContactsTable(ctx, opts.ContactsDB); err != nil {
-		return fmt.Errorf("truncate contacts table: %w", err)
-	}
 	if opts.ContactsDB == nil {
 		return fmt.Errorf("database required for write")
 	}
 	progress("Writing contacts and classifications to database")
 	if err := writeContactsAndClassifications(ctx, opts.ContactsDB, opts.ClassificationsFile, formattedOutput, opts.OwnerUserID); err != nil {
-		return err
-	}
-	progress("Restoring archive owner contact link")
-	if err := restoreOwnerContactLink(ctx, opts.ContactsDB, ownerLink); err != nil {
 		return err
 	}
 	if opts.RelationshipQuery != "" {
@@ -170,21 +155,6 @@ func writeContactsAndClassifications(ctx context.Context, db *sql.DB, classifica
 		return fmt.Errorf("apply classifications: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "Records written to database\n")
-	return nil
-}
-
-func TruncateContactsTable(ctx context.Context, db *sql.DB) error {
-	if sqlutil.IsSQLite(ctx, db) {
-		_, err := db.ExecContext(ctx, "DELETE FROM contacts")
-		if err != nil {
-			return fmt.Errorf("truncate contacts table: %w", err)
-		}
-		return nil
-	}
-	_, err := db.ExecContext(ctx, "TRUNCATE contacts CASCADE")
-	if err != nil {
-		return fmt.Errorf("truncate contacts table: %w", err)
-	}
 	return nil
 }
 

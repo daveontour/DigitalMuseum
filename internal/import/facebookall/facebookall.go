@@ -20,8 +20,12 @@ func ClearFacebookAllDataForUser(ctx context.Context, pool *sql.DB, userID int64
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Messenger: delete attachment media_items and their blobs.
-	if _, err = sqlutil.DeleteMediaItemsByUserAndSourceTx(ctx, tx, userID, "Facebook"); err != nil {
+	// Messenger: delete attachment media_items and their blobs. The source
+	// string here must match what the importer actually writes
+	// (internal/import/facebook/facebook.go's facebookSource constant) —
+	// this used to say "Facebook" (capitalized, no such source ever
+	// written), so this delete silently affected zero rows.
+	if _, err = sqlutil.DeleteMediaItemsByUserAndSourceTx(ctx, tx, userID, "facebook_messenger"); err != nil {
 		return fmt.Errorf("failed to clear Facebook Messenger media: %w", err)
 	}
 

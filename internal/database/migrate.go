@@ -179,11 +179,17 @@ func schemaDDL() []string {
 		// A cluster groups media_item_faces rows believed to be the same person.
 		// representative_face_id deliberately has no FK (it would be circular with
 		// media_item_faces, which references face_clusters); integrity is app-enforced.
+		// suggested_contact_id/suggested_distance: stored "possible match" guess
+		// for an unnamed cluster (FaceService.RefreshClusterSuggestions); its index
+		// is created by addFaceClustersSuggestionColumns, not here, since on an
+		// existing archive this list runs before that function adds the column.
 		`CREATE TABLE IF NOT EXISTS face_clusters (
 			id                     SERIAL PRIMARY KEY,
 			contact_id             INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
 			representative_face_id INTEGER,
 			face_count             INTEGER NOT NULL DEFAULT 0,
+			suggested_contact_id   INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+			suggested_distance     DOUBLE PRECISION,
 			created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			user_id                BIGINT REFERENCES users(id) ON DELETE CASCADE
@@ -211,6 +217,7 @@ func schemaDDL() []string {
 			face_cluster_id      INTEGER REFERENCES face_clusters(id) ON DELETE SET NULL,
 			contact_id           INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
 			ignored              BOOLEAN NOT NULL DEFAULT FALSE,
+			crop_data            BYTEA,
 			created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			user_id              BIGINT REFERENCES users(id) ON DELETE CASCADE
@@ -1134,6 +1141,12 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 	if err := addMediaItemFacesIgnoredColumn(ctx, db); err != nil {
 		return err
 	}
+	if err := addMediaItemFacesCropDataColumn(ctx, db); err != nil {
+		return err
+	}
+	if err := addFaceClustersSuggestionColumns(ctx, db); err != nil {
+		return err
+	}
 	if err := ensureFaceEmbeddingsVecTable(ctx, db); err != nil {
 		return err
 	}
@@ -1354,6 +1367,89 @@ func addMediaItemFacesIgnoredColumn(ctx context.Context, db *sql.DB) error {
 	slog.Info("sqlite migration: added media_item_faces.ignored")
 	return nil
 }
+
+// addMediaItemFacesCropDataColumn adds media_item_faces.crop_data for
+// databases created before face crops were stored at detection time — see
+// CLAUDE.md's Facial Recognition section. Fresh installs already get this
+// column from the canonical media_item_faces CREATE TABLE in schemaDDL().
+// Existing rows are left NULL; FaceHandler.serveFaceCrop falls back to
+// generating the crop on demand until the "Backfill face crop thumbnails"
+// job (or a future face-detection run) populates it.
+func addMediaItemFacesCropDataColumn(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_item_faces'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master media_item_faces: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	var has int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('media_item_faces') WHERE name = 'crop_data'`,
+	).Scan(&has); err != nil {
+		return fmt.Errorf("pragma_table_info media_item_faces.crop_data: %w", err)
+	}
+	if has > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE media_item_faces ADD COLUMN crop_data BLOB`); err != nil {
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "duplicate column") && !strings.Contains(msg, "already exists") {
+			return fmt.Errorf("add media_item_faces.crop_data: %w", err)
+		}
+	}
+	slog.Info("sqlite migration: added media_item_faces.crop_data")
+	return nil
+}
+
+// addFaceClustersSuggestionColumns adds face_clusters.suggested_contact_id and
+// suggested_distance for databases created before the People in Photos
+// "Possible Matches" filter stored its guesses. Fresh installs already get
+// both columns from the canonical CREATE TABLE in schemaDDL(); this also
+// creates the index, which that unconditional statement list can't do safely
+// on an existing archive. Existing rows stay NULL until the "Find possible
+// matches" background job fills them.
+func addFaceClustersSuggestionColumns(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'face_clusters'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master face_clusters: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	for _, col := range []struct{ name, ddl string }{
+		{"suggested_contact_id", `ALTER TABLE face_clusters ADD COLUMN suggested_contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL`},
+		{"suggested_distance", `ALTER TABLE face_clusters ADD COLUMN suggested_distance REAL`},
+	} {
+		var has int
+		if err := db.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM pragma_table_info('face_clusters') WHERE name = ?`, col.name,
+		).Scan(&has); err != nil {
+			return fmt.Errorf("pragma_table_info face_clusters.%s: %w", col.name, err)
+		}
+		if has > 0 {
+			continue
+		}
+		if _, err := db.ExecContext(ctx, col.ddl); err != nil {
+			msg := strings.ToLower(err.Error())
+			if !strings.Contains(msg, "duplicate column") && !strings.Contains(msg, "already exists") {
+				return fmt.Errorf("add face_clusters.%s: %w", col.name, err)
+			}
+		}
+		slog.Info("sqlite migration: added face_clusters." + col.name)
+	}
+	if _, err := db.ExecContext(ctx,
+		`CREATE INDEX IF NOT EXISTS idx_face_clusters_suggested_contact_id ON face_clusters (suggested_contact_id)`,
+	); err != nil {
+		return fmt.Errorf("create idx_face_clusters_suggested_contact_id: %w", err)
+	}
+	return nil
+}
+
 
 func addUserDeepSeekLLMColumns(ctx context.Context, db *sql.DB) error {
 	var n int

@@ -3314,13 +3314,11 @@ Modals.InactivityPromptConfig = (() => {
 })();
 
 
-// Headless resolver for the Auto-routing classifier provider and the error-failover on/off
-// toggle, both persisted in the 'hosted_llm_provider_order_v1' app_configuration key. The
-// actual UI for both — the classifier radio buttons and the failover checkbox — lives on
-// the AI Models tab (Modals.AIModelsConfig, which read-modify-writes the same key so it
-// never clobbers a field it doesn't own). This module has no UI of its own; it's shared by
-// app.js (chat failover) and local-ai-setup.js (reconciling the classifier choice when Local
-// AI availability changes).
+// Headless resolver for Auto-routing settings and the error-failover on/off
+// toggle, both persisted in the 'hosted_llm_provider_order_v1' app_configuration key.
+// Classification always uses Jev; the stored classifier_provider field is kept so older
+// rows still load. The failover checkbox lives on the AI Models tab. This module has no
+// UI of its own; it's shared by app.js (chat failover) and local-ai-setup.js.
 Modals.AutoRoutingConfig = (() => {
     const CONFIG_KEY = 'hosted_llm_provider_order_v1';
     const DEFAULT_CLASSIFIER_PROVIDER = 'localai';
@@ -3406,8 +3404,7 @@ Modals.AutoRoutingConfig = (() => {
         return normalizeClassifierProvider(cached.classifier_provider);
     }
 
-    /** Re-syncs cached state (e.g. after Local AI availability changes) and, if the AI
-     *  Models tab's classifier radios are currently rendered, updates their checked state. */
+    /** Re-syncs the cached classifier field. The AI Models tab no longer shows a classifier choice. */
     function reconcileClassifierProvider() {
         const resolved = normalizeClassifierProvider(cached.classifier_provider);
         cached.classifier_provider = resolved;

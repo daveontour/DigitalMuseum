@@ -77,6 +77,21 @@ func ProbeOllamaTags(ctx context.Context, baseURL, chatModel, embeddingModel str
 	return ProbeOllamaDual(ctx, baseURL, baseURL, chatModel, embeddingModel)
 }
 
+// ProbeOllamaEmbeddingOnly checks the embedding server and leaves the chat server unchecked.
+// The desktop app starts the chat server on the first local-AI chat, so startup status must not
+// treat a closed chat port as a failure.
+func ProbeOllamaEmbeddingOnly(ctx context.Context, chatBaseURL, embedBaseURL, chatModel, embeddingModel string) OllamaProbeResult {
+	result := ProbeOllamaDual(ctx, "", embedBaseURL, chatModel, embeddingModel)
+	chatBaseURL = strings.TrimRight(strings.TrimSpace(chatBaseURL), "/")
+	result.BaseURLConfigured = chatBaseURL != ""
+	result.BaseURL = chatBaseURL
+	result.ChatModel = strings.TrimSpace(chatModel)
+	result.ServerReachable = false
+	result.ServerError = ""
+	result.ChatModelAvailable = false
+	return result
+}
+
 // ProbeOllamaDual probes chat and embedding models on separate Ollama base URLs.
 func ProbeOllamaDual(ctx context.Context, chatBaseURL, embedBaseURL, chatModel, embeddingModel string) OllamaProbeResult {
 	embedName := ResolveEmbeddingModelName(embeddingModel, chatModel)

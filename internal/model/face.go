@@ -26,14 +26,25 @@ type Face struct {
 	FaceClusterID       *int64
 	ContactID           *int64
 	Ignored             bool
-	CreatedAt           sqlutil.DBTime
-	UpdatedAt           sqlutil.DBTime
+	// CropData is the pre-rendered JPEG crop for this face (see
+	// FaceRepo.InsertFace / GetFaceCropData), generated once at detection
+	// time from the full-resolution source photo already in memory then, so
+	// FaceHandler.serveFaceCrop never has to re-fetch the source image or
+	// re-invoke ImageMagick on every view. Deliberately left out of
+	// faceColumns/scanFace (used by every other face list/read query) so
+	// ordinary reads don't pull a JPEG blob per row — populated only via
+	// InsertFace (write) and GetFaceCropData/SetFaceCropData (targeted read).
+	CropData  []byte
+	CreatedAt sqlutil.DBTime
+	UpdatedAt sqlutil.DBTime
 }
 
 // FaceCluster is a row from face_clusters — a group of Face rows believed to
 // be the same person. ContactID is set once the user links the cluster to an
 // existing Contact; RepresentativeFaceID picks which member face's crop is
-// shown as the cluster's thumbnail.
+// shown as the cluster's thumbnail. SuggestedContactID/SuggestedDistance are
+// the stored "possible match" guess for an unnamed cluster — written only by
+// FaceService.RefreshClusterSuggestions, see there.
 type FaceCluster struct {
 	ID                   int64
 	ContactID            *int64
@@ -41,12 +52,22 @@ type FaceCluster struct {
 	FaceCount            int
 	CreatedAt            sqlutil.DBTime
 	UpdatedAt            sqlutil.DBTime
+	SuggestedContactID   *int64
+	SuggestedDistance    *float64
 }
 
 // FaceClusterWithContact is a FaceCluster joined with its linked contact's
-// name, for list/grid responses that need a display label without a second
-// round trip per cluster.
+// name (and its suggested contact's name), for list/grid responses that need
+// a display label without a second round trip per cluster.
 type FaceClusterWithContact struct {
 	FaceCluster
-	ContactName *string
+	ContactName          *string
+	SuggestedContactName *string
+}
+
+// ClusterSuggestion is one computed "possible match" for an unnamed cluster.
+type ClusterSuggestion struct {
+	ClusterID int64
+	ContactID int64
+	Distance  float64
 }

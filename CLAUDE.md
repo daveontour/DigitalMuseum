@@ -301,7 +301,7 @@ Both daemons are started with `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_MAX_LOADED_MODELS=
 
 **Local AI status API and chat toggle:**
 
-- `GET /api/local-ai/status` — auth-exempt; probes chat and embedding Ollama URLs separately for reachability and configured models. Works on the login page before sign-in (infrastructure fields only). When authenticated, also returns `use_enabled_for_chat` and `chat_available`. Includes `embedding_base_url`, `embedding_server_reachable`, and `embedding_server_error`.
+- `GET /api/local-ai/status` — auth-exempt; probes the embedding Ollama URL, and the chat URL unless `probe_chat=0`. Login startup uses `probe_chat=0` so a chat server that has not been started yet is not a failed check. The setup UI shows that state as “Starts on first local chat” in the desktop app. When authenticated, also returns `use_enabled_for_chat` and `chat_available`. Includes `embedding_base_url`, `embedding_server_reachable`, and `embedding_server_error`.
 - Per-archive **`local_ai_use_enabled_v1`** in `app_configuration` (via `POST /api/configuration`) controls whether Local AI appears in provider menus and Auto routing; default enabled when unset. See `internal/service/local_ai_use.go`.
 - Configuration → **AI & Setup** and the login **Local AI Setup** panel use [`static/js/museum/local-ai-setup.js`](static/js/museum/local-ai-setup.js) and the status API. Browser mode shows server Ollama status; Electron additionally offers start/download via IPC.
 
@@ -666,16 +666,53 @@ overlay, and the `find_photos_of_person` AI tool). Engine, background jobs, REST
 frontend are all implemented and verified end-to-end against real bundled model files.
 
 **Review/naming REST API (`internal/handler/face_handler.go`, `FaceHandler`):**
-`GET /api/faces/clusters` (optional `?named=true|false`), `GET`/`PATCH /api/faces/clusters/{id}`
-(detail + link-to-contact, propagates to every member face via
-`FaceService.LinkClusterToContact`), `GET /api/faces/clusters/{id}/thumbnail` and
-`GET /api/faces/{id}/crop` (JPEG face crops generated on demand via
-`service.CropFaceJPEG` — ImageMagick `-crop`, same bundled-binary/subprocess pattern as
-`internal/import/thumbnails`, not a stored thumbnail), `PATCH /api/faces/{id}` (move to another
-cluster, or detach — `face_cluster_id: null` — as "not this person"), and
-`GET /api/media-items/{id}/faces` (per-photo face list consumed by the gallery lightbox
-overlay). Gated by `requireVisitorContacts` — the same visitor-tier permission as the Contacts
-API, since linking a face to a named Contact is equivalently sensitive identity information.
+`GET /api/faces/clusters` (optional `?named=true|false&min_face_count=N&max_face_count=N&suggested=true`),
+`GET`/`PATCH /api/faces/clusters/{id}` (detail + link-to-contact, propagates to every member
+face via `FaceService.LinkClusterToContact`), `GET /api/faces/clusters/{id}/thumbnail` and
+`GET /api/faces/{id}/crop` (`FaceHandler.serveFaceCrop` — see **Face crop caching** below),
+`PATCH /api/faces/{id}` (move to another cluster, or detach — `face_cluster_id: null` — as
+"not this person"), and `GET /api/media-items/{id}/faces` (per-photo face list consumed by the
+gallery lightbox overlay). Gated by `requireVisitorContacts` — the same visitor-tier permission
+as the Contacts API, since linking a face to a named Contact is equivalently sensitive identity
+information.
+
+**"Possible Matches" filter (`suggested=true`) — stored, not live:** the People in Photos
+grid's 4th filter tab lists unnamed clusters with a stored guess in
+`face_clusters.suggested_contact_id`/`suggested_distance` (plain indexed SQL, best guess first).
+Guesses are written only by the **"Find possible matches for unnamed people"** background job
+(`JobFaceSuggestions` → `FaceService.RefreshClusterSuggestions` in
+`internal/service/face_suggestions.go`), which compares every unnamed cluster's representative
+embedding against every *named* face's embedding in memory (one `face_embeddings` scan via
+`FaceEmbeddingHelper.LoadEmbeddings`, then parallel brute-force L2 with early abandonment) and
+keeps the nearest within `faceSameClusterL2Sq` — the same "same person" threshold clustering
+uses. Do **not** compute this per request: an earlier version ran a vec0 KNN
+(`FindSimilarFaces`) per unnamed cluster at request time, which on a real archive (~73k
+embeddings, ~12k unnamed clusters) is ~160 ms each, i.e. over half an hour, during which the
+grid just kept showing the previous tab's cards. The job replaces all stored guesses in one
+transaction, so a stale guess never outlives a refresh; a cluster drops out of the filter the
+moment it's named (the query requires `contact_id IS NULL`), but newly *possible* matches only
+appear after the job re-runs (hourly by default; existing archives must enable it in
+Configuration → Background Jobs, since only new archives are auto-seeded). `ListClusters`
+returns each cluster's stored guess as a one-element `suggestions` array in every tab (shown as
+a "Possibly: X" card hint), and `GetCluster` puts it first among its live chips so the detail
+panel agrees with the grid.
+
+**Face crop caching (`media_item_faces.crop_data`):** every face crop JPEG (both cluster
+thumbnails and member-face crops — both routes end up in `serveFaceCrop`) is generated **once**,
+via `service.CropFaceJPEG` (ImageMagick `-crop`, same bundled-binary/subprocess pattern as
+`internal/import/thumbnails`), and stored in this column rather than regenerated on every
+request. `runFaceDetection` generates it immediately from the full-resolution source bytes
+already in memory for that detection pass. `serveFaceCrop` serves the stored blob directly (a
+plain DB read) when present; on a miss (a face detected before this column existed) it falls
+back to the old on-demand crop-from-source-photo path and opportunistically persists the result,
+so a face only ever needs the slow path once. The **"Backfill face crop thumbnails"**
+background job (`JobFaceCropBackfill`, `runFaceCropBackfill`) proactively does this for every
+existing face in one pass, grouping by `media_item_id` so each source photo is fetched once
+regardless of how many faces it contains — useful after upgrading an archive that already has
+detected faces, instead of waiting for each one to be viewed once. Before this was added,
+`serveFaceCrop` re-fetched the full-resolution original and re-ran ImageMagick on *every* view of
+every thumbnail, which was the dominant cost of the People in Photos dialog feeling slower the
+more of it you'd browsed in a session (more distinct faces = more first-time, uncached crops).
 
 **Frontend (`static/js/museum/modals-faces.js`, `Modals.Faces`):** a cluster grid (All/Named/
 Unnamed filter tabs) → cluster detail panel with a contact search-and-link picker (backed by
@@ -874,6 +911,39 @@ Start / `/stream` (SSE progress) / `/cancel` / `/status` quartet, backed by a pe
 
 All import handlers capture `uid` before launching background goroutines and pass it via
 `context.WithValue(context.Background(), appctx.ContextKeyUserID, uid)`.
+
+**Reimports are additive, not wipe-and-reload.** Every source (Facebook — Messenger, Albums,
+Posts, Places; WhatsApp; iMessage/SMS) matches an already-imported row by a stable natural key
+and either updates it in place or skips it, rather than deleting and reinserting — this matters
+because `media_item_faces`/`face_clusters` link to `media_items` (`ON DELETE CASCADE`) and to
+`contacts` (`ON DELETE SET NULL`), so a destructive reimport used to silently discard every
+face-recognition name link on re-run. Natural keys: album/post photos and message attachments
+key on `media_items.source_reference` (`<album_id>:<uri>`, `<post_id>:<uri>`,
+`<message_id>:<filename>` respectively — checked before insert in
+`internal/importstorage/facebook_album_storage.go`, `facebook_post_storage.go`, and
+`message_storage.go`'s `saveAttachment`); albums/posts themselves match by name /
+timestamp+title (`FindAlbumByName`/`FindPostByTimestampAndTitle`); messages match via
+`MessageStorage.SaveMessagesBatch`'s SQL-side lookup on `chat_session+message_date+sender_id+type`
+(sender_id excluded for `Outgoing`, since it's rewritten to the subject's *current* configured
+name on every import — see the comment above that lookup). `POST /facebook/all/import`
+(`runFacebookAllInProcess`) no longer calls `ClearFacebookAllDataForUser` first; that function
+still exists solely for the explicit, deliberate "Clear Facebook Data" purge action
+(`internal/handler/import_data_purge_handler.go`).
+
+**Contacts extraction (`POST /contacts/extract`, `internal/import/contacts/`) upserts, it
+doesn't rebuild.** `RunContactsNormalise` re-derives contacts from raw `emails`/`messages` data
+every run (it never reads the `contacts` table as its source), but `WriteContactsToDatabase`
+now matches each freshly computed record against already-present contacts — exact normalized
+email, then exact case-insensitive name, then fuzzy name similarity (same scorer/threshold
+`runMerge` uses to cluster raw records in the first place) — and only `UPDATE`s
+extraction-derived columns (message counts, merged `alternative_names`/`email`, `is_group`,
+`total`) on a match, or `INSERT`s a brand-new row when nothing matches. `name`, `rel_type`,
+`description`, `use_by_ai`, and the identifier columns are never touched by this path. Existing
+contacts that don't match anything this run — including one created purely to name a detected
+face via the People in Photos / Image Details identify flow, which has no message history to
+ever match against — are left alone, never deleted. This is what keeps
+`face_clusters.contact_id`/`media_item_faces.contact_id`/`relationships`/
+`subject_configuration.subject_contact_id` pointing at the same contact across reruns.
 
 ### Gmail Import
 

@@ -61,10 +61,9 @@ func (h *DashboardHandler) GetImportModalStats(w http.ResponseWriter, r *http.Re
 }
 
 // GetEmbeddingProgress handles GET /api/import-modal-embedding-progress?source=<key>.
-// Each of the five embedding-progress sources (see repository.EmbeddingProgressSourceKeys)
-// is fetched independently by the caller — one request per source — rather than in one
-// batched call, so a single slow source's query doesn't hold up the others and its
-// result can be rendered into the modal as soon as it's ready.
+// Each source is fetched independently so its line can update as soon as that query
+// returns. Vec-backed sources count the embedding table once instead of probing it
+// per source row.
 func (h *DashboardHandler) GetEmbeddingProgress(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.URL.Query().Get("source"))
 	if key == "" {

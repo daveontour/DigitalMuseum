@@ -6,39 +6,35 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	appai "github.com/daveontour/aimuseum/internal/ai"
 	"github.com/daveontour/aimuseum/internal/appctx"
 )
 
-// autoClassifierNumCtx is the preferred Ollama context window for Auto routing classification.
-// Some model tags (e.g. gemma4:e2b on Windows) crash Ollama when num_ctx is set too low;
-// SimpleGenerateClassifier retries without num_ctx on failure.
-const autoClassifierNumCtx = 4096
-
-var autoClassifierFormatSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"route":                     map[string]any{"type": "string", "enum": []any{"local", "hosted"}},
-		"reason":                    map[string]any{"type": "string"},
-		"confidence":                map[string]any{"type": "number"},
-		"needs_reference_documents": map[string]any{"type": "boolean"},
-		"needs_user_profile":        map[string]any{"type": "boolean"},
-	},
-	"required": []any{"route", "reason"},
-}
+const (
+	jevClassifierProvider = "jev"
+	// jevNoulYesThreshold is the probability above which a Jev yes/no answer is treated as yes.
+	jevNoulYesThreshold = 0.5
+	jevCriterionDescMax = 400
+)
 
 // AutoRouteDecision is the parsed output of the Auto routing classifier.
 type AutoRouteDecision struct {
-	Decision                  string // "local" or "hosted"
-	Reason                    string
-	Confidence                float64
-	ClassifierFallback        bool
-	ClassifierError           string
-	ClassifierProvider        string // provider that ran classification (localai, gemini, claude, deepseek)
-	NeedsReferenceDocuments   bool
-	NeedsUserProfile          bool
+	Decision                string // enabled model key, or "hosted" when classification fell back
+	Reason                  string
+	Confidence              float64
+	ClassifierFallback      bool
+	ClassifierError         string
+	ClassifierProvider      string // always "jev" when Jev ran or was attempted
+	NeedsReferenceDocuments bool
+	NeedsUserProfile        bool
+	ClassifierRequestJSON   string
+	ClassifierResponseJSON  string
+	ClassifierDurationMS    int64
+	ClassifierTimed         bool
 }
 
 // AutoExecutionContext controls optional user context included in the follow-up chat request.
@@ -47,109 +43,189 @@ type AutoExecutionContext struct {
 	IncludeUserProfile        bool
 }
 
-type autoClassifierJSON struct {
-	Route                     string  `json:"route"`
-	Reason                    string  `json:"reason"`
-	Confidence                float64 `json:"confidence"`
-	NeedsReferenceDocuments   *bool   `json:"needs_reference_documents"`
-	NeedsUserProfile          *bool   `json:"needs_user_profile"`
+type jevChoiceAnswer struct {
+	Choice     string  `json:"choice"`
+	Confidence float64 `json:"confidence"`
 }
 
-func buildAutoClassifierPrompt(userPrompt string, toolsCount, refDocCount int, hasSubjectProfile bool) string {
-	profileAvail := "no"
-	if hasSubjectProfile {
-		profileAvail = "yes"
-	}
-	return fmt.Sprintf(`You are a routing classifier for a digital archive chat assistant. The assistant has access to %d tools (database lookups, time/date, search, counts, etc.).
-
-Available context (may be omitted from the follow-up request if not needed):
-- %d reference document(s) can be inlined in the system prompt
-- Subject psychological/writing-style profile summaries available: %s
-
-Decide whether the user's request should be handled by a LOCAL small model (with tools) or a HOSTED larger model.
-
-Route LOCAL when the request:
-- Can be answered with one or two simple tool calls (e.g. current time/date, a count, a single lookup)
-- Needs only brief factual output with minimal reasoning or narrative
-- Is a straightforward command or question with low inference requirements
-
-Route HOSTED when the request:
-- Needs multi-step reasoning, synthesis across many records, or rich prose
-- Requires persona-heavy, creative, reflective, or emotionally nuanced answers
-- Explores the archive open-endedly or asks for summaries, stories, or essays
-- Is ambiguous, conversational, or would benefit from stronger language capability
-
-Also decide whether the follow-up request needs:
-- needs_reference_documents: true if answering requires material from the user's inlined reference documents (identity notes, background docs, etc.); false for generic/time/factual/tool-only queries
-- needs_user_profile: true if answering requires the subject's psychological or writing-style profile or archive data inventory; false when the question does not depend on who the archive subject is or what data they have
-
-Reply with ONLY valid JSON (no markdown fences):
-{"route":"local" or "hosted","reason":"brief explanation","confidence":0.0 to 1.0,"needs_reference_documents":true or false,"needs_user_profile":true or false}
-
-User request:
-%s`, toolsCount, refDocCount, profileAvail, userPrompt)
+type jevNoulAnswer struct {
+	Noul *float64 `json:"noul"`
 }
 
-func extractJSONObject(raw string) string {
-	raw = strings.TrimSpace(raw)
-	start := strings.Index(raw, "{")
-	if start == -1 {
-		return raw
-	}
-	depth := 0
-	for i := start; i < len(raw); i++ {
-		switch raw[i] {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				return raw[start : i+1]
-			}
+// buildJevModelCriteria maps each enabled model key to the text Jev uses to compare options.
+// Catalog fields (description, context length, price) are included when the slug matches.
+func buildJevModelCriteria(models []AIModel, catalog []appai.OpenRouterCatalogModel) map[string]string {
+	bySlug := indexCatalogBySlug(catalog)
+	out := make(map[string]string, len(models))
+	for _, m := range models {
+		key := strings.ToLower(strings.TrimSpace(m.Key))
+		if key == "" {
+			continue
 		}
+		if key == localAIModelKey {
+			out[key] = "Local AI (Ollama). Runs on this computer with no per-token API cost. Best for a short factual answer such as the current time or count. Very weak if the response requires accessing reference documents, user profiles, or multi-step reasoning or persona-heavy writing."
+			continue
+		}
+		out[key] = hostedModelCriterion(m, bySlug)
 	}
-	return raw[start:]
+	return out
 }
 
-func parseAutoClassifierResponse(raw string) (AutoRouteDecision, error) {
-	raw = strings.TrimSpace(raw)
-	if strings.HasPrefix(raw, "```") {
-		if idx := strings.Index(raw, "\n"); idx != -1 {
-			raw = raw[idx+1:]
+func indexCatalogBySlug(catalog []appai.OpenRouterCatalogModel) map[string]appai.OpenRouterCatalogModel {
+	out := make(map[string]appai.OpenRouterCatalogModel, len(catalog)*2)
+	for _, m := range catalog {
+		if id := strings.ToLower(strings.TrimSpace(m.ID)); id != "" {
+			out[id] = m
 		}
-		if idx := strings.LastIndex(raw, "```"); idx != -1 {
-			raw = raw[:idx]
+		if slug := strings.ToLower(strings.TrimSpace(m.CanonicalSlug)); slug != "" {
+			out[slug] = m
 		}
-		raw = strings.TrimSpace(raw)
 	}
-	raw = extractJSONObject(raw)
-	var parsed autoClassifierJSON
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+	return out
+}
+
+func hostedModelCriterion(m AIModel, bySlug map[string]appai.OpenRouterCatalogModel) string {
+	name := strings.TrimSpace(m.DisplayName)
+	if name == "" {
+		name = m.Key
+	}
+	slug := strings.TrimSpace(m.ModelSlug)
+	parts := []string{name}
+	if slug != "" {
+		parts = append(parts, "OpenRouter slug: "+slug)
+	}
+	if cat, ok := bySlug[strings.ToLower(slug)]; ok {
+		if desc := truncateRunes(strings.TrimSpace(cat.Description), jevCriterionDescMax); desc != "" {
+			parts = append(parts, desc)
+		}
+		if cat.ContextLength > 0 {
+			parts = append(parts, fmt.Sprintf("Context length: %d tokens", cat.ContextLength))
+		}
+		if price := formatPerMillion(cat.Pricing.Prompt); price != "" {
+			parts = append(parts, "Prompt price: "+price)
+		}
+		if price := formatPerMillion(cat.Pricing.Completion); price != "" {
+			parts = append(parts, "Completion price: "+price)
+		}
+	}
+	return strings.Join(parts, ". ")
+}
+
+func formatPerMillion(perToken string) string {
+	f, err := strconv.ParseFloat(strings.TrimSpace(perToken), 64)
+	if err != nil || f <= 0 {
+		return ""
+	}
+	return "$" + strconv.FormatFloat(f*1_000_000, 'f', -1, 64) + " per 1M tokens"
+}
+
+func truncateRunes(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max]) + "…"
+}
+
+func buildJevQuestions(criteria map[string]string) map[string]any {
+	return map[string]any{
+		"model": map[string]any{
+			"type":         "choice",
+			"instructions": "Which model should answer the request in `user_request`? Prefer the cheapest option that can do the job. Choose localai for a simple lookup, count, time, or short factual answer. Choose a hosted model when the request needs multi-step reasoning, synthesis across records, summaries, stories, or persona-heavy writing.",
+			"criteria":     criteria,
+		},
+		"needs_reference_documents": map[string]any{
+			"type":         "noul",
+			"instructions": "Does answering `user_request` require material from the user's inlined reference documents (identity notes, background docs)?",
+			"criteria": map[string]string{
+				"true":  "The answer depends on those documents.",
+				"false": "The request is generic, factual, or answerable with tools alone.",
+			},
+		},
+		"needs_user_profile": map[string]any{
+			"type":         "noul",
+			"instructions": "Does answering `user_request` require the subject's psychological or writing-style profile, or what data the archive holds?",
+			"criteria": map[string]string{
+				"true":  "The answer depends on who the archive subject is or what data they have.",
+				"false": "The request does not depend on the subject's identity or archive inventory.",
+			},
+		},
+	}
+}
+
+func jevState(prompt string, toolsCount, refDocCount int, hasSubjectProfile bool) map[string]any {
+	return map[string]any{
+		"user_request":              prompt,
+		"tools_available":           toolsCount,
+		"reference_document_count":  refDocCount,
+		"subject_profile_available": hasSubjectProfile,
+	}
+}
+
+func prettyJSON(v any) string {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func prettyRawJSON(raw []byte) string {
+	if len(bytesTrim(raw)) == 0 {
+		return ""
+	}
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return string(raw)
+	}
+	return prettyJSON(v)
+}
+
+func bytesTrim(raw []byte) []byte {
+	return []byte(strings.TrimSpace(string(raw)))
+}
+
+// parseJevDecision reads a Decisions API body and returns the chosen model key.
+// Missing yes/no answers default to including that context.
+func parseJevDecision(body []byte, allowed map[string]struct{}) (AutoRouteDecision, error) {
+	var parsed appai.JevDecisionResult
+	if err := json.Unmarshal(body, &parsed); err != nil {
 		return AutoRouteDecision{}, fmt.Errorf("invalid classifier JSON: %w", err)
 	}
-	route := strings.ToLower(strings.TrimSpace(parsed.Route))
-	if route != "local" && route != "hosted" {
-		return AutoRouteDecision{}, fmt.Errorf("invalid route %q", parsed.Route)
+	rawChoice := parsed.Answers["model"]
+	if len(rawChoice) == 0 {
+		return AutoRouteDecision{}, fmt.Errorf("missing model choice")
 	}
-	reason := strings.TrimSpace(parsed.Reason)
-	if reason == "" {
-		reason = "No reason provided"
+	var choice jevChoiceAnswer
+	if err := json.Unmarshal(rawChoice, &choice); err != nil {
+		return AutoRouteDecision{}, fmt.Errorf("invalid model choice: %w", err)
 	}
-	needsRefDocs := true
-	if parsed.NeedsReferenceDocuments != nil {
-		needsRefDocs = *parsed.NeedsReferenceDocuments
-	}
-	needsProfile := true
-	if parsed.NeedsUserProfile != nil {
-		needsProfile = *parsed.NeedsUserProfile
+	key := strings.ToLower(strings.TrimSpace(choice.Choice))
+	if _, ok := allowed[key]; !ok {
+		return AutoRouteDecision{}, fmt.Errorf("invalid route %q", choice.Choice)
 	}
 	return AutoRouteDecision{
-		Decision:                route,
-		Reason:                  reason,
-		Confidence:              parsed.Confidence,
-		NeedsReferenceDocuments: needsRefDocs,
-		NeedsUserProfile:        needsProfile,
+		Decision:                key,
+		Reason:                  "Jev selected " + key,
+		Confidence:              choice.Confidence,
+		ClassifierProvider:      jevClassifierProvider,
+		NeedsReferenceDocuments: jevNoulYes(parsed.Answers["needs_reference_documents"]),
+		NeedsUserProfile:        jevNoulYes(parsed.Answers["needs_user_profile"]),
 	}, nil
+}
+
+func jevNoulYes(raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return true
+	}
+	var n jevNoulAnswer
+	if err := json.Unmarshal(raw, &n); err != nil || n.Noul == nil {
+		return true
+	}
+	return *n.Noul > jevNoulYesThreshold
 }
 
 func (s *ChatService) pickHostedProviderForAuto(ctx context.Context, r *http.Request, lastManualHosted string) (string, appai.ChatProvider) {
@@ -168,6 +244,7 @@ func hostedClassifierFallbackDecision(reason string, classifierError string) Aut
 		Reason:                  reason,
 		ClassifierFallback:      true,
 		ClassifierError:         classifierError,
+		ClassifierProvider:      jevClassifierProvider,
 		NeedsReferenceDocuments: true,
 		NeedsUserProfile:        true,
 	}
@@ -190,7 +267,7 @@ func (s *ChatService) subjectProfileContextAvailable(ctx context.Context) bool {
 func autoExecutionContextFromDecision(decision AutoRouteDecision) AutoExecutionContext {
 	return AutoExecutionContext{
 		IncludeReferenceDocuments: decision.NeedsReferenceDocuments,
-		IncludeUserProfile:      decision.NeedsUserProfile,
+		IncludeUserProfile:        decision.NeedsUserProfile,
 	}
 }
 
@@ -202,167 +279,123 @@ func (s *ChatService) effectiveProviderByName(ctx context.Context, r *http.Reque
 	return s.effectiveProviderByKey(ctx, r, "", key), key
 }
 
-func (s *ChatService) runClassifierGenerate(ctx context.Context, providerName string, provider appai.ChatProvider, prompt string) (string, *appai.LLMUsage, error) {
-	if provider == nil || !provider.IsAvailable() {
-		return "", nil, fmt.Errorf("classifier provider %q unavailable", providerName)
-	}
-	if providerName == "localai" {
-		lp, ok := provider.(*appai.LocalAIProvider)
-		if !ok || lp == nil {
-			return "", nil, fmt.Errorf("classifier provider %q unavailable", providerName)
-		}
-		return lp.SimpleGenerateClassifier(ctx, prompt, autoClassifierNumCtx, autoClassifierFormatSchema)
-	}
-	return provider.SimpleGenerate(ctx, prompt)
-}
-
-func (s *ChatService) EffectiveClassifierProvider(ctx context.Context, r *http.Request, configured string) string {
-	name := s.normalizeClassifierProvider(ctx, configured)
-	if name != DefaultClassifierProvider {
-		return name
-	}
-	if s.LocalAIAvailable(ctx) {
-		return DefaultClassifierProvider
-	}
-	return s.firstAvailableHostedClassifierProvider(ctx, r)
-}
-
-func (s *ChatService) firstAvailableHostedClassifierProvider(ctx context.Context, r *http.Request) string {
-	autoOrder := s.defaultHostedLLMProviderOrder(ctx)
-	for _, p := range autoOrder {
-		prov, pname := s.effectiveProviderByName(ctx, r, p)
-		if prov != nil && prov.IsAvailable() {
-			return pname
-		}
-	}
-	if dk, ok := s.DefaultAIModelKey(ctx); ok {
-		return dk
-	}
-	return "localai"
-}
-
-func (s *ChatService) hostedClassifierFallbackCandidates(ctx context.Context, r *http.Request, exclude string) []string {
-	exclude = strings.ToLower(strings.TrimSpace(exclude))
-	var out []string
-	if s.LocalAIAvailable(ctx) && exclude != DefaultClassifierProvider {
-		out = append(out, DefaultClassifierProvider)
-	}
-	autoOrder := s.defaultHostedLLMProviderOrder(ctx)
-	seen := map[string]bool{exclude: true}
-	for _, p := range autoOrder {
-		if seen[p] {
-			continue
-		}
-		seen[p] = true
-		prov, _ := s.effectiveProviderByName(ctx, r, p)
-		if prov != nil && prov.IsAvailable() {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
 func (s *ChatService) classifyAutoRoute(ctx context.Context, r *http.Request, prompt string, toolsCount, refDocCount int, hasSubjectProfile bool) AutoRouteDecision {
-	orderCfg := s.loadHostedLLMProviderOrderConfig(ctx)
-	configuredClassifier := s.EffectiveClassifierProvider(ctx, r, orderCfg.ClassifierProvider)
-
+	var models []AIModel
+	if s.aiModelsSvc != nil {
+		listed, err := s.aiModelsSvc.ListEnabledInTableOrder(ctx)
+		if err != nil {
+			slog.Warn("auto classifier: list models", "err", err)
+		} else {
+			models = listed
+		}
+	}
+	var catalog []appai.OpenRouterCatalogModel
+	if s.openRouterCatalog != nil {
+		listed, err := s.openRouterCatalog.List(ctx)
+		if err != nil {
+			slog.Warn("auto classifier: catalog unavailable", "err", err)
+		} else {
+			catalog = listed
+		}
+	}
+	criteria := buildJevModelCriteria(models, catalog)
 	logAttrs := []any{
 		"user_id", appctx.UserIDFromCtx(ctx),
 		"user_prompt", prompt,
 		"tools_count", toolsCount,
 		"ref_doc_count", refDocCount,
 		"has_subject_profile", hasSubjectProfile,
-		"num_ctx", autoClassifierNumCtx,
-		"configured_classifier_provider", configuredClassifier,
+		"classifier_provider", jevClassifierProvider,
+		"model_options", len(criteria),
+	}
+	if len(criteria) == 0 {
+		decision := hostedClassifierFallbackDecision("No enabled models to choose from", "empty model list")
+		slog.Warn("auto classifier response", append(logAttrs, "decision", decision.Decision, "classifier_fallback", true, "err", decision.ClassifierError)...)
+		return decision
 	}
 
-	classifierPrompt := buildAutoClassifierPrompt(prompt, toolsCount, refDocCount, hasSubjectProfile)
-	slog.Info("auto classifier request", append(logAttrs, "classifier_prompt", classifierPrompt)...)
+	apiKey := s.effectiveOpenRouterKey(ctx, r, "")
+	state := jevState(prompt, toolsCount, refDocCount, hasSubjectProfile)
+	questions := buildJevQuestions(criteria)
+	reqJSON := prettyJSON(map[string]any{
+		"model":     appai.JevModelID,
+		"state":     state,
+		"questions": questions,
+	})
+	slog.Info("auto classifier request", append(logAttrs, "jev_model", appai.JevModelID)...)
 
-	provider, providerName := s.effectiveProviderByName(ctx, r, configuredClassifier)
-	classifierProviderUsed := providerName
-	raw, usage, err := s.runClassifierGenerate(ctx, providerName, provider, classifierPrompt)
-
-	if err != nil {
-		for _, alt := range s.hostedClassifierFallbackCandidates(ctx, r, providerName) {
-			altProv, altName := s.effectiveProviderByName(ctx, r, alt)
-			raw2, usage2, err2 := s.runClassifierGenerate(ctx, altName, altProv, classifierPrompt)
-			if err2 != nil {
-				continue
-			}
-			if usage != nil && usage2 != nil {
-				usage.InputTokens += usage2.InputTokens
-				usage.OutputTokens += usage2.OutputTokens
-			} else if usage2 != nil {
-				usage = usage2
-			}
-			raw, err = raw2, nil
-			classifierProviderUsed = altName
-			break
+	started := time.Now()
+	result, rawResp, err := appai.CallJevDecisions(ctx, apiKey, state, questions)
+	elapsedMS := time.Since(started).Milliseconds()
+	respJSON := prettyRawJSON(rawResp)
+	stamp := func(d AutoRouteDecision) AutoRouteDecision {
+		d.ClassifierRequestJSON = reqJSON
+		d.ClassifierResponseJSON = respJSON
+		d.ClassifierDurationMS = elapsedMS
+		d.ClassifierTimed = true
+		return d
+	}
+	var usage *appai.LLMUsage
+	if result != nil && (result.Usage.InputTokens > 0 || result.Usage.OutputTokens > 0) {
+		model := result.Model
+		if model == "" {
+			model = appai.JevModelID
 		}
-	}
-
-	if usage != nil {
+		usage = &appai.LLMUsage{
+			Provider:     jevClassifierProvider,
+			Model:        model,
+			InputTokens:  result.Usage.InputTokens,
+			OutputTokens: result.Usage.OutputTokens,
+		}
 		s.applyUsageKeySourceToLLMUsage(ctx, r, "", usage)
 		RecordLLMUsage(ctx, s.billing, s.userRepo, usage, err)
 	}
-
-	logAttrs = append(logAttrs, "classifier_provider", classifierProviderUsed)
-
 	if err != nil {
-		decision := hostedClassifierFallbackDecision("Classifier request failed", err.Error())
-		decision.ClassifierProvider = classifierProviderUsed
-		respAttrs := append(logAttrs,
-			"raw_response", raw,
+		decision := stamp(hostedClassifierFallbackDecision("Classifier request failed", err.Error()))
+		slog.Warn("auto classifier response", append(logAttrs,
 			"err", err,
 			"decision", decision.Decision,
 			"reason", decision.Reason,
 			"classifier_error", decision.ClassifierError,
-			"classifier_fallback", decision.ClassifierFallback,
-		)
-		if usage != nil {
-			respAttrs = append(respAttrs, "input_tokens", usage.InputTokens, "output_tokens", usage.OutputTokens, "model", usage.Model)
-		}
-		slog.Warn("auto classifier response", respAttrs...)
-		return decision
-	}
-
-	decision, parseErr := parseAutoClassifierResponse(raw)
-	decision.ClassifierProvider = classifierProviderUsed
-	if parseErr != nil {
-		decision = hostedClassifierFallbackDecision("Could not parse classifier response", parseErr.Error())
-		decision.ClassifierProvider = classifierProviderUsed
-		slog.Warn("auto classifier response", append(logAttrs,
-			"raw_response", raw,
-			"err", parseErr,
-			"decision", decision.Decision,
-			"reason", decision.Reason,
-			"classifier_error", decision.ClassifierError,
-			"classifier_fallback", decision.ClassifierFallback,
+			"classifier_fallback", true,
+			"classifier_duration_ms", elapsedMS,
 		)...)
 		return decision
 	}
 
-	respAttrs := append(logAttrs,
-		"raw_response", raw,
+	allowed := make(map[string]struct{}, len(criteria))
+	for key := range criteria {
+		allowed[key] = struct{}{}
+	}
+	raw, _ := json.Marshal(result)
+	decision, parseErr := parseJevDecision(raw, allowed)
+	if parseErr != nil {
+		decision = stamp(hostedClassifierFallbackDecision("Could not parse classifier response", parseErr.Error()))
+		slog.Warn("auto classifier response", append(logAttrs,
+			"err", parseErr,
+			"decision", decision.Decision,
+			"reason", decision.Reason,
+			"classifier_error", decision.ClassifierError,
+			"classifier_fallback", true,
+		)...)
+		return decision
+	}
+	slog.Info("auto classifier response", append(logAttrs,
 		"decision", decision.Decision,
 		"reason", decision.Reason,
 		"confidence", decision.Confidence,
 		"needs_reference_documents", decision.NeedsReferenceDocuments,
 		"needs_user_profile", decision.NeedsUserProfile,
-		"classifier_fallback", decision.ClassifierFallback,
-	)
-	if usage != nil {
-		respAttrs = append(respAttrs, "input_tokens", usage.InputTokens, "output_tokens", usage.OutputTokens, "model", usage.Model)
-	}
-	slog.Info("auto classifier response", respAttrs...)
-	return decision
+		"classifier_fallback", false,
+		"classifier_duration_ms", elapsedMS,
+	)...)
+	return stamp(decision)
 }
 
 func autoRouteMetaFromDecision(decision AutoRouteDecision, routedProvider string, executionFallback bool) map[string]any {
 	classifierProvider := strings.TrimSpace(decision.ClassifierProvider)
 	if classifierProvider == "" {
-		classifierProvider = DefaultClassifierProvider
+		classifierProvider = jevClassifierProvider
 	}
 	meta := map[string]any{
 		"requested_provider":        "auto",
@@ -380,6 +413,15 @@ func autoRouteMetaFromDecision(decision AutoRouteDecision, routedProvider string
 	}
 	if decision.Confidence > 0 {
 		meta["confidence"] = decision.Confidence
+	}
+	if decision.ClassifierRequestJSON != "" {
+		meta["classifier_request_json"] = decision.ClassifierRequestJSON
+	}
+	if decision.ClassifierResponseJSON != "" {
+		meta["classifier_response_json"] = decision.ClassifierResponseJSON
+	}
+	if decision.ClassifierTimed {
+		meta["classifier_duration_ms"] = decision.ClassifierDurationMS
 	}
 	return meta
 }
@@ -399,11 +441,11 @@ func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, 
 		}
 		if provider == nil || !provider.IsAvailable() {
 			meta := map[string]any{
-				"requested_provider":       "auto",
-				"auto_selection_enabled":   false,
-				"routed_provider":          providerName,
-				"classifier_skipped":       true,
-				"execution_fallback":       executionFallback,
+				"requested_provider":        "auto",
+				"auto_selection_enabled":    false,
+				"routed_provider":           providerName,
+				"classifier_skipped":        true,
+				"execution_fallback":        executionFallback,
 				"needs_reference_documents": true,
 				"needs_user_profile":        true,
 			}
@@ -428,19 +470,22 @@ func (s *ChatService) resolveAutoProvider(ctx context.Context, r *http.Request, 
 	var providerName string
 	executionFallback := false
 
-	if decision.Decision == "local" {
-		provider = s.localAIProviderForChat(ctx)
-		providerName = "localai"
-		if provider == nil || !provider.IsAvailable() {
-			providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted)
-			executionFallback = true
-		}
-	} else {
+	if decision.ClassifierFallback || decision.Decision == "" || decision.Decision == "hosted" {
 		providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted)
 		if provider == nil || !provider.IsAvailable() {
 			provider = s.localAIProviderForChat(ctx)
 			providerName = "localai"
 			executionFallback = true
+		}
+	} else {
+		provider, providerName = s.effectiveProviderByName(ctx, r, decision.Decision)
+		if provider == nil || !provider.IsAvailable() {
+			executionFallback = true
+			providerName, provider = s.pickHostedProviderForAuto(ctx, r, lastManualHosted)
+			if provider == nil || !provider.IsAvailable() {
+				provider = s.localAIProviderForChat(ctx)
+				providerName = "localai"
+			}
 		}
 	}
 
@@ -478,16 +523,6 @@ func (s *ChatService) AutoAvailable(ctx context.Context, r *http.Request) bool {
 }
 
 func (s *ChatService) classifierAvailable(ctx context.Context, r *http.Request, configured string) bool {
-	effective := s.EffectiveClassifierProvider(ctx, r, configured)
-	p, _ := s.effectiveProviderByName(ctx, r, effective)
-	if p != nil && p.IsAvailable() {
-		return true
-	}
-	for _, alt := range s.hostedClassifierFallbackCandidates(ctx, r, effective) {
-		altProv, _ := s.effectiveProviderByName(ctx, r, alt)
-		if altProv != nil && altProv.IsAvailable() {
-			return true
-		}
-	}
-	return false
+	_ = configured
+	return strings.TrimSpace(s.effectiveOpenRouterKey(ctx, r, "")) != ""
 }

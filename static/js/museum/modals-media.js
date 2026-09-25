@@ -593,12 +593,13 @@ Modals.NewImageGallery = (() => {
                     _renderThumbnailGrid();
                 });
             }
-            
+
             // Add event listeners for filter changes with debouncing
             const filterInputs = [
                 DOM.newImageGalleryTitle,
                 DOM.newImageGalleryTags,
                 DOM.newImageGalleryPerson,
+                DOM.newImageGalleryMinPeople,
                 DOM.newImageGalleryAuthor,
                 DOM.newImageGallerySource,
                 DOM.newImageGalleryRegionFilter,
@@ -666,6 +667,12 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryAIClassificationBtn) {
                 DOM.newImageGalleryAIClassificationBtn.addEventListener('click', async () => {
                     await _startAIClassificationForSelected();
+                });
+            }
+
+            if (DOM.newImageGalleryRescanFacesBtn) {
+                DOM.newImageGalleryRescanFacesBtn.addEventListener('click', async () => {
+                    await _startFaceRescanForSelected();
                 });
             }
 
@@ -807,6 +814,7 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryTitle) DOM.newImageGalleryTitle.value = '';
             if (DOM.newImageGalleryTags) DOM.newImageGalleryTags.value = '';
             if (DOM.newImageGalleryPerson) DOM.newImageGalleryPerson.value = '';
+            if (DOM.newImageGalleryMinPeople) DOM.newImageGalleryMinPeople.value = '';
             if (DOM.newImageGallerySimilarTags) DOM.newImageGallerySimilarTags.value = '';
             if (DOM.newImageGallerySimilarN) DOM.newImageGallerySimilarN.value = '25';
             if (DOM.newImageGalleryAuthor) DOM.newImageGalleryAuthor.value = '';
@@ -1144,6 +1152,9 @@ Modals.NewImageGallery = (() => {
             if (DOM.newImageGalleryPerson && DOM.newImageGalleryPerson.value.trim()) {
                 params.append('person', DOM.newImageGalleryPerson.value.trim());
             }
+            if (DOM.newImageGalleryMinPeople && DOM.newImageGalleryMinPeople.value.trim()) {
+                params.append('min_people_count', DOM.newImageGalleryMinPeople.value.trim());
+            }
             if (DOM.newImageGalleryAuthor && DOM.newImageGalleryAuthor.value.trim()) {
                 params.append('author', DOM.newImageGalleryAuthor.value.trim());
             }
@@ -1244,6 +1255,7 @@ Modals.NewImageGallery = (() => {
                 (DOM.newImageGalleryTitle && DOM.newImageGalleryTitle.value.trim()) ||
                 (DOM.newImageGalleryTags && DOM.newImageGalleryTags.value.trim()) ||
                 (DOM.newImageGalleryPerson && DOM.newImageGalleryPerson.value.trim()) ||
+                (DOM.newImageGalleryMinPeople && DOM.newImageGalleryMinPeople.value.trim()) ||
                 (DOM.newImageGallerySimilarTags && DOM.newImageGallerySimilarTags.value.trim()) ||
                 (DOM.newImageGalleryAuthor && DOM.newImageGalleryAuthor.value.trim()) ||
                 (DOM.newImageGallerySource && (DOM.newImageGallerySource.value || '').trim()) ||
@@ -1315,7 +1327,7 @@ Modals.NewImageGallery = (() => {
                     sourceBadge.textContent = _getSourceAbbreviation(image.source);
                     thumbnailItem.appendChild(sourceBadge);
                 }
-                
+
                 thumbnailItem.addEventListener('click', (e) => _selectImage(actualIndex, e));
                 
                 if (selectedImageIds.has(image.id)) {
@@ -1486,6 +1498,10 @@ Modals.NewImageGallery = (() => {
                 DOM.newImageGalleryAIClassificationBtn.disabled = selectedImageIds.size === 0;
             }
 
+            if (DOM.newImageGalleryRescanFacesBtn) {
+                DOM.newImageGalleryRescanFacesBtn.disabled = selectedImageIds.size === 0;
+            }
+
             if (DOM.newImageGallerySetGpsBtn) {
                 DOM.newImageGallerySetGpsBtn.disabled = selectedImageIds.size === 0;
             }
@@ -1531,6 +1547,47 @@ Modals.NewImageGallery = (() => {
             } catch (e) {
                 console.error('AI classification start failed:', e);
                 await AppDialogs.showAppAlert('AI Classification', e.message || 'Request failed.');
+            } finally {
+                _updateSelectionUI();
+            }
+        }
+
+        // Clears every existing face detection for each selected photo
+        // (named, unnamed, or previously ignored) and re-runs detection on
+        // them from scratch — bulk equivalent of the Image Details dialog's
+        // "Rescan for Faces" button. Fires the shared "Detect faces in
+        // photos" background job singleton and doesn't wait for it inline,
+        // same fire-and-forget pattern as _startAIClassificationForSelected.
+        async function _startFaceRescanForSelected() {
+            if (selectedImageIds.size === 0) return;
+            const ids = Array.from(selectedImageIds);
+
+            const ok = await AppDialogs.showAppConfirm(
+                'Rescan for faces',
+                `Clear and redetect faces in ${ids.length} selected photo(s)? Any names or "ignored" markings already set on faces in these photos will be lost — you'll need to re-review them in People in Photos afterward.`,
+                { danger: true }
+            );
+            if (!ok) return;
+
+            const btn = DOM.newImageGalleryRescanFacesBtn;
+            if (btn) {
+                btn.disabled = true;
+            }
+            try {
+                const response = await fetch('/api/faces/rescan', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ media_item_ids: ids })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.detail || data.error || `HTTP ${response.status}`);
+                }
+                await AppDialogs.showAppAlert('Rescan for faces', data.message || 'Face rescan started.');
+            } catch (e) {
+                console.error('Face rescan start failed:', e);
+                await AppDialogs.showAppAlert('Rescan for faces', e.message || 'Request failed.');
             } finally {
                 _updateSelectionUI();
             }
@@ -1770,6 +1827,8 @@ Modals.ImageDetailModal = (() => {
         let onSaveCallback = null;
         let onDeleteCallback = null;
         let allowRedirects = true;
+        let currentUnnamedFaces = [];  // {id, face_cluster_id} for every face with no linked contact, for the currently displayed photo
+        let currentIdentifyFaceId = null;  // face id the identify popover is currently open for, if any
 
         function formatDate(year, month, day) {
             if (!year && !month && !day) return 'No Date';
@@ -2230,6 +2289,14 @@ Modals.ImageDetailModal = (() => {
             if (DOM.newImageGalleryDetailFaceToggleLabel) {
                 DOM.newImageGalleryDetailFaceToggleLabel.style.display = 'none';
             }
+            if (DOM.newImageGalleryDetailIgnoreUnnamedBtn) {
+                DOM.newImageGalleryDetailIgnoreUnnamedBtn.style.display = 'none';
+            }
+            if (DOM.newImageGalleryDetailIgnoreUnnamedAllBtn) {
+                DOM.newImageGalleryDetailIgnoreUnnamedAllBtn.style.display = 'none';
+            }
+            currentUnnamedFaces = [];
+            _closeIdentifyPopover();
         }
 
         function init() {
@@ -2254,6 +2321,36 @@ Modals.ImageDetailModal = (() => {
                     }
                 });
             }
+
+            if (DOM.newImageGalleryDetailIgnoreUnnamedBtn) {
+                DOM.newImageGalleryDetailIgnoreUnnamedBtn.addEventListener('click', () => { void _ignoreUnnamedPeopleThisImage(); });
+            }
+            if (DOM.newImageGalleryDetailIgnoreUnnamedAllBtn) {
+                DOM.newImageGalleryDetailIgnoreUnnamedAllBtn.addEventListener('click', () => { void _ignoreUnnamedPeopleAllImages(); });
+            }
+            if (DOM.newImageGalleryDetailRescanFacesBtn) {
+                DOM.newImageGalleryDetailRescanFacesBtn.addEventListener('click', () => { void _rescanFacesThisImage(); });
+            }
+
+            if (DOM.newImageGalleryDetailIdentifyClose) {
+                DOM.newImageGalleryDetailIdentifyClose.addEventListener('click', _closeIdentifyPopover);
+            }
+            if (DOM.newImageGalleryDetailIdentifyInput) {
+                DOM.newImageGalleryDetailIdentifyInput.addEventListener('input', (e) => { void _onIdentifyInput(e); });
+                DOM.newImageGalleryDetailIdentifyInput.addEventListener('click', (e) => e.stopPropagation());
+            }
+            document.addEventListener('click', (e) => {
+                const popover = DOM.newImageGalleryDetailIdentifyPopover;
+                if (popover && popover.style.display !== 'none' && !popover.contains(e.target)) {
+                    _closeIdentifyPopover();
+                }
+            });
+            document.addEventListener('keydown', (e) => {
+                const popover = DOM.newImageGalleryDetailIdentifyPopover;
+                if (e.key === 'Escape' && popover && popover.style.display !== 'none') {
+                    _closeIdentifyPopover();
+                }
+            });
 
             if (DOM.newImageDetailFindSimilarBtn) {
                 DOM.newImageDetailFindSimilarBtn.addEventListener('click', async (e) => {
@@ -2343,8 +2440,9 @@ Modals.ImageDetailModal = (() => {
         // percentages of the image-wrap box (see .new-image-gallery-detail-image-wrap
         // in museum_of.css), which stays sized exactly to the rendered <img> — so
         // percentage positioning lines up with the image's own pixels responsively,
-        // with no JS resize recalculation needed. Purely informational (no click
-        // interaction) for this first pass.
+        // with no JS resize recalculation needed. A named face's box is purely
+        // informational; an unnamed one is a click target opening the identify
+        // popover (see _openIdentifyPopover) — everything else stays click-through.
         let faceOverlayRequestToken = 0;
         async function _loadFaceOverlay(mediaItemId) {
             const container = DOM.newImageGalleryDetailFaceOverlay;
@@ -2353,7 +2451,12 @@ Modals.ImageDetailModal = (() => {
 
             const toggleLabel = DOM.newImageGalleryDetailFaceToggleLabel;
             const toggle = DOM.newImageGalleryDetailFaceToggle;
+            const ignoreUnnamedBtn = DOM.newImageGalleryDetailIgnoreUnnamedBtn;
+            const ignoreUnnamedAllBtn = DOM.newImageGalleryDetailIgnoreUnnamedAllBtn;
             if (toggleLabel) toggleLabel.style.display = 'none';
+            if (ignoreUnnamedBtn) ignoreUnnamedBtn.style.display = 'none';
+            if (ignoreUnnamedAllBtn) ignoreUnnamedAllBtn.style.display = 'none';
+            currentUnnamedFaces = [];
 
             const thisRequest = ++faceOverlayRequestToken;
             let faces = [];
@@ -2379,6 +2482,17 @@ Modals.ImageDetailModal = (() => {
                     label.className = 'face-bbox-label';
                     label.textContent = face.contact_name;
                     box.appendChild(label);
+                } else {
+                    box.classList.add('face-bbox-overlay-unnamed');
+                    box.title = 'Click to identify this person';
+                    const label = document.createElement('span');
+                    label.className = 'face-bbox-label-unnamed';
+                    label.innerHTML = '<i class="fas fa-plus"></i> Identify';
+                    box.appendChild(label);
+                    box.addEventListener('click', (evt) => {
+                        evt.stopPropagation();
+                        _openIdentifyPopover(face.id, box);
+                    });
                 }
                 container.appendChild(box);
             });
@@ -2390,6 +2504,331 @@ Modals.ImageDetailModal = (() => {
                     container.style.display = '';
                 }
                 if (toggleLabel) toggleLabel.style.display = 'flex';
+            }
+
+            // "Ignore Unnamed People" only makes sense — and only shows up —
+            // when this photo actually has at least one detected face with no
+            // linked contact yet.
+            // contact_id can legitimately be 0 (the archive subject's reserved
+            // sentinel contact id — see contact_repo.go's "Always include the
+            // archive subject (id = 0)") so this must not use a falsy check:
+            // `!f.contact_id` would treat the subject's own linked face as
+            // unnamed and sweep it into "Ignore unnamed people".
+            currentUnnamedFaces = (faces || [])
+                .filter(f => f.contact_id === null || f.contact_id === undefined)
+                .map(f => ({ id: f.id, face_cluster_id: f.face_cluster_id }));
+            if (ignoreUnnamedBtn) {
+                ignoreUnnamedBtn.style.display = currentUnnamedFaces.length > 0 ? 'inline-flex' : 'none';
+            }
+            if (ignoreUnnamedAllBtn) {
+                ignoreUnnamedAllBtn.style.display = currentUnnamedFaces.length > 0 ? 'inline-flex' : 'none';
+            }
+        }
+
+        // Opens the "who is this?" popover anchored near the clicked unnamed
+        // face's box, positioned in pixels (not the box's own percentage
+        // left/top) and clamped to the image wrap's rendered bounds so it
+        // never spills outside the photo regardless of where the face is.
+        function _openIdentifyPopover(faceId, boxEl) {
+            const popover = DOM.newImageGalleryDetailIdentifyPopover;
+            const wrap = document.querySelector('.new-image-gallery-detail-image-wrap');
+            const input = DOM.newImageGalleryDetailIdentifyInput;
+            const results = DOM.newImageGalleryDetailIdentifyResults;
+            if (!popover || !wrap || !boxEl) return;
+
+            currentIdentifyFaceId = faceId;
+            if (input) input.value = '';
+            if (results) { results.innerHTML = ''; results.style.display = 'none'; }
+
+            popover.style.display = 'block';
+
+            const wrapRect = wrap.getBoundingClientRect();
+            const boxRect = boxEl.getBoundingClientRect();
+            const left = boxRect.left - wrapRect.left;
+            const top = boxRect.bottom - wrapRect.top + 6;
+            const maxLeft = Math.max(0, wrap.clientWidth - popover.offsetWidth - 4);
+            const maxTop = Math.max(0, wrap.clientHeight - popover.offsetHeight - 4);
+            popover.style.left = Math.min(Math.max(0, left), maxLeft) + 'px';
+            popover.style.top = Math.min(Math.max(0, top), maxTop) + 'px';
+
+            if (input) input.focus();
+        }
+
+        function _closeIdentifyPopover() {
+            const popover = DOM.newImageGalleryDetailIdentifyPopover;
+            if (popover) popover.style.display = 'none';
+            currentIdentifyFaceId = null;
+        }
+
+        // Fetched fresh on every call rather than cached — see the same fix
+        // (and the bug it fixed) in modals-faces.js's _fetchContactNames.
+        async function _fetchContactNamesForIdentify() {
+            try {
+                const resp = await fetch('/contacts/names');
+                if (!resp.ok) throw new Error('Failed to load contacts');
+                const data = await resp.json();
+                return data.contacts || [];
+            } catch (err) {
+                console.error('Error loading contact names:', err);
+                return [];
+            }
+        }
+
+        async function _onIdentifyInput(evt) {
+            const rawTerm = evt.target.value.trim();
+            const term = rawTerm.toLowerCase();
+            const resultsEl = DOM.newImageGalleryDetailIdentifyResults;
+            if (!resultsEl) return;
+            if (!term) {
+                resultsEl.innerHTML = '';
+                resultsEl.style.display = 'none';
+                return;
+            }
+            const names = await _fetchContactNamesForIdentify();
+            const matches = names.filter(c => c.name && c.name.toLowerCase().includes(term)).slice(0, 8);
+            const exactMatch = names.some(c => c.name && c.name.toLowerCase() === term);
+
+            resultsEl.innerHTML = '';
+            matches.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'face-identify-result-item';
+                item.textContent = c.name;
+                item.addEventListener('click', () => { void _identifyFaceWithContact(c.id); });
+                resultsEl.appendChild(item);
+            });
+
+            // No contact already has exactly this name — offer to create one
+            // (same pattern as modals-faces.js's "Add ... as a new person").
+            if (!exactMatch) {
+                const addItem = document.createElement('div');
+                addItem.className = 'face-identify-result-item face-identify-result-item-new';
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-plus';
+                addItem.appendChild(icon);
+                addItem.appendChild(document.createTextNode(' Add "' + rawTerm + '" as a new person'));
+                addItem.addEventListener('click', () => { void _createContactAndIdentify(rawTerm); });
+                resultsEl.appendChild(addItem);
+            }
+
+            resultsEl.style.display = 'block';
+        }
+
+        async function _identifyFaceWithContact(contactId) {
+            if (!currentIdentifyFaceId || !currentImageInModal) return;
+            try {
+                const resp = await fetch('/api/faces/' + currentIdentifyFaceId + '/identify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contact_id: contactId })
+                });
+                if (!resp.ok) {
+                    const errBody = await resp.json().catch(() => ({}));
+                    console.error('Failed to identify face:', errBody);
+                    alert('Could not identify this person: ' + (errBody.detail || errBody.error || resp.statusText));
+                    return;
+                }
+            } catch (err) {
+                console.error('Error identifying face:', err);
+                return;
+            }
+            _closeIdentifyPopover();
+            await _loadFaceOverlay(currentImageInModal.id);
+        }
+
+        async function _createContactAndIdentify(name) {
+            let contact;
+            try {
+                const resp = await fetch('/contacts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    console.error('Failed to create contact:', data);
+                    alert('Could not create new person: ' + (data.detail || data.error || resp.statusText));
+                    return;
+                }
+                contact = data;
+            } catch (err) {
+                console.error('Error creating contact:', err);
+                return;
+            }
+            await _identifyFaceWithContact(contact.id);
+        }
+
+        // Ignores every currently-unnamed face detected in this photo in one
+        // go (same PATCH .../faces/{id} {ignored:true} used by People in
+        // Photos) — for e.g. background strangers you'll never name, so they
+        // stop cluttering face review without touching anyone already named.
+        // Single-detection scoped: an unnamed person who also appears in
+        // other photos is untouched there — see _ignoreUnnamedPeopleAllImages
+        // for the cascading equivalent.
+        async function _ignoreUnnamedPeopleThisImage() {
+            const btn = DOM.newImageGalleryDetailIgnoreUnnamedBtn;
+            const faceIds = currentUnnamedFaces.map(f => f.id);
+            if (faceIds.length === 0 || !currentImageInModal) return;
+
+            const count = faceIds.length;
+            const ok = await AppDialogs.showAppConfirm(
+                'Ignore unnamed people',
+                `Ignore ${count} unnamed ${count === 1 ? 'person' : 'people'} detected in this photo? ` +
+                    'They will no longer be shown or grouped in People in Photos.',
+                { danger: true }
+            );
+            if (!ok) return;
+
+            const originalHTML = btn ? btn.innerHTML : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ignoring…';
+            }
+            try {
+                const results = await Promise.all(faceIds.map(faceId =>
+                    fetch('/api/faces/' + faceId, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ignored: true })
+                    }).then(resp => ({ faceId, ok: resp.ok }))
+                      .catch(err => {
+                          console.error('Error ignoring face', faceId, err);
+                          return { faceId, ok: false };
+                      })
+                ));
+                const failed = results.filter(r => !r.ok);
+                if (failed.length > 0) {
+                    console.error('Failed to ignore faces:', failed.map(f => f.faceId));
+                    await AppDialogs.showAppAlert('Ignore unnamed people', `${failed.length} of ${count} could not be ignored. Please try again.`);
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                }
+            }
+
+            await _loadFaceOverlay(currentImageInModal.id);
+        }
+
+        // Ignores every currently-unnamed person detected in this photo
+        // everywhere they appear, not just here: for each unnamed face
+        // that's already been grouped into a cluster (see the "Group similar
+        // faces" background job), ignores that whole cluster in one shot
+        // (PATCH .../faces/clusters/{id} {ignored:true} — same cascading
+        // action as People in Photos' "Ignore This Person", see
+        // modals-faces.js's _ignoreCluster) so they stop being tracked in
+        // every photo they're grouped into. A face not yet assigned a
+        // cluster has nothing else to cascade to, so it falls back to the
+        // single-face ignore used by _ignoreUnnamedPeopleThisImage.
+        async function _ignoreUnnamedPeopleAllImages() {
+            const btn = DOM.newImageGalleryDetailIgnoreUnnamedAllBtn;
+            const faces = currentUnnamedFaces.slice();
+            if (faces.length === 0 || !currentImageInModal) return;
+
+            const clusterIds = Array.from(new Set(
+                faces.filter(f => f.face_cluster_id !== null && f.face_cluster_id !== undefined)
+                     .map(f => f.face_cluster_id)
+            ));
+            const looseFaceIds = faces
+                .filter(f => f.face_cluster_id === null || f.face_cluster_id === undefined)
+                .map(f => f.id);
+            const peopleCount = clusterIds.length + looseFaceIds.length;
+
+            const ok = await AppDialogs.showAppConfirm(
+                'Ignore unnamed people everywhere',
+                `Ignore ${peopleCount} unnamed ${peopleCount === 1 ? 'person' : 'people'} detected in this photo? ` +
+                    'They will no longer be tracked in this photo or any other photo they appear in.',
+                { danger: true }
+            );
+            if (!ok) return;
+
+            const originalHTML = btn ? btn.innerHTML : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ignoring…';
+            }
+            try {
+                const results = await Promise.all([
+                    ...clusterIds.map(clusterId =>
+                        fetch('/api/faces/clusters/' + clusterId, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ignored: true })
+                        }).then(resp => ({ id: clusterId, ok: resp.ok }))
+                          .catch(err => {
+                              console.error('Error ignoring cluster', clusterId, err);
+                              return { id: clusterId, ok: false };
+                          })
+                    ),
+                    ...looseFaceIds.map(faceId =>
+                        fetch('/api/faces/' + faceId, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ignored: true })
+                        }).then(resp => ({ id: faceId, ok: resp.ok }))
+                          .catch(err => {
+                              console.error('Error ignoring face', faceId, err);
+                              return { id: faceId, ok: false };
+                          })
+                    )
+                ]);
+                const failed = results.filter(r => !r.ok);
+                if (failed.length > 0) {
+                    console.error('Failed to ignore unnamed people everywhere:', failed.map(f => f.id));
+                    await AppDialogs.showAppAlert('Ignore unnamed people everywhere', `${failed.length} of ${peopleCount} could not be ignored. Please try again.`);
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                }
+            }
+
+            await _loadFaceOverlay(currentImageInModal.id);
+        }
+
+        // Clears every existing face detection for this photo (named,
+        // unnamed, or previously ignored) and re-runs detection on it from
+        // scratch — for a photo where the detector missed a face, drew a bad
+        // box, or just to redo it after a model update. Fires the shared
+        // "Detect faces in photos" background job singleton (see
+        // FaceHandler.RescanFaces / runFaceRescan) rather than waiting for
+        // it inline, same fire-and-forget pattern as _startAIClassificationForSelected.
+        async function _rescanFacesThisImage() {
+            if (!currentImageInModal) return;
+            const btn = DOM.newImageGalleryDetailRescanFacesBtn;
+
+            const ok = await AppDialogs.showAppConfirm(
+                'Rescan for faces',
+                'Clear and redetect faces in this photo? Any names or "ignored" markings already set on faces in this photo will be lost — you\'ll need to re-review it in People in Photos afterward.',
+                { danger: true }
+            );
+            if (!ok) return;
+
+            const originalHTML = btn ? btn.innerHTML : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting…';
+            }
+            try {
+                const response = await fetch('/api/faces/rescan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ media_item_ids: [currentImageInModal.id] })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.detail || data.error || `HTTP ${response.status}`);
+                }
+                await AppDialogs.showAppAlert('Rescan for faces', data.message || 'Face rescan started.');
+            } catch (e) {
+                console.error('Face rescan start failed:', e);
+                await AppDialogs.showAppAlert('Rescan for faces', e.message || 'Request failed.');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                }
             }
         }
 

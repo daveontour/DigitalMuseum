@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const net = require('net');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+
 // ---------------------------------------------------------------------------
 // Global state
 // ---------------------------------------------------------------------------
@@ -19,6 +21,8 @@ let appPort = null;
 let activeDotenv = null;
 let ollamaChatProcess = null;
 let ollamaEmbedProcess = null;
+let ollamaChatControlURL = '';
+let ollamaChatStartInFlight = null;
 let activeProfileId = null;
 
 // MCP tools server (cmd/mcpserver) — every AI tool runs here, see CLAUDE.md. Peer process to
@@ -430,27 +434,22 @@ async function spawnOllamaServer(role, port, logFd) {
   return proc;
 }
 
-async function ensureBothOllamaServers(forceSpawn = false) {
+async function ensureOllamaRole(role, forceSpawn = false) {
   const ollamaExe = getOllamaExe();
   if (!fs.existsSync(ollamaExe)) {
     return { ok: false, error: 'Ollama executable not found' };
   }
 
-  const { chatPort, embedPort } = resolveOllamaPorts(getEffectiveDotenv());
+  const ports = resolveOllamaPorts(getEffectiveDotenv());
+  const port = role === 'chat' ? ports.chatPort : ports.embedPort;
   const { chatModel, embeddingModel } = resolveLocalAIModels(getEffectiveDotenv());
 
-  if (!forceSpawn) {
-    const chatUp = await isOllamaReachable(chatPort);
-    const embedUp = await isOllamaReachable(embedPort);
-    if (chatUp && embedUp) {
-      log(`Ollama chat (:${chatPort}) and embedding (:${embedPort}) already running`);
-      return { ok: true };
-    }
-  } else if (await isOllamaReachable(chatPort) || await isOllamaReachable(embedPort)) {
-    return {
-      ok: false,
-      error: `Ollama still running on :${chatPort} or :${embedPort}; stop it before starting new instances.`,
-    };
+  if (!forceSpawn && await isOllamaReachable(port)) {
+    log(`Ollama ${role} (:${port}) already running`);
+    return { ok: true };
+  }
+  if (forceSpawn && await isOllamaReachable(port)) {
+    return { ok: false, error: `Ollama still running on :${port}; stop it before starting a new instance.` };
   }
 
   const paths = getPaths();
@@ -459,24 +458,72 @@ async function ensureBothOllamaServers(forceSpawn = false) {
   try { logFd = fs.openSync(logFile, 'a'); } catch (_) { /* ignore */ }
 
   try {
-    if (forceSpawn || !(await isOllamaReachable(chatPort))) {
-      ollamaChatProcess = await spawnOllamaServer('chat', chatPort, logFd);
-      await preloadOllamaChatModel(chatPort, chatModel);
+    const proc = await spawnOllamaServer(role, port, logFd);
+    if (role === 'chat') {
+      ollamaChatProcess = proc;
+      await preloadOllamaChatModel(port, chatModel);
+    } else {
+      ollamaEmbedProcess = proc;
+      await preloadOllamaEmbedModel(port, embeddingModel);
     }
-    if (forceSpawn || !(await isOllamaReachable(embedPort))) {
-      ollamaEmbedProcess = await spawnOllamaServer('embed', embedPort, logFd);
-      await preloadOllamaEmbedModel(embedPort, embeddingModel);
-    }
-    log(`Ollama servers ready (chat :${chatPort}, embedding :${embedPort})`);
+    log(`Ollama ${role} ready (:${port})`);
     return { ok: true };
   } catch (err) {
-    log(`start-ollama: ${err.message}`);
+    log(`start-ollama ${role}: ${err.message}`);
     return { ok: false, error: err.message };
   }
 }
 
-async function ensureOllamaRunning(forceSpawn = false) {
-  return ensureBothOllamaServers(forceSpawn);
+function ensureOllamaEmbedding(forceSpawn = false) {
+  return ensureOllamaRole('embed', forceSpawn);
+}
+
+function ensureOllamaChat(forceSpawn = false) {
+  if (!forceSpawn && ollamaChatStartInFlight) return ollamaChatStartInFlight;
+  const run = (async () => {
+    try {
+      return await ensureOllamaRole('chat', forceSpawn);
+    } finally {
+      if (ollamaChatStartInFlight === run) ollamaChatStartInFlight = null;
+    }
+  })();
+  if (!forceSpawn) ollamaChatStartInFlight = run;
+  return run;
+}
+
+// Loopback endpoint the Go server calls the first time a local-AI chat request needs Ollama.
+function startOllamaChatControlServer() {
+  if (ollamaChatControlURL) return Promise.resolve();
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      const remote = req.socket.remoteAddress || '';
+      const local = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+      if (!local || req.method !== 'POST' || req.url !== '/start-chat') {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      ensureOllamaChat(false).then((result) => {
+        res.writeHead(result.ok ? 200 : 500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      }).catch((err) => {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      });
+    });
+    server.once('error', (err) => {
+      log(`Ollama chat control failed to listen: ${err.message}`);
+      resolve();
+    });
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address();
+      if (addr && typeof addr === 'object') {
+        ollamaChatControlURL = `http://127.0.0.1:${addr.port}/start-chat`;
+        log(`Ollama chat control listening at ${ollamaChatControlURL}`);
+      }
+      resolve();
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -599,6 +646,8 @@ function startGoServer(port, paths, dotenv) {
     // connects lazily on the first tool call / discovery attempt.
     MCP_SERVER_URL:  `http://127.0.0.1:${mcpPort}/mcp`,
     MCP_AUTH_TOKEN:  getOrCreateMcpAuthToken(),
+    // Go calls this the first time a local-AI chat request needs the chat Ollama daemon.
+    OLLAMA_CHAT_CONTROL_URL: ollamaChatControlURL || '',
   };
   const env = augmentPathWithMingwBin(rawEnv);
 
@@ -1092,6 +1141,7 @@ app.whenReady().then(async () => {
     dotenv.GMAIL_REDIRECT_URL = `http://localhost:${appPort}/gmail/auth/callback`;
 
     activeDotenv = dotenv;
+    await startOllamaChatControlServer();
     startGoServer(appPort, paths, dotenv);
 
     sendStatus('Waiting for server to be ready...');
@@ -1118,9 +1168,9 @@ app.whenReady().then(async () => {
     createMainWindow(appPort);
     setupTray(appPort);
     registerDevToolsShortcut();
-    ensureOllamaRunning().then((res) => {
-      if (!res.ok) log(`Ollama auto-start failed: ${res.error || 'unknown'}`);
-      else log('Ollama server available (auto-started when needed)');
+    ensureOllamaEmbedding().then((res) => {
+      if (!res.ok) log(`Ollama embedding auto-start failed: ${res.error || 'unknown'}`);
+      else log('Ollama embedding server available (chat server starts on the first local-AI chat request)');
     });
 
   } catch (err) {
@@ -1436,15 +1486,19 @@ ipcMain.handle('pull-ollama-model', async () => {
 });
 
 ipcMain.handle('start-ollama', async () => {
-  return ensureOllamaRunning(false);
+  return ensureOllamaEmbedding(false);
 });
 
 ipcMain.handle('restart-ollama', async () => {
   reloadActiveDotenvFromFiles();
+  const { chatPort } = resolveOllamaPorts(getEffectiveDotenv());
+  const chatWasUp = await isOllamaReachable(chatPort);
   const stop = await stopOllamaServer();
   if (!stop.ok) return stop;
   await new Promise((r) => setTimeout(r, 400));
-  return ensureBothOllamaServers(true);
+  const embed = await ensureOllamaEmbedding(true);
+  if (!embed.ok || !chatWasUp) return embed;
+  return ensureOllamaChat(true);
 });
 
 ipcMain.handle('get-auto-start-local-ai', () => {

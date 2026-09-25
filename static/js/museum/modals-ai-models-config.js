@@ -3,7 +3,6 @@
 Modals.AIModelsConfig = (() => {
     let rows = [];
     let editingId = null;
-    let classifierProvider = 'localai';
     let autoSelectionEnabled = true;
     let manualChatProvider = 'localai';
 
@@ -69,21 +68,17 @@ Modals.AIModelsConfig = (() => {
 
     function updateAutoSelectionUI() {
         const chatHeader = getEl('ai-models-config-chat-col-header');
-        const classifierHeader = getEl('ai-models-config-classifier-col-header');
         const tableWrap = getEl('ai-models-config-table-wrap');
-        const classifierOn = !!autoSelectionEnabled;
-        if (chatHeader) chatHeader.title = classifierOn
-            ? 'Disabled while query classifier is on — fixed model used when classifier is off'
-            : '';
-        if (classifierHeader) classifierHeader.style.display = classifierOn ? '' : 'none';
+        if (chatHeader) {
+            chatHeader.title = autoSelectionEnabled
+                ? 'Disabled while Jev is choosing the model — a fixed model is used when the query classifier is off'
+                : '';
+        }
         if (tableWrap) {
             tableWrap.querySelectorAll('.ai-models-config-chat-cell').forEach((cell) => {
                 cell.querySelectorAll('.ai-models-config-chat-radio').forEach((radio) => {
-                    radio.disabled = classifierOn;
+                    radio.disabled = autoSelectionEnabled;
                 });
-            });
-            tableWrap.querySelectorAll('.ai-models-config-classifier-cell').forEach((cell) => {
-                cell.style.display = classifierOn ? '' : 'none';
             });
         }
     }
@@ -114,19 +109,6 @@ Modals.AIModelsConfig = (() => {
         });
         tbody.querySelectorAll('.ai-models-config-enabled-checkbox').forEach((cb) => {
             cb.addEventListener('change', () => toggleEnabled(parseInt(cb.dataset.id, 10), cb.checked));
-        });
-        tbody.querySelectorAll('.ai-models-config-classifier-radio').forEach((radio) => {
-            radio.addEventListener('change', () => {
-                if (!radio.checked) return;
-                const key = radio.value;
-                classifierProvider = key;
-                saveRoutingConfig({ classifier_provider: key })
-                    .then(() => showStatus('Classifier updated.', false))
-                    .catch((err) => {
-                        showStatus(err.message, true);
-                        void load();
-                    });
-            });
         });
         tbody.querySelectorAll('.ai-models-config-chat-radio').forEach((radio) => {
             radio.addEventListener('change', () => {
@@ -185,9 +167,6 @@ Modals.AIModelsConfig = (() => {
                 <td style="text-align:center;" class="ai-models-config-chat-cell">
                     <input type="radio" name="ai-models-chat-provider-radio" class="ai-models-config-chat-radio" value="${escapeHtml(row.key)}" ${manualChatProvider === row.key ? 'checked' : ''} aria-label="Use ${escapeHtml(row.display_name)} for main chat"${autoSelectionEnabled ? ' disabled' : ''}>
                 </td>
-                <td style="text-align:center;" class="ai-models-config-classifier-cell">
-                    <input type="radio" name="ai-models-classifier-radio" class="ai-models-config-classifier-radio" value="${escapeHtml(row.key)}" ${classifierProvider === row.key ? 'checked' : ''} aria-label="Use ${escapeHtml(row.display_name)} as the Auto-routing classifier"${autoSelectionEnabled ? '' : ' disabled hidden'}>
-                </td>
                 <td>${actionsCell}</td>
             </tr>
         `;
@@ -214,7 +193,6 @@ Modals.AIModelsConfig = (() => {
             if (!modelsResponse.ok) throw new Error(`HTTP ${modelsResponse.status}`);
             const data = await modelsResponse.json();
             rows = Array.isArray(data.models) ? data.models : [];
-            classifierProvider = routingConfig.classifier_provider;
             autoSelectionEnabled = routingConfig.auto_selection_enabled;
             manualChatProvider = routingConfig.chat_provider;
             const autoCheckbox = getEl('ai-models-config-auto-selection-checkbox');
@@ -462,14 +440,13 @@ Modals.AIModelsConfig = (() => {
                     auto_selection_enabled: payload.auto_selection_enabled,
                     chat_provider: payload.chat_provider,
                 }),
-                description: 'Auto routing settings: classifier provider, auto selection mode, chat provider, and error failover toggle (provider order follows AI Models sort_order)',
+                description: 'Auto routing settings: auto selection mode, chat provider, and error failover toggle. Classification always uses Jev. Provider order follows AI Models sort_order',
             }),
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || err.detail || `HTTP ${res.status}`);
         }
-        classifierProvider = payload.classifier_provider;
         autoSelectionEnabled = payload.auto_selection_enabled;
         manualChatProvider = payload.chat_provider;
         if (typeof Modals !== 'undefined' && Modals.AutoRoutingConfig && Modals.AutoRoutingConfig.ensureLoaded) {
@@ -478,17 +455,8 @@ Modals.AIModelsConfig = (() => {
         return payload;
     }
 
-    /** Called by Modals.AutoRoutingConfig.reconcileClassifierProvider() when the classifier
-     *  choice changes elsewhere (e.g. Local AI gets disabled) — updates the radio selection
-     *  if this table is currently rendered. */
-    function reflectClassifierProvider(key) {
-        classifierProvider = key;
-        const tbody = getEl('ai-models-config-tbody');
-        if (!tbody) return;
-        tbody.querySelectorAll('.ai-models-config-classifier-radio').forEach((radio) => {
-            radio.checked = radio.value === key;
-        });
-    }
+    /** Kept so callers that used to sync the classifier radios do not break. Classification is always Jev. */
+    function reflectClassifierProvider() {}
 
     function init() {
         const addBtn = getEl('ai-models-config-add-btn');

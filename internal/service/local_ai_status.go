@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"os"
 	"strings"
 	"time"
 
@@ -50,14 +51,38 @@ func (s *ChatService) probeOllamaCached(ctx context.Context) appai.OllamaProbeRe
 	return result
 }
 
+// ollamaChatStartsOnDemand reports whether Electron will start the chat daemon on the first local chat.
+func ollamaChatStartsOnDemand() bool {
+	return strings.TrimSpace(os.Getenv("OLLAMA_CHAT_CONTROL_URL")) != ""
+}
+
 // LocalAIStatus probes Ollama and returns status for the setup UI.
+// When probeChat is false, the chat server is not contacted.
 // When the request is unauthenticated, use_enabled_for_chat and chat_available are omitted.
 func (s *ChatService) LocalAIStatus(ctx context.Context) LocalAIStatusReport {
+	return s.LocalAIStatusProbe(ctx, true)
+}
+
+// LocalAIStatusProbe is LocalAIStatus with an explicit chat-server probe.
+func (s *ChatService) LocalAIStatusProbe(ctx context.Context, probeChat bool) LocalAIStatusReport {
+	if !probeChat {
+		baseURL := strings.TrimSpace(s.defaultLocalAIURL)
+		return s.buildLocalAIStatusReport(ctx, appai.ProbeOllamaEmbeddingOnly(
+			ctx, baseURL, s.defaultLocalAIEmbeddingURL, s.effectiveLocalAIChatModel(), s.defaultLocalAIEmbeddingModel,
+		))
+	}
 	return s.buildLocalAIStatusReport(ctx, s.probeOllamaCached(ctx))
 }
 
 func (s *ChatService) buildLocalAIStatusReport(ctx context.Context, probe appai.OllamaProbeResult) LocalAIStatusReport {
+	onDemand := ollamaChatStartsOnDemand()
 	infra := probe.BaseURLConfigured && probe.ServerReachable && probe.ChatModelAvailable
+	if onDemand && probe.BaseURLConfigured && !probe.ServerReachable {
+		infra = true
+	}
+	if onDemand && !probe.ServerReachable {
+		probe.ServerError = ""
+	}
 
 	out := LocalAIStatusReport{
 		BaseURLConfigured:       probe.BaseURLConfigured,
@@ -86,8 +111,14 @@ func (s *ChatService) buildLocalAIStatusReport(ctx context.Context, probe appai.
 }
 
 // InfrastructureLocalAIStatus returns probe results without per-archive use_enabled fields.
-func InfrastructureLocalAIStatus(ctx context.Context, baseURL, embeddingBaseURL, chatModel, embeddingModel string) LocalAIStatusReport {
-	probe := appai.ProbeOllamaDual(ctx, baseURL, embeddingBaseURL, chatModel, embeddingModel)
+// probeChat false skips the chat server, matching login startup.
+func InfrastructureLocalAIStatus(ctx context.Context, baseURL, embeddingBaseURL, chatModel, embeddingModel string, probeChat bool) LocalAIStatusReport {
+	var probe appai.OllamaProbeResult
+	if probeChat {
+		probe = appai.ProbeOllamaDual(ctx, baseURL, embeddingBaseURL, chatModel, embeddingModel)
+	} else {
+		probe = appai.ProbeOllamaEmbeddingOnly(ctx, baseURL, embeddingBaseURL, chatModel, embeddingModel)
+	}
 	var s ChatService
 	return s.buildLocalAIStatusReport(ctx, probe)
 }

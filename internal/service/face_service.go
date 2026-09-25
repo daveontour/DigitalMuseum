@@ -193,7 +193,48 @@ func (s *FaceService) IgnoreFace(ctx context.Context, faceID int64) error {
 	return s.repo.IgnoreFace(ctx, faceID)
 }
 
+// IgnoreCluster ignores every member face of a cluster ("ignore this
+// person") — see FaceRepo.IgnoreCluster.
+func (s *FaceService) IgnoreCluster(ctx context.Context, clusterID int64) error {
+	return s.repo.IgnoreCluster(ctx, clusterID)
+}
+
 // MoveFaceToCluster reassigns a face to a different existing cluster.
 func (s *FaceService) MoveFaceToCluster(ctx context.Context, faceID, clusterID int64) error {
 	return s.repo.AssignFaceToCluster(ctx, faceID, clusterID)
+}
+
+// IdentifyFace names the person a face belongs to: links that face's cluster
+// to contactID, propagating to every other member face the same way
+// LinkClusterToContact does. If the face hasn't been assigned a cluster yet
+// (detected but not yet run through ClusterUnassignedFaces), a new singleton
+// cluster is created for it first. Used by the Image Details dialog's
+// "identify unnamed people" flow — naming someone directly from a photo
+// rather than via the People in Photos review screen. Returns the cluster id
+// (new or existing) that now carries the name.
+func (s *FaceService) IdentifyFace(ctx context.Context, faceID, contactID int64) (int64, error) {
+	face, err := s.repo.GetFace(ctx, faceID)
+	if err != nil {
+		return 0, fmt.Errorf("identify face: get face: %w", err)
+	}
+	if face == nil {
+		return 0, fmt.Errorf("identify face: face %d not found", faceID)
+	}
+
+	clusterID := face.FaceClusterID
+	if clusterID == nil {
+		id, err := s.repo.CreateCluster(ctx, faceID)
+		if err != nil {
+			return 0, fmt.Errorf("identify face: create cluster: %w", err)
+		}
+		if err := s.repo.SetNewClusterRepresentativeFace(ctx, faceID, id); err != nil {
+			return 0, fmt.Errorf("identify face: set representative face: %w", err)
+		}
+		clusterID = &id
+	}
+
+	if err := s.repo.SetClusterContact(ctx, *clusterID, &contactID); err != nil {
+		return 0, fmt.Errorf("identify face: set cluster contact: %w", err)
+	}
+	return *clusterID, nil
 }

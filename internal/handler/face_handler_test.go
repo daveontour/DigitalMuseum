@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -63,7 +64,7 @@ func newFaceHandlerTestFixture(t *testing.T) *faceHandlerTestFixture {
 	imageSvc := service.NewImageService(imageRepo, nil)
 	contactRepo := repository.NewContactRepo(db.Std)
 
-	h := NewFaceHandler(faceRepo, faceSvc, imageSvc, contactRepo, faceEmbedHelper)
+	h := NewFaceHandler(faceRepo, faceSvc, imageSvc, contactRepo, faceEmbedHelper, "")
 	r := chi.NewRouter()
 	h.RegisterRoutes(r)
 
@@ -389,6 +390,143 @@ func TestFaceHandler_IgnoreFace(t *testing.T) {
 	}
 }
 
+// TestFaceHandler_IgnoreUnnamedFace_LeavesNamedFaceInSamePhotoUntouched
+// reproduces the "Ignore unnamed people" button's exact frontend flow — GET
+// the photo's face list, PATCH-ignore only the face(s) the client sees as
+// unnamed (contact_id == nil), then re-GET — for a photo containing both a
+// named (contact-linked) face and a genuinely unnamed one, to confirm
+// ignoring the unnamed face never disturbs the named face's cluster/contact
+// link or its presence in the lightbox list.
+func TestFaceHandler_IgnoreUnnamedFace_LeavesNamedFaceInSamePhotoUntouched(t *testing.T) {
+	f := newFaceHandlerTestFixture(t)
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, f.uid)
+
+	var blobID int64
+	if err := f.db.QueryRowContext(ctx, `INSERT INTO media_blobs (image_data, user_id) VALUES (x'00', ?1) RETURNING id`, f.uid).Scan(&blobID); err != nil {
+		t.Fatalf("seed media_blob: %v", err)
+	}
+	var mediaItemID int64
+	if err := f.db.QueryRowContext(ctx,
+		`INSERT INTO media_items (media_blob_id, media_type, user_id) VALUES (?1, 'image/jpeg', ?2) RETURNING id`,
+		blobID, f.uid,
+	).Scan(&mediaItemID); err != nil {
+		t.Fatalf("seed media_item: %v", err)
+	}
+	var contactID int64
+	if err := f.db.QueryRowContext(ctx, `INSERT INTO contacts (name, user_id) VALUES ('Dave Burton', ?1) RETURNING id`, f.uid).Scan(&contactID); err != nil {
+		t.Fatalf("seed contact: %v", err)
+	}
+
+	faceRepo := repository.NewFaceRepo(f.db)
+	confidence := 0.9
+	namedFaceID, err := faceRepo.InsertFace(ctx, &model.Face{
+		MediaItemID: mediaItemID,
+		BBoxX:       0.1, BBoxY: 0.1, BBoxW: 0.2, BBoxH: 0.2,
+		DetectionConfidence: &confidence,
+		EmbeddingModel:      "test-model",
+	})
+	if err != nil {
+		t.Fatalf("InsertFace (named): %v", err)
+	}
+	clusterID, err := faceRepo.CreateCluster(ctx, namedFaceID)
+	if err != nil {
+		t.Fatalf("CreateCluster: %v", err)
+	}
+	if err := faceRepo.SetNewClusterRepresentativeFace(ctx, namedFaceID, clusterID); err != nil {
+		t.Fatalf("SetNewClusterRepresentativeFace: %v", err)
+	}
+	if err := faceRepo.SetClusterContact(ctx, clusterID, &contactID); err != nil {
+		t.Fatalf("SetClusterContact: %v", err)
+	}
+
+	unnamedFaceID, err := faceRepo.InsertFace(ctx, &model.Face{
+		MediaItemID: mediaItemID,
+		BBoxX:       0.6, BBoxY: 0.6, BBoxW: 0.2, BBoxH: 0.2,
+		DetectionConfidence: &confidence,
+		EmbeddingModel:      "test-model",
+	})
+	if err != nil {
+		t.Fatalf("InsertFace (unnamed): %v", err)
+	}
+
+	// ── Step 1: GET the photo's face list, exactly as the Image Details
+	// dialog's overlay does, and derive the "unnamed" set the same way the
+	// frontend's currentUnnamedFaceIds does (contact_id == nil).
+	rec := f.do(t, http.MethodGet, "/api/media-items/"+itoa(mediaItemID)+"/faces", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ListFacesForMediaItem: want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var faceList []struct {
+		ID            int64   `json:"id"`
+		ContactID     *int64  `json:"contact_id"`
+		ContactName   *string `json:"contact_name"`
+		FaceClusterID *int64  `json:"face_cluster_id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &faceList); err != nil {
+		t.Fatalf("decode ListFacesForMediaItem response: %v", err)
+	}
+	if len(faceList) != 2 {
+		t.Fatalf("want 2 faces in photo, got %d: %+v", len(faceList), faceList)
+	}
+	var unnamedIDs []int64
+	for _, fc := range faceList {
+		if fc.ContactID == nil {
+			unnamedIDs = append(unnamedIDs, fc.ID)
+		} else if fc.ID == namedFaceID && (fc.ContactName == nil || *fc.ContactName != "Dave Burton") {
+			t.Fatalf("want named face to report contact_name=Dave Burton, got %+v", fc)
+		}
+	}
+	if len(unnamedIDs) != 1 || unnamedIDs[0] != unnamedFaceID {
+		t.Fatalf("want exactly [%d] classified unnamed, got %v", unnamedFaceID, unnamedIDs)
+	}
+
+	// ── Step 2: PATCH-ignore only the unnamed face(s), as the "Ignore
+	// unnamed people" button does.
+	for _, id := range unnamedIDs {
+		rec = f.do(t, http.MethodPatch, "/api/faces/"+itoa(id), map[string]any{"ignored": true})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("PatchFace (ignore %d): want 200, got %d: %s", id, rec.Code, rec.Body.String())
+		}
+	}
+
+	// ── Step 3: re-GET the photo's face list — the named face must still be
+	// present, still linked to its contact, and the ignored face must be
+	// gone.
+	rec = f.do(t, http.MethodGet, "/api/media-items/"+itoa(mediaItemID)+"/faces", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ListFacesForMediaItem (after ignore): want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var faceListAfter []struct {
+		ID          int64   `json:"id"`
+		ContactID   *int64  `json:"contact_id"`
+		ContactName *string `json:"contact_name"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &faceListAfter); err != nil {
+		t.Fatalf("decode ListFacesForMediaItem (after ignore) response: %v", err)
+	}
+	if len(faceListAfter) != 1 {
+		t.Fatalf("want exactly 1 face remaining (the named one), got %d: %+v", len(faceListAfter), faceListAfter)
+	}
+	got := faceListAfter[0]
+	if got.ID != namedFaceID {
+		t.Fatalf("want remaining face to be the named one (%d), got %d", namedFaceID, got.ID)
+	}
+	if got.ContactID == nil || *got.ContactID != contactID {
+		t.Errorf("want named face still linked to contact %d, got %v", contactID, got.ContactID)
+	}
+	if got.ContactName == nil || *got.ContactName != "Dave Burton" {
+		t.Errorf("want named face to still report contact_name=Dave Burton, got %v", got.ContactName)
+	}
+
+	cluster, err := faceRepo.GetCluster(ctx, clusterID)
+	if err != nil {
+		t.Fatalf("GetCluster (after ignore): %v", err)
+	}
+	if cluster.ContactID == nil || *cluster.ContactID != contactID {
+		t.Errorf("want named face's cluster still linked to contact %d, got %v", contactID, cluster.ContactID)
+	}
+}
+
 // TestFaceHandler_ListClusters_Pagination seeds five singleton clusters and
 // drives GET /api/faces/clusters across three pages of two, confirming: each
 // page returns exactly `limit` clusters (the last, partial one aside), pages
@@ -617,5 +755,370 @@ func TestFaceHandler_ListClusters_MinFaceCountFilter(t *testing.T) {
 	}
 	if unfiltered.Total != 3 {
 		t.Errorf("want total=3 unfiltered, got %d", unfiltered.Total)
+	}
+}
+
+// TestFaceHandler_ListClusters_MaxFaceCountFilter reuses the same two
+// singletons + one 2-face cluster fixture as the min_face_count test above,
+// confirming max_face_count=1 returns only the two singleton clusters, and
+// that combining it with min_face_count=1 (an explicit "size == 1" range)
+// gives the identical result.
+func TestFaceHandler_ListClusters_MaxFaceCountFilter(t *testing.T) {
+	f := newFaceHandlerTestFixture(t)
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, f.uid)
+
+	var blobID int64
+	if err := f.db.QueryRowContext(ctx, `INSERT INTO media_blobs (image_data, user_id) VALUES (x'00', ?1) RETURNING id`, f.uid).Scan(&blobID); err != nil {
+		t.Fatalf("seed media_blob: %v", err)
+	}
+	faceRepo := repository.NewFaceRepo(f.db)
+	confidence := 0.9
+
+	newFace := func() int64 {
+		var mediaItemID int64
+		if err := f.db.QueryRowContext(ctx,
+			`INSERT INTO media_items (media_blob_id, media_type, user_id) VALUES (?1, 'image/jpeg', ?2) RETURNING id`,
+			blobID, f.uid,
+		).Scan(&mediaItemID); err != nil {
+			t.Fatalf("seed media_item: %v", err)
+		}
+		faceID, err := faceRepo.InsertFace(ctx, &model.Face{
+			MediaItemID: mediaItemID,
+			BBoxX:       0.1, BBoxY: 0.1, BBoxW: 0.2, BBoxH: 0.2,
+			DetectionConfidence: &confidence,
+			EmbeddingModel:      "test-model",
+		})
+		if err != nil {
+			t.Fatalf("InsertFace: %v", err)
+		}
+		return faceID
+	}
+
+	for i := 0; i < 2; i++ {
+		faceID := newFace()
+		clusterID, err := faceRepo.CreateCluster(ctx, faceID)
+		if err != nil {
+			t.Fatalf("CreateCluster: %v", err)
+		}
+		if err := faceRepo.SetNewClusterRepresentativeFace(ctx, faceID, clusterID); err != nil {
+			t.Fatalf("SetNewClusterRepresentativeFace: %v", err)
+		}
+	}
+
+	groupedFace1 := newFace()
+	groupedClusterID, err := faceRepo.CreateCluster(ctx, groupedFace1)
+	if err != nil {
+		t.Fatalf("CreateCluster (grouped): %v", err)
+	}
+	if err := faceRepo.SetNewClusterRepresentativeFace(ctx, groupedFace1, groupedClusterID); err != nil {
+		t.Fatalf("SetNewClusterRepresentativeFace (grouped): %v", err)
+	}
+	groupedFace2 := newFace()
+	if err := faceRepo.AssignFaceToCluster(ctx, groupedFace2, groupedClusterID); err != nil {
+		t.Fatalf("AssignFaceToCluster (grouped): %v", err)
+	}
+
+	type pageResp struct {
+		Clusters []struct {
+			ID        int64 `json:"id"`
+			FaceCount int   `json:"face_count"`
+		} `json:"clusters"`
+		Total int `json:"total"`
+	}
+
+	fetchAndCheckSingletonsOnly := func(t *testing.T, query string) {
+		t.Helper()
+		rec := f.do(t, http.MethodGet, "/api/faces/clusters?"+query, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("ListClusters(%s): want 200, got %d: %s", query, rec.Code, rec.Body.String())
+		}
+		var resp pageResp
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode ListClusters(%s) response: %v", query, err)
+		}
+		if resp.Total != 2 || len(resp.Clusters) != 2 {
+			t.Fatalf("ListClusters(%s): want exactly 2 singleton clusters, got total=%d clusters=%d", query, resp.Total, len(resp.Clusters))
+		}
+		for _, c := range resp.Clusters {
+			if c.ID == groupedClusterID {
+				t.Errorf("ListClusters(%s): grouped cluster %d should have been excluded", query, groupedClusterID)
+			}
+			if c.FaceCount != 1 {
+				t.Errorf("ListClusters(%s): want face_count=1, got %d for cluster %d", query, c.FaceCount, c.ID)
+			}
+		}
+	}
+
+	fetchAndCheckSingletonsOnly(t, "max_face_count=1")
+	fetchAndCheckSingletonsOnly(t, "min_face_count=1&max_face_count=1")
+
+	// An impossible range (min > max) degrades to an empty result, not an error.
+	rec := f.do(t, http.MethodGet, "/api/faces/clusters?min_face_count=5&max_face_count=1", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ListClusters(min=5,max=1): want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var empty pageResp
+	if err := json.Unmarshal(rec.Body.Bytes(), &empty); err != nil {
+		t.Fatalf("decode ListClusters(min=5,max=1) response: %v", err)
+	}
+	if empty.Total != 0 || len(empty.Clusters) != 0 {
+		t.Fatalf("want empty result for an impossible min>max range, got total=%d clusters=%d", empty.Total, len(empty.Clusters))
+	}
+}
+
+// TestFaceHandler_ListClusters_ContactNameFilter seeds three named clusters
+// (Blake Whitney, Blake Anderson, Dave Burton) and one unnamed cluster, then
+// confirms contact_name=blake case-insensitively substring-matches only the
+// two Blakes, contact_name combined with an unmatched name returns empty,
+// and an unnamed cluster never matches any non-empty contact_name filter
+// regardless of namedOnly.
+func TestFaceHandler_ListClusters_ContactNameFilter(t *testing.T) {
+	f := newFaceHandlerTestFixture(t)
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, f.uid)
+
+	var blobID int64
+	if err := f.db.QueryRowContext(ctx, `INSERT INTO media_blobs (image_data, user_id) VALUES (x'00', ?1) RETURNING id`, f.uid).Scan(&blobID); err != nil {
+		t.Fatalf("seed media_blob: %v", err)
+	}
+	faceRepo := repository.NewFaceRepo(f.db)
+	confidence := 0.9
+
+	newFace := func() int64 {
+		var mediaItemID int64
+		if err := f.db.QueryRowContext(ctx,
+			`INSERT INTO media_items (media_blob_id, media_type, user_id) VALUES (?1, 'image/jpeg', ?2) RETURNING id`,
+			blobID, f.uid,
+		).Scan(&mediaItemID); err != nil {
+			t.Fatalf("seed media_item: %v", err)
+		}
+		faceID, err := faceRepo.InsertFace(ctx, &model.Face{
+			MediaItemID: mediaItemID,
+			BBoxX:       0.1, BBoxY: 0.1, BBoxW: 0.2, BBoxH: 0.2,
+			DetectionConfidence: &confidence,
+			EmbeddingModel:      "test-model",
+		})
+		if err != nil {
+			t.Fatalf("InsertFace: %v", err)
+		}
+		return faceID
+	}
+
+	newNamedCluster := func(name string) int64 {
+		var contactID int64
+		if err := f.db.QueryRowContext(ctx, `INSERT INTO contacts (name, user_id) VALUES (?1, ?2) RETURNING id`, name, f.uid).Scan(&contactID); err != nil {
+			t.Fatalf("seed contact %q: %v", name, err)
+		}
+		faceID := newFace()
+		clusterID, err := faceRepo.CreateCluster(ctx, faceID)
+		if err != nil {
+			t.Fatalf("CreateCluster: %v", err)
+		}
+		if err := faceRepo.SetNewClusterRepresentativeFace(ctx, faceID, clusterID); err != nil {
+			t.Fatalf("SetNewClusterRepresentativeFace: %v", err)
+		}
+		if err := faceRepo.SetClusterContact(ctx, clusterID, &contactID); err != nil {
+			t.Fatalf("SetClusterContact: %v", err)
+		}
+		return clusterID
+	}
+
+	blakeWhitneyID := newNamedCluster("Blake Whitney")
+	blakeAndersonID := newNamedCluster("Blake Anderson")
+	newNamedCluster("Dave Burton")
+
+	// Unnamed cluster.
+	unnamedFace := newFace()
+	unnamedClusterID, err := faceRepo.CreateCluster(ctx, unnamedFace)
+	if err != nil {
+		t.Fatalf("CreateCluster (unnamed): %v", err)
+	}
+	if err := faceRepo.SetNewClusterRepresentativeFace(ctx, unnamedFace, unnamedClusterID); err != nil {
+		t.Fatalf("SetNewClusterRepresentativeFace (unnamed): %v", err)
+	}
+
+	type pageResp struct {
+		Clusters []struct {
+			ID          int64   `json:"id"`
+			ContactName *string `json:"contact_name"`
+		} `json:"clusters"`
+		Total int `json:"total"`
+	}
+
+	// Case-insensitive substring match against both Blakes.
+	rec := f.do(t, http.MethodGet, "/api/faces/clusters?contact_name="+url.QueryEscape("blake"), nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ListClusters(contact_name=blake): want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var blakeResp pageResp
+	if err := json.Unmarshal(rec.Body.Bytes(), &blakeResp); err != nil {
+		t.Fatalf("decode contact_name=blake response: %v", err)
+	}
+	gotIDs := map[int64]bool{}
+	for _, c := range blakeResp.Clusters {
+		gotIDs[c.ID] = true
+	}
+	if blakeResp.Total != 2 || !gotIDs[blakeWhitneyID] || !gotIDs[blakeAndersonID] {
+		t.Fatalf("want exactly [%d,%d] for contact_name=blake, got total=%d ids=%v", blakeWhitneyID, blakeAndersonID, blakeResp.Total, gotIDs)
+	}
+
+	// A more specific match narrows to one.
+	rec = f.do(t, http.MethodGet, "/api/faces/clusters?contact_name="+url.QueryEscape("Whitney"), nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ListClusters(contact_name=Whitney): want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var whitneyResp pageResp
+	if err := json.Unmarshal(rec.Body.Bytes(), &whitneyResp); err != nil {
+		t.Fatalf("decode contact_name=Whitney response: %v", err)
+	}
+	if whitneyResp.Total != 1 || len(whitneyResp.Clusters) != 1 || whitneyResp.Clusters[0].ID != blakeWhitneyID {
+		t.Fatalf("want exactly [%d] for contact_name=Whitney, got %+v", blakeWhitneyID, whitneyResp)
+	}
+
+	// A name matching nobody returns an empty result, not an error.
+	rec = f.do(t, http.MethodGet, "/api/faces/clusters?contact_name="+url.QueryEscape("Nonexistent"), nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ListClusters(contact_name=Nonexistent): want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var noneResp pageResp
+	if err := json.Unmarshal(rec.Body.Bytes(), &noneResp); err != nil {
+		t.Fatalf("decode contact_name=Nonexistent response: %v", err)
+	}
+	if noneResp.Total != 0 || len(noneResp.Clusters) != 0 {
+		t.Fatalf("want empty result for an unmatched contact_name, got total=%d clusters=%d", noneResp.Total, len(noneResp.Clusters))
+	}
+
+	// The unnamed cluster is never swept up by a non-empty contact_name
+	// filter, even without combining it with named=true.
+	for _, c := range blakeResp.Clusters {
+		if c.ID == unnamedClusterID {
+			t.Error("unnamed cluster must never match a contact_name filter")
+		}
+	}
+}
+
+// TestFaceHandler_FaceCrop_ServesStoredCropDirectly confirms GET
+// /api/faces/{id}/crop serves a pre-stored crop_data blob byte-for-byte
+// without falling back to fetching the source photo / invoking ImageMagick
+// — the fast path added so viewing People in Photos doesn't regenerate
+// every crop on every request. Deliberately seeds a face with crop_data set
+// directly (bypassing InsertFace/CropFaceJPEG) so this test exercises the
+// HTTP-serving logic in isolation and needs no real image data or the
+// bundled ImageMagick binary to pass.
+func TestFaceHandler_FaceCrop_ServesStoredCropDirectly(t *testing.T) {
+	f := newFaceHandlerTestFixture(t)
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, f.uid)
+
+	var blobID int64
+	if err := f.db.QueryRowContext(ctx, `INSERT INTO media_blobs (image_data, user_id) VALUES (x'00', ?1) RETURNING id`, f.uid).Scan(&blobID); err != nil {
+		t.Fatalf("seed media_blob: %v", err)
+	}
+	var mediaItemID int64
+	if err := f.db.QueryRowContext(ctx,
+		`INSERT INTO media_items (media_blob_id, media_type, user_id) VALUES (?1, 'image/jpeg', ?2) RETURNING id`,
+		blobID, f.uid,
+	).Scan(&mediaItemID); err != nil {
+		t.Fatalf("seed media_item: %v", err)
+	}
+
+	faceRepo := repository.NewFaceRepo(f.db)
+	confidence := 0.9
+	storedCrop := []byte("fake-jpeg-bytes-stored-crop")
+	faceID, err := faceRepo.InsertFace(ctx, &model.Face{
+		MediaItemID: mediaItemID,
+		BBoxX:       0.1, BBoxY: 0.1, BBoxW: 0.2, BBoxH: 0.2,
+		DetectionConfidence: &confidence,
+		EmbeddingModel:      "test-model",
+		CropData:            storedCrop,
+	})
+	if err != nil {
+		t.Fatalf("InsertFace: %v", err)
+	}
+
+	rec := f.do(t, http.MethodGet, "/api/faces/"+itoa(faceID)+"/crop", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("FaceCrop: want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Body.Bytes(); !bytes.Equal(got, storedCrop) {
+		t.Fatalf("FaceCrop: want stored crop bytes %q, got %q", storedCrop, got)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "image/jpeg" {
+		t.Errorf("FaceCrop: want Content-Type image/jpeg, got %q", ct)
+	}
+}
+
+// TestFaceHandler_IdentifyFace drives POST /api/faces/{id}/identify end to
+// end: naming an unclustered face (must create a singleton cluster), a
+// missing/invalid contact_id (400), and a nonexistent contact (400) — the
+// flow behind the Image Details dialog's "identify unnamed people" feature.
+func TestFaceHandler_IdentifyFace(t *testing.T) {
+	f := newFaceHandlerTestFixture(t)
+	ctx := context.WithValue(context.Background(), appctx.ContextKeyUserID, f.uid)
+
+	var blobID int64
+	if err := f.db.QueryRowContext(ctx, `INSERT INTO media_blobs (image_data, user_id) VALUES (x'00', ?1) RETURNING id`, f.uid).Scan(&blobID); err != nil {
+		t.Fatalf("seed media_blob: %v", err)
+	}
+	var mediaItemID int64
+	if err := f.db.QueryRowContext(ctx,
+		`INSERT INTO media_items (media_blob_id, media_type, user_id) VALUES (?1, 'image/jpeg', ?2) RETURNING id`,
+		blobID, f.uid,
+	).Scan(&mediaItemID); err != nil {
+		t.Fatalf("seed media_item: %v", err)
+	}
+	var contactID int64
+	if err := f.db.QueryRowContext(ctx, `INSERT INTO contacts (name, user_id) VALUES ('Blake Whitney', ?1) RETURNING id`, f.uid).Scan(&contactID); err != nil {
+		t.Fatalf("seed contact: %v", err)
+	}
+
+	faceRepo := repository.NewFaceRepo(f.db)
+	confidence := 0.9
+	faceID, err := faceRepo.InsertFace(ctx, &model.Face{
+		MediaItemID: mediaItemID,
+		BBoxX:       0.1, BBoxY: 0.1, BBoxW: 0.2, BBoxH: 0.2,
+		DetectionConfidence: &confidence,
+		EmbeddingModel:      "test-model",
+	})
+	if err != nil {
+		t.Fatalf("InsertFace: %v", err)
+	}
+
+	// Missing contact_id.
+	rec := f.do(t, http.MethodPost, "/api/faces/"+itoa(faceID)+"/identify", map[string]any{})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("IdentifyFace (missing contact_id): want 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Nonexistent contact.
+	rec = f.do(t, http.MethodPost, "/api/faces/"+itoa(faceID)+"/identify", map[string]any{"contact_id": contactID + 9999})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("IdentifyFace (bad contact): want 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Success: names the previously-unclustered face.
+	rec = f.do(t, http.MethodPost, "/api/faces/"+itoa(faceID)+"/identify", map[string]any{"contact_id": contactID})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("IdentifyFace: want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		OK        bool  `json:"ok"`
+		ClusterID int64 `json:"cluster_id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode IdentifyFace response: %v", err)
+	}
+	if !resp.OK || resp.ClusterID == 0 {
+		t.Fatalf("want ok=true and a non-zero cluster_id, got %+v", resp)
+	}
+
+	// The face now carries the contact and is surfaced as a named cluster.
+	updated, err := faceRepo.GetFace(ctx, faceID)
+	if err != nil {
+		t.Fatalf("GetFace: %v", err)
+	}
+	if updated.ContactID == nil || *updated.ContactID != contactID {
+		t.Fatalf("want face linked to contact %d, got %v", contactID, updated.ContactID)
+	}
+	if updated.FaceClusterID == nil || *updated.FaceClusterID != resp.ClusterID {
+		t.Fatalf("want face's cluster to be %d, got %v", resp.ClusterID, updated.FaceClusterID)
 	}
 }
