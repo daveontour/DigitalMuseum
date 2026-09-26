@@ -1156,8 +1156,40 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 	if err := dropPamBotSchema(ctx, db); err != nil {
 		return fmt.Errorf("drop pam bot schema: %w", err)
 	}
+	if err := addEmailPersonalScoreColumn(ctx, db); err != nil {
+		return err
+	}
 
 	slog.Info("sqlite database migration complete")
+	return nil
+}
+
+func addEmailPersonalScoreColumn(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'emails'`,
+	).Scan(&n); err != nil {
+		return fmt.Errorf("sqlite_master emails: %w", err)
+	}
+	if n == 0 {
+		return nil
+	}
+	var has int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('emails') WHERE name = 'personal_score'`,
+	).Scan(&has); err != nil {
+		return fmt.Errorf("pragma_table_info emails.personal_score: %w", err)
+	}
+	if has > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE emails ADD COLUMN personal_score INTEGER`); err != nil {
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "duplicate column") && !strings.Contains(msg, "already exists") {
+			return fmt.Errorf("add emails.personal_score: %w", err)
+		}
+	}
+	slog.Info("sqlite migration: added emails.personal_score")
 	return nil
 }
 
@@ -1449,7 +1481,6 @@ func addFaceClustersSuggestionColumns(ctx context.Context, db *sql.DB) error {
 	}
 	return nil
 }
-
 
 func addUserDeepSeekLLMColumns(ctx context.Context, db *sql.DB) error {
 	var n int

@@ -205,6 +205,11 @@ func (s *ChatService) effectiveOpenRouterConfig(ctx context.Context, r *http.Req
 	return
 }
 
+// EffectiveOpenRouterKey returns the resolved OpenRouter API key for this request.
+func (s *ChatService) EffectiveOpenRouterKey(ctx context.Context, r *http.Request) string {
+	return s.effectiveOpenRouterKey(ctx, r, "")
+}
+
 // effectiveOpenRouterKey returns just the resolved OpenRouter API key (see effectiveOpenRouterConfig).
 func (s *ChatService) effectiveOpenRouterKey(ctx context.Context, r *http.Request, authSessionID string) string {
 	k, _ := s.effectiveOpenRouterConfig(ctx, r, authSessionID)

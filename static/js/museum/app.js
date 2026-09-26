@@ -703,6 +703,7 @@ const App = (() => {
                 el.style.display = masterOk ? '' : 'none';
             });
             if (!masterOk) {
+                if (window.EmailPersonalScore) window.EmailPersonalScore.hide();
                 document.querySelectorAll('.config-tab-button').forEach((btn) => btn.classList.remove('active'));
                 document.querySelectorAll('.config-tab-content').forEach((c) => c.classList.remove('active'));
                 const settingsBtn = document.querySelector('.config-tab-button[data-tab="settings"]');
@@ -789,16 +790,21 @@ const App = (() => {
                 DOM.configPage.style.display = 'flex';
                 loadControlDefaults();
                 refreshSettingsDataImportModalLLM();
+                if (window.EmailPersonalScore) window.EmailPersonalScore.onConfigShown();
             });
         }
         if (DOM.closeConfigBtn && DOM.configPage) {
             DOM.closeConfigBtn.addEventListener('click', () => {
+                if (window.EmailPersonalScore) window.EmailPersonalScore.hide();
                 DOM.configPage.style.display = 'none';
             });
         }
         if (DOM.configPage) {
             DOM.configPage.addEventListener('click', (e) => {
-                if (e.target === DOM.configPage) DOM.configPage.style.display = 'none';
+                if (e.target === DOM.configPage) {
+                    if (window.EmailPersonalScore) window.EmailPersonalScore.hide();
+                    DOM.configPage.style.display = 'none';
+                }
             });
         }
 
@@ -1190,6 +1196,11 @@ const App = (() => {
                     if (Modals.ModelCatalog && Modals.ModelCatalog.load) {
                         void Modals.ModelCatalog.load();
                     }
+                }
+                if (targetTab === 'email-personal-score') {
+                    if (window.EmailPersonalScore) window.EmailPersonalScore.show();
+                } else if (window.EmailPersonalScore) {
+                    window.EmailPersonalScore.hide();
                 }
             });
         });
@@ -5026,6 +5037,7 @@ const App = (() => {
                 DOM.configPage.style.display = 'flex';
                 loadControlDefaults();
                 refreshSettingsDataImportModalLLM();
+                if (window.EmailPersonalScore) window.EmailPersonalScore.onConfigShown();
             });
         }
 

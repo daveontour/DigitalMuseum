@@ -795,6 +795,9 @@
                         <button id="config-tab-btn-file-dupe" type="button" class="config-tab-button" data-tab="file-dupe">
                             <i class="fas fa-clone"></i> Duplicate File Tool
                         </button>
+                        <button id="config-tab-btn-email-personal-score" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="email-personal-score">
+                            <i class="fas fa-envelope-open-text"></i> Email Personal Score
+                        </button>
                         <button id="config-tab-btn-custom-voices" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="custom-voices">
                             <i class="fas fa-microphone-alt"></i> Custom Voices
                         </button>
@@ -1756,6 +1759,33 @@
                         </div>
                     </div>
                 </div>
+                <div class="config-tab-content" id="email-personal-score-tab">
+                    <section class="section-config">
+                        <h1>Email Personal Score</h1>
+                        <p class="config-tab-lead">Asks Jev, once per email, how specifically personal it is, and whether it is business and important. The personal score runs from zero for spam or marketing to one hundred for mail written to or about a specific person. When a probability is over one half, the Personal, Business, or Important flag on that email is set. A lower probability clears that flag. Emails that already have a score are skipped unless you choose to re-score them. Leaving this tab does not stop a job that is already running.</p>
+                    </section>
+                    <div class="email-personal-score-panel">
+                        <label class="email-gallery-checkbox-label" for="email-personal-score-rescore">
+                            <input type="checkbox" id="email-personal-score-rescore">
+                            Re-score emails that already have a score
+                        </label>
+                        <div class="email-personal-score-actions">
+                            <button id="email-personal-score-run" type="button" class="modal-btn modal-btn-primary"><i class="fas fa-play"></i> Run</button>
+                            <button id="email-personal-score-cancel" type="button" class="modal-btn modal-btn-secondary" hidden><i class="fas fa-stop"></i> Cancel</button>
+                            <span id="email-personal-score-status" class="email-personal-score-status">Idle</span>
+                        </div>
+                        <div class="email-personal-score-meta">
+                            <div><span class="email-gallery-meta-k">From</span> <span id="email-personal-score-from"></span></div>
+                            <div><span class="email-gallery-meta-k">Subject</span> <span id="email-personal-score-subject"></span></div>
+                            <div><span class="email-gallery-meta-k">Score</span> <span id="email-personal-score-value"></span></div>
+                        </div>
+                        <p id="email-personal-score-error" class="email-personal-score-error"></p>
+                        <label for="email-personal-score-body">Text sent</label>
+                        <pre id="email-personal-score-body" class="email-personal-score-pre"></pre>
+                        <label for="email-personal-score-jev">Jev result</label>
+                        <pre id="email-personal-score-jev" class="email-personal-score-pre"></pre>
+                    </div>
+                </div>
                 <div class="config-tab-content" id="tool-test-tab">
                     <section class="section-config">
                         <h1>Tool Test</h1>
@@ -2507,6 +2537,15 @@
                                                     <option value="imap">IMAP (not Gmail)</option>
                                                 </select>
                                             </div>
+                                            <div class="email-gallery-personal-score-filters">
+                                                <span class="email-gallery-personal-score-caption" id="email-editor-personal-score-caption">Personal score</span>
+                                                <div class="email-gallery-personal-score-row">
+                                                    <label for="email-editor-personal-score-min">Min <span id="email-editor-personal-score-min-value">0</span></label>
+                                                    <input type="range" id="email-editor-personal-score-min" min="0" max="100" value="0" aria-label="Minimum personal score">
+                                                    <label for="email-editor-personal-score-max">Max <span id="email-editor-personal-score-max-value">100</span></label>
+                                                    <input type="range" id="email-editor-personal-score-max" min="0" max="100" value="100" aria-label="Maximum personal score">
+                                                </div>
+                                            </div>
                                             <div class="email-gallery-button-row">
                                                 <button id="email-editor-search-btn" class="modal-btn modal-btn-primary">
                                                     <i class="fas fa-search"></i> Search
@@ -3130,6 +3169,15 @@
                                                     <option value="imap">IMAP (not Gmail)</option>
                                                 </select>
                                             </div>
+                                            <div class="email-gallery-personal-score-filters">
+                                                <span class="email-gallery-personal-score-caption" id="email-gallery-personal-score-caption">Personal score</span>
+                                                <div class="email-gallery-personal-score-row">
+                                                    <label for="email-gallery-personal-score-min">Min <span id="email-gallery-personal-score-min-value">0</span></label>
+                                                    <input type="range" id="email-gallery-personal-score-min" min="0" max="100" value="0" aria-label="Minimum personal score">
+                                                    <label for="email-gallery-personal-score-max">Max <span id="email-gallery-personal-score-max-value">100</span></label>
+                                                    <input type="range" id="email-gallery-personal-score-max" min="0" max="100" value="100" aria-label="Maximum personal score">
+                                                </div>
+                                            </div>
                                             <div class="email-gallery-button-row">
                                                 <div class="email-gallery-actions-start">
                                                     <button id="email-gallery-search-btn" class="modal-btn modal-btn-primary" type="button">
@@ -3192,6 +3240,7 @@
                                         <div class="email-gallery-detail-meta-line"><span class="email-gallery-meta-k">From</span> <span id="email-gallery-metadata-from"></span></div>
                                         <div class="email-gallery-detail-meta-line"><span class="email-gallery-meta-k">To</span> <span id="email-gallery-metadata-to"></span></div>
                                         <div class="email-gallery-detail-meta-line"><span class="email-gallery-meta-k">Folder</span> <span id="email-gallery-folder-crumb"></span></div>
+                                        <div class="email-gallery-detail-meta-line"><span class="email-gallery-meta-k">Personal score</span> <span id="email-gallery-personal-score"></span></div>
                                     </div>
                                     <div class="email-gallery-detail-meta-aside">
                                         <span id="email-gallery-metadata-date" class="email-gallery-detail-date-full"></span>
@@ -4973,7 +5022,7 @@
     <script src="/static/js/museum/modals-core.js" defer></script>
     <script src="/static/js/museum/modals-media.js?v={{ static_modals_media_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-suggestions.js" defer></script>
-    <script src="/static/js/museum/modals-email.js" defer></script>
+    <script src="/static/js/museum/modals-email.js?v=20260926-score3-{{ static_modals_email_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-comms.js?v={{ static_modals_comms_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-people.js" defer></script>
     <script src="/static/js/museum/modals-artefacts.js?v={{ static_modals_artefacts_js_cache_bust }}" defer></script>

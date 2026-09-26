@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/daveontour/aimuseum/internal/ai"
@@ -26,6 +27,8 @@ type EmailService struct {
 	summarizer ai.SummarizerResolver
 	billing    *repository.BillingRepo
 	users      *repository.UserRepo
+	scoreMu    sync.Mutex
+	scoreJobs  map[int64]*personalScoreJob
 }
 
 // NewEmailService creates an EmailService.
@@ -283,5 +286,6 @@ func toMetadataResponse(e *model.Email, attachmentIDs []int64) model.EmailMetada
 		IsImportant:   e.IsImportant,
 		UseByAI:       e.UseByAI,
 		Source:        e.Source,
+		PersonalScore: e.PersonalScore,
 	}
 }

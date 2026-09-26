@@ -184,6 +184,7 @@ const Guide = {
         openConfigMcpServers: () => Guide._openConfigurationTab('mcp-servers-config'),
         openConfigToolsAccess: () => Guide._openConfigurationTab('tools-access'),
         openConfigToolTest: () => Guide._openConfigurationTab('tool-test'),
+        openConfigEmailPersonalScore: () => Guide._openConfigurationTab('email-personal-score'),
         openSettingsManageKeys: () => Guide._openConfigurationTab('manage-keys'),
         // Chat area
         openReferenceDocuments: () => document.getElementById('chat-context-status-refs-seg')?.click(),

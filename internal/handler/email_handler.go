@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -18,10 +19,11 @@ import (
 
 // EmailHandler handles all /emails/* read endpoints.
 type EmailHandler struct {
-	svc          *service.EmailService
-	sessionStore *keystore.SessionMasterStore
-	pool         *sql.DB
-	embeddingSvc *service.EmbeddingService
+	svc           *service.EmailService
+	sessionStore  *keystore.SessionMasterStore
+	pool          *sql.DB
+	embeddingSvc  *service.EmbeddingService
+	openRouterKey func(context.Context, *http.Request) string
 }
 
 // NewEmailHandler creates an EmailHandler.
@@ -35,6 +37,10 @@ func (h *EmailHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/emails/folders", h.GetFolders)
 	r.Get("/emails/label", h.GetByLabel)
 	r.Get("/emails/search", h.Search)
+	r.Post("/emails/personal-score/start", h.StartPersonalScore)
+	r.Get("/emails/personal-score/status", h.PersonalScoreStatus)
+	r.Get("/emails/personal-score/stream", h.PersonalScoreStream)
+	r.Post("/emails/personal-score/cancel", h.CancelPersonalScore)
 	r.Post("/emails/similar-by-text", h.SimilarEmailsByText)
 	r.Delete("/emails/bulk-delete", h.BulkDelete)
 
@@ -132,6 +138,20 @@ func (h *EmailHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := strings.TrimSpace(q.Get("email_source")); v != "" && strings.ToLower(v) != "all" {
 		params.SourceFilter = &v
+	}
+	if minRaw, maxRaw := q.Get("personal_score_min"), q.Get("personal_score_max"); minRaw != "" || maxRaw != "" {
+		if minRaw == "" || maxRaw == "" {
+			writeError(w, http.StatusBadRequest, "personal_score_min and personal_score_max must be sent together")
+			return
+		}
+		minScore, errMin := strconv.Atoi(minRaw)
+		maxScore, errMax := strconv.Atoi(maxRaw)
+		if errMin != nil || errMax != nil || minScore < 0 || maxScore > 100 || minScore > maxScore {
+			writeError(w, http.StatusBadRequest, "personal score range must be integers from 0 to 100 with min <= max")
+			return
+		}
+		params.PersonalScoreMin = &minScore
+		params.PersonalScoreMax = &maxScore
 	}
 
 	result, err := h.svc.Search(r.Context(), params)

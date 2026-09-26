@@ -185,6 +185,12 @@ func (h *TemplateHandler) GetRoot(w http.ResponseWriter, r *http.Request) {
 	} else {
 		extras["static_app_js_cache_bust"] = "0"
 	}
+	// Bust cache for modals-email.js (email gallery and the personal-score job controls).
+	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "modals-email.js")); err == nil {
+		extras["static_modals_email_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())
+	} else {
+		extras["static_modals_email_js_cache_bust"] = "0"
+	}
 	// Bust cache for modals-settings.js because upload modal wiring lives there.
 	if fi, err := os.Stat(filepath.Join(h.pythonStaticDir, "js", "museum", "modals-settings.js")); err == nil {
 		extras["static_modals_settings_js_cache_bust"] = fmt.Sprintf("%d", fi.ModTime().Unix())

@@ -348,6 +348,7 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 		configRepo,
 	)
 	chatSvc.SetOpenRouterCatalog(openRouterCatalogSvc)
+	emailHandler.SetOpenRouterKey(chatSvc.EffectiveOpenRouterKey)
 	emailSvc.WithSummarizer(chatSvc)
 	messageSvc.WithSummarizer(chatSvc)
 	adminHandler.WithSummarizer(chatSvc)

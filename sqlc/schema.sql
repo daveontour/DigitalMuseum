@@ -215,6 +215,7 @@ CREATE TABLE IF NOT EXISTS emails (
     updated_at      TIMESTAMP DEFAULT NOW(),
     user_id         BIGINT REFERENCES users(id) ON DELETE CASCADE,
     source          VARCHAR(255),
+    personal_score  INTEGER,
     CONSTRAINT uq_email_uid_folder_user UNIQUE (uid, folder, user_id)
 );
 

@@ -498,6 +498,9 @@ const DOM = {
     emailGalleryMetadataTo: document.getElementById('email-gallery-metadata-to'),
     emailGalleryMetadataDate: document.getElementById('email-gallery-metadata-date'),
     emailGalleryFolderCrumb: document.getElementById('email-gallery-folder-crumb'),
+    emailGalleryPersonalScore: document.getElementById('email-gallery-personal-score'),
+    emailGalleryPersonalScoreMin: document.getElementById('email-gallery-personal-score-min'),
+    emailGalleryPersonalScoreMax: document.getElementById('email-gallery-personal-score-max'),
     emailGalleryDetailAvatarSm: document.getElementById('email-gallery-detail-avatar-sm'),
     emailGalleryEmailDetails: null, // Removed from HTML, kept for compatibility
     emailAskAIBtn: document.getElementById('email-ask-ai-btn'),
@@ -523,6 +526,8 @@ const DOM = {
     emailEditorMonthFilter: document.getElementById('email-editor-month-filter'),
     emailEditorAttachmentsFilter: document.getElementById('email-editor-attachments-filter'),
     emailEditorSourceFilter: document.getElementById('email-editor-source-filter'),
+    emailEditorPersonalScoreMin: document.getElementById('email-editor-personal-score-min'),
+    emailEditorPersonalScoreMax: document.getElementById('email-editor-personal-score-max'),
     emailEditorSearchBtn: document.getElementById('email-editor-search-btn'),
     emailEditorClearBtn: document.getElementById('email-editor-clear-btn'),
     emailEditorTableBody: document.getElementById('email-editor-table-body'),

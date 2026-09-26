@@ -29,7 +29,7 @@ func (r *EmailRepo) GetByID(ctx context.Context, id int64) (*model.Email, error)
 		SELECT id, uid, folder, subject, from_address, to_addresses, cc_addresses, bcc_addresses,
 		       date, raw_message, plain_text, snippet, embedding,
 		       has_attachments, user_deleted, is_personal, is_business, is_social, is_promotional,
-		       is_spam, is_important, use_by_ai, source, created_at, updated_at
+		       is_spam, is_important, use_by_ai, source, personal_score, created_at, updated_at
 		FROM emails
 		WHERE id = ?1
 		  AND user_deleted = FALSE`
@@ -39,12 +39,13 @@ func (r *EmailRepo) GetByID(ctx context.Context, id int64) (*model.Email, error)
 	row := r.pool.QueryRowContext(ctx, q, args...)
 
 	e := &model.Email{}
+	var score sql.NullInt64
 	err := row.Scan(
 		&e.ID, &e.UID, &e.Folder, &e.Subject, &e.FromAddress, &e.ToAddresses,
 		&e.CCAddresses, &e.BCCAddresses, &e.Date, &e.RawMessage, &e.PlainText,
 		&e.Snippet, &e.Embedding, &e.HasAttachments, &e.UserDeleted,
 		&e.IsPersonal, &e.IsBusiness, &e.IsSocial, &e.IsPromotional,
-		&e.IsSpam, &e.IsImportant, &e.UseByAI, &e.Source, &e.CreatedAt, &e.UpdatedAt,
+		&e.IsSpam, &e.IsImportant, &e.UseByAI, &e.Source, &score, &e.CreatedAt, &e.UpdatedAt,
 	)
 	if err != nil {
 		if isNoRows(err) {
@@ -52,6 +53,7 @@ func (r *EmailRepo) GetByID(ctx context.Context, id int64) (*model.Email, error)
 		}
 		return nil, fmt.Errorf("email GetByID %d: %w", id, err)
 	}
+	setPersonalScore(e, score)
 	return e, nil
 }
 
@@ -137,6 +139,10 @@ func (r *EmailRepo) Search(ctx context.Context, p model.EmailSearchParams) ([]*m
 			}
 		}
 	}
+	if p.PersonalScoreMin != nil && p.PersonalScoreMax != nil {
+		add("personal_score >= ?", *p.PersonalScoreMin)
+		add("personal_score <= ?", *p.PersonalScoreMax)
+	}
 	// Always exclude soft-deleted rows
 	conds = append(conds, "user_deleted = FALSE")
 
@@ -148,7 +154,7 @@ func (r *EmailRepo) Search(ctx context.Context, p model.EmailSearchParams) ([]*m
 	sql := `SELECT id, uid, folder, subject, from_address, to_addresses, cc_addresses, bcc_addresses,
 			       date, raw_message, plain_text, snippet, embedding,
 			       has_attachments, user_deleted, is_personal, is_business, is_social, is_promotional,
-			       is_spam, is_important, use_by_ai, source, created_at, updated_at
+			       is_spam, is_important, use_by_ai, source, personal_score, created_at, updated_at
 			FROM emails`
 	if len(conds) > 0 {
 		sql += " WHERE " + strings.Join(conds, " AND ")
@@ -193,7 +199,7 @@ func (r *EmailRepo) GetByLabels(ctx context.Context, labels []string) ([]*model.
 	sql := `SELECT id, uid, folder, subject, from_address, to_addresses, cc_addresses, bcc_addresses,
 			       date, raw_message, plain_text, snippet, embedding,
 			       has_attachments, user_deleted, is_personal, is_business, is_social, is_promotional,
-			       is_spam, is_important, use_by_ai, source, created_at, updated_at
+			       is_spam, is_important, use_by_ai, source, personal_score, created_at, updated_at
 			FROM emails
 			WHERE (` + strings.Join(conds, " OR ") + `) AND user_deleted = FALSE`
 	sql, args = addUIDFilter(sql, args, uid)
@@ -393,7 +399,7 @@ func (r *EmailRepo) GetThreadEmails(ctx context.Context, participant string) ([]
 		SELECT id, uid, folder, subject, from_address, to_addresses, cc_addresses, bcc_addresses,
 		       date, raw_message, plain_text, snippet, embedding,
 		       has_attachments, user_deleted, is_personal, is_business, is_social, is_promotional,
-		       is_spam, is_important, use_by_ai, source, created_at, updated_at
+		       is_spam, is_important, use_by_ai, source, personal_score, created_at, updated_at
 		FROM emails
 		WHERE (from_address LIKE ?1 OR to_addresses LIKE ?1)
 		  AND user_deleted = FALSE`
@@ -473,6 +479,74 @@ func (r *EmailRepo) ListFolders(ctx context.Context) ([]string, error) {
 	return folders, rows.Err()
 }
 
+// ListPersonalScoreCandidateIDs returns non-deleted email ids for the scoring job.
+// When rescoreAll is false, only emails with no stored score are included.
+func (r *EmailRepo) ListPersonalScoreCandidateIDs(ctx context.Context, rescoreAll bool) ([]int64, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT id FROM emails WHERE user_deleted = FALSE`
+	var args []any
+	if !rescoreAll {
+		q += ` AND personal_score IS NULL`
+	}
+	q, args = addUIDFilter(q, args, uid)
+	q += ` ORDER BY date DESC, id DESC`
+	rows, err := r.pool.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("email ListPersonalScoreCandidateIDs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if ids == nil {
+		ids = []int64{}
+	}
+	return ids, rows.Err()
+}
+
+// GetPersonalScoreSource loads the fields sent to Jev for one non-deleted email.
+func (r *EmailRepo) GetPersonalScoreSource(ctx context.Context, id int64) (*model.EmailPersonalScoreSource, error) {
+	uid := uidFromCtx(ctx)
+	q := `SELECT id, subject, from_address, to_addresses, date, plain_text, snippet
+		FROM emails WHERE id = ? AND user_deleted = FALSE`
+	args := []any{id}
+	q, args = addUIDFilter(q, args, uid)
+	row := r.pool.QueryRowContext(ctx, q, args...)
+	src := &model.EmailPersonalScoreSource{}
+	if err := row.Scan(&src.ID, &src.Subject, &src.FromAddress, &src.ToAddresses, &src.Date, &src.PlainText, &src.Snippet); err != nil {
+		if isNoRows(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("email GetPersonalScoreSource %d: %w", id, err)
+	}
+	return src, nil
+}
+
+// SetPersonalScore stores a 0–100 score on a non-deleted email.
+func (r *EmailRepo) SetPersonalScore(ctx context.Context, id int64, score int) error {
+	uid := uidFromCtx(ctx)
+	q := `UPDATE emails SET personal_score = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND user_deleted = FALSE`
+	args := []any{score, id}
+	q, args = addUIDFilterDollar(q, args, uid)
+	if _, err := r.pool.ExecContext(ctx, q, args...); err != nil {
+		return fmt.Errorf("email SetPersonalScore %d: %w", id, err)
+	}
+	return nil
+}
+
+func setPersonalScore(e *model.Email, score sql.NullInt64) {
+	if !score.Valid {
+		return
+	}
+	v := int(score.Int64)
+	e.PersonalScore = &v
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 // scanEmails collects rows into a slice of Email pointers.
@@ -484,15 +558,17 @@ func scanEmails(rows interface {
 	var emails []*model.Email
 	for rows.Next() {
 		e := &model.Email{}
+		var score sql.NullInt64
 		if err := rows.Scan(
 			&e.ID, &e.UID, &e.Folder, &e.Subject, &e.FromAddress, &e.ToAddresses,
 			&e.CCAddresses, &e.BCCAddresses, &e.Date, &e.RawMessage, &e.PlainText,
 			&e.Snippet, &e.Embedding, &e.HasAttachments, &e.UserDeleted,
 			&e.IsPersonal, &e.IsBusiness, &e.IsSocial, &e.IsPromotional,
-			&e.IsSpam, &e.IsImportant, &e.UseByAI, &e.Source, &e.CreatedAt, &e.UpdatedAt,
+			&e.IsSpam, &e.IsImportant, &e.UseByAI, &e.Source, &score, &e.CreatedAt, &e.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		setPersonalScore(e, score)
 		emails = append(emails, e)
 	}
 	return emails, rows.Err()

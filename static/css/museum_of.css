@@ -3364,6 +3364,52 @@ body {
     color: var(--color-text-muted);
 }
 
+.email-personal-score-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0 20px 20px;
+    min-height: 0;
+}
+
+.email-personal-score-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.email-personal-score-status {
+    font-size: var(--text-md);
+    font-weight: 600;
+}
+
+.email-personal-score-meta {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.email-personal-score-error {
+    margin: 0;
+    color: var(--danger, #b42318);
+}
+
+.email-personal-score-error:empty {
+    display: none;
+}
+
+.email-personal-score-pre {
+    margin: 0;
+    max-height: 22vh;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-size: var(--text-sm);
+    padding: 0.6rem 0.75rem;
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 6px;
+}
+
 /* Configuration → Local AI Setup (Ollama — mirrors login advanced panel) */
 .local-ai-setup-panel {
     padding: 20px;
@@ -7674,6 +7720,35 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.45rem;
+}
+
+.email-gallery-personal-score-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.35rem;
+}
+
+.email-gallery-personal-score-caption {
+    font-size: var(--text-xs);
+    font-weight: 600;
+}
+
+.email-gallery-personal-score-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: center;
+}
+
+.email-gallery-personal-score-row label {
+    font-size: var(--text-xs);
+    white-space: nowrap;
+}
+
+.email-gallery-personal-score-row input[type="range"] {
+    width: 100%;
+    min-width: 0;
 }
 
 /* Year + month + attachments on one row (Emails dialog search panel) */

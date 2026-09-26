@@ -262,6 +262,7 @@ Modals.EmailGallery = (() => {
                 dateShort: rawDate ? formatShortListDate(rawDate) : '',
                 rawDate,
                 folder: email.folder || 'Unknown Folder',
+                personalScore: email.personal_score == null ? null : email.personal_score,
                 body: email.snippet || 'No content',
                 preview: email.snippet || 'No preview',
                 attachments: (email.attachment_ids || []).map(id => `/attachments/${id}`),
@@ -391,6 +392,7 @@ Modals.EmailGallery = (() => {
             if (DOM.emailGalleryContentSearchClearBtn) {
                 DOM.emailGalleryContentSearchClearBtn.addEventListener('click', _handleEmailContentSearchClear);
             }
+            _bindPersonalScoreSliders();
             
             // Delete button handler
             if (DOM.emailDeleteBtn) {
@@ -818,6 +820,40 @@ Modals.EmailGallery = (() => {
             // });
         }
 
+        function _resetPersonalScoreSliders() {
+            if (DOM.emailGalleryPersonalScoreMin) DOM.emailGalleryPersonalScoreMin.value = '0';
+            if (DOM.emailGalleryPersonalScoreMax) DOM.emailGalleryPersonalScoreMax.value = '100';
+            const minLabel = document.getElementById('email-gallery-personal-score-min-value');
+            const maxLabel = document.getElementById('email-gallery-personal-score-max-value');
+            if (minLabel) minLabel.textContent = '0';
+            if (maxLabel) maxLabel.textContent = '100';
+        }
+
+        function _bindPersonalScoreSliders() {
+            const minEl = DOM.emailGalleryPersonalScoreMin;
+            const maxEl = DOM.emailGalleryPersonalScoreMax;
+            if (!minEl || !maxEl) return;
+            const minLabel = document.getElementById('email-gallery-personal-score-min-value');
+            const maxLabel = document.getElementById('email-gallery-personal-score-max-value');
+            function sync(changed) {
+                let min = parseInt(minEl.value, 10);
+                let max = parseInt(maxEl.value, 10);
+                if (min > max) {
+                    if (changed === 'min') {
+                        max = min;
+                        maxEl.value = String(max);
+                    } else {
+                        min = max;
+                        minEl.value = String(min);
+                    }
+                }
+                if (minLabel) minLabel.textContent = String(min);
+                if (maxLabel) maxLabel.textContent = String(max);
+            }
+            minEl.addEventListener('input', () => sync('min'));
+            maxEl.addEventListener('input', () => sync('max'));
+        }
+
         function _handleSearch() {
             const searchTerm = DOM.emailGallerySearch.value.trim();
             const senderFilter = DOM.emailGallerySender.value.trim();
@@ -851,6 +887,12 @@ Modals.EmailGallery = (() => {
             }
             if (attachmentsFilter) {
                 params.append('has_attachments', 'true');
+            }
+            const scoreMin = DOM.emailGalleryPersonalScoreMin ? parseInt(DOM.emailGalleryPersonalScoreMin.value, 10) : 0;
+            const scoreMax = DOM.emailGalleryPersonalScoreMax ? parseInt(DOM.emailGalleryPersonalScoreMax.value, 10) : 100;
+            if (scoreMin !== 0 || scoreMax !== 100) {
+                params.append('personal_score_min', String(scoreMin));
+                params.append('personal_score_max', String(scoreMax));
             }
             appendEmailSourceSearchParam(params, DOM.emailGallerySourceFilter, 'email-gallery-source-filter');
 
@@ -966,6 +1008,7 @@ Modals.EmailGallery = (() => {
             DOM.emailGalleryYearFilter.value = 0;
             DOM.emailGalleryMonthFilter.value = 0;
             DOM.emailGalleryAttachmentsFilter.checked = false;
+            _resetPersonalScoreSliders();
             const _gsf = document.getElementById('email-gallery-source-filter');
             if (_gsf) _gsf.value = 'all';
             if (DOM.emailGalleryContentSearch) DOM.emailGalleryContentSearch.value = '';
@@ -1194,6 +1237,17 @@ Modals.EmailGallery = (() => {
             if (DOM.emailGalleryFolderCrumb) {
                 DOM.emailGalleryFolderCrumb.textContent = email.folder || 'Inbox';
             }
+            if (DOM.emailGalleryPersonalScore) {
+                const scoreLabel = DOM.emailGalleryPersonalScore.closest('.email-gallery-detail-meta-line');
+                const scoreKey = scoreLabel ? scoreLabel.querySelector('.email-gallery-meta-k') : null;
+                if (email.personalScore == null) {
+                    if (scoreKey) scoreKey.textContent = '';
+                    DOM.emailGalleryPersonalScore.textContent = 'Not scored';
+                } else {
+                    if (scoreKey) scoreKey.textContent = 'Personal score';
+                    DOM.emailGalleryPersonalScore.textContent = String(email.personalScore);
+                }
+            }
             if (DOM.emailGalleryDetailAvatarSm) {
                 DOM.emailGalleryDetailAvatarSm.textContent = initialsFromSender(email.sender);
             }
@@ -1421,6 +1475,9 @@ Modals.EmailGallery = (() => {
             if (DOM.emailGalleryFolderCrumb) {
                 DOM.emailGalleryFolderCrumb.textContent = '';
             }
+            if (DOM.emailGalleryPersonalScore) {
+                DOM.emailGalleryPersonalScore.textContent = '';
+            }
             if (DOM.emailGalleryMetadataTo) {
                 DOM.emailGalleryMetadataTo.textContent = '';
             }
@@ -1529,6 +1586,7 @@ Modals.EmailGallery = (() => {
             DOM.emailGalleryToFrom.value = contactName || '';
             DOM.emailGalleryYearFilter.value = '0';
             DOM.emailGalleryMonthFilter.value = '0';
+            _resetPersonalScoreSliders();
             DOM.emailGalleryModal.style.display = 'flex';
             _handleSearch();
         }
@@ -1571,9 +1629,10 @@ Modals.EmailGallery = (() => {
                 DOM.emailGalleryToFrom.value = emailMetadata.from_address || '';
                 DOM.emailGalleryYearFilter.value = year > 0 ? year.toString() : '0';
                 DOM.emailGalleryMonthFilter.value = month > 0 ? month.toString() : '0';
-                DOM.emailGalleryAttachmentsFilter.checked = false;
+            DOM.emailGalleryAttachmentsFilter.checked = false;
+            _resetPersonalScoreSliders();
 
-                const srcRaw = emailMetadata.source != null ? String(emailMetadata.source).trim() : '';
+            const srcRaw = emailMetadata.source != null ? String(emailMetadata.source).trim() : '';
                 const gsfOpen = document.getElementById('email-gallery-source-filter');
                 if (gsfOpen) {
                     if (!srcRaw) gsfOpen.value = 'imap';
@@ -1788,6 +1847,7 @@ Modals.EmailEditor = (() => {
                     _loadEmails();
                 });
             }
+            _bindEditorPersonalScoreSliders();
             _setupFilters();
         }
 
@@ -1797,6 +1857,53 @@ Modals.EmailEditor = (() => {
             _emailEditorLoadingCount += loading ? 1 : -1;
             _emailEditorLoadingCount = Math.max(0, _emailEditorLoadingCount);
             DOM.emailEditorViewer.classList.toggle('loading', _emailEditorLoadingCount > 0);
+        }
+
+        function _resetEditorPersonalScoreSliders() {
+            const minEl = document.getElementById('email-editor-personal-score-min');
+            const maxEl = document.getElementById('email-editor-personal-score-max');
+            const minLabel = document.getElementById('email-editor-personal-score-min-value');
+            const maxLabel = document.getElementById('email-editor-personal-score-max-value');
+            if (minEl) minEl.value = '0';
+            if (maxEl) maxEl.value = '100';
+            if (minLabel) minLabel.textContent = '0';
+            if (maxLabel) maxLabel.textContent = '100';
+        }
+
+        function _bindEditorPersonalScoreSliders() {
+            const minEl = document.getElementById('email-editor-personal-score-min');
+            const maxEl = document.getElementById('email-editor-personal-score-max');
+            if (!minEl || !maxEl) return;
+            const minLabel = document.getElementById('email-editor-personal-score-min-value');
+            const maxLabel = document.getElementById('email-editor-personal-score-max-value');
+            function sync(changed) {
+                let min = parseInt(minEl.value, 10);
+                let max = parseInt(maxEl.value, 10);
+                if (min > max) {
+                    if (changed === 'min') {
+                        max = min;
+                        maxEl.value = String(max);
+                    } else {
+                        min = max;
+                        minEl.value = String(min);
+                    }
+                }
+                if (minLabel) minLabel.textContent = String(min);
+                if (maxLabel) maxLabel.textContent = String(max);
+            }
+            minEl.addEventListener('input', () => sync('min'));
+            maxEl.addEventListener('input', () => sync('max'));
+        }
+
+        function _appendEditorPersonalScoreParams(params) {
+            const minEl = document.getElementById('email-editor-personal-score-min');
+            const maxEl = document.getElementById('email-editor-personal-score-max');
+            const scoreMin = minEl ? parseInt(minEl.value, 10) : 0;
+            const scoreMax = maxEl ? parseInt(maxEl.value, 10) : 100;
+            if (scoreMin !== 0 || scoreMax !== 100) {
+                params.append('personal_score_min', String(scoreMin));
+                params.append('personal_score_max', String(scoreMax));
+            }
         }
 
         function _handleSearch() {
@@ -1812,6 +1919,7 @@ Modals.EmailEditor = (() => {
             DOM.emailEditorYearFilter.value = '0';
             DOM.emailEditorMonthFilter.value = '0';
             DOM.emailEditorAttachmentsFilter.checked = false;
+            _resetEditorPersonalScoreSliders();
             const _esf = document.getElementById('email-editor-source-filter');
             if (_esf) _esf.value = 'all';
             emailData = [];
@@ -1853,6 +1961,7 @@ Modals.EmailEditor = (() => {
             if (attachmentsFilter) {
                 params.append('has_attachments', 'true');
             }
+            _appendEditorPersonalScoreParams(params);
             appendEmailSourceSearchParam(params, DOM.emailEditorSourceFilter, 'email-editor-source-filter');
 
             _setEmailEditorLoading(true);
@@ -2343,6 +2452,174 @@ Modals.EmailAttachments = (() => {
         }
 
         return { init, open, close };
+})();
+
+(function initEmailPersonalScoreJob() {
+    const runBtn = document.getElementById('email-personal-score-run');
+    const cancelBtn = document.getElementById('email-personal-score-cancel');
+    const statusEl = document.getElementById('email-personal-score-status');
+    const rescoreEl = document.getElementById('email-personal-score-rescore');
+    if (!runBtn || !statusEl) return;
+
+    let source = null;
+    let poll = null;
+    let watching = false;
+    let streamGen = 0;
+    let statusSeq = 0;
+
+    function progressText(ev) {
+        if (!ev || ev.type === 'idle' || (!ev.running && !ev.finished && !ev.total)) return 'Idle';
+        if (ev.running) {
+            if (!ev.total) return 'Preparing…';
+            return 'Scoring ' + (ev.current || 0) + ' of ' + ev.total;
+        }
+        if (ev.cancelled) return 'Cancelled after ' + ev.done + ' of ' + ev.total;
+        let text = 'Finished ' + ev.done + ' of ' + ev.total;
+        if (ev.failed) text += ', ' + ev.failed + ' failed';
+        return text;
+    }
+
+    function fillDetails(ev) {
+        if (!ev) return;
+        const waitingForJev = !!ev.body && !ev.jev_response && !ev.error && ev.score == null;
+        if (waitingForJev) return;
+        const fromEl = document.getElementById('email-personal-score-from');
+        const subjectEl = document.getElementById('email-personal-score-subject');
+        const scoreEl = document.getElementById('email-personal-score-value');
+        const errEl = document.getElementById('email-personal-score-error');
+        const bodyEl = document.getElementById('email-personal-score-body');
+        const jevEl = document.getElementById('email-personal-score-jev');
+        if (fromEl) fromEl.textContent = ev.from || '';
+        if (subjectEl) subjectEl.textContent = ev.subject || '';
+        if (scoreEl) scoreEl.textContent = ev.score == null ? '' : String(ev.score);
+        if (errEl) errEl.textContent = ev.error || '';
+        if (bodyEl) bodyEl.textContent = ev.body || '';
+        if (jevEl) jevEl.textContent = ev.jev_response || '';
+    }
+
+    function applyStatus(ev) {
+        statusEl.textContent = progressText(ev);
+        const running = !!(ev && ev.running);
+        if (cancelBtn) cancelBtn.hidden = !running;
+        runBtn.disabled = running;
+        if (rescoreEl) rescoreEl.disabled = running;
+        fillDetails(ev);
+        if (watching && running) startPoll();
+        else stopPoll();
+    }
+
+    function stopPoll() {
+        if (poll) {
+            clearInterval(poll);
+            poll = null;
+        }
+    }
+
+    function startPoll() {
+        if (poll) return;
+        poll = setInterval(() => { void refreshStatus(); }, 2000);
+    }
+
+    async function refreshStatus() {
+        const seq = ++statusSeq;
+        try {
+            const res = await fetch('/emails/personal-score/status');
+            if (!res.ok || seq !== statusSeq) return;
+            const ev = await res.json();
+            if (seq !== statusSeq) return;
+            applyStatus(ev);
+        } catch (e) { /* status poll is best-effort */ }
+    }
+
+    function closeStream() {
+        streamGen++;
+        if (source) {
+            source.close();
+            source = null;
+        }
+    }
+
+    function openStream() {
+        if (!watching) return;
+        closeStream();
+        const gen = ++streamGen;
+        const es = new EventSource('/emails/personal-score/stream');
+        source = es;
+        es.onmessage = (msg) => {
+            if (gen !== streamGen) return;
+            let ev;
+            try { ev = JSON.parse(msg.data); } catch (e) { return; }
+            applyStatus(ev);
+            if (ev.type === 'done' || ev.type === 'idle') {
+                streamGen++;
+                if (source === es) {
+                    es.close();
+                    source = null;
+                }
+            }
+        };
+        es.onerror = () => {
+            if (gen !== streamGen) return;
+            es.close();
+            if (source === es) source = null;
+            if (!watching) return;
+            setTimeout(() => {
+                if (watching && gen === streamGen) openStream();
+            }, 1000);
+        };
+    }
+
+    runBtn.addEventListener('click', async () => {
+        runBtn.disabled = true;
+        statusEl.textContent = 'Starting…';
+        statusSeq++;
+        try {
+            const res = await fetch('/emails/personal-score/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rescore_all: !!(rescoreEl && rescoreEl.checked) })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                statusEl.textContent = data.detail || data.error || 'Could not start';
+                runBtn.disabled = false;
+                return;
+            }
+            applyStatus(Object.assign({ running: true }, data));
+            openStream();
+        } catch (e) {
+            statusEl.textContent = 'Could not start';
+            runBtn.disabled = false;
+        }
+    });
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', async () => {
+            try {
+                const res = await fetch('/emails/personal-score/cancel', { method: 'POST' });
+                if (res.ok) applyStatus(await res.json());
+            } catch (e) { /* cancel is best-effort */ }
+        });
+    }
+
+    function show() {
+        watching = true;
+        void refreshStatus();
+        openStream();
+    }
+
+    window.EmailPersonalScore = {
+        show,
+        hide() {
+            watching = false;
+            closeStream();
+            stopPoll();
+        },
+        onConfigShown() {
+            const tab = document.getElementById('email-personal-score-tab');
+            if (tab && tab.classList.contains('active')) show();
+        }
+    };
 })();
 
 

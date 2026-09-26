@@ -28,8 +28,20 @@ type Email struct {
 	IsImportant    bool
 	UseByAI        bool
 	Source         *string // import origin: "gmail", IMAP hostname, etc.
+	PersonalScore  *int    // 0–100 from Jev; nil when not scored
 	CreatedAt      sqlutil.DBTime
 	UpdatedAt      sqlutil.DBTime
+}
+
+// EmailPersonalScoreSource is the text sent to Jev when scoring one email.
+type EmailPersonalScoreSource struct {
+	ID          int64
+	Subject     *string
+	FromAddress *string
+	ToAddresses *string
+	Date        sqlutil.NullDBTime
+	PlainText   *string
+	Snippet     *string
 }
 
 // EmailMetadataResponse is the JSON shape returned by the metadata, search, and label endpoints.
@@ -53,6 +65,7 @@ type EmailMetadataResponse struct {
 	IsImportant   bool               `json:"is_important"`
 	UseByAI       bool               `json:"use_by_ai"`
 	Source        *string            `json:"source,omitempty"`
+	PersonalScore *int               `json:"personal_score"`
 }
 
 // EmailSearchParams holds the optional filters for GET /emails/search.
@@ -66,4 +79,7 @@ type EmailSearchParams struct {
 	HasAttachments *bool
 	// SourceFilter: omit or "all" = all sources; "gmail"; "imap" = any non-Gmail import (includes legacy NULL); else exact emails.source value (e.g. IMAP hostname).
 	SourceFilter *string
+	// PersonalScoreMin and PersonalScoreMax, when both set, keep only scored emails in that inclusive range.
+	PersonalScoreMin *int
+	PersonalScoreMax *int
 }

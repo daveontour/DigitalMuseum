@@ -49,6 +49,7 @@ Modals.GuideTopicsConfig = (() => {
         'openConfigManageVisitorKeys',
         'openConfigMcpServers',
         'openConfigToolsAccess',
+        'openConfigEmailPersonalScore',
         'openSettingsManageKeys',
         'openReferenceDocuments',
         'openToolCallsDialog',
