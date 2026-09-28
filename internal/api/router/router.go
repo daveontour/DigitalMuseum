@@ -357,6 +357,12 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	localAISettingsHandler := handler.NewLocalAISettingsHandler(chatSvc, cfg.AI.LocalAIBaseURL)
 	localAISettingsHandler.RegisterRoutes(r)
 
+	// ── ChatBot (generic, no-persona chat modality — see CLAUDE.md) ──────────────
+	chatBotRepo := repository.NewChatBotRepo(pool)
+	chatBotSvc := service.NewChatBotService(chatSvc, chatBotRepo)
+	chatBotHandler := handler.NewChatBotHandler(chatBotSvc, sessionMasterStore)
+	chatBotHandler.RegisterRoutes(r)
+
 	haveAChatSessionRepo := repository.NewHaveAChatSessionRepo(pool)
 	haveAChatHandler := handler.NewHaveAChatHandler(chatSvc, sessionMasterStore, haveAChatSessionRepo)
 	haveAChatHandler.RegisterRoutes(r)

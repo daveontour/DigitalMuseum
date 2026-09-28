@@ -36,6 +36,19 @@ type GenerateRequest struct {
 	// OpenRouterModels, when len > 1 (max 3), is sent as OpenRouter's "models" fallback array
 	// (primary slug first). Empty means use the provider's configured model only.
 	OpenRouterModels []string
+	// Attachments, when non-empty, are woven into the final user message as multimodal content
+	// parts (OpenRouterProvider only — see buildOpenRouterMessages). Only ever populated by
+	// ChatBotService, whose vision gate guarantees the resolved provider supports image input
+	// before setting this; every other caller (persona chat, Interview, Have-a-Chat) leaves it
+	// nil, so their request bodies are unchanged.
+	Attachments []Attachment
+}
+
+// Attachment is one image to send alongside a chat request as multimodal content.
+type Attachment struct {
+	MimeType   string
+	DataBase64 string
+	Filename   string
 }
 
 // LLMUsage summarises token usage for one completed generation (tool loop totals).

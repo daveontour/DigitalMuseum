@@ -166,6 +166,9 @@ func run() error {
 		if err := database.SeedBuiltinMCPServerIfMissing(migrateCtx, db.Std); err != nil {
 			return fmt.Errorf("seed builtin mcp server: %w", err)
 		}
+		if err := database.SeedBuiltinChatbotMCPServerIfMissing(migrateCtx, db.Std); err != nil {
+			return fmt.Errorf("seed builtin chatbot mcp server: %w", err)
+		}
 	}
 
 	// ── HTTP server ────────────────────────────────────────────────────────────

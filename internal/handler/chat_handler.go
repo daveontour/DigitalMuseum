@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/daveontour/aimuseum/internal/keystore"
 	"github.com/daveontour/aimuseum/internal/model"
 	"github.com/daveontour/aimuseum/internal/repository"
+	"github.com/daveontour/aimuseum/internal/responsepdf"
 	"github.com/daveontour/aimuseum/internal/service"
 	"github.com/go-chi/chi/v5"
 )
@@ -43,6 +45,7 @@ func (h *ChatHandler) RegisterRoutes(r chi.Router) {
 	r.Put("/chat/conversations/{id}", h.UpdateConversation)
 	r.Delete("/chat/conversations/{id}", h.DeleteConversation)
 	r.Get("/chat/conversations/{id}/turns", h.GetTurns)
+	r.Get("/chat/conversations/{id}/pdf", h.DownloadConversationPDF)
 
 	// Complete profile (must be before /chat/conversations/{id} to avoid "complete-profile" as id)
 	r.Get("/chat/complete-profile/names", h.CompleteProfileListNames)
@@ -354,6 +357,59 @@ func (h *ChatHandler) GetTurns(w http.ResponseWriter, r *http.Request) {
 		result = append(result, turnResponse(t))
 	}
 	writeJSON(w, result)
+}
+
+// chatPDFMaxTurns bounds a transcript export; far above any realistic conversation length.
+const chatPDFMaxTurns = 100000
+
+// GET /chat/conversations/{id}/pdf — the full conversation transcript as a downloadable PDF.
+func (h *ChatHandler) DownloadConversationPDF(w http.ResponseWriter, r *http.Request) {
+	id, err := parseIDParam(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	conv, err := h.svc.GetConversation(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if conv == nil {
+		writeError(w, http.StatusNotFound, "conversation not found")
+		return
+	}
+	turns, err := h.svc.GetTurns(r.Context(), id, chatPDFMaxTurns)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	meta := responsepdf.ConversationMeta{
+		Title:     conv.Title,
+		Voice:     conv.Voice,
+		CreatedAt: conv.CreatedAt.Time,
+		Turns:     make([]responsepdf.ConversationTurn, 0, len(turns)),
+	}
+	if conv.LastMessageAt.Valid {
+		meta.LastActivity = conv.LastMessageAt.Time
+	}
+	for _, t := range turns {
+		meta.Turns = append(meta.Turns, responsepdf.ConversationTurn{
+			UserInput:    t.UserInput,
+			ResponseText: t.ResponseText,
+			CreatedAt:    t.CreatedAt.Time,
+		})
+	}
+
+	data, err := responsepdf.RenderConversation(meta)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("error rendering PDF: %s", err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.pdf"`, pdfSafeFilename(conv.Title)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

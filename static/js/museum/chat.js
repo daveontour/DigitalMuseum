@@ -40,54 +40,6 @@ const Chat = (() => {
         }
     }
 
-    function _addSaveButton(messageElement, role, text, contentElement) {
-        if (!['assistant', 'model'].includes(role)) return;
-        const saveButton = document.createElement('button');
-        saveButton.className = 'copy-hover-btn save-hover-btn';
-        saveButton.innerHTML = '<i class="fa-regular fa-floppy-disk"></i> Save';
-        saveButton.addEventListener('click', () => {
-            let contentToSave = text;
-            const rawMarkdown = contentElement.querySelector('.raw-markdown');
-            if (rawMarkdown) contentToSave = rawMarkdown.value;
-            const voice = typeof VoiceSelector !== 'undefined' && VoiceSelector.getSelectedVoice ? VoiceSelector.getSelectedVoice() : null;
-            const llmProvider = DOM.llmProviderSelect?.value || null;
-            Modals.SaveResponseTitle.open('', (title) => {
-                _doSaveResponse(saveButton, title, contentToSave, voice, llmProvider);
-            });
-        });
-        messageElement.appendChild(saveButton);
-    }
-
-    async function _doSaveResponse(saveButton, title, contentToSave, voice, llmProvider) {
-        try {
-            const res = await fetch('/api/saved-responses', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: title.trim(),
-                    content: contentToSave,
-                    voice: voice || undefined,
-                    llm_provider: llmProvider || undefined
-                })
-            });
-            if (!res.ok) throw new Error(await res.text());
-            saveButton.innerHTML = '<i class="fa-solid fa-check"></i> Saved!';
-            saveButton.classList.add('saved');
-            setTimeout(() => {
-                saveButton.innerHTML = '<i class="fa-regular fa-floppy-disk"></i> Save';
-                saveButton.classList.remove('saved');
-            }, 2000);
-        } catch (err) {
-            console.error('Failed to save:', err);
-            saveButton.innerHTML = '<i class="fa-solid fa-xmark"></i> Failed';
-            saveButton.classList.add('error');
-            setTimeout(() => {
-                saveButton.innerHTML = '<i class="fa-regular fa-floppy-disk"></i> Save';
-                saveButton.classList.remove('error');
-            }, 2000);
-        }
-    }
-
     function _addCopyButton(messageElement, role, text, contentElement) {
         const copyButton = document.createElement('button');
         copyButton.className = 'copy-hover-btn';
@@ -483,7 +435,6 @@ const Chat = (() => {
         const contentElement = document.createElement('div');
         contentElement.classList.add('message-content');
         _renderMessageContent(contentElement, text, role, isMarkdown);
-        _addSaveButton(messageElement, role, text, contentElement);
         _addCopyButton(messageElement, role, text, contentElement); // Pass contentElement for raw markdown access
 
         messageElement.appendChild(contentElement);

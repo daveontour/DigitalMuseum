@@ -77,6 +77,7 @@ func mcpServerJSON(m *service.MCPServer) map[string]any {
 		"enabled":        m.Enabled,
 		"is_builtin":     m.IsBuiltin,
 		"sort_order":     m.SortOrder,
+		"scope":          m.Scope,
 	}
 }
 

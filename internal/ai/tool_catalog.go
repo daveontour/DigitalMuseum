@@ -23,10 +23,11 @@ var errMCPNotConfigured = errors.New("no MCP servers configured")
 // The cache is in-memory only (never persisted) since it's meant to reflect what the registered
 // servers currently report, not a stale snapshot — a restart naturally re-discovers.
 type ToolCatalog struct {
-	mu          sync.RWMutex
-	bySource    map[string][]map[string]any // key: "" for the bundled server, "<name>:" for an additional one
-	errBySource map[string]error
-	lastRefresh time.Time
+	mu            sync.RWMutex
+	bySource      map[string][]map[string]any // key: "" for the archive server, "<name>:" for any other
+	scopeBySource map[string]string           // key matches bySource; value is ScopeArchive/ScopeChatbot/ScopeShared
+	errBySource   map[string]error
+	lastRefresh   time.Time
 }
 
 var defaultToolCatalog = &ToolCatalog{}
@@ -41,6 +42,7 @@ func SeedCatalogForTests(defs []map[string]any) {
 	defaultToolCatalog.mu.Lock()
 	defer defaultToolCatalog.mu.Unlock()
 	defaultToolCatalog.bySource = map[string][]map[string]any{"": defs}
+	defaultToolCatalog.scopeBySource = map[string]string{"": ScopeArchive}
 	defaultToolCatalog.errBySource = nil
 }
 
@@ -62,9 +64,11 @@ func (c *ToolCatalog) Refresh(ctx context.Context) error {
 	}
 
 	newBySource := make(map[string][]map[string]any, len(entries))
+	newScopes := make(map[string]string, len(entries))
 	newErrs := make(map[string]error, len(entries))
 	var firstErr error
 	for _, e := range entries {
+		newScopes[e.prefix] = e.scope
 		defs, err := e.client.ListToolDefinitions(ctx)
 		if err != nil {
 			newErrs[e.prefix] = err
@@ -97,6 +101,7 @@ func (c *ToolCatalog) Refresh(ctx context.Context) error {
 
 	c.mu.Lock()
 	c.bySource = newBySource
+	c.scopeBySource = newScopes
 	c.errBySource = newErrs
 	c.lastRefresh = time.Now()
 	c.mu.Unlock()
@@ -111,6 +116,27 @@ func (c *ToolCatalog) Definitions() []map[string]any {
 	defer c.mu.RUnlock()
 	var out []map[string]any
 	for _, defs := range c.bySource {
+		out = append(out, defs...)
+	}
+	return out
+}
+
+// DefinitionsForScopes is like Definitions but only merges sources whose scope
+// (ScopeArchive/ScopeChatbot/ScopeShared) is one of the given scopes — e.g. the persona chat
+// requests (ScopeArchive, ScopeShared) and the ChatBot requests (ScopeChatbot, ScopeShared), so
+// each feature only ever sees its own bundled server's tools plus any owner-added ones.
+func (c *ToolCatalog) DefinitionsForScopes(scopes ...string) []map[string]any {
+	allowed := make(map[string]bool, len(scopes))
+	for _, s := range scopes {
+		allowed[s] = true
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	var out []map[string]any
+	for prefix, defs := range c.bySource {
+		if !allowed[c.scopeBySource[prefix]] {
+			continue
+		}
 		out = append(out, defs...)
 	}
 	return out

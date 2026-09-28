@@ -886,6 +886,11 @@ func schemaDDL() []string {
 		`CREATE INDEX IF NOT EXISTS idx_ai_models_sort ON ai_models (sort_order, id)`,
 
 		// ── MCP servers (deployment-wide; the AI's tool sources) ───────────────
+		// scope: 'archive' (bundled archive-data server, unprefixed/trusted, used only by the
+		// persona chat), 'chatbot' (bundled ChatBot-only utility server, prefixed/trusted, used
+		// only by the ChatBot feature), or 'shared' (any owner-added additional server —
+		// untrusted, usable by both features). Exactly one is_builtin=1 row exists per
+		// archive/chatbot scope; every additional row is scope='shared'.
 		`CREATE TABLE IF NOT EXISTS mcp_servers (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
 			name         TEXT NOT NULL,
@@ -894,11 +899,62 @@ func schemaDDL() []string {
 			enabled      INTEGER NOT NULL DEFAULT 1,
 			is_builtin   INTEGER NOT NULL DEFAULT 0,
 			sort_order   INTEGER NOT NULL DEFAULT 0,
+			scope        TEXT NOT NULL DEFAULT 'shared',
 			created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_mcp_servers_name ON mcp_servers (name)`,
 		`CREATE INDEX IF NOT EXISTS idx_mcp_servers_sort ON mcp_servers (sort_order, id)`,
+
+		// ── ChatBot conversations/turns/attachments (user-scoped) ───────────────
+		// Fully separate from chat_conversations/chat_turns (the persona chat's history) — the
+		// ChatBot is a distinct, non-persona chat modality with its own history list.
+		`CREATE TABLE IF NOT EXISTS chatbot_conversations (
+			id              INTEGER PRIMARY KEY AUTOINCREMENT,
+			title           TEXT NOT NULL DEFAULT 'New Chat',
+			provider        TEXT,
+			created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_message_at TEXT,
+			user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_conv_last_message ON chatbot_conversations (last_message_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_conversations_user_id ON chatbot_conversations (user_id)`,
+
+		`CREATE TABLE IF NOT EXISTS chatbot_turns (
+			id              INTEGER PRIMARY KEY AUTOINCREMENT,
+			conversation_id INTEGER NOT NULL REFERENCES chatbot_conversations(id) ON DELETE CASCADE,
+			user_input      TEXT NOT NULL,
+			response_text   TEXT NOT NULL,
+			provider        TEXT,
+			temperature     REAL,
+			turn_number     INTEGER NOT NULL,
+			created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_turn_conv_turn ON chatbot_turns (conversation_id, turn_number)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_turn_conv_created ON chatbot_turns (conversation_id, created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_turns_user_id ON chatbot_turns (user_id)`,
+
+		// turn_id is NULL until the attachment is actually sent with a turn — lets the UI show
+		// "attached, not yet sent" chips and allow removal before sending.
+		`CREATE TABLE IF NOT EXISTS chatbot_attachments (
+			id               INTEGER PRIMARY KEY AUTOINCREMENT,
+			conversation_id  INTEGER NOT NULL REFERENCES chatbot_conversations(id) ON DELETE CASCADE,
+			turn_id          INTEGER REFERENCES chatbot_turns(id) ON DELETE SET NULL,
+			filename         TEXT NOT NULL,
+			content_type     TEXT NOT NULL,
+			kind             TEXT NOT NULL,
+			size             INTEGER NOT NULL,
+			data             BLOB NOT NULL,
+			extracted_text   TEXT,
+			extraction_error TEXT,
+			created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			user_id          INTEGER REFERENCES users(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_attach_conv ON chatbot_attachments (conversation_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_attach_turn ON chatbot_attachments (turn_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_attach_user_id ON chatbot_attachments (user_id)`,
 
 		// ── Filesystem path equivalences (user-scoped; import dedup across moved drives/folders) ──
 		`CREATE TABLE IF NOT EXISTS filesystem_path_equivalences (
@@ -1159,8 +1215,42 @@ func MigrateSQLite(ctx context.Context, db *sql.DB) error {
 	if err := addEmailPersonalScoreColumn(ctx, db); err != nil {
 		return err
 	}
+	if err := addMCPServersScopeColumn(ctx, db); err != nil {
+		return err
+	}
 
 	slog.Info("sqlite database migration complete")
+	return nil
+}
+
+// addMCPServersScopeColumn adds mcp_servers.scope for installs migrating from before the
+// archive/chatbot/shared MCP scope split existed, then backfills the pre-existing bundled
+// archive-tools row (the only is_builtin row on any install prior to this migration) to
+// scope='archive' — new installs get 'archive' directly from SeedBuiltinMCPServerIfMissing's
+// INSERT, but this column's own DEFAULT 'shared' would otherwise leave that row unclassified.
+func addMCPServersScopeColumn(ctx context.Context, db *sql.DB) error {
+	var has int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('mcp_servers') WHERE name = 'scope'`,
+	).Scan(&has); err != nil {
+		return fmt.Errorf("pragma_table_info mcp_servers.scope: %w", err)
+	}
+	if has > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE mcp_servers ADD COLUMN scope TEXT NOT NULL DEFAULT 'shared'`); err != nil {
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "duplicate column") && !strings.Contains(msg, "already exists") {
+			return fmt.Errorf("add mcp_servers.scope: %w", err)
+		}
+	}
+	if _, err := db.ExecContext(ctx,
+		`UPDATE mcp_servers SET scope = 'archive' WHERE is_builtin = 1 AND name = ? AND scope = 'shared'`,
+		BuiltinMCPServerName,
+	); err != nil {
+		return fmt.Errorf("backfill mcp_servers.scope for builtin archive server: %w", err)
+	}
+	slog.Info("sqlite migration: added mcp_servers.scope")
 	return nil
 }
 

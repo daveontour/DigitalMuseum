@@ -1,8 +1,10 @@
-// Package responsepdf renders a single saved chat response as a downloadable PDF.
+// Package responsepdf renders a saved chat response, or a whole chat conversation transcript, as
+// a downloadable PDF.
 package responsepdf
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -59,6 +61,112 @@ func Render(meta Meta) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// ConversationTurn is one user prompt + AI reply in a conversation transcript.
+type ConversationTurn struct {
+	UserInput    string
+	ResponseText string
+	CreatedAt    time.Time
+}
+
+// ConversationMeta describes a whole chat conversation to export.
+type ConversationMeta struct {
+	Title        string
+	Voice        string // AI personality the conversation used; labels the AI's replies
+	CreatedAt    time.Time
+	LastActivity time.Time // zero if the conversation has no messages
+	Turns        []ConversationTurn
+}
+
+// RenderConversation builds PDF bytes for a full chat transcript: a title block, then each turn
+// as a "You" prompt followed by the AI's reply (reply bodies use the same light Markdown
+// rendering as Render).
+func RenderConversation(meta ConversationMeta) ([]byte, error) {
+	pdf := fpdf.New("P", "mm", "A4", "")
+	pdf.SetMargins(18, 18, 18)
+	pdf.SetAutoPageBreak(true, 18)
+	pdf.AliasNbPages("")
+	pdf.SetFooterFunc(func() {
+		pdf.SetY(-12)
+		pdf.SetFont("Helvetica", "", 8)
+		pdf.SetTextColor(140, 140, 140)
+		pdf.CellFormat(0, 5, fmt.Sprintf("Page %d of {nb}", pdf.PageNo()), "", 0, "C", false, 0, "")
+		pdf.SetTextColor(0, 0, 0)
+	})
+	pdf.AddPage()
+	pdf.SetTitle(sanitize(meta.Title), true)
+	tr := pdf.UnicodeTranslatorFromDescriptor("")
+
+	pdf.SetFont("Helvetica", "B", 16)
+	pdf.MultiCell(0, 8, tr(sanitize(meta.Title)), "", "L", false)
+	pdf.Ln(2)
+
+	aiLabel := "AI"
+	if v := strings.TrimSpace(meta.Voice); v != "" {
+		aiLabel = "AI (" + strings.ToUpper(v[:1]) + v[1:] + ")"
+	}
+	metaParts := []string{"Started: " + meta.CreatedAt.Format("2 Jan 2006, 15:04")}
+	if !meta.LastActivity.IsZero() {
+		metaParts = append(metaParts, "Last message: "+meta.LastActivity.Format("2 Jan 2006, 15:04"))
+	}
+	metaParts = append(metaParts, fmt.Sprintf("%d exchanges", len(meta.Turns)))
+	if v := strings.TrimSpace(meta.Voice); v != "" {
+		metaParts = append(metaParts, "Personality: "+v)
+	}
+	pdf.SetFont("Helvetica", "", 9)
+	pdf.SetTextColor(90, 90, 90)
+	pdf.MultiCell(0, 5, tr(sanitize(strings.Join(metaParts, "   ·   "))), "", "L", false)
+	pdf.SetTextColor(0, 0, 0)
+	pdf.Ln(3)
+
+	if len(meta.Turns) == 0 {
+		pdf.SetFont("Helvetica", "I", 11)
+		pdf.MultiCell(0, 6, tr("This conversation has no messages."), "", "L", false)
+	}
+
+	pageW, _ := pdf.GetPageSize()
+	left, _, right, _ := pdf.GetMargins()
+	for _, t := range meta.Turns {
+		// Divider between turns.
+		pdf.SetDrawColor(210, 210, 210)
+		y := pdf.GetY()
+		pdf.Line(left, y, pageW-right, y)
+		pdf.Ln(3)
+
+		if strings.TrimSpace(t.UserInput) != "" {
+			speakerLine(pdf, tr, "You", t.CreatedAt, 35, 90, 170)
+			pdf.SetFont("Helvetica", "", 11)
+			for _, line := range strings.Split(strings.ReplaceAll(t.UserInput, "\r\n", "\n"), "\n") {
+				pdf.MultiCell(0, 5.5, tr(sanitize(line)), "", "L", false)
+			}
+			pdf.Ln(2)
+		}
+
+		speakerLine(pdf, tr, aiLabel, time.Time{}, 110, 60, 160)
+		renderMarkdownBody(pdf, tr, t.ResponseText)
+		pdf.Ln(4)
+	}
+
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// speakerLine writes a bold, coloured speaker label, with an optional grey timestamp after it.
+func speakerLine(pdf *fpdf.Fpdf, tr func(string) string, label string, at time.Time, r, g, b int) {
+	pdf.SetFont("Helvetica", "B", 10)
+	pdf.SetTextColor(r, g, b)
+	pdf.CellFormat(pdf.GetStringWidth(tr(label))+2, 6, tr(label), "", 0, "L", false, 0, "")
+	if !at.IsZero() {
+		pdf.SetFont("Helvetica", "", 8)
+		pdf.SetTextColor(140, 140, 140)
+		pdf.CellFormat(0, 6, at.Format("2 Jan 2006, 15:04"), "", 0, "L", false, 0, "")
+	}
+	pdf.Ln(6)
+	pdf.SetTextColor(0, 0, 0)
 }
 
 func derefStr(p *string) string {

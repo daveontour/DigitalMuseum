@@ -411,7 +411,7 @@ func (s *ChatService) buildChatTools(ctx context.Context, r *http.Request) (appa
 	// "Refresh Tools" button and the startup/on-write discovery hooks keep the cache fresh instead.
 	filtered := appai.FilterToolDefinitionsForTier(policy, tier)
 	_, tavily := s.effectiveOpenRouterConfig(ctx, r, "")
-	base := appai.NewMCPToolExecutor(getRAM, tavily)
+	base := appai.NewMCPToolExecutor(getRAM, tavily, []string{appai.ScopeArchive, appai.ScopeShared})
 	wrapped := appai.WrapToolExecutorWithPolicy(base, policy, tier)
 	return wrapped, &filtered
 }
@@ -706,7 +706,9 @@ func (s *ChatService) GenerateResponse(ctx context.Context, r *http.Request, req
 
 	// Save turn if conversation ID provided
 	if req.ConversationID != nil {
-		_ = s.chatRepo.SaveTurn(ctx, *req.ConversationID, savedUserInput, result.PlainText, voice, temperature)
+		if err := s.chatRepo.SaveTurn(ctx, *req.ConversationID, savedUserInput, result.PlainText, voice, temperature); err == nil {
+			s.autoTitleConversation(ctx, *req.ConversationID, savedUserInput)
+		}
 	}
 
 	// Enrich metadata and return
@@ -761,7 +763,9 @@ func (s *ChatService) generateRequestOnlyResponse(ctx context.Context, r *http.R
 	RecordLLMUsage(ctx, s.billing, s.userRepo, result.Usage, nil)
 
 	if req.ConversationID != nil {
-		_ = s.chatRepo.SaveTurn(ctx, *req.ConversationID, req.Prompt, result.PlainText, voice, 0)
+		if err := s.chatRepo.SaveTurn(ctx, *req.ConversationID, req.Prompt, result.PlainText, voice, 0); err == nil {
+			s.autoTitleConversation(ctx, *req.ConversationID, req.Prompt)
+		}
 	}
 
 	var embeddedJSON map[string]any
@@ -1033,6 +1037,38 @@ func (s *ChatService) loadVoiceInstructions(ctx context.Context) map[string]voic
 }
 
 // ── Conversation CRUD ─────────────────────────────────────────────────────────
+
+// DefaultChatConversationTitle is the placeholder title the UI gives a brand-new conversation;
+// autoTitleConversation replaces it with one derived from the first message.
+const DefaultChatConversationTitle = "New Chat"
+
+const autoTitleMaxRunes = 60
+
+// autoTitleConversation names a conversation after its first user message (Claude-style) when it
+// still carries a placeholder title. "Chat" is the placeholder older builds auto-created. Only the
+// first turn triggers it, so an existing long-running "Chat" is never renamed after the fact.
+// Best-effort: failures leave the placeholder title in place.
+func (s *ChatService) autoTitleConversation(ctx context.Context, conversationID int64, firstMessage string) {
+	n, err := s.chatRepo.TurnCount(ctx, conversationID)
+	if err != nil || n != 1 {
+		return
+	}
+	conv, err := s.chatRepo.GetConversation(ctx, conversationID)
+	if err != nil || conv == nil {
+		return
+	}
+	if t := strings.TrimSpace(conv.Title); t != DefaultChatConversationTitle && t != "Chat" {
+		return
+	}
+	title := strings.Join(strings.Fields(firstMessage), " ")
+	if title == "" {
+		return
+	}
+	if r := []rune(title); len(r) > autoTitleMaxRunes {
+		title = strings.TrimSpace(string(r[:autoTitleMaxRunes-1])) + "…"
+	}
+	_, _ = s.chatRepo.UpdateConversation(ctx, conversationID, &title, nil)
+}
 
 func (s *ChatService) CreateConversation(ctx context.Context, title, voice string) (*model.ChatConversation, error) {
 	return s.chatRepo.CreateConversation(ctx, title, voice)

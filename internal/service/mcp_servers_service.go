@@ -22,6 +22,7 @@ type MCPServer struct {
 	Enabled     bool
 	IsBuiltin   bool
 	SortOrder   int
+	Scope       string
 }
 
 // MCPServerInput holds the editable fields for one MCP server. Name/EndpointURL/AuthToken are
@@ -66,6 +67,7 @@ func toMCPServer(row *model.MCPServerRow) MCPServer {
 		Enabled:     row.Enabled,
 		IsBuiltin:   row.IsBuiltin,
 		SortOrder:   row.SortOrder,
+		Scope:       row.Scope,
 	}
 }
 
@@ -80,6 +82,7 @@ func syncRegistry(servers []MCPServer) {
 			AuthToken:   s.AuthToken,
 			Enabled:     s.Enabled,
 			IsBuiltin:   s.IsBuiltin,
+			Scope:       s.Scope,
 		})
 	}
 	appai.DefaultMCPRegistry().SyncServers(rows)

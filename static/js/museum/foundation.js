@@ -256,7 +256,6 @@ const DOM = {
     voiceSettingsModal: document.getElementById('voice-settings-modal'),
     voiceSettingsTrigger: document.getElementById('voice-settings-trigger'),
     closeVoiceSettingsBtn: document.getElementById('close-voice-settings'),
-    clearVoiceConversationHistoryBtn: document.getElementById('clear-voice-conversation-history-btn'),
     chatMain: document.querySelector('.chat-main'),
     messageFontSize: document.getElementById('message-font-size'),
     creativityLevel: document.getElementById('creativity-level'),
@@ -1090,11 +1089,12 @@ const UI = (() => {
         const hac = document.getElementById('have-a-chat-control-bar');
         const hacRound = document.getElementById('have-a-chat-round-prompt');
         const iv = document.getElementById('interview-control-bar');
+        const cb = document.getElementById('chatbot-panel');
         function visible(el) {
             if (!el) return false;
             return window.getComputedStyle(el).display !== 'none';
         }
-        const hideBar = visible(hac) || visible(hacRound) || visible(iv);
+        const hideBar = visible(hac) || visible(hacRound) || visible(iv) || visible(cb);
         bar.style.display = hideBar ? 'none' : 'flex';
     }
 

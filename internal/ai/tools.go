@@ -1529,12 +1529,20 @@ var mcpSecretArgTools = map[string]bool{
 //
 // getRAM resolves the RAM session master password locally and tavilyKey is resolved server-side
 // (ChatService.effectiveOpenRouterConfig); both are secrets and are attached to tools/call
-// arguments only when the resolved server is trusted (i.e. it's the bundled server) AND the bare
+// arguments only when the resolved server is trusted (i.e. it's a bundled server) AND the bare
 // tool name is one of mcpSecretArgTools — never for an additional server, regardless of what a
 // tool there happens to be named, and never logged.
-func NewMCPToolExecutor(getRAM RAMMasterGetter, tavilyKey string) ToolExecutor {
+//
+// allowedScopes restricts which MCP servers this executor may dispatch to (ScopeArchive/
+// ScopeChatbot/ScopeShared) — the persona chat passes {ScopeArchive, ScopeShared}, the ChatBot
+// feature passes {ScopeChatbot, ScopeShared}. See MCPRegistry.Resolve.
+func NewMCPToolExecutor(getRAM RAMMasterGetter, tavilyKey string, allowedScopes []string) ToolExecutor {
+	scopeSet := make(map[string]bool, len(allowedScopes))
+	for _, s := range allowedScopes {
+		scopeSet[s] = true
+	}
 	return func(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-		client, bareName, trusted, ok := DefaultMCPRegistry().Resolve(name)
+		client, bareName, trusted, ok := DefaultMCPRegistry().Resolve(name, scopeSet)
 		if !ok || client == nil {
 			return map[string]any{"error": "tool execution service unavailable: no MCP server registered for this tool"}, nil
 		}

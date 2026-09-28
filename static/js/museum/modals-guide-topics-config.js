@@ -26,7 +26,6 @@ Modals.GuideTopicsConfig = (() => {
         'openDataImportMaintenance',
         'openDataImportBackgroundJobs',
         'openConfiguration',
-        'openPreviousResponses',
         'openSuggestions',
         'openContacts',
         'openContactsRelationships',

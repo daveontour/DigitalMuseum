@@ -33,6 +33,8 @@ extraResources:
     to: bin/digitalmuseum.exe
   - from: ../bin/digitalmuseum-mcp.exe
     to: bin/digitalmuseum-mcp.exe
+  - from: ../bin/digitalmuseum-chatbot-mcp.exe
+    to: bin/digitalmuseum-chatbot-mcp.exe
   - from: ../bin/ImageMagick
     to: bin/ImageMagick
     filter:

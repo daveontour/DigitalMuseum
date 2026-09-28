@@ -72,6 +72,42 @@ func SetDefaultMCPClientForTests(c *MCPClient) {
 	defaultMCPClient = c
 }
 
+// NewChatbotMCPClientFromEnv builds an MCPClient from CHATBOT_MCP_SERVER_URL / MCP_AUTH_TOKEN —
+// the bundled ChatBot-only utility-tools server (cmd/chatbotmcpserver), a separate peer process
+// from the archive-data MCP server but sharing the same Electron-minted auth token (see
+// electron/main.js). Returns nil when CHATBOT_MCP_SERVER_URL is unset (e.g. `go run
+// ./cmd/server` outside Electron without that server running).
+func NewChatbotMCPClientFromEnv() *MCPClient {
+	endpoint := strings.TrimSpace(os.Getenv("CHATBOT_MCP_SERVER_URL"))
+	if endpoint == "" {
+		return nil
+	}
+	return &MCPClient{
+		endpoint:  endpoint,
+		authToken: strings.TrimSpace(os.Getenv("MCP_AUTH_TOKEN")),
+	}
+}
+
+var (
+	defaultChatbotMCPClientOnce sync.Once
+	defaultChatbotMCPClient     *MCPClient
+)
+
+// DefaultChatbotMCPClient returns a process-wide MCPClient for the ChatBot utility-tools server,
+// built from env vars (nil when CHATBOT_MCP_SERVER_URL is unset). Constructed once and reused
+// for the life of the process, mirroring DefaultMCPClient.
+func DefaultChatbotMCPClient() *MCPClient {
+	defaultChatbotMCPClientOnce.Do(func() { defaultChatbotMCPClient = NewChatbotMCPClientFromEnv() })
+	return defaultChatbotMCPClient
+}
+
+// SetDefaultChatbotMCPClientForTests overrides the process-wide chatbot MCPClient singleton —
+// mirrors SetDefaultMCPClientForTests. Not for production use.
+func SetDefaultChatbotMCPClientForTests(c *MCPClient) {
+	defaultChatbotMCPClientOnce.Do(func() {})
+	defaultChatbotMCPClient = c
+}
+
 // authRoundTripper attaches the shared-secret bearer token to every request, so only
 // this process (which holds MCP_AUTH_TOKEN) can call the local MCP server.
 type authRoundTripper struct {

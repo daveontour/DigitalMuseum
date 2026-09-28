@@ -148,7 +148,6 @@ const Guide = {
         openDataImportBackgroundJobs: () => Guide._openDataImportTab('background-jobs'),
         openConfiguration: () => Guide._clickSidebarButton('settings-data-import-sidebar-btn'),
         // Right sidebar — tools
-        openPreviousResponses: () => Guide._clickSidebarButton('previous-responses-sidebar-btn'),
         openSuggestions: () => Guide._clickSidebarButton('suggestions-sidebar-btn'),
         openContacts: () => Guide._clickSidebarButton('contacts-sidebar-btn'),
         openContactsRelationships: () => {

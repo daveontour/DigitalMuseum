@@ -144,8 +144,16 @@ func PolicyAllows(policy ToolAccessPolicy, toolName string, tier UnlockTier) boo
 // FilterToolDefinitionsForTier returns tool schema entries allowed for this tier, from the
 // live MCP-discovered catalog (DefaultToolCatalog) — not a static list. A tool the catalog
 // hasn't (yet) discovered, or one with no saved policy row, is excluded here regardless of tier.
+// Used by the persona chat; equivalent to FilterToolDefinitionsForScopesAndTier scoped to the
+// archive-builtin and shared/additional servers only (never the ChatBot-only server).
 func FilterToolDefinitionsForTier(policy ToolAccessPolicy, tier UnlockTier) []map[string]any {
-	all := DefaultToolCatalog().Definitions()
+	return FilterToolDefinitionsForScopesAndTier(policy, tier, ScopeArchive, ScopeShared)
+}
+
+// FilterToolDefinitionsForScopesAndTier is like FilterToolDefinitionsForTier but restricted to
+// tool sources whose scope is one of scopes — see ToolCatalog.DefinitionsForScopes.
+func FilterToolDefinitionsForScopesAndTier(policy ToolAccessPolicy, tier UnlockTier, scopes ...string) []map[string]any {
+	all := DefaultToolCatalog().DefinitionsForScopes(scopes...)
 	var out []map[string]any
 	for _, td := range all {
 		name, _ := td["name"].(string)

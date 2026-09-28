@@ -19,12 +19,12 @@ func NewMCPServersRepo(pool *sql.DB) *MCPServersRepo {
 	return &MCPServersRepo{pool: pool}
 }
 
-const mcpServerColumns = `id, name, endpoint_url, auth_token, enabled, is_builtin, sort_order`
+const mcpServerColumns = `id, name, endpoint_url, auth_token, enabled, is_builtin, sort_order, scope`
 
 func scanMCPServerRow(row interface{ Scan(...any) error }) (*model.MCPServerRow, error) {
 	var r model.MCPServerRow
 	var authToken sql.NullString
-	if err := row.Scan(&r.ID, &r.Name, &r.EndpointURL, &authToken, &r.Enabled, &r.IsBuiltin, &r.SortOrder); err != nil {
+	if err := row.Scan(&r.ID, &r.Name, &r.EndpointURL, &authToken, &r.Enabled, &r.IsBuiltin, &r.SortOrder, &r.Scope); err != nil {
 		return nil, err
 	}
 	r.AuthToken = authToken.String
@@ -75,11 +75,13 @@ func (r *MCPServersRepo) NameExistsExcluding(ctx context.Context, name string, e
 	return n > 0, nil
 }
 
-// Create inserts a new (always non-builtin — see MCPServersService) mcp_servers row and returns it.
+// Create inserts a new (always non-builtin, always scope='shared' — see MCPServersService)
+// mcp_servers row and returns it. Owner-added servers can never be scope='archive'/'chatbot' —
+// those scopes are reserved for the two seeded builtin rows.
 func (r *MCPServersRepo) Create(ctx context.Context, name, endpointURL, authToken string, enabled bool, sortOrder int) (*model.MCPServerRow, error) {
 	res, err := r.pool.ExecContext(ctx,
-		`INSERT INTO mcp_servers (name, endpoint_url, auth_token, enabled, is_builtin, sort_order)
-		 VALUES (?, ?, ?, ?, 0, ?)`,
+		`INSERT INTO mcp_servers (name, endpoint_url, auth_token, enabled, is_builtin, sort_order, scope)
+		 VALUES (?, ?, ?, ?, 0, ?, 'shared')`,
 		name, endpointURL, nullableString(authToken), enabled, sortOrder)
 	if err != nil {
 		return nil, fmt.Errorf("create mcp_server: %w", err)

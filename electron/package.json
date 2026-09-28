@@ -1,6 +1,6 @@
 {
   "name": "digital-museum",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Digital Museum Desktop",
   "main": "main.js",
   "scripts": {

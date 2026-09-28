@@ -879,6 +879,18 @@ Modals.ConversationManager = (() => {
         // Store conversation state
         const CONVERSATION_STORAGE_KEY = 'current_conversation_id';
         const CONVERSATION_TITLE_STORAGE_KEY = 'current_conversation_title';
+        // Placeholder title; the server renames it from the first message (ChatService.autoTitleConversation).
+        const NEW_CHAT_TITLE = 'New Chat';
+
+        /** Re-renders whichever conversation views are showing: the history panel always, and the
+         *  conversation-list modal only if it's already open (never pops it open). */
+        function refreshViews() {
+            if (typeof ChatHistoryPanel !== 'undefined') void ChatHistoryPanel.refresh();
+            if (DOM.conversationListModal && DOM.conversationListModal.style.display !== 'none'
+                && DOM.conversationListModal.style.display !== '') {
+                void fetchConversations().then(renderConversationList);
+            }
+        }
 
         async function fetchConversations() {
             try {
@@ -1048,7 +1060,7 @@ Modals.ConversationManager = (() => {
             if (!trimmed || trimmed === currentTitle) return;
             try {
                 await updateConversationTitle(conversationId, trimmed);
-                showConversationList(); // Refresh list
+                refreshViews();
                 if (currentConversationId === conversationId) {
                     currentConversationTitle = trimmed;
                     updateConversationIndicator();
@@ -1077,49 +1089,40 @@ Modals.ConversationManager = (() => {
                     localStorage.removeItem(CONVERSATION_TITLE_STORAGE_KEY);
                     updateConversationIndicator();
                     Chat.clearChat();
-                    void ensureChatConversationContext();
+                    await ensureChatConversationContext();
                 }
-                showConversationList(); // Refresh list
+                refreshViews();
             } catch (error) {
                 await AppDialogs.showAppAlert('Error', `Error deleting conversation: ${error.message}`);
             }
         }
 
-        /** Clears server-side turns for the active chat (Voice Settings). Requires owner master unlock on the API. */
-        async function clearCurrentConversationHistoryWithConfirm() {
-            let id = getCurrentConversationId();
-            if (id == null) {
-                await ensureChatConversationContext();
-                id = getCurrentConversationId();
-            }
-            if (id == null) {
-                await AppDialogs.showAppAlert('No conversation', 'There is no active chat conversation to clear.');
-                return;
-            }
-            const ok = await AppDialogs.showAppConfirm(
-                'Clear conversation history',
-                'Remove all saved messages for this conversation from the server? The on-screen chat will be emptied. This cannot be undone.',
-                { danger: true }
-            );
-            if (!ok) {
-                return;
-            }
+        /** Top-bar "New Chat": starts a fresh conversation with the current personality. The previous
+         *  conversation is left intact on the server (resumable from the conversation list). */
+        async function startNewChat() {
+            const voice = (typeof VoiceSelector !== 'undefined' && VoiceSelector.getSelectedVoice)
+                ? VoiceSelector.getSelectedVoice()
+                : 'expert';
             try {
-                const res = await fetch(`/chat/conversations/${id}/clear-history`, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                });
-                if (!res.ok) {
-                    let detail = await res.text();
-                    try {
-                        const j = JSON.parse(detail);
-                        if (j.detail) detail = j.detail;
-                    } catch (_) { /* keep body as detail */ }
-                    throw new Error(detail || `HTTP ${res.status}`);
+                // Already on an empty conversation? Reuse it rather than piling up blank "New Chat" rows.
+                if (currentConversationId != null) {
+                    const current = await getConversation(currentConversationId).catch(() => null);
+                    if (current && (current.turn_count || 0) === 0) {
+                        Chat.clearChat();
+                        refreshViews();
+                        return;
+                    }
                 }
+                const conversation = await createConversation(NEW_CHAT_TITLE, voice);
+                currentConversationId = conversation.id;
+                currentConversationTitle = conversation.title;
+                localStorage.setItem(CONVERSATION_STORAGE_KEY, conversation.id.toString());
+                localStorage.setItem(CONVERSATION_TITLE_STORAGE_KEY, conversation.title);
                 Chat.clearChat();
+                updateConversationIndicator();
+                refreshViews();
             } catch (error) {
-                await AppDialogs.showAppAlert('Error', error.message || String(error));
+                await AppDialogs.showAppAlert('Error', `Error starting a new chat: ${error.message}`);
             }
         }
 
@@ -1158,7 +1161,8 @@ Modals.ConversationManager = (() => {
                 
                 // Close modal
                 close();
-                
+                refreshViews();
+
                 // Scroll to bottom
                 UI.scrollToBottom();
             } catch (error) {
@@ -1203,8 +1207,7 @@ Modals.ConversationManager = (() => {
                 // Clear form
                 DOM.newConversationTitleInput.value = '';
                 
-                // Refresh conversation list
-                showConversationList();
+                refreshViews();
             } catch (error) {
                 await AppDialogs.showAppAlert('Error', `Error creating conversation: ${error.message}`);
             }
@@ -1262,12 +1265,12 @@ Modals.ConversationManager = (() => {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: 'Chat', voice })
+                    body: JSON.stringify({ title: NEW_CHAT_TITLE, voice })
                 });
                 if (!createRes.ok) return;
                 const conv = await createRes.json();
                 currentConversationId = conv.id;
-                currentConversationTitle = conv.title != null ? conv.title : 'Chat';
+                currentConversationTitle = conv.title != null ? conv.title : NEW_CHAT_TITLE;
                 localStorage.setItem(CONVERSATION_STORAGE_KEY, String(conv.id));
                 localStorage.setItem(CONVERSATION_TITLE_STORAGE_KEY, currentConversationTitle);
                 updateConversationIndicator();
@@ -1399,7 +1402,9 @@ Modals.ConversationManager = (() => {
             getCurrentConversationId,
             updateConversationIndicator,
             clearCurrentConversation,
-            clearCurrentConversationHistoryWithConfirm,
+            startNewChat,
+            renameConversation: editConversationTitle,
+            deleteConversation: deleteConversationWithConfirm,
             ensureChatConversationContext
         };
 })();
@@ -3952,8 +3957,6 @@ Modals.initAll = () => {
         if (Modals.Interests && Modals.Interests.init) Modals.Interests.init();
         if (Modals.CustomVoices && Modals.CustomVoices.init) Modals.CustomVoices.init();
         if (Modals.EmailExclusions && Modals.EmailExclusions.init) Modals.EmailExclusions.init();
-        if (Modals.PreviousResponses && Modals.PreviousResponses.init) Modals.PreviousResponses.init();
-        if (Modals.SaveResponseTitle && Modals.SaveResponseTitle.init) Modals.SaveResponseTitle.init();
         if (Modals.UserLLMSettings && Modals.UserLLMSettings.init) Modals.UserLLMSettings.init();
         if (typeof LocalAiSetup !== 'undefined' && LocalAiSetup.init) void LocalAiSetup.init();
         if (typeof HaveAChat !== 'undefined' && HaveAChat.init) HaveAChat.init();
@@ -4030,14 +4033,6 @@ Modals.closeAll = (options) => {
             if (Modals.ConfirmationModal && Modals.ConfirmationModal.close) Modals.ConfirmationModal.close();
         } catch (e) { console.debug('Error closing ConfirmationModal:', e); }
         
-        try {
-            if (Modals.PreviousResponses && Modals.PreviousResponses.close) Modals.PreviousResponses.close();
-        } catch (e) { console.debug('Error closing PreviousResponses:', e); }
-        
-        try {
-            if (Modals.SaveResponseTitle && Modals.SaveResponseTitle.close) Modals.SaveResponseTitle.close();
-        } catch (e) { console.debug('Error closing SaveResponseTitle:', e); }
-
         try {
             if (Modals.UserLLMSettings && Modals.UserLLMSettings.closeInfoPopover) Modals.UserLLMSettings.closeInfoPopover();
         } catch (e) { console.debug('Error closing UserLLM info popover:', e); }
@@ -5179,216 +5174,6 @@ Modals.EmailExclusions = (() => {
         load: loadEmailExclusions,
         init: init
     };
-})();
-
-Modals.SaveResponseTitle = (() => {
-    let onConfirm = null;
-
-    function close() {
-        const modal = document.getElementById('save-response-title-modal');
-        const input = document.getElementById('save-response-title-input');
-        if (modal) modal.style.display = 'none';
-        if (input) input.value = '';
-        onConfirm = null;
-    }
-
-    function open(defaultTitle, onConfirmFn) {
-        const modal = document.getElementById('save-response-title-modal');
-        const input = document.getElementById('save-response-title-input');
-        if (!modal || !input) return;
-        onConfirm = onConfirmFn;
-        input.value = defaultTitle || '';
-        modal.style.display = 'flex';
-        input.focus();
-    }
-
-    function init() {
-        const modal = document.getElementById('save-response-title-modal');
-        const input = document.getElementById('save-response-title-input');
-        const saveBtn = document.getElementById('save-response-title-save');
-        const cancelBtn = document.getElementById('save-response-title-cancel');
-        const closeBtn = document.getElementById('close-save-response-title-modal');
-
-        const handleSave = () => {
-            const title = input?.value?.trim() || '';
-            if (!title) return;
-            const callback = onConfirm;
-            close();
-            if (typeof callback === 'function') callback(title);
-        };
-
-        if (saveBtn) saveBtn.addEventListener('click', handleSave);
-        if (cancelBtn) cancelBtn.addEventListener('click', close);
-        if (closeBtn) closeBtn.addEventListener('click', close);
-        if (input) input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleSave();
-            if (e.key === 'Escape') close();
-        });
-        if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
-    }
-
-    return { open, close, init };
-})();
-
-Modals.PreviousResponses = (() => {
-    let currentId = null;
-
-    function _formatDateDMY(dateString) {
-        if (!dateString) return '';
-        try {
-            const d = new Date(dateString);
-            if (isNaN(d.getTime())) return '';
-            return d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        } catch (e) { return ''; }
-    }
-
-    function _esc(s) {
-        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    }
-
-    function showListView() {
-        document.getElementById('previous-responses-list-view').style.display = 'block';
-        document.getElementById('previous-responses-detail-view').style.display = 'none';
-    }
-
-    function showDetailView() {
-        document.getElementById('previous-responses-list-view').style.display = 'none';
-        document.getElementById('previous-responses-detail-view').style.display = 'flex';
-    }
-
-    async function loadList() {
-        const listEl = document.getElementById('previous-responses-list');
-        const emptyEl = document.getElementById('previous-responses-empty');
-        listEl.innerHTML = '';
-        try {
-            const res = await fetch('/api/saved-responses');
-            if (!res.ok) throw new Error(await res.text());
-            const items = await res.json();
-            if (items.length === 0) {
-                emptyEl.style.display = 'block';
-                return;
-            }
-            emptyEl.style.display = 'none';
-            items.forEach(item => {
-                const li = document.createElement('li');
-                li.style.cssText = 'padding: 12px 16px; border-bottom: 1px solid #dee2e6; cursor: pointer;';
-                li.onmouseover = () => { li.style.backgroundColor = '#f0f0f0'; };
-                li.onmouseout = () => { li.style.backgroundColor = ''; };
-                const topRow = document.createElement('div');
-                topRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
-                const titleSpan = document.createElement('span');
-                titleSpan.textContent = item.title;
-                titleSpan.style.fontWeight = '500';
-                const rightWrap = document.createElement('span');
-                rightWrap.style.cssText = 'display: flex; align-items: center; gap: 10px;';
-                const dateSpan = document.createElement('span');
-                dateSpan.textContent = _formatDateDMY(item.created_at);
-                dateSpan.style.color = '#666'; dateSpan.style.fontSize = '0.9em';
-                const downloadBtn = document.createElement('button');
-                downloadBtn.type = 'button';
-                downloadBtn.className = 'manage-contacts-icon-btn modal-btn modal-btn-secondary';
-                downloadBtn.style.cssText = 'padding: 2px 8px;';
-                downloadBtn.title = 'Download as PDF';
-                downloadBtn.setAttribute('aria-label', 'Download as PDF');
-                downloadBtn.innerHTML = '<i class="fas fa-file-pdf" aria-hidden="true"></i>';
-                downloadBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    downloadSavedResponsePDF(item.id);
-                });
-                rightWrap.appendChild(dateSpan);
-                rightWrap.appendChild(downloadBtn);
-                topRow.appendChild(titleSpan);
-                topRow.appendChild(rightWrap);
-                li.appendChild(topRow);
-                const metaRow = document.createElement('div');
-                metaRow.style.cssText = 'font-size: 0.85em; color: #888; margin-top: 4px;';
-                const metaParts = [];
-                if (item.voice) metaParts.push('Voice: ' + item.voice);
-                if (item.llm_provider) metaParts.push('LLM: ' + item.llm_provider);
-                metaRow.textContent = metaParts.length ? metaParts.join(' · ') : '';
-                li.appendChild(metaRow);
-                li.addEventListener('click', () => openDetail(item.id));
-                listEl.appendChild(li);
-            });
-        } catch (e) {
-            emptyEl.textContent = 'Error loading: ' + e.message;
-            emptyEl.style.display = 'block';
-        }
-    }
-
-    function downloadSavedResponsePDF(id) {
-        if (!id) return;
-        window.location.href = `/api/saved-responses/${id}/pdf`;
-    }
-
-    async function openDetail(id) {
-        currentId = id;
-        try {
-            const res = await fetch(`/api/saved-responses/${id}`);
-            if (!res.ok) throw new Error(await res.text());
-            const item = await res.json();
-            document.getElementById('previous-responses-detail-title').textContent = item.title;
-            const metaEl = document.getElementById('previous-responses-detail-meta');
-            const metaParts = [];
-            if (item.created_at) metaParts.push('Saved: ' + _formatDateDMY(item.created_at));
-            if (item.voice) metaParts.push('Voice: ' + item.voice);
-            if (item.llm_provider) metaParts.push('LLM: ' + item.llm_provider);
-            metaEl.textContent = metaParts.length ? metaParts.join(' · ') : '';
-            const contentEl = document.getElementById('previous-responses-detail-content');
-            contentEl.innerHTML = marked.parse(item.content || '');
-            showDetailView();
-        } catch (e) {
-            console.error('Failed to load saved response:', e);
-        }
-    }
-
-    function close() {
-        const modal = document.getElementById('previous-responses-modal');
-        if (modal) modal.style.display = 'none';
-        showListView();
-    }
-
-    async function open() {
-        const modal = document.getElementById('previous-responses-modal');
-        if (!modal) return;
-        await loadList();
-        showListView();
-        modal.style.display = 'flex';
-    }
-
-    function init() {
-        const sidebarBtn = document.getElementById('previous-responses-sidebar-btn');
-        const closeBtn = document.getElementById('close-previous-responses-modal');
-        const backBtn = document.getElementById('previous-responses-back-btn');
-        const deleteBtn = document.getElementById('previous-responses-delete-btn');
-        const downloadPdfBtn = document.getElementById('previous-responses-download-pdf-btn');
-        const modal = document.getElementById('previous-responses-modal');
-
-        if (sidebarBtn) sidebarBtn.addEventListener('click', () => open());
-        if (closeBtn) closeBtn.addEventListener('click', close);
-        if (backBtn) backBtn.addEventListener('click', () => { showListView(); });
-        if (downloadPdfBtn) downloadPdfBtn.addEventListener('click', () => downloadSavedResponsePDF(currentId));
-        if (deleteBtn) deleteBtn.addEventListener('click', async () => {
-            if (!currentId) return;
-            const okDel = await AppDialogs.showAppConfirm(
-                'Delete saved response',
-                'Delete this saved response?',
-                { danger: true }
-            );
-            if (!okDel) return;
-            try {
-                const res = await fetch(`/api/saved-responses/${currentId}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error(await res.text());
-                showListView();
-                await loadList();
-            } catch (e) {
-                console.error('Delete failed:', e);
-            }
-        });
-        if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
-    }
-
-    return { open, close, init };
 })();
 
 Modals.AppConfig = (() => {

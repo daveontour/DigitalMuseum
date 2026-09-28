@@ -380,7 +380,23 @@ func buildOpenRouterMessages(req GenerateRequest, history []ConvTurn, systemProm
 	} else {
 		parts = []string{req.UserInput}
 	}
-	messages = append(messages, map[string]any{"role": "user", "content": strings.Join(parts, "\n")})
+	userText := strings.Join(parts, "\n")
+
+	if len(req.Attachments) > 0 {
+		content := []map[string]any{{"type": "text", "text": userText}}
+		for _, a := range req.Attachments {
+			content = append(content, map[string]any{
+				"type": "image_url",
+				"image_url": map[string]any{
+					"url": fmt.Sprintf("data:%s;base64,%s", a.MimeType, a.DataBase64),
+				},
+			})
+		}
+		messages = append(messages, map[string]any{"role": "user", "content": content})
+		return messages
+	}
+
+	messages = append(messages, map[string]any{"role": "user", "content": userText})
 	return messages
 }
 

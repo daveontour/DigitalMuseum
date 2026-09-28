@@ -856,7 +856,6 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `openDataImportMaintenance` | Opens Data Maintenance on the Data Maintenance tab |
 | `openDataImportBackgroundJobs` | Opens Data Maintenance on the Scheduled Jobs tab |
 | `openConfiguration` | Clicks the Configuration sidebar button |
-| `openPreviousResponses` | Clicks the Previous Responses sidebar button |
 | `openSuggestions` | Clicks the Suggestions sidebar button |
 | `openContacts` | Clicks the Contacts and Relationships sidebar button |
 | `openContactsRelationships` | Opens Contacts and Relationships on the Relationships tab |

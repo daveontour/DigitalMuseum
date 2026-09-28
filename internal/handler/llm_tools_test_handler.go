@@ -173,7 +173,9 @@ func (h *LLMToolsTestHandler) TestTools(w http.ResponseWriter, r *http.Request) 
 	if h.chatSvc != nil {
 		tavilyKey = h.chatSvc.EffectiveTavilyKey(ctx, r)
 	}
-	executor := appai.NewMCPToolExecutor(h.getRAM(r), tavilyKey)
+	// Admin diagnostic tool — allowed to test any tool from any registered server (archive,
+	// chatbot, or shared/additional), unlike a real chat request which is scoped to one feature.
+	executor := appai.NewMCPToolExecutor(h.getRAM(r), tavilyKey, []string{appai.ScopeArchive, appai.ScopeChatbot, appai.ScopeShared})
 
 	results := make([]map[string]any, 0, len(body.Tools))
 	for _, item := range body.Tools {

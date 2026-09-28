@@ -298,6 +298,8 @@ const App = (() => {
             return { ok: false, aborted: true, error: 'Cancelled' };
         }
         if (first.ok) {
+            // The turn is now saved (and may have been auto-titled) — reflect it in the history panel.
+            if (typeof ChatHistoryPanel !== 'undefined') void ChatHistoryPanel.refresh();
             return { ok: true, data: first.data, switched: false };
         }
         return { ok: false, error: first.error || 'Request failed', data: first.data };
@@ -733,6 +735,7 @@ const App = (() => {
         DOM.chatForm.addEventListener('submit', (event) => {
             event.preventDefault();
             if (typeof InterviewerMode !== 'undefined' && InterviewerMode.isActive()) return;
+            if (typeof ChatBotMode !== 'undefined' && ChatBotMode.isActive()) return;
             const userPrompt = DOM.userInput.value.trim();
             if (!userPrompt) return;
             processFormSubmit(userPrompt);
@@ -822,13 +825,6 @@ const App = (() => {
         if (DOM.voiceSettingsModal) {
             DOM.voiceSettingsModal.addEventListener('click', (e) => {
                 if (e.target === DOM.voiceSettingsModal) DOM.voiceSettingsModal.style.display = 'none';
-            });
-        }
-        if (DOM.clearVoiceConversationHistoryBtn) {
-            DOM.clearVoiceConversationHistoryBtn.addEventListener('click', async () => {
-                if (Modals.ConversationManager && Modals.ConversationManager.clearCurrentConversationHistoryWithConfirm) {
-                    await Modals.ConversationManager.clearCurrentConversationHistoryWithConfirm();
-                }
             });
         }
 
@@ -5792,9 +5788,11 @@ const App = (() => {
         if (typeof Modals.ConversationManager !== 'undefined' && Modals.ConversationManager.ensureChatConversationContext) {
             await Modals.ConversationManager.ensureChatConversationContext();
         }
+        if (typeof ChatHistoryPanel !== 'undefined') ChatHistoryPanel.init();
 
         //SSE.init();
         InterviewerMode.init();
+        if (typeof ChatBotMode !== 'undefined') ChatBotMode.init();
         if (typeof ChatVoiceInput !== 'undefined' && ChatVoiceInput.init) ChatVoiceInput.init();
         try {
             initEventListeners(); // Attach main app event listeners

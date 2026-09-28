@@ -31,6 +31,13 @@ let mcpProcess = null;
 let mcpPort = 8082;
 let mcpAuthToken = null;
 
+// ChatBot-only utility-tools MCP server (cmd/chatbotmcpserver) — a separate bundled server from
+// the archive-data one above, exclusive to the ChatBot feature (see CLAUDE.md's MCP scope
+// model). Unlike mcpProcess, it has no SQLITE_PATH dependency, so it's started once at app boot
+// and stays up for the process lifetime rather than being restarted per archive switch.
+let chatbotMcpProcess = null;
+let chatbotMcpPort = 8083;
+
 // ---------------------------------------------------------------------------
 // Resource path resolution
 // ---------------------------------------------------------------------------
@@ -48,6 +55,7 @@ function getPaths() {
   //userData = "C:/Users/dave_/OneDrive/Desktop/digitalmuseum"
   const goExe = path.join(res, 'bin', 'digitalmuseum.exe');
   const mcpExe = path.join(res, 'bin', 'digitalmuseum-mcp.exe');
+  const chatbotMcpExe = path.join(res, 'bin', 'digitalmuseum-chatbot-mcp.exe');
   return {
     // Install / project root (contains bin/, static/, templates/). The Go server
     // must run with this as cwd so relative paths like static/data/*.json in
@@ -55,6 +63,7 @@ function getPaths() {
     appRoot:     res,
     goExe,
     mcpExe,
+    chatbotMcpExe,
     templatesDir: path.join(res, 'templates'),
     staticDir:   path.join(res, 'static'),
     userData,
@@ -546,6 +555,10 @@ async function killZombies() {
     execFile('taskkill', ['/f', '/im', 'digitalmuseum-mcp.exe', '/t'],
       { windowsHide: true }, () => resolve());
   });
+  await new Promise((resolve) => {
+    execFile('taskkill', ['/f', '/im', 'digitalmuseum-chatbot-mcp.exe', '/t'],
+      { windowsHide: true }, () => resolve());
+  });
 }
 
 /**
@@ -604,6 +617,19 @@ function forceKillMcpServerWindows() {
   });
 }
 
+/** Best-effort: ensures digitalmuseum-chatbot-mcp.exe is gone (covers shell-wrapped spawns on Windows). */
+function forceKillChatbotMcpServerWindows() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve();
+    execFile(
+      'taskkill',
+      ['/f', '/im', 'digitalmuseum-chatbot-mcp.exe', '/t'],
+      { windowsHide: true },
+      () => resolve(),
+    );
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Go server lifecycle
 // ---------------------------------------------------------------------------
@@ -646,6 +672,9 @@ function startGoServer(port, paths, dotenv) {
     // connects lazily on the first tool call / discovery attempt.
     MCP_SERVER_URL:  `http://127.0.0.1:${mcpPort}/mcp`,
     MCP_AUTH_TOKEN:  getOrCreateMcpAuthToken(),
+    // ChatBot-only utility-tools MCP server (cmd/chatbotmcpserver) — see CLAUDE.md. Also static/
+    // harmless-if-not-up-yet, same as MCP_SERVER_URL above.
+    CHATBOT_MCP_SERVER_URL: `http://127.0.0.1:${chatbotMcpPort}/mcp`,
     // Go calls this the first time a local-AI chat request needs the chat Ollama daemon.
     OLLAMA_CHAT_CONTROL_URL: ollamaChatControlURL || '',
   };
@@ -873,6 +902,88 @@ async function startMcpServerForCurrentArchive(paths, dotenv) {
   }
 }
 
+/**
+ * Spawns bin/digitalmuseum-chatbot-mcp.exe — the ChatBot-only utility-tools server. Unlike
+ * startMcpServer, this one needs no SQLITE_PATH/KEYRING_PEPPER/LOCALAI_* env (no DB access, no
+ * per-user data), and is CGO-free (see the Makefile's build-chatbot-mcp-exe), so it doesn't need
+ * the MinGW PATH augmentation startMcpServer/startGoServer require either.
+ */
+function startChatbotMcpServer(port, paths, authToken) {
+  log(`Starting ChatBot tools server on port ${port}...`);
+
+  const exeResolved = path.resolve(paths.chatbotMcpExe);
+  if (!fs.existsSync(exeResolved)) {
+    log(`ChatBot MCP server executable not found: ${exeResolved} — run \`make build-chatbot-mcp-exe\` (dev) or \`make build-chatbot-mcp-exe-electron\` (installer). Continuing without it; ChatBot tools will be unavailable but chat otherwise degrades gracefully.`);
+    return;
+  }
+
+  const env = {
+    ...process.env,
+    HOST_PORT:      String(port),
+    MCP_AUTH_TOKEN: authToken,
+  };
+
+  const spawnBase = /** @type {const} */ ({
+    cwd: paths.appRoot,
+    env,
+    windowsHide: true,
+  });
+  const ignore3 = /** @type {const} */ (['ignore', 'ignore', 'ignore']);
+
+  if (process.platform === 'win32') {
+    const attempts = /** @type {const} */ ([
+      ['spawn+ignore', () => spawn(exeResolved, [], { ...spawnBase, stdio: ignore3 })],
+      ['spawn+detached', () => spawn(exeResolved, [], { ...spawnBase, stdio: ignore3, detached: true })],
+      ['execFile', () => execFile(exeResolved, [], { ...spawnBase, stdio: ignore3 })],
+      ['spawn+shell', () => spawn(exeResolved, [], { ...spawnBase, stdio: ignore3, shell: true })],
+    ]);
+    let started = false;
+    for (const [name, fn] of attempts) {
+      try {
+        chatbotMcpProcess = fn();
+        log(`ChatBot MCP server process started (${name})`);
+        started = true;
+        break;
+      } catch (e) {
+        log(`ChatBot MCP ${name} failed: ${e.code || e.errno || ''} ${e.message}`);
+      }
+    }
+    if (!started) {
+      log('Could not launch digitalmuseum-chatbot-mcp.exe — ChatBot tools will be unavailable; chat otherwise degrades gracefully.');
+      return;
+    }
+  } else {
+    try {
+      chatbotMcpProcess = spawn(exeResolved, [], { ...spawnBase, stdio: ignore3 });
+    } catch (e) {
+      log(`ChatBot MCP server spawn failed: ${e.message}`);
+      return;
+    }
+  }
+
+  chatbotMcpProcess.on('exit', (code, signal) => {
+    log(`ChatBot MCP server exited (code=${code}, signal=${signal})`);
+  });
+  chatbotMcpProcess.on('error', (err) => {
+    log(`ChatBot MCP server spawn error: ${err.message}`);
+  });
+}
+
+async function stopChatbotMcpServer() {
+  if (chatbotMcpProcess && !chatbotMcpProcess.killed) {
+    chatbotMcpProcess.kill('SIGTERM');
+    await new Promise((resolve) => {
+      const t = setTimeout(() => {
+        if (chatbotMcpProcess && !chatbotMcpProcess.killed) chatbotMcpProcess.kill('SIGKILL');
+        resolve();
+      }, 5000);
+      chatbotMcpProcess.once('exit', () => { clearTimeout(t); resolve(); });
+    });
+  }
+  chatbotMcpProcess = null;
+  await forceKillChatbotMcpServerWindows();
+}
+
 async function restartGoServer(logLevel) {
   if (goProcess && !goProcess.killed) {
     goProcess.kill('SIGTERM');
@@ -1071,6 +1182,7 @@ async function shutdown() {
   await forceKillDigitalMuseumWindows();
 
   await stopMcpServer();
+  await stopChatbotMcpServer();
 
   await stopOllamaServer();
 
@@ -1084,6 +1196,8 @@ async function shutdown() {
 // Single-instance guard
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
+  // Otherwise this quits silently a moment later, mid-startup, with no clue why.
+  console.log('Another Digital Museum instance is already running (single-instance lock held) — exiting. Quit it (check the system tray) and try again.');
   app.quit();
 } else {
   app.on('second-instance', () => {
@@ -1142,6 +1256,12 @@ app.whenReady().then(async () => {
 
     activeDotenv = dotenv;
     await startOllamaChatControlServer();
+
+    // ChatBot tools server has no SQLITE_PATH dependency, so it starts once here (not per
+    // archive switch like the archive MCP server) and runs for the app's whole lifetime.
+    sendStatus('Starting ChatBot tools server...');
+    startChatbotMcpServer(chatbotMcpPort, paths, getOrCreateMcpAuthToken());
+
     startGoServer(appPort, paths, dotenv);
 
     sendStatus('Waiting for server to be ready...');
@@ -1163,6 +1283,13 @@ app.whenReady().then(async () => {
 
     sendStatus('Starting MCP tools server...');
     await startMcpServerForCurrentArchive(paths, activeDotenv);
+
+    try {
+      await waitForHealth(chatbotMcpPort, 15000, 'ChatBot tools server');
+      log('ChatBot tools server is healthy');
+    } catch (err) {
+      log(`ChatBot tools server did not become healthy: ${err.message} — ChatBot tools will be unavailable; chat otherwise degrades gracefully.`);
+    }
 
     sendStatus('Ready!');
     createMainWindow(appPort);

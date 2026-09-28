@@ -109,12 +109,6 @@
           "position": "middle-left"
         },
         {
-          "text": "Previous Responses — revisit and resume saved chat turns.",
-          "glow": "#previous-responses-sidebar-btn",
-          "navigate_action": "closeOpenDialog;pause0_5s;openPreviousResponses",
-          "position": "middle-right"
-        },
-        {
           "text": "Suggestions — ready-made prompts to explore your archive; click one to fill the chat input.",
           "glow": "#suggestions-sidebar-btn",
           "navigate_action": "closeOpenDialog;pause0_5s;openSuggestions",
@@ -722,30 +716,32 @@
       ]
     },
     {
-      "key": "SavedResponses",
-      "title": "Previous responses",
-      "description": "Browse and revisit your previously saved AI chat responses.",
+      "key": "ChatHistory",
+      "title": "Chat history",
+      "description": "Reopen, rename, delete or download your earlier chats.",
       "QA":"OK",
       "dismiss_navigate_action": "closeOpenDialog",
       "category": "Daily Use",
       "steps": [
         {
-          "text": "Open Previous Responses in the right sidebar to browse AI answers you have saved from past chat sessions.",
-          "glow": "#previous-responses-sidebar-btn",
-          "navigate_action": "openPreviousResponses",
-          "position": "top-center"
-        },
-        {
-          "text": "Responses are listed in reverse chronological order. Each entry shows the question asked and a preview of the AI's answer.",
-          "position": "top-center"
-        },
-        {
-          "text": "Click any saved response to expand it and read the full content, including any images or formatted sections.",
-          "position": "top-center"
-        },
-        {
-          "text": "To save a new response, use the save (bookmark) icon that appears on an AI chat bubble after the response completes.",
+          "text": "Every chat is saved automatically. The Chats panel on the left of the chat area lists them, newest first, grouped by date.",
+          "glow": "#chat-history-panel",
           "navigate_action": "closeOpenDialog",
+          "position": "middle-center"
+        },
+        {
+          "text": "Click a chat to reopen it — the AI picks up with the earlier conversation as context. New chats are named automatically from your first message.",
+          "glow": "#chat-history-list",
+          "position": "middle-center"
+        },
+        {
+          "text": "Hover over a chat to download it as a PDF, rename it, or delete it.",
+          "glow": "#chat-history-list",
+          "position": "middle-center"
+        },
+        {
+          "text": "Click New Chat to start fresh. Use the arrow at the top of the panel to collapse it to a slim strip when you want more room.",
+          "glow": "#new-chat-btn",
           "position": "middle-center"
         }
       ]
@@ -1668,10 +1664,9 @@
           "glow": "#voice-settings-trigger",
           "position": "middle-center"
         }, {
-          "text": "You can clear the conversation history by clicking the voice image in the top right corner and selecting \"Clear conversation history\".",
+          "text": "To start fresh, click \"New Chat\" in the chat history panel on the left. Every conversation is saved there, so you can reopen, rename or delete earlier chats at any time.",
           "position": "middle-center",
-          "glow":"#selected-voice-image",
-          "image_url": "/static/images/guide/clear-conversation.png"
+          "glow":"#new-chat-btn"
         }
       ]
     },
