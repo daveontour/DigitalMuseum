@@ -543,6 +543,7 @@ func (h *GmailHandler) runGmailImport(ctx context.Context, tok *oauth2.Token, la
 		"status_line": fmt.Sprintf("Import completed. %d emails processed.", totalProcessed),
 	})
 	runThumbnailsAfterImportIfIdle(h.pool)
+	startPostImportProcessing(appctx.UserIDFromCtx(ctx), postImportEmails)
 	h.job.Broadcast("completed", h.job.GetState())
 }
 

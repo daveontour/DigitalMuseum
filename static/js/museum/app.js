@@ -5027,16 +5027,6 @@ const App = (() => {
             });
         }
 
-        const settingsDataImportSidebarBtn = document.getElementById('settings-data-import-sidebar-btn');
-        if (settingsDataImportSidebarBtn && DOM.configPage) {
-            settingsDataImportSidebarBtn.addEventListener('click', () => {
-                DOM.configPage.style.display = 'flex';
-                loadControlDefaults();
-                refreshSettingsDataImportModalLLM();
-                if (window.EmailPersonalScore) window.EmailPersonalScore.onConfigShown();
-            });
-        }
-
         const emailEditorOpenAttachmentsBtn = document.getElementById('email-editor-open-attachments-btn');
         if (emailEditorOpenAttachmentsBtn) {
             emailEditorOpenAttachmentsBtn.addEventListener('click', async () => {
@@ -5572,12 +5562,9 @@ const App = (() => {
         if (subjectBtn && !subjectBtn.dataset.onboardingWired) {
             subjectBtn.dataset.onboardingWired = '1';
             subjectBtn.addEventListener('click', () => {
-                const configBtn = document.getElementById('settings-data-import-sidebar-btn');
-                if (configBtn) configBtn.click();
-                setTimeout(() => {
-                    const subjectTab = document.querySelector('.config-tab-button[data-tab="subject-configuration"]');
-                    if (subjectTab) subjectTab.click();
-                }, 120);
+                if (typeof window.openConfigurationToTab === 'function') {
+                    void window.openConfigurationToTab('subject-configuration');
+                }
             });
         }
 

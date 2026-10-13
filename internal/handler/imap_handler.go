@@ -269,5 +269,6 @@ func (h *IMAPHandler) runIMAPImport(req imapProcessRequest, folders []string, ui
 		"status_line": fmt.Sprintf("Import completed. %d emails processed.", total),
 	})
 	runThumbnailsAfterImportIfIdle(h.pool)
+	startPostImportProcessing(uid, postImportEmails)
 	h.job.Broadcast("completed", h.job.GetState())
 }

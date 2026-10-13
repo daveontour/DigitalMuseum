@@ -406,6 +406,20 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	backgroundJobsHandler := handler.NewBackgroundJobsHandler(backgroundJobsRepo, backgroundJobsRunner, backgroundJobsScheduler)
 	backgroundJobsHandler.RegisterRoutes(r)
 
+	// ── Post-import processing (runs the maintenance steps once after each import) ──
+	handler.ConfigurePostImportPipeline(pool, backgroundJobsRunner, backgroundJobsRepo, backgroundJobsScheduler, configRepo)
+	postImportHandler := handler.NewPostImportHandler(configRepo, sessionMasterStore, sensitiveSvc, authSvc)
+	postImportHandler.RegisterRoutes(r)
+
+	// ── Archive backup (one-click VACUUM INTO snapshot) ──────────────────────
+	backupSvc := service.NewArchiveBackupService(pool, configRepo)
+	backupHandler := handler.NewBackupHandler(backupSvc, sessionMasterStore, sensitiveSvc, authSvc, cfg.App.DeploymentNature)
+	backupHandler.RegisterRoutes(r)
+
+	// ── Timeline + quick search (cross-source, date-ordered views) ────────────
+	timelineHandler := handler.NewTimelineHandler(repository.NewTimelineRepo(pool))
+	timelineHandler.RegisterRoutes(r)
+
 	// ── Share tokens ──────────────────────────────────────────────────────────
 	shareRepo := repository.NewArchiveShareRepo(pool)
 	shareSvc := service.NewArchiveShareService(shareRepo, authSvc)

@@ -126,7 +126,7 @@
           "position": "middle-center"
         },
         {
-          "text": "Profiles — AI-generated biographical profiles for contacts, editable and regeneratable.",
+          "text": "People Profiles — AI-generated biographical profiles for contacts, editable and regeneratable.",
           "glow": "#profiles-sidebar-btn",
           "navigate_action": "closeOpenDialog;pause0_5s;openProfiles",
           "position": "middle-right"
@@ -186,7 +186,7 @@
         },
         {
           "text": "Configuration — appearance, API keys, subject details, regions, suggestions, guide topics, custom voices, visitor keys, and tool access.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "navigate_action": "closeOpenDialog;pause0_5s;openConfiguration",
           "position": "bottom-left"
         },
@@ -505,7 +505,7 @@
           "navigate_action": "openContacts"
         },
         {
-          "text": "Open Profiles to view detailed notes and relationship context.",
+          "text": "Open People Profiles to view detailed notes and relationship context.",
           "glow": "#profiles-sidebar-btn",
           "navigate_action": "openProfiles"
         },
@@ -516,7 +516,7 @@
         },
         {
           "text": "Use Configuration to classify contacts and tune contact recognition.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "position": "bottom-center"
         }
       ],
@@ -573,7 +573,7 @@
           "position": "middle-center"
         },
         {
-          "text": "Open Profiles from the right sidebar. This is the main place to create and manage complete profiles.",
+          "text": "Open People Profiles from the right sidebar. This is the main place to create and manage complete profiles.",
           "glow": "#profiles-sidebar-btn",
           "position": "middle-center"
         },
@@ -769,7 +769,7 @@
         },
         {
           "text": "Administrators can customise the suggestion library via Configuration → Suggestions — adding, editing, and removing prompts, or importing a new set.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "position": "bottom-center"
         }
       ]
@@ -794,7 +794,7 @@
         },
         {
           "text": "Add more interests in Configuration → Subject Configuration for better variety.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "navigate_action": "closeOpenDialog",
           "position": "bottom-center"
         }
@@ -1107,7 +1107,7 @@
       "steps": [
         {
           "text": "Open Configuration from the left sidebar, then switch to the API Keys tab.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "navigate_action": "openConfigApiKeys",
           "position": "bottom-center"
         },
@@ -1149,7 +1149,7 @@
       "steps": [
         {
           "text": "Open Configuration from the left sidebar, then switch to the Subject Configuration tab.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "navigate_action": "openConfigSubjectConfiguration",
           "position": "bottom-center"
         },
@@ -1194,7 +1194,7 @@
       "steps": [
         {
           "text": "As well as the pre defined AI personae (voices) you can create your own custom AI voice personas. Open Configuration from the left sidebar, then switch to the Custom Voices tab.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "image_url": "/static/images/guide/voices.png",
           "position": "middle-center"
         },
@@ -1550,7 +1550,7 @@
         },
         {
           "text": "The master key is set and changed via Configuration. If you forget your master key, encrypted records cannot be recovered — it is not stored anywhere.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "position": "bottom-center"
         }
       ],
@@ -1603,7 +1603,7 @@
         },
         {
           "text": "Open Configuration and switch to the Tools Access tab.",
-          "glow": "#settings-data-import-sidebar-btn",
+          "glow": "#hamburger-menu",
           "position": "bottom-center"
         },
         {

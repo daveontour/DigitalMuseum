@@ -346,6 +346,7 @@ func runUploadWhatsApp(ctx context.Context, pool *sql.DB, subjectRepo *repositor
 		"status_line": statusLine,
 	})
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(appctx.UserIDFromCtx(ctx), postImportMessages|postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 
@@ -396,6 +397,7 @@ func runUploadIMessage(ctx context.Context, pool *sql.DB, subjectRepo *repositor
 		"status_line": statusLine,
 	})
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(appctx.UserIDFromCtx(ctx), postImportMessages|postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 
@@ -445,6 +447,7 @@ func runUploadInstagram(ctx context.Context, pool *sql.DB, subjectRepo *reposito
 		"status_line": statusLine,
 	})
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(appctx.UserIDFromCtx(ctx), postImportMessages|postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 
@@ -582,6 +585,7 @@ func runUploadFacebook(ctx context.Context, pool *sql.DB, subjectRepo *repositor
 	}
 
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(appctx.UserIDFromCtx(ctx), postImportMessages|postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 

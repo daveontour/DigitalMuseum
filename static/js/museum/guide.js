@@ -13,7 +13,12 @@ const Guide = {
     },
 
     _openConfigurationTab(tabName) {
-        Guide._clickSidebarButton('settings-data-import-sidebar-btn');
+        if (typeof window.openConfigurationToTab === 'function') {
+            void window.openConfigurationToTab(tabName);
+            return;
+        }
+        const page = document.getElementById('config-modal-overlay');
+        if (page) page.style.display = 'flex';
         setTimeout(() => {
             document.querySelector(`.config-tab-button[data-tab="${tabName}"]`)?.click();
         }, 120);
@@ -146,7 +151,7 @@ const Guide = {
         openDataImportImport: () => Guide._openDataImportTab('import'),
         openDataImportMaintenance: () => Guide._openDataImportTab('maintenance'),
         openDataImportBackgroundJobs: () => Guide._openDataImportTab('background-jobs'),
-        openConfiguration: () => Guide._clickSidebarButton('settings-data-import-sidebar-btn'),
+        openConfiguration: () => Guide._openConfigurationTab('settings'),
         // Right sidebar — tools
         openSuggestions: () => Guide._clickSidebarButton('suggestions-sidebar-btn'),
         openContacts: () => Guide._clickSidebarButton('contacts-sidebar-btn'),

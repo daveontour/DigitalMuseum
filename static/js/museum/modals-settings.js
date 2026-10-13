@@ -3973,6 +3973,7 @@ Modals.closeAll = (options) => {
         
         try {
             if (Modals.FBAlbums && Modals.FBAlbums.close) Modals.FBAlbums.close();
+            if (Modals.FBPosts && Modals.FBPosts.close) Modals.FBPosts.close();
         } catch (e) { console.debug('Error closing FBAlbums modal:', e); }
         
         try {

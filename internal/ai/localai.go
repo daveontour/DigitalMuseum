@@ -226,6 +226,7 @@ func (p *LocalAIProvider) GenerateResponse(
 
 	messages := buildLocalAIMessages(req, history, systemPrompt)
 	funcCallsMade := []map[string]any{}
+	sources := newSourceCollector()
 	inputTokens := 0
 	outputTokens := 0
 
@@ -260,6 +261,7 @@ func (p *LocalAIProvider) GenerateResponse(
 			metadata := map[string]any{
 				"referenced_files": []any{},
 				"function_calls":   funcCallsMade,
+				"sources":          sources.list(),
 				"input_tokens":     inputTokens,
 				"output_tokens":    outputTokens,
 				"total_tokens":     inputTokens + outputTokens,
@@ -308,6 +310,7 @@ func (p *LocalAIProvider) GenerateResponse(
 			if err != nil {
 				result = map[string]any{"error": err.Error()}
 			}
+			sources.addToolResult(toolName, result)
 			resultJSON, _ := json.Marshal(result)
 
 			// Ollama native API does not use tool_call_id.

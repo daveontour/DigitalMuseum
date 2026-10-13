@@ -1,11 +1,30 @@
 'use strict';
 
+function showFacebookDialogTab(tab) {
+    const showAlbums = tab !== 'posts';
+    const albumsPane = document.getElementById('fb-albums-pane');
+    const postsPane = document.getElementById('fb-posts-pane');
+    const albumsBtn = document.getElementById('fb-dialog-tab-albums');
+    const postsBtn = document.getElementById('fb-dialog-tab-posts');
+    if (albumsPane) albumsPane.classList.toggle('fb-dialog-pane--active', showAlbums);
+    if (postsPane) postsPane.classList.toggle('fb-dialog-pane--active', !showAlbums);
+    if (albumsBtn) {
+        albumsBtn.classList.toggle('fb-dialog-tab--active', showAlbums);
+        albumsBtn.setAttribute('aria-selected', showAlbums ? 'true' : 'false');
+    }
+    if (postsBtn) {
+        postsBtn.classList.toggle('fb-dialog-tab--active', !showAlbums);
+        postsBtn.setAttribute('aria-selected', showAlbums ? 'false' : 'true');
+    }
+}
+
 Modals.FBAlbums = (() => {
         let albums = [];
         let filteredAlbums = [];
         let selectedAlbumId = null;
         let resizeStartX = null;
         let resizeStartWidth = null;
+        let loaded = false;
 
         function formatDateAustralian(dateString) {
             if (!dateString) return 'No Date';
@@ -219,7 +238,10 @@ Modals.FBAlbums = (() => {
         }
 
         async function open() {
+            showFacebookDialogTab('albums');
             Modals._openModal(DOM.fbAlbumsModal);
+            if (loaded) return;
+            loaded = true;
             selectedAlbumId = null;
             await loadAlbums();
 
@@ -248,13 +270,27 @@ Modals.FBAlbums = (() => {
         }
 
 
-        function close() { 
+        function close() {
+            loaded = false;
             Modals._closeModal(DOM.fbAlbumsModal);
         }
 
         function init() {
-            if (DOM.closeFBAlbumsModalBtn) {
+            if (DOM.closeFBAlbumsModalBtn && !DOM.closeFBAlbumsModalBtn.dataset.fbAlbumsWired) {
+                DOM.closeFBAlbumsModalBtn.dataset.fbAlbumsWired = '1';
                 DOM.closeFBAlbumsModalBtn.addEventListener('click', close);
+            }
+            const albumsTab = document.getElementById('fb-dialog-tab-albums');
+            const postsTab = document.getElementById('fb-dialog-tab-posts');
+            if (albumsTab && !albumsTab.dataset.wired) {
+                albumsTab.dataset.wired = '1';
+                albumsTab.addEventListener('click', () => { void open(); });
+            }
+            if (postsTab && !postsTab.dataset.wired) {
+                postsTab.dataset.wired = '1';
+                postsTab.addEventListener('click', () => {
+                    if (Modals.FBPosts && Modals.FBPosts.open) void Modals.FBPosts.open();
+                });
             }
             if (DOM.fbAlbumsModal) {
                 DOM.fbAlbumsModal.addEventListener('click', (e) => {
@@ -272,9 +308,10 @@ Modals.FBAlbums = (() => {
         }
 
         async function openAndSelectAlbum(albumId) {
-            // Open the Facebook Albums modal
+            showFacebookDialogTab('albums');
             Modals._openModal(DOM.fbAlbumsModal);
-            
+            loaded = true;
+
             // Load albums and wait for them to load
             try {
                 await loadAlbums();
@@ -325,6 +362,7 @@ Modals.FBPosts = (() => {
     let selectedPostId = null;
     let resizeStartX = 0;
     let resizeStartWidth = 0;
+    let loaded = false;
 
     function formatDate(isoStr) {
         if (!isoStr) return '';
@@ -474,10 +512,12 @@ Modals.FBPosts = (() => {
     }
 
     function open() {
-        if (DOM.fbPostsModal) {
-            DOM.fbPostsModal.style.display = 'flex';
-            loadPosts();
-        }
+        showFacebookDialogTab('posts');
+        if (!DOM.fbPostsModal) return;
+        DOM.fbPostsModal.style.display = 'flex';
+        if (loaded) return;
+        loaded = true;
+        loadPosts();
     }
     async function openAndFilterOnPosts(postIds) {
         if (!DOM.fbPostsModal || !postIds || postIds.length === 0) return;
@@ -485,7 +525,9 @@ Modals.FBPosts = (() => {
             ? postIds.map(id => Number(id))
             : String(postIds).split(',').map(id => parseInt(id, 10));
         if (ids.length === 0) return;
+        showFacebookDialogTab('posts');
         DOM.fbPostsModal.style.display = 'flex';
+        loaded = true;
         selectedPostId = null;
         await loadPosts('', ids);
         if (filteredPosts.length > 0) {
@@ -494,12 +536,19 @@ Modals.FBPosts = (() => {
     }
 
     function close() {
+        loaded = false;
         if (DOM.fbPostsModal) DOM.fbPostsModal.style.display = 'none';
     }
 
     function init() {
-        if (DOM.closeFBPostsModalBtn) DOM.closeFBPostsModalBtn.addEventListener('click', close);
-        if (DOM.fbPostsModal) DOM.fbPostsModal.addEventListener('click', e => { if (e.target === DOM.fbPostsModal) close(); });
+        if (DOM.closeFBPostsModalBtn && !DOM.closeFBPostsModalBtn.dataset.fbPostsWired) {
+            DOM.closeFBPostsModalBtn.dataset.fbPostsWired = '1';
+            DOM.closeFBPostsModalBtn.addEventListener('click', close);
+        }
+        if (DOM.fbPostsModal && !DOM.fbPostsModal.dataset.fbPostsOverlayWired) {
+            DOM.fbPostsModal.dataset.fbPostsOverlayWired = '1';
+            DOM.fbPostsModal.addEventListener('click', e => { if (e.target === DOM.fbPostsModal) close(); });
+        }
         if (DOM.fbPostsSearch) DOM.fbPostsSearch.addEventListener('input', e => searchPosts(e.target.value));
         if (DOM.fbPostsClearBtn) DOM.fbPostsClearBtn.addEventListener('click', async () => {
             if (DOM.fbPostsSearch) DOM.fbPostsSearch.value = '';

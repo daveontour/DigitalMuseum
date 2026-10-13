@@ -498,6 +498,7 @@ func runFilesystemInProcess(pool *sql.DB, job *importer.ImportJob, directories [
 		"error_messages":    stats.ErrorMessages,
 	})
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(uid, postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 
@@ -1018,6 +1019,7 @@ func runReferenceImport(repo *repository.ImageRepo, job *importer.ImportJob, poo
 		"error_message": errMsg, "error_messages": errMsgs,
 	})
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(uid, postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 
@@ -1902,6 +1904,7 @@ func runWhatsAppInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfigRep
 		"errors":                       stats.Errors,
 	})
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(uid, postImportMessages|postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 
@@ -2030,6 +2033,7 @@ func runIMessageInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfigRep
 		"errors":                       stats.Errors,
 	})
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(uid, postImportMessages|postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 
@@ -2153,6 +2157,7 @@ func runInstagramInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfigRe
 		"errors":            stats.Errors,
 	})
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(uid, postImportMessages|postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 
@@ -2462,6 +2467,7 @@ func runFacebookAllInProcess(pool *sql.DB, subjectRepo *repository.SubjectConfig
 
 	job.UpdateState(stats)
 	runThumbnailsAfterImportIfIdle(pool)
+	startPostImportProcessing(uid, postImportMessages|postImportPhotos)
 	job.Broadcast("completed", job.GetState())
 }
 

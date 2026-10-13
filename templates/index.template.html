@@ -109,6 +109,19 @@
                 <span class="its-me-visitor-option active" data-value="visitor">A Visitor</span>
             </div>
             <div class="top-bar-right-buttons" style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+                <button id="quick-search-btn" class="quick-search-btn" type="button" title="Search messages, emails, photos and posts (Ctrl+K)">
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <span>Search</span>
+                    <kbd class="quick-search-kbd">Ctrl K</kbd>
+                </button>
+                <button id="post-import-status-btn" class="post-import-status-btn" type="button" title="Show what's being prepared after your last import" hidden>
+                    <i id="post-import-status-icon" class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+                    <span id="post-import-status-label">Preparing your archive&hellip;</span>
+                </button>
+                <button id="backup-reminder-btn" class="backup-reminder-btn" type="button" title="It's been a while since your archive was backed up" hidden>
+                    <i class="fas fa-hdd" aria-hidden="true"></i>
+                    <span id="backup-reminder-label">Back up your archive</span>
+                </button>
                 <button id="guide-sidebar-btn" class="top-bar-guide-btn" type="button" title="Guide">
                     <i class="fas fa-question-circle"></i>
                      <span style="margin-left:4px; font-size:var(--text-sm);">Guide</span>
@@ -141,6 +154,11 @@
                                 <i class="fas fa-sync-alt" style="margin-right:6px;"></i>Reload Guide Topics
                             </button>
                         </div>
+                        <div id="account-backup-section" style="display:none; border-bottom:1px solid var(--color-border); padding-bottom:4px; margin-bottom:4px;">
+                            <button type="button" id="account-backup-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
+                                <i class="fas fa-hdd" style="margin-right:6px;"></i>Back Up Archive&hellip;
+                            </button>
+                        </div>
                         <button type="button" id="account-about-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
                             <i class="fas fa-info-circle" style="margin-right:6px;"></i>About
                         </button>
@@ -157,7 +175,11 @@
             <!-- More Options Section (Left - Media & Communication) -->
             <div class="more-options-section sidebar-left-main">
                 <!-- <h3>Explore {{owner}}'s World</h3> -->
-                <div class="more-options-buttons">
+                <div class="sidebar-group-label" id="sidebar-group-label-explore">Explore</div>
+                <div class="more-options-buttons" id="sidebar-explore-buttons">
+                    <button type="button" class="more-options-btn" id="timeline-sidebar-btn" title="Browse everything by year, month and day">
+                        <i class="fas fa-stream"></i> Timeline
+                    </button>
                     <button type="button" class="more-options-btn" id="sms-messages-sidebar-btn">
                         <i class="fas fa-comment-dots"></i> Messages and Chats
                     </button>
@@ -165,11 +187,11 @@
                         <i class="fas fa-envelope"></i> Emails
                     </button>
                     <button type="button" class="more-options-btn" id="fb-albums-sidebar-btn">
-                        <i class="fas fa-images"></i> Facebook Albums
+                        <i class="fas fa-images"></i> Facebook
                     </button>
-                    <button type="button" class="more-options-btn" id="fb-posts-sidebar-btn">
+                    <!-- <button type="button" class="more-options-btn" id="fb-posts-sidebar-btn">
                         <i class="fas fa-newspaper"></i> Facebook Posts
-                    </button>
+                    </button> -->
                     <button type="button" class="more-options-btn" id="new-image-gallery-sidebar-btn">
                         <i class="fas fa-images"></i>Images
                     </button>
@@ -185,6 +207,7 @@
                     <button type="button" class="more-options-btn" id="message-similarity-sidebar-btn">
                         <i class="fas fa-search"></i> Multi Source Search
                     </button>
+                    <p id="sidebar-explore-empty-hint" class="sidebar-empty-hint" hidden>Nothing imported yet. Use <strong>Source Data</strong> below to add emails, messages or photos.</p>
 
 
                     <!-- <button type="button" class="more-options-btn" id="identity-profile-wizard-btn-legacy" title="Create or edit your identity profile" style="margin-top:4px;">
@@ -194,13 +217,10 @@
                 <div class="sidebar-spacer" aria-hidden="true"></div>
                 <div class="sidebar-bottom-tile">
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="identity-profile-wizard-btn" title="Create or edit your identity profile" style="margin-top:4px;">
-                        <i class="fas fa-id-card"></i> Profile
+                        <i class="fas fa-id-card"></i> Identity Profile
                     </button>
                     <button type="button" class="more-options-btn sidebar-settings-btn" id="data-import-sidebar-btn">
                         <i class="fas fa-tools sidebar-data-import-btn-icon" aria-hidden="true"></i> Source Data
-                    </button>
-                    <button type="button" class="more-options-btn sidebar-settings-btn" id="settings-data-import-sidebar-btn">
-                        <i class="fas fa-cog"></i> Configuration
                     </button>
                 </div>
             </div>
@@ -385,21 +405,13 @@
         <div class="sidebar sidebar-right">
             <div class="more-options-section sidebar-right-main">
                 <!-- <h3>Tools &amp; Data</h3> -->
-                <div class="more-options-buttons">
+                <div class="sidebar-group-label" id="sidebar-group-label-ask">Ask &amp; Play</div>
+                <div class="more-options-buttons" id="sidebar-ask-buttons">
                     <button type="button" class="more-options-btn" id="chatbot-sidebar-btn">
                         <i class="fas fa-robot"></i> ChatBot
                     </button>
                     <button type="button" class="more-options-btn" id="suggestions-sidebar-btn">
                         <i class="fas fa-lightbulb"></i> Suggestions
-                    </button>
-                    <button type="button" class="more-options-btn" id="contacts-sidebar-btn">
-                        <i class="fas fa-address-book"></i> Contacts and Relationships
-                    </button>
-                    <button type="button" class="more-options-btn" id="profiles-sidebar-btn">
-                        <i class="fas fa-id-card"></i> Profiles
-                    </button>
-                    <button type="button" class="more-options-btn" id="sensitive-data-sidebar-btn">
-                        <i class="fas fa-lock"></i> Sensitive &amp; Private Data
                     </button>
                     <button type="button" class="more-options-btn" id="have-a-chat-sidebar-btn">
                         <i class="fas fa-comments"></i> Have a Chat
@@ -413,10 +425,21 @@
                     <button type="button" class="more-options-btn" id="todays-thing-sidebar-btn">
                         <i class="fas fa-star"></i> Today's Thing of Interest
                     </button>
+                </div>
+                <div class="sidebar-group-label" id="sidebar-group-label-people">People &amp; Records</div>
+                <div class="more-options-buttons" id="sidebar-people-buttons">
+                    <button type="button" class="more-options-btn" id="contacts-sidebar-btn">
+                        <i class="fas fa-address-book"></i> Contacts and Relationships
+                    </button>
+                    <button type="button" class="more-options-btn" id="profiles-sidebar-btn" title="AI-written profiles of the people in the archive">
+                        <i class="fas fa-user-friends"></i> People Profiles
+                    </button>
+                    <button type="button" class="more-options-btn" id="sensitive-data-sidebar-btn">
+                        <i class="fas fa-lock"></i> Sensitive &amp; Private Data
+                    </button>
                     <button type="button" class="more-options-btn" id="statistics-sidebar-btn">
                         <i class="fas fa-chart-bar"></i> Dashboard
                     </button>
-
                 </div>
                 <div class="sidebar-spacer" aria-hidden="true"></div>
                 <div class="sidebar-bottom-tile">
@@ -611,6 +634,95 @@
                     <pre id="chat-tool-calls-log-body" class="chat-tool-calls-log-body"></pre>
                     <div class="chat-tool-calls-log-actions">
                         <button type="button" class="modal-btn modal-btn-secondary" id="chat-tool-calls-log-close-btn">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post-import processing ("Getting your archive ready") — post-import-status.js -->
+        <div id="post-import-modal" class="modal" style="display:none; z-index: 4100;">
+            <div class="modal-content post-import-modal-content" style="max-width:560px; width:92vw;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-magic"></i> Getting your archive ready</h2>
+                    <button type="button" class="modal-close-btn" id="close-post-import-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="post-import-modal-summary" class="post-import-modal-summary">After each import, Digital Museum prepares the new data so you can search it, browse photos, and ask the AI about it.</p>
+                    <ol id="post-import-steps-list" class="post-import-steps-list"></ol>
+                    <div class="post-import-modal-actions">
+                        <button type="button" class="modal-btn modal-btn-secondary" id="post-import-open-jobs-btn"><i class="fas fa-tasks" aria-hidden="true"></i> Scheduled jobs</button>
+                        <button type="button" class="modal-btn modal-btn-secondary" id="post-import-stop-btn" hidden><i class="fas fa-stop" aria-hidden="true"></i> Stop</button>
+                        <button type="button" class="modal-btn modal-btn-primary" id="post-import-close-btn">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline — timeline.js. Default modal z-index on purpose: records opened from it
+             (emails, conversations, photos, posts) are later in the DOM and stack on top. -->
+        <div id="timeline-modal" class="modal" style="display:none;">
+            <div class="modal-content timeline-modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-stream"></i> Timeline</h2>
+                    <button type="button" class="modal-close-btn" id="close-timeline-modal">&times;</button>
+                </div>
+                <div class="timeline-body">
+                    <div id="timeline-years" class="timeline-years" role="tablist" aria-label="Years"></div>
+                    <div id="timeline-months" class="timeline-months" aria-label="Months"></div>
+                    <div class="timeline-month-header">
+                        <button type="button" class="modal-btn modal-btn-secondary timeline-nav-btn" id="timeline-prev-btn" title="Previous month with something in it" aria-label="Previous month"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+                        <h3 id="timeline-month-title" class="timeline-month-title"></h3>
+                        <button type="button" class="modal-btn modal-btn-secondary timeline-nav-btn" id="timeline-next-btn" title="Next month with something in it" aria-label="Next month"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+                        <span id="timeline-month-summary" class="timeline-month-summary"></span>
+                    </div>
+                    <div id="timeline-days" class="timeline-days" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick search (Ctrl+K) — quick-search.js -->
+        <div id="quick-search-modal" class="quick-search-overlay" hidden>
+            <div class="quick-search-panel" role="dialog" aria-modal="true" aria-label="Quick search">
+                <div class="quick-search-input-row">
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <input id="quick-search-input" type="search" placeholder="Search messages, emails, photos and posts&hellip;" autocomplete="off" spellcheck="false" aria-controls="quick-search-results">
+                    <kbd class="quick-search-kbd">Esc</kbd>
+                </div>
+                <div id="quick-search-results" class="quick-search-results" role="listbox" aria-label="Search results"></div>
+                <div id="quick-search-footer" class="quick-search-footer">&uarr; &darr; to move &middot; Enter to open &middot; finds words anywhere in your messages, emails, photo titles and tags, and posts</div>
+            </div>
+        </div>
+
+        <!-- Archive backup — archive-backup.js -->
+        <div id="backup-modal" class="modal" style="display:none; z-index: 4100;">
+            <div class="modal-content backup-modal-content" style="max-width:560px; width:92vw;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-hdd"></i> Back up your archive</h2>
+                    <button type="button" class="modal-close-btn" id="close-backup-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="backup-modal-lead">Saves a complete copy of this archive as a single file. Keep it on a different drive (a USB drive or cloud folder) so a broken or lost computer can't take your archive with it.</p>
+                    <dl id="backup-modal-facts" class="backup-modal-facts">
+                        <dt>Last backup</dt><dd id="backup-modal-last">&mdash;</dd>
+                        <dt>Archive size</dt><dd id="backup-modal-size">&mdash;</dd>
+                        <dt>Archive file</dt><dd id="backup-modal-archive-path" class="backup-modal-path">&mdash;</dd>
+                    </dl>
+                    <div id="backup-modal-progress" class="backup-modal-progress" hidden>
+                        <i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+                        <span id="backup-modal-progress-text">Backing up&hellip;</span>
+                    </div>
+                    <div id="backup-modal-result" class="backup-modal-result" hidden></div>
+                    <ul class="backup-modal-notes">
+                        <li>You can keep using the app while the backup runs.</li>
+                        <li>Encrypted items stay encrypted in the backup &mdash; you'll need your master password to open them.</li>
+                        <li>Photos added with &ldquo;Link to Images on Disk&rdquo; stay in their original folders and aren't copied; back those folders up too.</li>
+                        <li>To restore, close Digital Museum and copy the backup file over your archive file (shown above), keeping the archive&rsquo;s file name.</li>
+                    </ul>
+                    <p id="backup-modal-unavailable" class="backup-modal-unavailable" hidden>Backups can only be made from the Digital Museum desktop app.</p>
+                    <div class="backup-modal-actions">
+                        <button type="button" class="modal-btn modal-btn-secondary" id="backup-snooze-btn" hidden>Remind me in a week</button>
+                        <button type="button" class="modal-btn modal-btn-secondary" id="backup-close-btn">Close</button>
+                        <button type="button" class="modal-btn modal-btn-primary" id="backup-start-btn"><i class="fas fa-save" aria-hidden="true"></i> Choose location &amp; back up</button>
                     </div>
                 </div>
             </div>
@@ -1874,6 +1986,13 @@
                             </div>
                             <div class="data-import-panels-scroll">
                             <div id="data-import-panel-import" role="tabpanel" class="data-import-category-panel data-import-category-panel--active" data-import-category-panel="import" aria-labelledby="data-import-tab-import">
+                                <div class="post-import-auto-row">
+                                    <label for="post-import-auto-checkbox" class="post-import-auto-label">
+                                        <input type="checkbox" id="post-import-auto-checkbox" checked>
+                                        <span><strong>Automatically prepare new data after each import</strong> (recommended) &mdash; updates contacts, creates thumbnails, makes messages, emails and photos searchable, and finds faces. Paid photo tagging is never started automatically.</span>
+                                    </label>
+                                    <span id="post-import-auto-status" class="post-import-auto-status" aria-live="polite"></span>
+                                </div>
                                 <div class="data-import-cards-grid">
                                 <article class="data-import-card data-import-row" data-import="email_processing">
                                     <div class="data-import-card-header">
@@ -1896,7 +2015,7 @@
                                 </article>
                                 <article class="data-import-card data-import-row" data-import="imap_processing">
                                     <div class="data-import-card-header">
-                                        <h3 class="data-import-card-title"><i class="fas fa-inbox"></i> Imort Mail from an IMAP server (Basic Authentication)</h3>
+                                        <h3 class="data-import-card-title"><i class="fas fa-inbox"></i> Import Mail from an IMAP server (Basic Authentication)</h3>
                                     </div>
                                     <div class="data-import-card-metrics-source">
                                         <span class="data-import-count" data-import-count-key="imap_processing">—</span>
@@ -2730,71 +2849,61 @@
             </div>
         </div>
 
-        <!-- Facebook Choose Albums Modal  -->
-        <div id="fb-albums-modal" class="modal">
-            <div class="modal-content" style="max-width: 1400px; width: 95vw; padding: 0; display: flex; flex-direction: column; height: 90vh;">
+        <!-- Facebook Albums and Posts -->
+        <div id="fb-modal" class="modal">
+            <div class="modal-content fb-dialog-content">
                 <div class="modal-header">
-                    <h2><i class="fas fa-images"></i> Facebook Albums</h2>
-                    <button class="modal-close-btn" id="close-fb-albums-modal">&times;</button>
+                    <h2><i class="fas fa-facebook"></i> Facebook</h2>
+                    <button type="button" class="modal-close-btn" id="close-fb-modal" aria-label="Close">&times;</button>
                 </div>
-                <div style="display: flex; flex: 1; overflow: hidden;">
-                    <!-- Master Pane (Left) - Resizable -->
-                    <div id="fb-albums-master-pane" style="width: 350px; min-width: 200px; max-width: 600px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background-color: var(--color-bg-base); position: relative;">
-                        <div style="padding: 1rem; border-bottom: 1px solid var(--color-border); box-sizing: border-box;">
-                            <input type="text" id="fb-albums-search" placeholder="Search albums..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-size: var(--text-md); box-sizing: border-box;">
+                <div class="fb-dialog-tabstrip" role="tablist" aria-label="Facebook">
+                    <button type="button" class="fb-dialog-tab fb-dialog-tab--active" id="fb-dialog-tab-albums" role="tab" aria-selected="true" aria-controls="fb-albums-pane">Albums</button>
+                    <button type="button" class="fb-dialog-tab" id="fb-dialog-tab-posts" role="tab" aria-selected="false" aria-controls="fb-posts-pane">Posts</button>
+                </div>
+                <div id="fb-albums-pane" class="fb-dialog-pane fb-dialog-pane--active" role="tabpanel" aria-labelledby="fb-dialog-tab-albums">
+                    <div class="fb-dialog-pane-body">
+                        <div id="fb-albums-master-pane" style="width: 350px; min-width: 200px; max-width: 600px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background-color: var(--color-bg-base); position: relative;">
+                            <div style="padding: 1rem; border-bottom: 1px solid var(--color-border); box-sizing: border-box;">
+                                <input type="text" id="fb-albums-search" placeholder="Search albums..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-size: var(--text-md); box-sizing: border-box;">
+                            </div>
+                            <div id="fb-albums-list" style="flex: 1; overflow-y: auto; padding: 0.5rem;">
+                                <div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">Loading albums...</div>
+                            </div>
+                            <div id="fb-albums-resize-handle" style="position: absolute; right: 0; top: 0; bottom: 0; width: 4px; cursor: col-resize; background-color: transparent; z-index: 5;"></div>
                         </div>
-                        <div id="fb-albums-list" style="flex: 1; overflow-y: auto; padding: 0.5rem;">
-                            <!-- Albums will be loaded here -->
-                            <div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">Loading albums...</div>
-                        </div>
-                        <!-- Resize handle -->
-                        <div id="fb-albums-resize-handle" style="position: absolute; right: 0; top: 0; bottom: 0; width: 4px; cursor: col-resize; background-color: transparent; z-index: 5;"></div>
-                    </div>
-                    <!-- Slave Pane (Right) -->
-                    <div id="fb-albums-slave-pane" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                        <div id="fb-albums-album-header" style="padding: 1rem; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base);">
-                            <h3 id="fb-albums-album-title" style="margin: 0; color: var(--color-text); font-size: var(--text-heading);">Select an album</h3>
-                            <p id="fb-albums-album-description" style="margin: 0.5rem 0 0 0; color: var(--color-text-muted); font-size: var(--text-md);"></p>
-                        </div>
-                        <div id="fb-albums-images-container" style="flex: 1; overflow-y: auto; padding: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; align-content: start; min-height: 0;">
-                            <!-- Images will be displayed here -->
-                            <div style="text-align: center; padding: 2rem; color: var(--color-text-muted); grid-column: 1 / -1;">Select an album to view images</div>
+                        <div id="fb-albums-slave-pane" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                            <div id="fb-albums-album-header" style="padding: 1rem; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base);">
+                                <h3 id="fb-albums-album-title" style="margin: 0; color: var(--color-text); font-size: var(--text-heading);">Select an album</h3>
+                                <p id="fb-albums-album-description" style="margin: 0.5rem 0 0 0; color: var(--color-text-muted); font-size: var(--text-md);"></p>
+                            </div>
+                            <div id="fb-albums-images-container" style="flex: 1; overflow-y: auto; padding: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; align-content: start; min-height: 0;">
+                                <div style="text-align: center; padding: 2rem; color: var(--color-text-muted); grid-column: 1 / -1;">Select an album to view images</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Facebook Posts Modal -->
-        <div id="fb-posts-modal" class="modal">
-            <div class="modal-content" style="max-width: 1400px; width: 95vw; padding: 0; display: flex; flex-direction: column; height: 90vh;">
-                <div class="modal-header">
-                    <h2><i class="fas fa-newspaper"></i> Facebook Posts</h2>
-                    <button class="modal-close-btn" id="close-fb-posts-modal">&times;</button>
-                </div>
-                <div style="display: flex; flex: 1; overflow: hidden;">
-                    <!-- Master Pane (Left) - Resizable -->
-                    <div id="fb-posts-master-pane" style="width: 350px; min-width: 200px; max-width: 600px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background-color: var(--color-bg-base); position: relative;">
-                        <div style="padding: 1rem; border-bottom: 1px solid var(--color-border); box-sizing: border-box; display: flex; gap: 8px; align-items: center;">
-                            <input type="text" id="fb-posts-search" placeholder="Search posts..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-size: var(--text-md); box-sizing: border-box;">
-                            <button type="button" id="fb-posts-clear-btn" class="modal-btn modal-btn-secondary" style="flex-shrink: 0;">Clear</button>
+                <div id="fb-posts-pane" class="fb-dialog-pane" role="tabpanel" aria-labelledby="fb-dialog-tab-posts">
+                    <div class="fb-dialog-pane-body">
+                        <div id="fb-posts-master-pane" style="width: 350px; min-width: 200px; max-width: 600px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background-color: var(--color-bg-base); position: relative;">
+                            <div style="padding: 1rem; border-bottom: 1px solid var(--color-border); box-sizing: border-box; display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="fb-posts-search" placeholder="Search posts..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #bfc9da; font-size: var(--text-md); box-sizing: border-box;">
+                                <button type="button" id="fb-posts-clear-btn" class="modal-btn modal-btn-secondary" style="flex-shrink: 0;">Clear</button>
+                            </div>
+                            <div id="fb-posts-list" style="flex: 1; overflow-y: auto; padding: 0.5rem;">
+                                <div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">Loading posts...</div>
+                            </div>
+                            <div id="fb-posts-resize-handle" style="position: absolute; right: 0; top: 0; bottom: 0; width: 4px; cursor: col-resize; background-color: transparent; z-index: 5;"></div>
                         </div>
-                        <div id="fb-posts-list" style="flex: 1; overflow-y: auto; padding: 0.5rem;">
-                            <div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">Loading posts...</div>
-                        </div>
-                        <!-- Resize handle -->
-                        <div id="fb-posts-resize-handle" style="position: absolute; right: 0; top: 0; bottom: 0; width: 4px; cursor: col-resize; background-color: transparent; z-index: 5;"></div>
-                    </div>
-                    <!-- Slave Pane (Right) -->
-                    <div id="fb-posts-slave-pane" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                        <div id="fb-posts-post-header" style="padding: 1rem; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base);">
-                            <h3 id="fb-posts-post-date" style="margin: 0; color: var(--color-text); font-size: var(--text-heading);">Select a post</h3>
-                            <p id="fb-posts-post-text" style="margin: 0.5rem 0 0 0; color: var(--color-text); font-size: var(--text-lead); white-space: pre-wrap;"></p>
-                            <a id="fb-posts-post-link" href="#" target="_blank" rel="noopener noreferrer" style="display: none; margin-top: 0.5rem; font-size: var(--text-sm); color: var(--color-blue); word-break: break-all;"></a>
-                        </div>
-                        <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 1rem;">
-                            <div id="fb-posts-images-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; align-content: start;">
-                                <div style="text-align: center; padding: 2rem; color: var(--color-text-muted); grid-column: 1 / -1;">Select a post to view details</div>
+                        <div id="fb-posts-slave-pane" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                            <div id="fb-posts-post-header" style="padding: 1rem; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base);">
+                                <h3 id="fb-posts-post-date" style="margin: 0; color: var(--color-text); font-size: var(--text-heading);">Select a post</h3>
+                                <p id="fb-posts-post-text" style="margin: 0.5rem 0 0 0; color: var(--color-text); font-size: var(--text-lead); white-space: pre-wrap;"></p>
+                                <a id="fb-posts-post-link" href="#" target="_blank" rel="noopener noreferrer" style="display: none; margin-top: 0.5rem; font-size: var(--text-sm); color: var(--color-blue); word-break: break-all;"></a>
+                            </div>
+                            <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 1rem;">
+                                <div id="fb-posts-images-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; align-content: start;">
+                                    <div style="text-align: center; padding: 2rem; color: var(--color-text-muted); grid-column: 1 / -1;">Select a post to view details</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -4758,7 +4867,7 @@
 
                 <section class="getting-started-section">
                     <h2><i class="fas fa-cog"></i> Configuration</h2>
-                    <p>Use <strong>Configuration</strong> in the left sidebar to configure the app, import emails, Facebook, Instagram, or WhatsApp data, and manage interests under <strong>Subject Configuration</strong>.</p>
+                    <p>Use the cog in the top bar to configure the app and manage interests under <strong>Subject Configuration</strong>. Import emails, Facebook, Instagram, or WhatsApp data from <strong>Source Data</strong>.</p>
                 </section>
 
                 <p class="getting-started-footer">Select any topic in the Guide for step-by-step help.</p>
@@ -5002,7 +5111,7 @@
     <script src="/static/js/museum/foundation.js" defer></script>
     <script src="/static/js/museum/ai-models.js" defer></script>
     <script src="/static/js/museum/app-dialogs.js" defer></script>
-    <script src="/static/js/museum/chat.js" defer></script>
+    <script src="/static/js/museum/chat.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-core.js" defer></script>
     <script src="/static/js/museum/modals-media.js?v={{ static_modals_media_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/modals-suggestions.js" defer></script>
@@ -5036,6 +5145,11 @@
     <script src="/static/js/museum/upload-import.js" defer></script>
     <script src="/static/js/museum/modals-path-equivalences.js" defer></script>
     <script src="/static/js/museum/images-grid.js?v={{ static_images_grid_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/post-import-status.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/sidebar-sources.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/archive-backup.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/timeline.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/quick-search.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script>
     window.__uploadImportSelectedPath = '';
     window.startUploadImportFromSelected = function(evt) {

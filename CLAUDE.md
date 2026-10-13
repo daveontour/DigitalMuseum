@@ -611,6 +611,15 @@ Admin JSON/UI lives under `/admin/llm-usage/…`. Users can download their own P
 - Tool loop: up to `maxToolCallIterations` per request in all providers
 - **Provider selection:** `"auto"`, `"localai"`, or any `key` from the admin-managed AI Models table (default seed: `"claude"`, `"gemini"`, `"deepseek"`, `"openai"`) in request body
 - All AI tool SQL is scoped by `user_id` via `toolsUIDFilter(ctx, q, args)` in `internal/ai/tools.go`
+- **Answer sources ("Looked at: 3 emails · 12 messages"):** while a provider runs its tool loop,
+  `internal/ai/source_refs.go`'s `sourceCollector` scans each bundled-tool result for the records
+  the LLM was shown (keyed on tool name + documented result shape in `sourceExtractorsByTool`) and
+  returns them in the response metadata as `sources: [{kind, id, label, detail}]` (kinds:
+  `message`, `email`, `photo`, `facebook_post`, `facebook_album`; capped per kind; never `null`).
+  Namespaced tools from additional MCP servers are never matched. `chat.js`'s `_addSourceChips`
+  renders them under the answer; `Chat.openSource(kind, id)` opens a record in its existing
+  viewer and is reused by the Timeline and Quick Search. **When a new tool returns archive
+  records, add it to `sourceExtractorsByTool`.**
 
 ### Have-a-Chat (Two-Voice Conversations)
 
@@ -944,6 +953,52 @@ ever match against — are left alone, never deleted. This is what keeps
 `face_clusters.contact_id`/`media_item_faces.contact_id`/`relationships`/
 `subject_configuration.subject_contact_id` pointing at the same contact across reruns.
 
+### Post-Import Processing ("Getting your archive ready")
+
+`internal/handler/post_import_pipeline.go`. Every import calls `startPostImportProcessing(uid, kinds)`
+right after its existing `runThumbnailsAfterImportIfIdle(pool)` — **add both calls to any new
+importer**. It queues a one-shot pass that runs, one at a time: contact refresh (message/email
+imports), thumbnails, message/email embeddings, photo-tag embeddings, face detection → clustering →
+suggestions. Background-job steps go through the same `JobRunner.Start` the scheduler and "Run now"
+use (and mark the `background_jobs` row running/tracked when one exists); a step that can't start
+(e.g. embedding server down) is recorded as skipped and the pass continues; a step already running
+is waited for. Paid "Tag photos automatically" (RunPod) is never started here. Imports that finish
+while a pass runs are merged into one follow-up pass. Per-archive opt-out: app_configuration
+`post_import_processing_enabled_v1` (default on; checkbox at the top of Source Data → Data Import).
+UI: `static/js/museum/post-import-status.js` (top-bar progress pill + step dialog), routes
+`GET /api/post-import/status`, `POST /api/post-import/cancel` (owner).
+
+### Archive Backup
+
+`internal/service/archive_backup_service.go` + `internal/handler/backup_handler.go`. Account →
+**Back Up Archive…** (and a top-bar reminder when there's data and no backup in 30 days, snoozable)
+writes a consistent copy of the main archive file with `VACUUM INTO` on a **separate** connection
+(never the app's single main connection), to `<dest>.partial-*`, runs `PRAGMA quick_check`, then
+renames into place — a failed backup never replaces an older file. Records
+`last_backup_at_v1`/`last_backup_path_v1` (and `backup_reminder_snoozed_until_v1`) in
+app_configuration. `POST /api/backup {path}` is owner-only and only allowed for
+`DEPLOYMENT_NATURE=local` from localhost; the path comes from Electron's `showSaveDialog`. Photos
+imported in "link to images on disk" mode and the billing DB are not included. UI:
+`static/js/museum/archive-backup.js`.
+
+### Timeline & Quick Search
+
+`internal/repository/timeline_repo.go` + `internal/handler/timeline_handler.go`:
+`GET /api/timeline` (per-month counts), `GET /api/timeline/{year}/{month}` (conversations grouped
+per day, emails, photos, Facebook posts — each capped, with full totals), `GET /api/quick-search?q=`
+(substring search, a few newest hits per kind; LIKE wildcards in the query are escaped). Dates are
+read with `substr(col, 1, 7|10)` on the stored TEXT timestamps (not `strftime`, which would shift
+timezone-suffixed values into UTC). Messages/emails are omitted for visitor keys without those
+permissions (`hidden` in the response). UI: `static/js/museum/timeline.js` (sidebar **Timeline**)
+and `static/js/museum/quick-search.js` (top-bar **Search**, Ctrl+K / ⌘K).
+
+### Sidebar
+
+Left sidebar = **Explore** group (+ Identity Profile / Source Data / Configuration at the bottom);
+right sidebar = **Ask & Play** and **People & Records** groups. `static/js/museum/sidebar-sources.js`
+hides Explore buttons for sources with no data yet (counts from `GET /api/import-modal-stats`; shows
+everything if that fails) and refreshes on Source Data close / post-import completion.
+
 ### Gmail Import
 
 Gmail OAuth uses a Desktop App client configured in Google Cloud Console:
@@ -1092,6 +1147,11 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Suggestions (DB + seed JSON) | `static/data/suggestions.json`, `internal/service/suggestions_service.go`, `static/js/museum/modals-suggestions-config.js` |
 | Guide system (DB + seed JSON) | `static/data/guide_topics.json`, `internal/service/guide_topics_service.go`, `static/js/museum/guide.js`, `static/js/museum/modals-guide-topics-config.js` |
 | Frontend MCP Servers config UI | `static/js/museum/modals-mcp-servers-config.js` |
+| Chat answer sources (tool-result → record refs) | `internal/ai/source_refs.go`, `static/js/museum/chat.js` (`_addSourceChips`, `Chat.openSource`) |
+| Post-import processing pipeline | `internal/handler/post_import_pipeline.go`, `static/js/museum/post-import-status.js` |
+| Archive backup | `internal/service/archive_backup_service.go`, `internal/handler/backup_handler.go`, `static/js/museum/archive-backup.js` |
+| Timeline & quick search | `internal/repository/timeline_repo.go`, `internal/handler/timeline_handler.go`, `static/js/museum/timeline.js`, `static/js/museum/quick-search.js` |
+| Sidebar empty-source hiding | `static/js/museum/sidebar-sources.js` |
 | Frontend AI Tool Access / Tool Test UI | `static/js/museum/modals-settings.js` (`Modals.LLMToolsAccess`), `static/js/museum/modals-tool-test.js` |
 
 ## Security Notes

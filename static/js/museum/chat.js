@@ -105,6 +105,160 @@ const Chat = (() => {
         }
     }
 
+    // --- Sources consulted (embeddedJson.sources, built server-side in internal/ai/source_refs.go) ---
+
+    const SOURCE_KINDS = {
+        message:        { icon: 'fa-comment-dots', one: 'message',        many: 'messages',        gate: 'messages_chat' },
+        email:          { icon: 'fa-envelope',     one: 'email',          many: 'emails',          gate: 'emails' },
+        photo:          { icon: 'fa-image',        one: 'photo',          many: 'photos',          gate: null },
+        facebook_post:  { icon: 'fa-newspaper',    one: 'Facebook post',  many: 'Facebook posts',  gate: null },
+        facebook_album: { icon: 'fa-images',       one: 'Facebook album', many: 'Facebook albums', gate: null },
+    };
+
+    function _sourceKindAllowed(kind) {
+        const meta = SOURCE_KINDS[kind];
+        const va = window.__visitorAccess;
+        if (!meta || !meta.gate || !va || !va.restricted) return true;
+        if (meta.gate === 'messages_chat') return !!va.can_messages_chat;
+        if (meta.gate === 'emails') return !!va.can_emails;
+        return true;
+    }
+
+    async function _openSource(kind, id) {
+        try {
+            if (kind === 'email' && Modals.EmailGallery) {
+                await Modals.EmailGallery.openAndSelectEmail(id);
+            } else if (kind === 'message' && Modals.SMSMessages) {
+                await Modals.SMSMessages.openAndSelectConversation(id);
+            } else if (kind === 'photo' && Modals.ImageDetailModal) {
+                const resp = await fetch(`/images/${encodeURIComponent(id)}/metadata`, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                Modals.ImageDetailModal.open(await resp.json());
+            } else if (kind === 'facebook_post' && Modals.FBPosts) {
+                await Modals.FBPosts.openAndFilterOnPosts([id]);
+            } else if (kind === 'facebook_album' && Modals.FBAlbums) {
+                await Modals.FBAlbums.openAndSelectAlbum(id);
+            }
+        } catch (err) {
+            console.error('Unable to open source', kind, id, err);
+            if (typeof AppDialogs !== 'undefined' && AppDialogs.showAppAlert) {
+                await AppDialogs.showAppAlert('Unable to open', 'That item could not be opened. It may have been deleted.');
+            }
+        }
+    }
+
+    function _validSources(embeddedJson) {
+        const raw = embeddedJson && Array.isArray(embeddedJson.sources) ? embeddedJson.sources : [];
+        return raw.filter(s => s && typeof s === 'object' && SOURCE_KINDS[s.kind] && s.id != null);
+    }
+
+    function _addSourceChips(messageElement, role, embeddedJson) {
+        if (role !== 'assistant') return;
+        const sources = _validSources(embeddedJson);
+        if (sources.length === 0) return;
+
+        const groups = new Map();
+        sources.forEach(s => {
+            if (!groups.has(s.kind)) groups.set(s.kind, []);
+            groups.get(s.kind).push(s);
+        });
+
+        const wrap = document.createElement('div');
+        wrap.className = 'chat-sources';
+
+        const bar = document.createElement('div');
+        bar.className = 'chat-sources-bar';
+        const lead = document.createElement('span');
+        lead.className = 'chat-sources-lead';
+        lead.textContent = 'Looked at:';
+        bar.appendChild(lead);
+        wrap.appendChild(bar);
+
+        const list = document.createElement('ul');
+        list.className = 'chat-sources-list';
+        list.hidden = true;
+        wrap.appendChild(list);
+
+        let openKind = null;
+        const chipButtons = [];
+
+        function renderList(kind) {
+            list.innerHTML = '';
+            const items = groups.get(kind) || [];
+            const allowed = _sourceKindAllowed(kind);
+            items.forEach(s => {
+                const li = document.createElement('li');
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'chat-source-item';
+                btn.id = `chat-source-item-${kind}-${s.id}-${Math.random().toString(36).slice(2, 8)}`;
+                if (kind === 'photo') {
+                    const img = document.createElement('img');
+                    img.className = 'chat-source-thumb';
+                    img.loading = 'lazy';
+                    img.alt = '';
+                    img.src = `/images/${encodeURIComponent(s.id)}?type=metadata&preview=true`;
+                    img.onerror = function () { this.remove(); };
+                    btn.appendChild(img);
+                } else {
+                    const icon = document.createElement('i');
+                    icon.className = `fas ${SOURCE_KINDS[kind].icon} chat-source-item-icon`;
+                    icon.setAttribute('aria-hidden', 'true');
+                    btn.appendChild(icon);
+                }
+                const text = document.createElement('span');
+                text.className = 'chat-source-item-text';
+                const label = document.createElement('span');
+                label.className = 'chat-source-item-label';
+                label.textContent = s.label || SOURCE_KINDS[kind].one;
+                text.appendChild(label);
+                if (s.detail) {
+                    const detail = document.createElement('span');
+                    detail.className = 'chat-source-item-detail';
+                    detail.textContent = s.detail;
+                    text.appendChild(detail);
+                }
+                btn.appendChild(text);
+                if (allowed) {
+                    btn.title = `Open this ${SOURCE_KINDS[kind].one}`;
+                    btn.addEventListener('click', () => { void _openSource(kind, s.id); });
+                } else {
+                    btn.disabled = true;
+                    btn.title = 'Not available for your visitor key.';
+                }
+                li.appendChild(btn);
+                list.appendChild(li);
+            });
+        }
+
+        groups.forEach((items, kind) => {
+            const meta = SOURCE_KINDS[kind];
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'chat-source-chip';
+            chip.id = `chat-source-chip-${kind}-${Math.random().toString(36).slice(2, 8)}`;
+            chip.setAttribute('aria-expanded', 'false');
+            chip.title = `Show the ${items.length === 1 ? meta.one : meta.many} the AI looked at`;
+            chip.innerHTML = `<i class="fas ${meta.icon}" aria-hidden="true"></i> `;
+            chip.appendChild(document.createTextNode(`${items.length} ${items.length === 1 ? meta.one : meta.many}`));
+            chip.addEventListener('click', () => {
+                const opening = openKind !== kind;
+                openKind = opening ? kind : null;
+                chipButtons.forEach(b => {
+                    const on = opening && b === chip;
+                    b.classList.toggle('chat-source-chip--active', on);
+                    b.setAttribute('aria-expanded', on ? 'true' : 'false');
+                });
+                if (opening) renderList(kind);
+                list.hidden = !opening;
+            });
+            chipButtons.push(chip);
+            bar.appendChild(chip);
+        });
+
+        messageElement.appendChild(wrap);
+    }
+
     function _imageSwitcher(images, uri){
 
         if (images.length > 1) {
@@ -440,6 +594,7 @@ const Chat = (() => {
         messageElement.appendChild(contentElement);
 
         _addImagePreviews(messageElement, embeddedJson);
+        _addSourceChips(messageElement, role, embeddedJson);
         _addResponseActionButtons(messageElement, role, embeddedJson);  //Add the buttons for the actions that the AI wants to perform
         _applyShowImagesFromEmbedded(embeddedJson);
         _applyMessageInStarsFromEmbedded(embeddedJson);
@@ -782,7 +937,7 @@ const Chat = (() => {
         });
     }
 
-    return { addMessage, clearChat, addConversation, renderExistingMessages, renderMarkdown, addEmail, updateMoodInMessages };
+    return { addMessage, clearChat, addConversation, renderExistingMessages, renderMarkdown, addEmail, updateMoodInMessages, openSource: _openSource };
 })();
 
 // --- API Service Module ---
