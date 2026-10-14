@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -370,4 +371,121 @@ func (s *ArchiveBackupService) ArchiveHasData(ctx context.Context) bool {
 		}
 	}
 	return false
+}
+
+// ── Restore ──────────────────────────────────────────────────────────────────
+//
+// Restoring swaps the archive file itself, which can't happen while this server (and the MCP
+// tools server) have it open, so the swap is done by the desktop shell (electron/main.js,
+// "restore-archive"): it stops both servers, moves the current archive aside as a safety copy,
+// copies the backup into place and restarts. The server's part is InspectRestoreCandidate —
+// checking, before anything is stopped, that the chosen file really is a healthy archive.
+
+// RestoreCandidate describes a backup file the owner has picked to restore.
+type RestoreCandidate struct {
+	Path        string    `json:"path"`
+	SizeBytes   int64     `json:"size_bytes"`
+	ModifiedAt  time.Time `json:"modified_at"`
+	ArchivePath string    `json:"archive_path"`
+	Messages    int64     `json:"messages"`
+	Emails      int64     `json:"emails"`
+	Photos      int64     `json:"photos"`
+}
+
+// sqliteFileHeader is the first 16 bytes of every SQLite 3 database file.
+const sqliteFileHeader = "SQLite format 3\x00"
+
+// requiredArchiveTables must all exist for a file to be treated as a Digital Museum archive.
+var requiredArchiveTables = []string{"users", "app_configuration", "messages", "emails", "media_items"}
+
+// InspectRestoreCandidate checks that path is a readable, intact Digital Museum archive that is
+// not the archive currently open, and summarises what it contains. It opens the file read-only.
+func (s *ArchiveBackupService) InspectRestoreCandidate(ctx context.Context, path string) (*RestoreCandidate, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, errors.New("choose a backup file to restore")
+	}
+	if !filepath.IsAbs(path) {
+		return nil, errors.New("the backup location must be a full path")
+	}
+	path = filepath.Clean(path)
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("can't open that file: %w", err)
+	}
+	if fi.IsDir() {
+		return nil, errors.New("that's a folder — choose the backup file inside it")
+	}
+	src, err := s.SourcePath(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if samePath(src, path) || samePath(src+"-wal", path) || samePath(src+"-shm", path) || samePath(src+"-journal", path) {
+		return nil, errors.New("that's the archive you have open now — choose a backup file instead")
+	}
+	if err := checkSQLiteHeader(path); err != nil {
+		return nil, err
+	}
+	// A copy taken from a running archive can have unsaved changes in a "-wal" file beside it;
+	// only the main file is restored, so those changes would be lost. App-made backups never
+	// have one.
+	if wfi, err := os.Stat(path + "-wal"); err == nil && wfi.Size() > 0 {
+		return nil, errors.New("that file has unsaved changes in a \"-wal\" file next to it (it was copied while Digital Museum was running) — choose a backup made with Back Up Archive")
+	}
+
+	db, err := sql.Open("sqlite3", "file:"+filepath.ToSlash(path)+"?mode=ro&_busy_timeout=5000")
+	if err != nil {
+		return nil, fmt.Errorf("open backup: %w", err)
+	}
+	defer func() { _ = db.Close() }()
+	db.SetMaxOpenConns(1)
+
+	var check string
+	if err := db.QueryRowContext(ctx, `PRAGMA quick_check`).Scan(&check); err != nil {
+		return nil, fmt.Errorf("couldn't read the backup: %w", err)
+	}
+	if check != backupQuickCheckOK {
+		return nil, fmt.Errorf("the backup file is damaged (integrity check: %s)", check)
+	}
+	for _, table := range requiredArchiveTables {
+		var n int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&n); err != nil {
+			return nil, fmt.Errorf("couldn't read the backup: %w", err)
+		}
+		if n == 0 {
+			return nil, errors.New("that file isn't a Digital Museum archive")
+		}
+	}
+
+	out := &RestoreCandidate{
+		Path:        path,
+		SizeBytes:   fi.Size(),
+		ModifiedAt:  fi.ModTime().UTC(),
+		ArchivePath: src,
+	}
+	// Whole-file counts (not user-scoped): the restore replaces the whole file.
+	for table, dst := range map[string]*int64{"messages": &out.Messages, "emails": &out.Emails, "media_items": &out.Photos} {
+		_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+table).Scan(dst)
+	}
+	return out, nil
+}
+
+// Busy reports whether a backup is currently being written.
+func (s *ArchiveBackupService) Busy() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.running
+}
+
+func checkSQLiteHeader(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("can't open that file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	buf := make([]byte, len(sqliteFileHeader))
+	if _, err := io.ReadFull(f, buf); err != nil || string(buf) != sqliteFileHeader {
+		return errors.New("that file isn't a Digital Museum archive")
+	}
+	return nil
 }

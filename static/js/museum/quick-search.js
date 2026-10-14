@@ -5,7 +5,9 @@
  * messages, emails, photo titles/descriptions/tags and Facebook posts, newest first.
  * Data: GET /api/quick-search?q= (internal/handler/timeline_handler.go).
  *
- * Results open in their existing viewers via Chat.openSource (chat.js).
+ * Results open in their existing viewers via Chat.openSource (chat.js). The last row always offers
+ * "Search by meaning" — the embedding search behind the sidebar's Search by Meaning button
+ * (#message-similarity-modal in app.js), pre-filled and run with the same words.
  * Loaded after app.js, so it self-initialises at the bottom of the file.
  */
 const QuickSearch = (() => {
@@ -17,6 +19,7 @@ const QuickSearch = (() => {
         facebook_post: { icon: 'fa-newspaper',    label: 'Facebook posts' },
     };
     const ORDER = ['message', 'email', 'photo', 'facebook_post'];
+    const MEANING = '__meaning';
 
     let debounceTimer = null;
     let controller = null;
@@ -87,7 +90,7 @@ const QuickSearch = (() => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             if (el('quick-search-input').value.trim() !== q) return; // stale
-            render(Array.isArray(data.hits) ? data.hits : [], data.hidden || []);
+            render(Array.isArray(data.hits) ? data.hits : [], data.hidden || [], q);
         } catch (err) {
             if (err && err.name === 'AbortError') return;
             renderHint(`Search failed: ${err.message}`);
@@ -96,13 +99,18 @@ const QuickSearch = (() => {
         }
     }
 
-    function render(list, hidden) {
+    function render(list, hidden, q) {
         const box = el('quick-search-results');
         box.innerHTML = '';
         hits = [];
         active = -1;
         if (list.length === 0) {
-            renderHint('No matches. Try a different word, or ask the AI in the chat — it can search by meaning.');
+            const p = document.createElement('p');
+            p.className = 'quick-search-hint';
+            p.textContent = 'No exact matches. Try a different word, or search by meaning to find things that are about the same topic.';
+            box.appendChild(p);
+            appendMeaningRow(box, q);
+            setActive(0);
             return;
         }
         ORDER.forEach(kind => {
@@ -165,7 +173,47 @@ const QuickSearch = (() => {
             p.textContent = `Your visitor key doesn't include ${hidden.join(' or ')}, so they weren't searched.`;
             box.appendChild(p);
         }
+        appendMeaningRow(box, q);
         setActive(0);
+    }
+
+    function appendMeaningRow(box, q) {
+        if (!q || !document.getElementById('message-similarity-sidebar-btn')) return;
+        const idx = hits.length;
+        hits.push({ kind: MEANING, query: q });
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'quick-search-hit quick-search-hit--meaning';
+        btn.id = `quick-search-hit-${idx}`;
+        btn.setAttribute('role', 'option');
+        btn.setAttribute('aria-selected', 'false');
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-wand-magic-sparkles quick-search-hit-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        btn.appendChild(icon);
+        const text = document.createElement('span');
+        text.className = 'quick-search-hit-text';
+        const title = document.createElement('span');
+        title.className = 'quick-search-hit-title';
+        title.textContent = `Search by meaning for “${q}”`;
+        const sn = document.createElement('span');
+        sn.className = 'quick-search-hit-snippet';
+        sn.textContent = 'Finds things about the same topic, even when they use different words';
+        text.appendChild(title);
+        text.appendChild(sn);
+        btn.appendChild(text);
+        btn.addEventListener('mousemove', () => setActive(idx));
+        btn.addEventListener('click', () => choose(idx));
+        box.appendChild(btn);
+    }
+
+    function openMeaningSearch(q) {
+        const sidebarBtn = document.getElementById('message-similarity-sidebar-btn');
+        if (!sidebarBtn) return;
+        sidebarBtn.click();
+        const text = document.getElementById('message-similarity-text');
+        if (text) text.value = q;
+        document.getElementById('message-similarity-run-btn')?.click();
     }
 
     function setActive(idx) {
@@ -189,6 +237,10 @@ const QuickSearch = (() => {
         const h = hits[idx];
         if (!h) return;
         close();
+        if (h.kind === MEANING) {
+            openMeaningSearch(h.query);
+            return;
+        }
         if (typeof Chat !== 'undefined' && typeof Chat.openSource === 'function') {
             void Chat.openSource(h.kind, h.id);
         }

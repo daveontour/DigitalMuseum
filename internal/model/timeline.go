@@ -51,7 +51,9 @@ type TimelineMonthDetail struct {
 	Posts         []TimelinePost            `json:"posts"`
 	Totals        TimelineMonth             `json:"totals"`
 	Limits        map[string]int            `json:"limits"`
-	Hidden        []string                  `json:"hidden"` // sources not available to this session
+	Hidden        []string                  `json:"hidden"`   // sources not available to this session
+	Filtered      bool                      `json:"filtered"` // a person/keyword/tag filter was applied
+	Excluded      []string                  `json:"excluded"` // sources the filter leaves out (e.g. a tag filter → photos only)
 }
 
 // QuickSearchHit is one quick-search result.

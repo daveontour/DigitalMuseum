@@ -416,6 +416,10 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	backupHandler := handler.NewBackupHandler(backupSvc, sessionMasterStore, sensitiveSvc, authSvc, cfg.App.DeploymentNature)
 	backupHandler.RegisterRoutes(r)
 
+	// ── System status + setup checklist (owner diagnostics / first-run steps) ──
+	systemStatusHandler := handler.NewSystemStatusHandler(pool, configRepo, userRepo, chatSvc, privateStoreSvc, backupSvc, authSvc, cfg.App.DeploymentNature)
+	systemStatusHandler.RegisterRoutes(r)
+
 	// ── Timeline + quick search (cross-source, date-ordered views) ────────────
 	timelineHandler := handler.NewTimelineHandler(repository.NewTimelineRepo(pool))
 	timelineHandler.RegisterRoutes(r)

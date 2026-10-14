@@ -1,5 +1,14 @@
 'use strict';
 
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function showFacebookDialogTab(tab) {
     const showAlbums = tab !== 'posts';
     const albumsPane = document.getElementById('fb-albums-pane');
@@ -15,6 +24,32 @@ function showFacebookDialogTab(tab) {
     if (postsBtn) {
         postsBtn.classList.toggle('fb-dialog-tab--active', !showAlbums);
         postsBtn.setAttribute('aria-selected', showAlbums ? 'false' : 'true');
+    }
+}
+
+function closeFacebookDialog() {
+    const modal = document.getElementById('fb-modal');
+    if (modal) modal.style.display = 'none';
+    if (Modals.FBAlbums && typeof Modals.FBAlbums.resetAfterClose === 'function') {
+        Modals.FBAlbums.resetAfterClose();
+    }
+    if (Modals.FBPosts && typeof Modals.FBPosts.resetAfterClose === 'function') {
+        Modals.FBPosts.resetAfterClose();
+    }
+}
+
+function initFacebookDialogChrome() {
+    const modal = document.getElementById('fb-modal');
+    const closeBtn = document.getElementById('close-fb-modal');
+    if (closeBtn && !closeBtn.dataset.fbDialogWired) {
+        closeBtn.dataset.fbDialogWired = '1';
+        closeBtn.addEventListener('click', closeFacebookDialog);
+    }
+    if (modal && !modal.dataset.fbDialogWired) {
+        modal.dataset.fbDialogWired = '1';
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeFacebookDialog();
+        });
     }
 }
 
@@ -46,7 +81,7 @@ Modals.FBAlbums = (() => {
         }
 
         async function loadAlbums() {
-            if (!DOM.fbAlbumsList) return;
+            if (!DOM.fbAlbumsList) return false;
             
             DOM.fbAlbumsList.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666;">Loading albums...</div>';
             
@@ -55,12 +90,18 @@ Modals.FBAlbums = (() => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                albums = await response.json();
+                const data = await response.json();
+                if (!Array.isArray(data)) {
+                    throw new Error('Unexpected albums response');
+                }
+                albums = data;
                 filteredAlbums = albums;
                 renderAlbums();
+                return true;
             } catch (error) {
                 console.error("Failed to load FB albums:", error);
-                DOM.fbAlbumsList.innerHTML = '<div style="text-align: center; padding: 2rem; color: #dc3545;">Failed to load albums: ' + error.message + '</div>';
+                DOM.fbAlbumsList.innerHTML = '<div style="text-align: center; padding: 2rem; color: #dc3545;">Failed to load albums: ' + escapeHtml(error.message) + '</div>';
+                return false;
             }
         }
 
@@ -241,9 +282,13 @@ Modals.FBAlbums = (() => {
             showFacebookDialogTab('albums');
             Modals._openModal(DOM.fbAlbumsModal);
             if (loaded) return;
-            loaded = true;
             selectedAlbumId = null;
-            await loadAlbums();
+            const ok = await loadAlbums();
+            if (!ok) {
+                loaded = false;
+                return;
+            }
+            loaded = true;
 
             if (filteredAlbums.length > 0) {
                 await selectAlbum(filteredAlbums[0].id);
@@ -260,26 +305,19 @@ Modals.FBAlbums = (() => {
             }
         }
 
-        async function openAndSelectAlbum(albumId) {
-            // Open the Facebook Albums modal
-            Modals._openModal(DOM.fbAlbumsModal);
-            await loadAlbums();
-            await selectAlbum(albumId);
-            
 
+
+        function resetAfterClose() {
+            loaded = false;
+            if (DOM.fbAlbumsSearch) DOM.fbAlbumsSearch.value = '';
         }
 
-
         function close() {
-            loaded = false;
-            Modals._closeModal(DOM.fbAlbumsModal);
+            closeFacebookDialog();
         }
 
         function init() {
-            if (DOM.closeFBAlbumsModalBtn && !DOM.closeFBAlbumsModalBtn.dataset.fbAlbumsWired) {
-                DOM.closeFBAlbumsModalBtn.dataset.fbAlbumsWired = '1';
-                DOM.closeFBAlbumsModalBtn.addEventListener('click', close);
-            }
+            initFacebookDialogChrome();
             const albumsTab = document.getElementById('fb-dialog-tab-albums');
             const postsTab = document.getElementById('fb-dialog-tab-posts');
             if (albumsTab && !albumsTab.dataset.wired) {
@@ -290,11 +328,6 @@ Modals.FBAlbums = (() => {
                 postsTab.dataset.wired = '1';
                 postsTab.addEventListener('click', () => {
                     if (Modals.FBPosts && Modals.FBPosts.open) void Modals.FBPosts.open();
-                });
-            }
-            if (DOM.fbAlbumsModal) {
-                DOM.fbAlbumsModal.addEventListener('click', (e) => {
-                    if (e.target === DOM.fbAlbumsModal) close();
                 });
             }
             if (DOM.fbAlbumsSearch) {
@@ -310,11 +343,15 @@ Modals.FBAlbums = (() => {
         async function openAndSelectAlbum(albumId) {
             showFacebookDialogTab('albums');
             Modals._openModal(DOM.fbAlbumsModal);
-            loaded = true;
 
             // Load albums and wait for them to load
             try {
-                await loadAlbums();
+                const ok = await loadAlbums();
+                if (!ok) {
+                    loaded = false;
+                    return;
+                }
+                loaded = true;
                 
                 // Find album by ID (handle both string and number comparisons)
                 const albumIdNum = typeof albumId === 'string' ? parseInt(albumId) : albumId;
@@ -341,6 +378,7 @@ Modals.FBAlbums = (() => {
                     }
                 }
             } catch (error) {
+                loaded = false;
                 console.error('Error loading albums:', error);
             }
         }
@@ -350,7 +388,8 @@ Modals.FBAlbums = (() => {
             close,
             init,
             startResize,
-            openAndSelectAlbum
+            openAndSelectAlbum,
+            resetAfterClose
         };
 })();
 
@@ -363,6 +402,7 @@ Modals.FBPosts = (() => {
     let resizeStartX = 0;
     let resizeStartWidth = 0;
     let loaded = false;
+    let fullList = false;
 
     function formatDate(isoStr) {
         if (!isoStr) return '';
@@ -383,22 +423,27 @@ Modals.FBPosts = (() => {
 
     async function loadPosts(search = '', postIds = null) {
         const container = DOM.fbPostsList;
-        if (!container) return;
+        if (!container) return false;
         container.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">Loading...</div>';
         try {
             let url = `/facebook/posts?page=1&page_size=200`;
             if (search) url += '&search=' + encodeURIComponent(search);
             if (postIds && postIds.length > 0) url += '&post_ids=' + postIds.join(',');
             const resp = await fetch(url);
+            if (!resp.ok) {
+                throw new Error(resp.statusText || 'Failed to load posts');
+            }
             const data = await resp.json();
-            posts = data.posts || [];
+            posts = Array.isArray(data.posts) ? data.posts : [];
             filteredPosts = posts;
             renderPosts(filteredPosts);
             if (filteredPosts.length > 0 && !selectedPostId) {
                 selectPost(filteredPosts[0].id);
             }
+            return true;
         } catch (err) {
-            container.innerHTML = `<div style="color:#dc3545;padding:1rem;">Error loading posts: ${err.message}</div>`;
+            container.innerHTML = `<div style="color:#dc3545;padding:1rem;">Error loading posts: ${escapeHtml(err.message)}</div>`;
+            return false;
         }
     }
 
@@ -410,11 +455,12 @@ Modals.FBPosts = (() => {
             return;
         }
         container.innerHTML = list.map(p => {
-            const preview = (p.post_text || p.title || '(no text)').substring(0, 80) + ((p.post_text || '').length > 80 ? '…' : '');
+            const raw = p.post_text || p.title || '(no text)';
+            const preview = escapeHtml(raw.substring(0, 80)) + (raw.length > 80 ? '…' : '');
             const icon = postTypeIcon(p);
             const isSelected = p.id === selectedPostId;
-            return `<div class="fb-post-list-item${isSelected ? ' selected' : ''}" data-post-id="${p.id}">
-                <div class="fb-post-list-item-date">${formatDate(p.timestamp)}${icon}</div>
+            return `<div class="fb-post-list-item${isSelected ? ' selected' : ''}" data-post-id="${Number(p.id)}">
+                <div class="fb-post-list-item-date">${escapeHtml(formatDate(p.timestamp))}${icon}</div>
                 <div class="fb-post-list-item-preview">${preview}</div>
             </div>`;
         }).join('');
@@ -463,7 +509,7 @@ Modals.FBPosts = (() => {
             // Error responses use { detail: "..." }; (body || []) is still an object, so .map would throw.
             if (!resp.ok) {
                 const msg = (body && typeof body.detail === 'string' && body.detail) || resp.statusText || 'Failed to load media';
-                imgContainer.innerHTML = `<div style="color:#dc3545;padding:1rem;grid-column:1/-1;">${msg.replace(/</g, '&lt;')}</div>`;
+                imgContainer.innerHTML = `<div style="color:#dc3545;padding:1rem;grid-column:1/-1;">${escapeHtml(msg)}</div>`;
                 return;
             }
             const mediaItems = Array.isArray(body) ? body : [];
@@ -471,15 +517,27 @@ Modals.FBPosts = (() => {
                 imgContainer.innerHTML = '<div style="text-align:center;padding:2rem;color:#888;grid-column:1/-1;">No media found</div>';
                 return;
             }
-            imgContainer.innerHTML = mediaItems.map(mi => `
-                <div style="position:relative;overflow:hidden;border-radius:8px;background:#eee;aspect-ratio:1;cursor:pointer;" onclick="Modals.SingleImageDisplay && Modals.SingleImageDisplay.showSingleImageModal('${(mi.title||'').replace(/'/g,"\\'")}','/facebook/posts/media/${mi.id}',0,0,0)">
-                    <img src="/facebook/posts/media/${mi.id}" loading="lazy" alt="${mi.title || ''}"
+            imgContainer.innerHTML = mediaItems.map(mi => {
+                const mediaId = Number(mi.id);
+                const title = escapeHtml(mi.title || '');
+                return `<div class="fb-post-media-card" data-media-id="${mediaId}" data-title="${title}" style="position:relative;overflow:hidden;border-radius:8px;background:#eee;aspect-ratio:1;cursor:pointer;">
+                    <img src="/facebook/posts/media/${mediaId}" loading="lazy" alt="${title}"
                         style="width:100%;height:100%;object-fit:cover;transition:transform 0.2s;"
                         onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
-                    ${mi.title ? `<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.6));color:#fff;font-size:0.75em;padding:0.4rem 0.5rem;">${mi.title}</div>` : ''}
-                </div>`).join('');
+                    ${mi.title ? `<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.6));color:#fff;font-size:0.75em;padding:0.4rem 0.5rem;">${title}</div>` : ''}
+                </div>`;
+            }).join('');
+            imgContainer.querySelectorAll('.fb-post-media-card').forEach(el => {
+                el.addEventListener('click', () => {
+                    const title = el.getAttribute('data-title') || '';
+                    const id = el.getAttribute('data-media-id');
+                    if (Modals.SingleImageDisplay && Modals.SingleImageDisplay.showSingleImageModal) {
+                        Modals.SingleImageDisplay.showSingleImageModal(title, '/facebook/posts/media/' + id, 0, 0, 0);
+                    }
+                });
+            });
         } catch (err) {
-            imgContainer.innerHTML = `<div style="color:#dc3545;padding:1rem;grid-column:1/-1;">Error loading media: ${err.message}</div>`;
+            imgContainer.innerHTML = `<div style="color:#dc3545;padding:1rem;grid-column:1/-1;">Error loading media: ${escapeHtml(err.message)}</div>`;
         }
     }
 
@@ -511,55 +569,52 @@ Modals.FBPosts = (() => {
         document.removeEventListener('mouseup', stopResize);
     }
 
+    async function loadFullPostList() {
+        if (DOM.fbPostsSearch) DOM.fbPostsSearch.value = '';
+        selectedPostId = null;
+        const ok = await loadPosts();
+        loaded = !!ok;
+        fullList = !!ok;
+    }
+
     function open() {
         showFacebookDialogTab('posts');
         if (!DOM.fbPostsModal) return;
         DOM.fbPostsModal.style.display = 'flex';
-        if (loaded) return;
-        loaded = true;
-        loadPosts();
+        if (loaded && fullList) return;
+        void loadFullPostList();
     }
     async function openAndFilterOnPosts(postIds) {
         if (!DOM.fbPostsModal || !postIds || postIds.length === 0) return;
         const ids = Array.isArray(postIds)
             ? postIds.map(id => Number(id))
             : String(postIds).split(',').map(id => parseInt(id, 10));
-        if (ids.length === 0) return;
+        if (ids.length === 0 || ids.some(id => !Number.isFinite(id))) return;
         showFacebookDialogTab('posts');
         DOM.fbPostsModal.style.display = 'flex';
-        loaded = true;
         selectedPostId = null;
-        await loadPosts('', ids);
-        if (filteredPosts.length > 0) {
-            selectPost(filteredPosts[0].id);
-        }
+        const ok = await loadPosts('', ids);
+        loaded = !!ok;
+        fullList = false;
+    }
+
+    function resetAfterClose() {
+        loaded = false;
+        fullList = false;
+        if (DOM.fbPostsSearch) DOM.fbPostsSearch.value = '';
     }
 
     function close() {
-        loaded = false;
-        if (DOM.fbPostsModal) DOM.fbPostsModal.style.display = 'none';
+        closeFacebookDialog();
     }
 
     function init() {
-        if (DOM.closeFBPostsModalBtn && !DOM.closeFBPostsModalBtn.dataset.fbPostsWired) {
-            DOM.closeFBPostsModalBtn.dataset.fbPostsWired = '1';
-            DOM.closeFBPostsModalBtn.addEventListener('click', close);
-        }
-        if (DOM.fbPostsModal && !DOM.fbPostsModal.dataset.fbPostsOverlayWired) {
-            DOM.fbPostsModal.dataset.fbPostsOverlayWired = '1';
-            DOM.fbPostsModal.addEventListener('click', e => { if (e.target === DOM.fbPostsModal) close(); });
-        }
         if (DOM.fbPostsSearch) DOM.fbPostsSearch.addEventListener('input', e => searchPosts(e.target.value));
-        if (DOM.fbPostsClearBtn) DOM.fbPostsClearBtn.addEventListener('click', async () => {
-            if (DOM.fbPostsSearch) DOM.fbPostsSearch.value = '';
-            selectedPostId = null;
-            await loadPosts();
-            if (filteredPosts.length > 0) selectPost(filteredPosts[0].id);
-        });
+        if (DOM.fbPostsClearBtn) DOM.fbPostsClearBtn.addEventListener('click', () => { void loadFullPostList(); });
         if (DOM.fbPostsResizeHandle) DOM.fbPostsResizeHandle.addEventListener('mousedown', startResize);
     }
 
-    return { open, close, init, openAndFilterOnPosts };
+    return { open, close, init, openAndFilterOnPosts, resetAfterClose };
 })();
 
 

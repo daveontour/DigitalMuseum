@@ -50,7 +50,7 @@ func newTimelineTestRepo(t *testing.T) (*TimelineRepo, context.Context) {
 
 func TestTimeline_MonthlyCounts(t *testing.T) {
 	repo, ctx := newTimelineTestRepo(t)
-	months, err := repo.MonthlyCounts(ctx, TimelineSources{Messages: true, Emails: true})
+	months, _, err := repo.MonthlyCounts(ctx, TimelineSources{Messages: true, Emails: true}, TimelineFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestTimeline_MonthlyCounts(t *testing.T) {
 		t.Fatalf("unexpected June counts: %+v", months[1])
 	}
 
-	restricted, err := repo.MonthlyCounts(ctx, TimelineSources{})
+	restricted, _, err := repo.MonthlyCounts(ctx, TimelineSources{}, TimelineFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestTimeline_MonthlyCounts(t *testing.T) {
 
 func TestTimeline_MonthDetail(t *testing.T) {
 	repo, ctx := newTimelineTestRepo(t)
-	d, err := repo.MonthDetail(ctx, 2014, 5, TimelineSources{Messages: true, Emails: true})
+	d, err := repo.MonthDetail(ctx, 2014, 5, TimelineSources{Messages: true, Emails: true}, TimelineFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,15 +95,104 @@ func TestTimeline_MonthDetail(t *testing.T) {
 		t.Fatalf("posts = %+v", d.Posts)
 	}
 
-	hidden, err := repo.MonthDetail(ctx, 2014, 5, TimelineSources{})
+	hidden, err := repo.MonthDetail(ctx, 2014, 5, TimelineSources{}, TimelineFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(hidden.Conversations) != 0 || len(hidden.Emails) != 0 || len(hidden.Hidden) != 2 {
 		t.Fatalf("restricted month detail leaked data: %+v", hidden)
 	}
-	if _, err := repo.MonthDetail(ctx, 2014, 13, TimelineSources{}); err == nil {
+	if _, err := repo.MonthDetail(ctx, 2014, 13, TimelineSources{}, TimelineFilter{}); err == nil {
 		t.Fatal("invalid month should error")
+	}
+}
+
+func TestTimeline_Filter(t *testing.T) {
+	repo, ctx := newTimelineTestRepo(t)
+	p := repo.pool
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := p.ExecContext(ctx, q, args...); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	tz := time.FixedZone("AEST", 10*3600)
+	may20 := time.Date(2014, 5, 20, 10, 0, 0, 0, tz)
+	exec(`INSERT INTO contacts (id, name, alternative_names, email) VALUES (50, 'Sarah Jones', 'Sarah, SJ', 'sarah@example.com')`)
+	exec(`INSERT INTO emails (uid, folder, subject, from_address, to_addresses, date, plain_text) VALUES ('3', 'INBOX', 'Dinner', 'me@example.com', 'Sarah <sarah@example.com>', ?, 'See you at dinner')`, may20)
+	exec(`INSERT INTO media_items (media_blob_id, title, media_type, year, month, day, tags) VALUES (1, 'Sarah at the beach', 'image/jpeg', 2014, 6, 4, 'Beach, holiday')`)
+	exec(`INSERT INTO media_item_faces (media_item_id, bbox_x, bbox_y, bbox_w, bbox_h, embedding_model, contact_id)
+		SELECT id, 0, 0, 1, 1, 'test', 50 FROM media_items WHERE title = 'Sarah at the beach'`)
+	all := TimelineSources{Messages: true, Emails: true}
+
+	// Person: Sarah's conversation + the email to her in May, her tagged face in June.
+	months, excluded, err := repo.MonthlyCounts(ctx, all, TimelineFilter{PersonID: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(excluded) != 0 || len(months) != 2 {
+		t.Fatalf("person months = %+v excluded=%v", months, excluded)
+	}
+	if m := months[0]; m.Month != "2014-05" || m.Messages != 2 || m.Emails != 1 || m.Photos != 0 || m.Posts != 0 {
+		t.Fatalf("person May = %+v", m)
+	}
+	if m := months[1]; m.Month != "2014-06" || m.Messages != 0 || m.Photos != 1 {
+		t.Fatalf("person June = %+v", m)
+	}
+	d, err := repo.MonthDetail(ctx, 2014, 5, all, TimelineFilter{PersonID: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.Filtered || len(d.Emails) != 1 || d.Emails[0].Subject != "Dinner" || len(d.Conversations) != 1 || len(d.Photos) != 0 {
+		t.Fatalf("person May detail = %+v", d)
+	}
+	if _, _, err := repo.MonthlyCounts(ctx, all, TimelineFilter{PersonID: 999}); err != ErrTimelinePersonNotFound {
+		t.Fatalf("unknown person err = %v", err)
+	}
+
+	// Keywords: every term must match; across sources.
+	months, _, err = repo.MonthlyCounts(ctx, all, TimelineFilter{Keywords: ParseTimelineKeywords(`"new house"`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(months) != 1 || months[0].Messages != 1 || months[0].Emails != 1 || months[0].Posts != 1 || months[0].Photos != 0 {
+		t.Fatalf("keyword months = %+v", months)
+	}
+	months, _, _ = repo.MonthlyCounts(ctx, all, TimelineFilter{Keywords: []string{"house", "zebra"}})
+	if len(months) != 0 {
+		t.Fatalf("all keywords must match, got %+v", months)
+	}
+
+	// Tag: exact tag, photos only.
+	months, excluded, err = repo.MonthlyCounts(ctx, all, TimelineFilter{Tag: "holiday"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(months) != 1 || months[0].Month != "2014-06" || months[0].Photos != 1 || len(excluded) != 3 {
+		t.Fatalf("tag months = %+v excluded=%v", months, excluded)
+	}
+	if months, _, _ = repo.MonthlyCounts(ctx, all, TimelineFilter{Tag: "hol"}); len(months) != 0 {
+		t.Fatalf("tag must match whole tags, got %+v", months)
+	}
+	if months, _, _ = repo.MonthlyCounts(ctx, all, TimelineFilter{Tag: "GARDEN"}); len(months) != 1 || months[0].Month != "2014-05" {
+		t.Fatalf("tag match should ignore case, got %+v", months)
+	}
+
+	// Combined: person AND tag.
+	months, _, _ = repo.MonthlyCounts(ctx, all, TimelineFilter{PersonID: 50, Tag: "garden"})
+	if len(months) != 0 {
+		t.Fatalf("person+tag should combine with AND, got %+v", months)
+	}
+}
+
+func TestParseTimelineKeywords(t *testing.T) {
+	got := ParseTimelineKeywords(`  new "front  door" a  keys "unbalanced`)
+	want := []string{"new", "front door", "keys", "unbalanced"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if len(ParseTimelineKeywords("")) != 0 {
+		t.Fatal("empty input should give no keywords")
 	}
 }
 

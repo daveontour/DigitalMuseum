@@ -64,6 +64,7 @@ const Guide = {
             const attempt = (remaining) => {
                 const el = document.querySelector(trimmed);
                 if (el) {
+                    Guide._revealTarget(el);
                     el.click();
                     resolve(true);
                     return;
@@ -193,6 +194,8 @@ const Guide = {
         // Chat area
         openReferenceDocuments: () => document.getElementById('chat-context-status-refs-seg')?.click(),
         openToolCallsDialog: () => document.getElementById('chat-context-last-toolcalls-seg')?.click(),
+        openSetupChecklist: () => { if (typeof SystemStatus !== 'undefined') SystemStatus.open('setup'); },
+        openSystemStatus: () => { if (typeof SystemStatus !== 'undefined') SystemStatus.open('health'); },
     },
 
     topicAliases: {
@@ -248,6 +251,13 @@ const Guide = {
         return { key, config: topics[key] };
     },
 
+    // Import cards (import-wizard.js) and advanced Configuration tabs (config-advanced.js) can be
+    // tucked away; make sure a step's target is shown before highlighting or clicking it.
+    _revealTarget(el) {
+        if (typeof ImportWizard !== 'undefined' && ImportWizard.reveal) ImportWizard.reveal(el);
+        if (typeof ConfigAdvanced !== 'undefined' && ConfigAdvanced.reveal) ConfigAdvanced.reveal(el);
+    },
+
     _clearGlows() {
         document.querySelectorAll('.guide-glow').forEach(el => el.classList.remove('guide-glow'));
     },
@@ -256,6 +266,7 @@ const Guide = {
         if (!selector) return true;
         const el = document.querySelector(selector);
         if (el) {
+            Guide._revealTarget(el);
             el.classList.add('guide-glow');
             return true;
         }

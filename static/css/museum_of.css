@@ -6843,24 +6843,6 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     background: rgba(15, 23, 42, 0.45) !important;
 }
 
-/* FB Messenger Options Modal */
-/* FB Albums Modal */
-#fb-albums-modal .modal-content { /* Similar to FB Messenger modal */
-    max-width: 400px;
-    animation: modal-pop-in 0.25s cubic-bezier(.4,2,.6,1) 1;
-}
-#fb-albums-modal .setting-group { margin-bottom: 1.2em; }
-#fb-albums-modal label {
-    font-weight: 500; color: var(--color-text-muted);
-    margin-bottom: 0.3em; display: block;
-}
-#fb-albums-modal select {
-    width: 100%; padding: 0.5em; border-radius: 6px;
-    border: 1px solid var(--color-border-input); font-size: 1em;
-    background: var(--color-bg-surface); color: var(--color-text); margin-top: 0.2em;
-}
-
-
 /* Tile Album Modal (Image Grid) */
 #fb-album-modal .modal-content { /* .tile-album-modal-content */
     max-width: 1000px; /* Wider for grid */
@@ -7101,9 +7083,6 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     .modal-content {
         max-height: 90vh; /* Allow more height on smaller screens */
         width: 95vw;
-    }
-    #fb-albums-modal .modal-content { /* Specific small screen adjustments */
-        padding: 1.2rem 0.7rem;
     }
 }
 
@@ -11584,6 +11563,7 @@ body.deployment-hide-path-import-tiles #data-import-modal .data-import-path-row 
     display: flex;
     flex-direction: column;
     height: 90vh;
+    animation: modal-pop-in 0.25s cubic-bezier(.4,2,.6,1) 1;
 }
 .fb-dialog-tabstrip {
     display: flex;
@@ -17912,6 +17892,58 @@ tr.file-dupe-group-header td {
     padding: 12px 16px 16px;
 }
 
+.timeline-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.timeline-filter-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 160px;
+    min-width: 0;
+    max-width: 240px;
+    padding: 4px 8px;
+    border: 1px solid var(--color-border-input);
+    border-radius: 6px;
+    background: var(--color-bg-surface);
+    color: var(--color-text-muted);
+}
+
+.timeline-filter-field--wide {
+    flex-basis: 220px;
+    max-width: 360px;
+}
+
+.timeline-filter-field:focus-within {
+    border-color: var(--color-blue);
+}
+
+.timeline-filter-field input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--text-md);
+}
+
+.timeline-filter-status {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    flex: 0 0 auto;
+}
+
+.timeline-filter-status--error {
+    color: var(--color-danger);
+}
+
 .timeline-years {
     display: flex;
     gap: 6px;
@@ -18141,4 +18173,548 @@ tr.file-dupe-group-header td {
     .top-bar .quick-search-btn .quick-search-kbd {
         display: none;
     }
+}
+
+/* ============================================================
+   Import wizard (Source Data → Data Import) — import-wizard.js
+   ============================================================ */
+.import-wizard {
+    margin: 4px 0 14px;
+}
+
+.import-wizard-heading {
+    margin: 4px 0 12px;
+    font-size: var(--text-heading);
+    color: var(--color-text);
+}
+
+.import-wizard-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 12px;
+}
+
+.import-wizard-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-height: 140px;
+    padding: 18px 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--color-border-input);
+    background: var(--color-bg-surface);
+    color: var(--color-text);
+    text-align: center;
+    cursor: pointer;
+    font-family: var(--font-sans-ui);
+}
+
+.import-wizard-tile:hover,
+.import-wizard-tile:focus-visible {
+    border-color: var(--color-blue);
+    background: var(--color-bg-hover);
+}
+
+.import-wizard-tile > i {
+    margin-bottom: 6px;
+    font-size: var(--text-icon-xl);
+    color: var(--color-blue);
+}
+
+.import-wizard-tile-name {
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+
+.import-wizard-tile-sub {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--line-height-snug);
+}
+
+.import-wizard-tile-count {
+    margin-top: auto;
+    padding-top: 6px;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+}
+
+.import-wizard-tile--has-data .import-wizard-tile-count {
+    color: var(--color-success);
+}
+
+.import-wizard-pick-footer,
+.import-wizard-all-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 12px;
+}
+
+.import-wizard-all-bar {
+    margin: 0 0 12px;
+}
+
+.import-wizard-link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-blue);
+    font-size: var(--text-md);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.import-wizard-link:hover,
+.import-wizard-link:focus-visible {
+    color: var(--color-text);
+}
+
+.import-wizard-source-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 10px;
+}
+
+.import-wizard-source-header .import-wizard-heading {
+    margin: 0;
+}
+
+.import-wizard-howto {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-base);
+    color: var(--color-text);
+    font-size: var(--text-md);
+    line-height: var(--line-height-body);
+}
+
+.import-wizard-howto > summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.import-wizard-howto ol,
+.import-wizard-howto ul {
+    margin: 8px 0;
+    padding-left: 1.4em;
+}
+
+.import-wizard-howto li {
+    margin: 4px 0;
+}
+
+.import-wizard-howto p {
+    margin: 8px 0;
+}
+
+.import-wizard-note {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+}
+
+#data-import-modal .data-import-cards-grid.import-wizard-grid--hidden {
+    display: none;
+}
+
+#data-import-modal .data-import-cards-grid.import-wizard-grid--filtered > .data-import-card:not(.import-wizard-card--match) {
+    display: none;
+}
+
+/* ============================================================
+   Configuration → Show advanced settings — config-advanced.js
+   ============================================================ */
+.config-tabs-sidebar--basic .config-tab-button.config-tab-advanced {
+    display: none !important;
+}
+
+.config-advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+    padding: 12px 11px 6px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.config-advanced-toggle input {
+    margin: 0;
+    cursor: pointer;
+}
+
+.import-wizard [hidden],
+.import-wizard-all-bar[hidden] {
+    display: none;
+}
+
+/* ============================================================
+   Backup modal — restore section (archive-backup.js)
+   ============================================================ */
+.backup-restore-section {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--color-border);
+}
+
+.backup-restore-section[hidden] {
+    display: none;
+}
+
+.backup-restore-heading {
+    margin: 0 0 6px;
+    font-size: var(--text-heading);
+    color: var(--color-text);
+}
+
+.backup-restore-text {
+    margin: 0 0 10px;
+    color: var(--color-text-muted);
+    font-size: var(--text-md);
+    line-height: var(--line-height-body);
+}
+
+.backup-restore-section .backup-modal-progress {
+    margin-bottom: 10px;
+}
+
+/* ============================================================
+   Setup & System Status — system-status.js
+   ============================================================ */
+.top-bar .museum-health-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--color-blue);
+    background: rgba(79, 156, 249, 0.12);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.top-bar .museum-health-btn[hidden] {
+    display: none;
+}
+
+.top-bar .museum-health-btn i {
+    color: var(--color-blue);
+}
+
+.top-bar .museum-health-btn:hover,
+.top-bar .museum-health-btn:focus-visible {
+    background: rgba(79, 156, 249, 0.22);
+}
+
+.top-bar .museum-health-btn--error {
+    border-color: var(--color-danger);
+    background: rgba(239, 68, 68, 0.14);
+}
+
+.top-bar .museum-health-btn--error i {
+    color: var(--color-danger);
+}
+
+.top-bar .museum-health-btn--error:hover,
+.top-bar .museum-health-btn--error:focus-visible {
+    background: rgba(239, 68, 68, 0.24);
+}
+
+.system-status-modal-content {
+    width: 92vw;
+    max-width: 760px;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.system-status-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px 0;
+    border-bottom: 1px solid var(--color-border);
+    flex: 0 0 auto;
+}
+
+.system-status-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-md);
+    cursor: pointer;
+}
+
+.system-status-tab:hover,
+.system-status-tab:focus-visible {
+    color: var(--color-text);
+}
+
+.system-status-tab--active {
+    border-bottom-color: var(--color-blue);
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.system-status-tab-badge {
+    min-width: 0;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--color-bg-surface);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 600;
+}
+
+.system-status-tab-badge:empty {
+    display: none;
+}
+
+.system-status-tab-badge--error {
+    background: var(--color-danger);
+    color: #fff;
+}
+
+.system-status-tab-badge--warn {
+    background: var(--color-warning);
+    color: #111;
+}
+
+.system-status-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 16px 18px;
+}
+
+.system-status-body [hidden] {
+    display: none;
+}
+
+.system-status-lead {
+    margin: 0 0 10px;
+    color: var(--color-text);
+    font-size: var(--text-md);
+    line-height: var(--line-height-body);
+}
+
+.system-status-progress {
+    height: 6px;
+    margin-bottom: 14px;
+    border-radius: 999px;
+    background: var(--color-bg-surface);
+    overflow: hidden;
+}
+
+.system-status-progress-bar {
+    width: 0;
+    height: 100%;
+    background: var(--color-success);
+    transition: width 0.3s ease;
+}
+
+.system-status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.system-status-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-base);
+}
+
+.system-status-row-icon {
+    flex: 0 0 auto;
+    width: 18px;
+    margin-top: 2px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.system-status-row-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.system-status-row-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--color-text);
+    font-size: var(--text-md);
+    font-weight: 600;
+}
+
+.system-status-row-message {
+    margin-top: 2px;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--line-height-snug);
+    overflow-wrap: anywhere;
+}
+
+.system-status-fix-btn {
+    flex: 0 0 auto;
+    align-self: center;
+    white-space: nowrap;
+}
+
+.system-status-optional {
+    padding: 0 6px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border-input);
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.system-status-step--done .system-status-row-icon,
+.system-status-row--ok .system-status-row-icon {
+    color: var(--color-success);
+}
+
+.system-status-step--done .system-status-row-title {
+    color: var(--color-text-muted);
+}
+
+.system-status-step--todo {
+    border-color: var(--color-border-input);
+}
+
+.system-status-row--error {
+    border-color: var(--color-danger);
+}
+
+.system-status-row--error .system-status-row-icon {
+    color: var(--color-danger);
+}
+
+.system-status-row--warn {
+    border-color: var(--color-warning);
+}
+
+.system-status-row--warn .system-status-row-icon {
+    color: var(--color-warning);
+}
+
+.system-status-row--info .system-status-row-icon {
+    color: var(--color-blue);
+}
+
+.system-status-dismiss {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.system-status-health-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+/* Chat warning when no AI tools are on */
+.chat-tools-off-banner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 6px 14px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--color-warning);
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    flex-shrink: 0;
+}
+
+.chat-tools-off-banner[hidden] {
+    display: none;
+}
+
+.chat-tools-off-banner > i {
+    color: var(--color-warning);
+}
+
+.chat-tools-off-text {
+    flex: 1 1 280px;
+    min-width: 0;
+}
+
+.chat-tools-off-dismiss {
+    padding: 0 4px;
+    border: none;
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-lg);
+    line-height: 1;
+    cursor: pointer;
+}
+
+.chat-tools-off-dismiss:hover,
+.chat-tools-off-dismiss:focus-visible {
+    color: var(--color-text);
+}
+
+@media (max-width: 600px) {
+    .system-status-row {
+        flex-wrap: wrap;
+    }
+    .system-status-fix-btn {
+        margin-left: 30px;
+    }
+    .top-bar .museum-health-btn span {
+        display: none;
+    }
+}
+
+/* Quick search: the "Search by meaning" row stays visible at the bottom of the results. */
+.quick-search-hit--meaning {
+    position: sticky;
+    bottom: -6px;
+    margin-top: 6px;
+    border-top: 1px solid var(--color-border);
+    border-radius: 0 0 8px 8px;
+    background: var(--color-bg-elevated);
+}
+
+.quick-search-hit--meaning.quick-search-hit--active {
+    background: var(--color-bg-selected);
+}
+
+.quick-search-hit--meaning .quick-search-hit-icon {
+    color: var(--color-warning);
 }

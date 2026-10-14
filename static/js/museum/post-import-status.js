@@ -158,6 +158,11 @@ const PostImportStatus = (() => {
         });
         const active = isActive(lastRun, lastQueued);
         if (stopBtn) stopBtn.hidden = !active;
+        const statusBtn = el('post-import-open-status-btn');
+        if (statusBtn) {
+            const c = counts(lastRun);
+            statusBtn.hidden = active || (c.problems === 0 && c.skipped === 0) || typeof SystemStatus === 'undefined';
+        }
         if (summary) {
             summary.textContent = active
                 ? 'Digital Museum is preparing your newly imported data so you can search it, browse photos, and ask the AI about it. You can keep using the app while this runs.'
@@ -270,6 +275,10 @@ const PostImportStatus = (() => {
         el('post-import-close-btn')?.addEventListener('click', closeModal);
         el('post-import-stop-btn')?.addEventListener('click', () => { void stop(); });
         el('post-import-open-jobs-btn')?.addEventListener('click', openScheduledJobs);
+        el('post-import-open-status-btn')?.addEventListener('click', () => {
+            closeModal();
+            if (typeof SystemStatus !== 'undefined') SystemStatus.open('health');
+        });
         const modal = el('post-import-modal');
         modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
         el('post-import-auto-checkbox')?.addEventListener('change', () => { void saveSetting(); });

@@ -1364,6 +1364,172 @@ ipcMain.handle('select-db', async (_event, opts) => {
   }
 });
 
+// ── Restore archive from a backup ─────────────────────────────────────────────
+//
+// The Go server checks the chosen file first (POST /api/backup/restore-check, called by the
+// renderer — static/js/museum/archive-backup.js). This handler then swaps the file, which needs
+// both servers that hold the archive open (Go server + MCP tools server) stopped:
+//   1. copy the backup next to the archive (<archive>.restoring-<stamp>),
+//   2. move the current archive and its -wal/-shm/-journal aside as a safety copy
+//      (<name>.before-restore-<stamp>.sqlite — never deleted here),
+//   3. move the copy into place and restart both servers.
+// Any failure puts the original files back and restarts on them.
+
+const ARCHIVE_SIDECAR_SUFFIXES = ['-wal', '-shm', '-journal'];
+
+function sleepMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** fs.renameSync with retries — Windows can hold a file briefly after its process exits. */
+async function renameWithRetry(from, to, attempts = 20) {
+  for (let i = 0; ; i++) {
+    try {
+      fs.renameSync(from, to);
+      return;
+    } catch (err) {
+      if (i >= attempts - 1 || !['EBUSY', 'EPERM', 'EACCES'].includes(err.code)) throw err;
+      await sleepMs(250);
+    }
+  }
+}
+
+async function stopGoServerProcess() {
+  if (goProcess && !goProcess.killed) {
+    goProcess.kill('SIGTERM');
+    await new Promise((resolve) => {
+      const t = setTimeout(() => {
+        if (goProcess && !goProcess.killed) goProcess.kill('SIGKILL');
+        resolve();
+      }, 5000);
+      goProcess.once('exit', () => { clearTimeout(t); resolve(); });
+    });
+  }
+  goProcess = null;
+  await forceKillDigitalMuseumWindows();
+}
+
+/** True when the running Go server has an archive open (the no-archive router answers 503). */
+async function goServerHasArchiveOpen() {
+  try {
+    const res = await goFetch('/api/post-import/status', { headers: { Accept: 'application/json' } });
+    return res.status !== 503;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isSqliteFile(filePath) {
+  let fd;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(16);
+    fs.readSync(fd, buf, 0, 16, 0);
+    return buf.toString('latin1') === 'SQLite format 3\u0000';
+  } catch (_) {
+    return false;
+  } finally {
+    if (fd !== undefined) { try { fs.closeSync(fd); } catch (_) { /* ignore */ } }
+  }
+}
+
+ipcMain.handle('restore-archive', async (_event, opts) => {
+  const backupPath = (opts && typeof opts.backupPath === 'string') ? opts.backupPath.trim() : '';
+  if (!backupPath || !path.isAbsolute(backupPath)) return { ok: false, error: 'Choose a backup file to restore.' };
+  if (!appPort) return { ok: false, error: 'The app server is not running.' };
+
+  const paths = applyResolvedDataPaths(getPaths(), activeDotenv || {});
+  let archivePath = '';
+  try {
+    const res = await goFetch('/api/resolved-main-sqlite-path');
+    if (res.ok) {
+      const d = await res.json();
+      archivePath = (d && d.sqlite_path) ? String(d.sqlite_path).trim() : '';
+    }
+  } catch (_) { /* handled below */ }
+  if (!archivePath) return { ok: false, error: "Couldn't find the archive file that's open." };
+  archivePath = path.resolve(paths.appRoot, archivePath);
+  if (path.resolve(backupPath).toLowerCase() === archivePath.toLowerCase()) {
+    return { ok: false, error: "That's the archive you have open now — choose a backup file instead." };
+  }
+  if (!isSqliteFile(backupPath)) return { ok: false, error: "That file isn't a Digital Museum archive." };
+
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '-');
+  const ext = path.extname(archivePath);
+  const base = ext ? archivePath.slice(0, -ext.length) : archivePath;
+  const safetyPath = `${base}.before-restore-${stamp}${ext || '.sqlite'}`;
+  const incoming = `${archivePath}.restoring-${stamp}`;
+  const moved = []; // [originalPath, safetyCopyPath]
+
+  const restartServers = async () => {
+    startGoServer(appPort, paths, activeDotenv);
+    await waitForHealth(appPort, 60000);
+    if (!(await goServerHasArchiveOpen())) throw new Error('the archive could not be opened');
+    await startMcpServerForCurrentArchive(paths, activeDotenv);
+  };
+  // Removes what is now at the archive's paths and moves the safety copies back. When the swap
+  // completed (allSwapped), everything at those paths belongs to the restored copy (a server may
+  // have created a -wal/-shm for it) and must go — a stray WAL would corrupt the original. When
+  // the swap stopped part-way, only paths whose original was moved aside are removed; anything
+  // else there is still an original file.
+  const putOriginalBack = async (allSwapped) => {
+    for (const sfx of ['', ...ARCHIVE_SIDECAR_SUFFIXES]) {
+      const p = archivePath + sfx;
+      const originalMoved = moved.some(([from]) => from === p);
+      if (fs.existsSync(p) && (allSwapped || originalMoved)) fs.unlinkSync(p);
+    }
+    for (const [from, to] of [...moved].reverse()) await renameWithRetry(to, from);
+  };
+
+  log(`Restore: replacing ${archivePath} with ${backupPath} (current archive kept as ${safetyPath})`);
+  await stopMcpServer();
+  await stopGoServerProcess();
+
+  try {
+    fs.copyFileSync(backupPath, incoming);
+    await renameWithRetry(archivePath, safetyPath);
+    moved.push([archivePath, safetyPath]);
+    for (const sfx of ARCHIVE_SIDECAR_SUFFIXES) {
+      if (fs.existsSync(archivePath + sfx)) {
+        await renameWithRetry(archivePath + sfx, safetyPath + sfx);
+        moved.push([archivePath + sfx, safetyPath + sfx]);
+      }
+    }
+    await renameWithRetry(incoming, archivePath);
+  } catch (err) {
+    log(`Restore failed while swapping files: ${err.message} — putting the original archive back`);
+    try { if (fs.existsSync(incoming)) fs.unlinkSync(incoming); } catch (_) { /* ignore */ }
+    let rollbackErr = null;
+    try { await putOriginalBack(false); } catch (e) { rollbackErr = e; log(`Restore rollback failed: ${e.message}`); }
+    try { await restartServers(); } catch (e) { log(`Restart after failed restore: ${e.message}`); }
+    return {
+      ok: false,
+      error: rollbackErr
+        ? `Couldn't replace the archive file (${err.message}), and moving the original back also failed. Your original archive is saved at ${safetyPath}.`
+        : `Couldn't replace the archive file: ${err.message}. Your archive was left as it was.`,
+    };
+  }
+
+  try {
+    await restartServers();
+  } catch (err) {
+    log(`Restore: server did not start on the restored archive: ${err.message} — rolling back`);
+    await stopMcpServer();
+    await stopGoServerProcess();
+    try {
+      await putOriginalBack(true);
+    } catch (e) {
+      log(`Restore rollback failed: ${e.message}`);
+      return { ok: false, error: `The backup couldn't be opened (${err.message}). Your original archive is saved at ${safetyPath}.` };
+    }
+    try { await restartServers(); } catch (e) { log(`Restart after rollback: ${e.message}`); }
+    return { ok: false, error: `The backup couldn't be opened (${err.message}). Your archive was put back as it was.` };
+  }
+
+  log(`Restore complete: ${archivePath} (previous archive kept as ${safetyPath})`);
+  return { ok: true, archivePath, safetyPath };
+});
+
 // ── Archive profile management ────────────────────────────────────────────────
 
 function slugify(name) {

@@ -3622,9 +3622,37 @@ Modals.LLMToolsAccess = (() => {
         if (btn) btn.addEventListener('click', () => void save());
         const refreshBtn = document.getElementById('llm-tools-access-refresh');
         if (refreshBtn) refreshBtn.addEventListener('click', () => void refresh());
+        const recommendedBtn = document.getElementById('llm-tools-access-recommended');
+        if (recommendedBtn) recommendedBtn.addEventListener('click', () => void enableRecommended());
     }
 
-    return { init, load, save, refresh };
+    // Turns on the recommended bundled tools for owner sessions (server keeps every other choice),
+    // then reloads the table. See internal/ai/tool_recommended.go.
+    async function enableRecommended() {
+        const btn = document.getElementById('llm-tools-access-recommended');
+        if (btn) btn.disabled = true;
+        try {
+            const res = await fetch('/api/settings/llm-tools-access/enable-recommended', {
+                method: 'POST',
+                credentials: 'same-origin',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                _status(data.detail || data.error || 'Could not turn on recommended tools', true);
+                return;
+            }
+            const n = Array.isArray(data.turned_on) ? data.turned_on.length : 0;
+            _status(n > 0 ? `Turned on ${n} recommended tool(s).` : 'The recommended tools were already on.', false);
+            await load();
+            if (typeof SystemStatus !== 'undefined') void SystemStatus.refresh();
+        } catch (e) {
+            _status(e.message || 'Could not turn on recommended tools', true);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    return { init, load, save, refresh, enableRecommended };
 })();
 
 

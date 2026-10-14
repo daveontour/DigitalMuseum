@@ -222,6 +222,7 @@ These env vars pre-fill import dialog fields and are not required:
 | `get-db-path` | renderer→main | Current SQLITE_PATH |
 | `get-log-level` | renderer→main | Current LOG_LEVEL |
 | `select-db` | renderer→main | Switch database + log level, restart Go server |
+| `restore-archive` | renderer→main | Replace the open archive with a backup file (see Archive Backup) |
 | `get-profiles` | renderer→main | List archive profiles from billing DB |
 | `create-profile` | renderer→main | Create a new named archive profile |
 | `update-profile` | renderer→main | Update profile display name / metadata |
@@ -854,7 +855,7 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `openImageGallery` | Clicks the Images sidebar button |
 | `openFacebookAlbums` | Clicks the Facebook Albums sidebar button |
 | `openFacebookPosts` | Clicks the Facebook Posts sidebar button |
-| `openMultiSourceSearch` | Clicks the Multi-Source Search (similarity) sidebar button |
+| `openMultiSourceSearch` | Clicks the Search by Meaning (similarity) sidebar button |
 | `openLocations` | Clicks the Locations sidebar button |
 | `openArtefacts` | Clicks the Artefacts sidebar button |
 | `openIdentityProfile` | Clicks the Identity Profile Wizard sidebar button |
@@ -891,6 +892,8 @@ The guide provides step-by-step help topics accessible from the Guide button in 
 | `openSettingsManageKeys` | Alias for `openConfigManageVisitorKeys` |
 | `openReferenceDocuments` | Clicks the Ref Docs segment in the chat context bar, opening the Reference Documents manager |
 | `openToolCallsDialog` | Opens the tool calls log dialog from the chat context bar (last request) |
+| `openSetupChecklist` | Opens Setup & System Status on the Getting started tab |
+| `openSystemStatus` | Opens Setup & System Status on the System status tab |
 
 To add a new navigation action: (1) add an entry to `Guide.NavActions` in `guide.js`; (2) add the key to the `NAV_ACTIONS` array in `modals-guide-topics-config.js` so it appears in the admin UI dropdown.
 
@@ -981,6 +984,40 @@ app_configuration. `POST /api/backup {path}` is owner-only and only allowed for
 imported in "link to images on disk" mode and the billing DB are not included. UI:
 `static/js/museum/archive-backup.js`.
 
+**Restore** (same dialog, desktop app only): the renderer picks a file, `POST /api/backup/restore-check
+{path}` (owner, local, localhost) opens it **read-only** and checks it is an intact Digital Museum
+archive (SQLite header, `quick_check`, required tables, not the open archive, no pending `-wal`
+beside it; refused while a backup or post-import pass runs) and returns its counts for the
+confirmation. Then Electron's `restore-archive` IPC (`electron/main.js`) stops the Go and MCP
+servers, moves the current archive and its `-wal`/`-shm`/`-journal` aside as
+`<name>.before-restore-<stamp>.sqlite` (never deleted), moves a copy of the backup into place and
+restarts; if the restored file won't open (checked by the no-archive router answering 503), it
+puts the original files back and restarts on them. The user signs in again afterwards (sessions
+live in the archive).
+
+### System status, setup checklist & recommended AI tools
+
+`internal/handler/system_status_handler.go` (owner only): `GET /api/system-status` returns one row
+per part of the app — archive file, AI connection, AI tools server (catalog status), tools turned
+on, local search indexing (embedding server), local chat, bundled ImageMagick/ExifTool/face
+recognizer, backup age, failed scheduled jobs, last post-import pass — each `{status: ok|info|warn|error,
+message, fix?: {label, action}}`. `GET /api/setup-checklist` derives first-run steps from real data
+(AI connected, subject emails/phones, any data imported, tools on, a named face cluster, a backup,
+a visitor key); `POST /api/setup-checklist/dismiss` stores `setup_checklist_dismissed_v1`. Fix
+`action`s are keys the frontend maps to UI (`FIX_ACTIONS` in `static/js/museum/system-status.js`),
+which also drives the top-bar pill ("n problems need attention" / "Finish setup n/m"), the welcome
+dialog's "Continue setup" button, Account → **Setup & System Status…**, and the chat warning shown
+when no AI tools are on.
+
+**Recommended AI tools** (`internal/ai/tool_recommended.go`): `POST /api/settings/llm-tools-access/enable-recommended`
+(master unlock, like the policy PUT) turns on a fixed allowlist of bundled read-only tools for the
+**owner tier only**, merging into the saved policy — visitor flags, sensitive-document tools,
+`search_tavily` and every additional-server tool are left alone. `GET /api/settings/llm-tools-access/summary`
+gives the counts (plain policy mirror, no password). New archives are seeded with every tool then
+in the catalog (`archive_owner_seed.go`), so this mainly helps archives created while the tools
+server was down, and older ones. **Add a new bundled read-only tool to `recommendedOwnerTools` if it
+should be part of the default set.**
+
 ### Timeline & Quick Search
 
 `internal/repository/timeline_repo.go` + `internal/handler/timeline_handler.go`:
@@ -989,8 +1026,15 @@ per day, emails, photos, Facebook posts — each capped, with full totals), `GET
 (substring search, a few newest hits per kind; LIKE wildcards in the query are escaped). Dates are
 read with `substr(col, 1, 7|10)` on the stored TEXT timestamps (not `strftime`, which would shift
 timezone-suffixed values into UTC). Messages/emails are omitted for visitor keys without those
-permissions (`hidden` in the response). UI: `static/js/museum/timeline.js` (sidebar **Timeline**)
-and `static/js/museum/quick-search.js` (top-bar **Search**, Ctrl+K / ⌘K).
+permissions (`hidden` in the response). Both timeline routes take an optional filter
+`?person=<contact id>&q=<keywords>&tag=<photo tag>` (`internal/repository/timeline_filter.go`,
+AND-combined): person matches messages by conversation/sender name and ids, emails by from/to/cc,
+photos by a face linked to that contact, posts by name mentions (needs the visitor contacts
+permission); keywords must all appear ("quoted phrases" kept together); a tag matches one whole
+photo tag and leaves the other sources out (`excluded` in the response). UI: `static/js/museum/timeline.js` (sidebar **Timeline**)
+and `static/js/museum/quick-search.js` (top-bar **Search**, Ctrl+K / ⌘K). The palette's last row
+(sticky) is always "Search by meaning for …", which opens the sidebar's **Search by Meaning**
+dialog (`#message-similarity-modal`, formerly "Multi Source Search") pre-filled and run.
 
 ### Sidebar
 
@@ -998,6 +1042,20 @@ Left sidebar = **Explore** group (+ Identity Profile / Source Data / Configurati
 right sidebar = **Ask & Play** and **People & Records** groups. `static/js/museum/sidebar-sources.js`
 hides Explore buttons for sources with no data yet (counts from `GET /api/import-modal-stats`; shows
 everything if that fails) and refreshes on Source Data close / post-import completion.
+
+### Source Data import picker & advanced Configuration tabs
+
+Source Data → Data Import opens on a "What would you like to add?" tile picker
+(`static/js/museum/import-wizard.js`). Picking a tile shows that source's "How do I get this export?"
+steps (static HTML in `#import-wizard-howto`) and filters the existing import cards to that source
+(`SOURCES` maps tile → card selectors) — the cards themselves are unchanged and still wired by
+`app.js`; "Show all import options" shows every card. Configuration hides tabs marked
+`.config-tab-advanced` behind the **Show advanced settings** switch (`static/js/museum/config-advanced.js`,
+per-browser localStorage); clicking an advanced tab programmatically reveals them for the visit.
+`Guide._revealTarget` calls `ImportWizard.reveal` / `ConfigAdvanced.reveal` before a guide step
+highlights or clicks something, so guide selectors on hidden cards/tabs keep working. **When adding
+an import card, add it to `SOURCES`; when adding a developer/admin Configuration tab, give its
+button `config-tab-advanced`.**
 
 ### Gmail Import
 
@@ -1149,9 +1207,12 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | Frontend MCP Servers config UI | `static/js/museum/modals-mcp-servers-config.js` |
 | Chat answer sources (tool-result → record refs) | `internal/ai/source_refs.go`, `static/js/museum/chat.js` (`_addSourceChips`, `Chat.openSource`) |
 | Post-import processing pipeline | `internal/handler/post_import_pipeline.go`, `static/js/museum/post-import-status.js` |
-| Archive backup | `internal/service/archive_backup_service.go`, `internal/handler/backup_handler.go`, `static/js/museum/archive-backup.js` |
+| Archive backup & restore | `internal/service/archive_backup_service.go`, `internal/handler/backup_handler.go`, `static/js/museum/archive-backup.js`, `electron/main.js` (`restore-archive`) |
+| System status / setup checklist | `internal/handler/system_status_handler.go`, `static/js/museum/system-status.js` |
+| Recommended AI tools | `internal/ai/tool_recommended.go`, `internal/handler/llm_tools_access_handler.go` |
 | Timeline & quick search | `internal/repository/timeline_repo.go`, `internal/handler/timeline_handler.go`, `static/js/museum/timeline.js`, `static/js/museum/quick-search.js` |
 | Sidebar empty-source hiding | `static/js/museum/sidebar-sources.js` |
+| Import source picker / advanced config tabs | `static/js/museum/import-wizard.js`, `static/js/museum/config-advanced.js` |
 | Frontend AI Tool Access / Tool Test UI | `static/js/museum/modals-settings.js` (`Modals.LLMToolsAccess`), `static/js/museum/modals-tool-test.js` |
 
 ## Security Notes

@@ -392,6 +392,12 @@ func (p *postImportPipeline) status(uid int64) (*postImportRun, bool) {
 	return &cp, queued
 }
 
+// postImportBusy reports whether uid has a post-import pass running or queued.
+func postImportBusy(uid int64) bool {
+	run, queued := postImport.status(uid)
+	return queued || (run != nil && run.Running)
+}
+
 // cancel stops the caller's run (current step's job is cancelled) and drops any queued pass.
 func (p *postImportPipeline) cancel(uid int64) bool {
 	p.mu.Lock()

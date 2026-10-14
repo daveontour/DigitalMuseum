@@ -52,6 +52,8 @@ Modals.GuideTopicsConfig = (() => {
         'openSettingsManageKeys',
         'openReferenceDocuments',
         'openToolCallsDialog',
+        'openSetupChecklist',
+        'openSystemStatus',
         'closeOpenDialog',
         'pause0_5s',
         'pause1s',

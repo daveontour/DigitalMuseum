@@ -43,6 +43,7 @@ func (h *BackupHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/backup/status", h.Status)
 	r.Post("/api/backup", h.Start)
 	r.Post("/api/backup/snooze", h.Snooze)
+	r.Post("/api/backup/restore-check", h.RestoreCheck)
 }
 
 func (h *BackupHandler) available(r *http.Request) bool {
@@ -117,4 +118,40 @@ func (h *BackupHandler) Snooze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"status": "ok"})
+}
+
+// RestoreCheck handles POST /api/backup/restore-check {"path": "<absolute file path>"}.
+//
+// The desktop app calls this before it stops the servers to swap the archive file (see
+// electron/main.js "restore-archive"), so a wrong, damaged or non-archive file is rejected while
+// everything is still running. Refuses while a backup or post-import processing is in progress.
+func (h *BackupHandler) RestoreCheck(w http.ResponseWriter, r *http.Request) {
+	if !h.available(r) {
+		writeError(w, http.StatusForbidden, "Restoring is only possible from the Digital Museum desktop app.")
+		return
+	}
+	if !RequireOwnerMasterUnlockOrNoKeyring(w, r, h.sessionStore, h.sensitiveSvc, h.authSvc) {
+		return
+	}
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if h.svc.Busy() {
+		writeError(w, http.StatusConflict, "A backup is being written right now. Try again when it has finished.")
+		return
+	}
+	if postImportBusy(appctx.UserIDFromCtx(r.Context())) {
+		writeError(w, http.StatusConflict, "Digital Museum is still preparing recently imported data. Wait for it to finish (or stop it) and try again.")
+		return
+	}
+	cand, err := h.svc.InspectRestoreCandidate(r.Context(), req.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "candidate": cand})
 }

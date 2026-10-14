@@ -37,6 +37,8 @@ func (h *LLMToolsAccessHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/settings/llm-tools-access", h.Get)
 	r.Put("/api/settings/llm-tools-access", h.Put)
 	r.Post("/api/settings/llm-tools-access/refresh-catalog", h.RefreshCatalog)
+	r.Get("/api/settings/llm-tools-access/summary", h.Summary)
+	r.Post("/api/settings/llm-tools-access/enable-recommended", h.EnableRecommended)
 }
 
 func (h *LLMToolsAccessHandler) masterPassword(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -80,10 +82,10 @@ func (h *LLMToolsAccessHandler) Get(w http.ResponseWriter, r *http.Request) {
 	for _, meta := range appai.AllToolMetas() {
 		rule, configured := policy[meta.Name]
 		out = append(out, map[string]any{
-			"name":             meta.Name,
-			"description":      meta.Description,
-			"enabled":          rule.Enabled,
-			"visitor_enabled":  rule.VisitorEnabled,
+			"name":            meta.Name,
+			"description":     meta.Description,
+			"enabled":         rule.Enabled,
+			"visitor_enabled": rule.VisitorEnabled,
 			// configured is false for a tool the MCP tools server has newly reported (via
 			// "Refresh Tools") that has no saved policy row yet — distinct from a tool an admin
 			// explicitly saved as disabled, which also renders enabled=false/visitor_enabled=false
@@ -174,4 +176,74 @@ func (h *LLMToolsAccessHandler) Put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"message": "LLM tools access policy saved"})
+}
+
+// Summary handles GET /api/settings/llm-tools-access/summary — how many tools the AI may use in
+// owner sessions, and how many recommended tools are still off. Owner-only; reads the plaintext
+// policy mirror, so it works without the master password.
+func (h *LLMToolsAccessHandler) Summary(w http.ResponseWriter, r *http.Request) {
+	if !ArchiveOwnerAuthenticated(r, h.authSvc) {
+		writeError(w, http.StatusForbidden, "owner session required")
+		return
+	}
+	var policy appai.ToolAccessPolicy
+	if h.privateStore != nil {
+		policy, _ = h.privateStore.LoadLLMToolsAccessPolicyMirror(r.Context())
+	}
+	writeJSON(w, appai.SummarizeToolAccess(policy, appai.AllToolMetas()))
+}
+
+// EnableRecommended handles POST /api/settings/llm-tools-access/enable-recommended — turns on the
+// recommended bundled tools for owner sessions (see internal/ai/tool_recommended.go), keeping
+// every other saved choice, including visitor access. Needs the owner master key like Put.
+func (h *LLMToolsAccessHandler) EnableRecommended(w http.ResponseWriter, r *http.Request) {
+	if !RequireOwnerMasterUnlock(w, r, h.sessionStore) {
+		return
+	}
+	mp, ok := h.masterPassword(w, r)
+	if !ok {
+		return
+	}
+	if h.privateStore == nil {
+		writeError(w, http.StatusInternalServerError, "private store not configured")
+		return
+	}
+	metas := appai.AllToolMetas()
+	if len(metas) == 0 {
+		writeError(w, http.StatusServiceUnavailable, "The AI tools server hasn't reported any tools yet. Check System status, then try again.")
+		return
+	}
+	var policy appai.ToolAccessPolicy
+	rec, err := h.privateStore.GetByKey(r.Context(), appai.LLMToolsAccessStoreKey, mp)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("load policy: %s", err))
+		return
+	}
+	if rec != nil && strings.TrimSpace(rec.Value) != "" {
+		if policy, err = appai.ParseToolAccessPolicyJSON(rec.Value); err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid stored policy JSON: %s", err))
+			return
+		}
+	} else if mirror, err := h.privateStore.LoadLLMToolsAccessPolicyMirror(r.Context()); err == nil && mirror != nil {
+		policy = mirror
+	}
+	updated, turnedOn := appai.WithRecommendedToolsEnabled(policy, metas)
+	if len(turnedOn) > 0 {
+		raw, err := appai.MarshalToolAccessPolicyJSON(updated)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("encode policy: %s", err))
+			return
+		}
+		if err := h.privateStore.UpsertLLMToolsAccessPolicy(r.Context(), raw, mp); err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("save policy: %s", err))
+			return
+		}
+	}
+	if turnedOn == nil {
+		turnedOn = []string{}
+	}
+	writeJSON(w, map[string]any{
+		"turned_on": turnedOn,
+		"summary":   appai.SummarizeToolAccess(updated, metas),
+	})
 }

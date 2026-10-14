@@ -1,9 +1,13 @@
 'use strict';
 
 /**
- * One-click archive backup (Account → Back Up Archive…, plus a top-bar reminder when the
- * archive hasn't been backed up for 30 days). Server side: internal/handler/backup_handler.go
+ * One-click archive backup and restore (Account → Back Up or Restore…, plus a top-bar reminder
+ * when the archive hasn't been backed up for 30 days). Server side: internal/handler/backup_handler.go
  * and internal/service/archive_backup_service.go.
+ *
+ * Restore: the server checks the chosen file (POST /api/backup/restore-check), then the desktop
+ * shell swaps the archive file and restarts the servers (window.electronAPI.restoreArchive →
+ * electron/main.js "restore-archive"), keeping the old archive as a safety copy.
  *
  * The destination is chosen with Electron's native save dialog (window.electronAPI.showSaveDialog);
  * outside the desktop app the server reports available=false and the dialog explains why.
@@ -20,6 +24,7 @@ const ArchiveBackup = (() => {
     let pollTimer = null;
     let wasRunning = false;
     let lastOutcomeShownFor = null;
+    let restoring = false;
 
     function el(id) { return document.getElementById(id); }
 
@@ -118,8 +123,85 @@ const ArchiveBackup = (() => {
 
         el('backup-modal-unavailable').hidden = available;
         const startBtn = el('backup-start-btn');
-        startBtn.disabled = !available || running;
+        startBtn.disabled = !available || running || restoring;
         el('backup-snooze-btn').hidden = !(st.reminder_due && !running);
+
+        const restoreSection = el('backup-restore-section');
+        if (restoreSection) restoreSection.hidden = !(isOwner && available && canRestore());
+        const restoreBtn = el('backup-restore-btn');
+        if (restoreBtn) restoreBtn.disabled = running || restoring;
+        const restoreProgress = el('backup-restore-progress');
+        if (restoreProgress) restoreProgress.hidden = !restoring;
+    }
+
+    function canRestore() {
+        const api = window.electronAPI;
+        return !!(api && typeof api.restoreArchive === 'function' && typeof api.showOpenDialog === 'function');
+    }
+
+    function plural(n, word) {
+        const v = Number(n) || 0;
+        return `${v.toLocaleString()} ${word}${v === 1 ? '' : 's'}`;
+    }
+
+    async function restore() {
+        if (!canRestore() || restoring) return;
+        const pick = await window.electronAPI.showOpenDialog({
+            title: 'Choose a backup to restore',
+            properties: ['openFile'],
+            filters: [{ name: 'Digital Museum backup', extensions: ['sqlite', 'db'] }, { name: 'All files', extensions: ['*'] }],
+        });
+        const path = pick && !pick.canceled && Array.isArray(pick.filePaths) ? pick.filePaths[0] : '';
+        if (!path) return;
+
+        let cand;
+        try {
+            const res = await fetch('/api/backup/restore-check', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path }),
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.detail || body.error || `HTTP ${res.status}`);
+            cand = body.candidate || {};
+        } catch (err) {
+            await AppDialogs.showAppAlert("Can't restore that file", err.message || 'Request failed.');
+            return;
+        }
+
+        const when = cand.modified_at ? new Date(cand.modified_at).toLocaleString() : 'an unknown date';
+        const ok = await AppDialogs.showAppConfirm(
+            'Replace your archive with this backup?',
+            `Backup saved ${when} (${formatBytes(cand.size_bytes)}), containing ${plural(cand.messages, 'message')}, ` +
+            `${plural(cand.emails, 'email')} and ${plural(cand.photos, 'photo')}.\n\n` +
+            'Anything added or changed since that backup will no longer be in the archive. ' +
+            'Your current archive is kept as a safety copy in the same folder, so you can go back to it.\n\n' +
+            'Digital Museum will restart and you will need to sign in again.',
+            { confirmLabel: 'Restore', danger: true }
+        );
+        if (!ok) return;
+
+        restoring = true;
+        render();
+        let result;
+        try {
+            result = await window.electronAPI.restoreArchive({ backupPath: path });
+        } catch (err) {
+            result = { ok: false, error: err && err.message ? err.message : String(err) };
+        }
+        restoring = false;
+        render();
+        if (result && result.ok) {
+            await AppDialogs.showAppAlert(
+                'Archive restored',
+                `Your archive now contains the backup. The archive you had before is kept at:\n${result.safetyPath}\n\nSign in again to continue.`
+            );
+            window.location.href = '/login';
+            return;
+        }
+        await AppDialogs.showAppAlert('Restore did not complete', (result && result.error) || 'The restore failed.');
+        window.location.reload();
     }
 
     function openModal() {
@@ -210,6 +292,7 @@ const ArchiveBackup = (() => {
         el('backup-close-btn')?.addEventListener('click', closeModal);
         el('backup-start-btn')?.addEventListener('click', () => { void start(); });
         el('backup-snooze-btn')?.addEventListener('click', () => { void snooze(); });
+        el('backup-restore-btn')?.addEventListener('click', () => { void restore(); });
         const modal = el('backup-modal');
         modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
         await loadIdentity();

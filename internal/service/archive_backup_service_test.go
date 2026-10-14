@@ -159,3 +159,76 @@ func TestBackupReminderDue(t *testing.T) {
 		}
 	}
 }
+
+func TestInspectRestoreCandidate(t *testing.T) {
+	ctx := context.Background()
+	db, src := newBackupTestArchive(t)
+	for _, stmt := range []string{
+		`CREATE TABLE users (id INTEGER PRIMARY KEY)`,
+		`CREATE TABLE app_configuration (key TEXT, value TEXT)`,
+		`CREATE TABLE emails (id INTEGER PRIMARY KEY)`,
+		`CREATE TABLE media_items (id INTEGER PRIMARY KEY)`,
+		`INSERT INTO emails DEFAULT VALUES`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	svc := NewArchiveBackupService(db, nil)
+	dir := filepath.Dir(src)
+
+	backup := filepath.Join(dir, "good-backup.sqlite")
+	if res := svc.RunSync(ctx, backup); res.Error != "" {
+		t.Fatalf("backup failed: %s", res.Error)
+	}
+	cand, err := svc.InspectRestoreCandidate(ctx, backup)
+	if err != nil {
+		t.Fatalf("good backup rejected: %v", err)
+	}
+	if cand.Messages != 2 || cand.Emails != 1 || cand.Photos != 0 || !samePath(cand.ArchivePath, src) {
+		t.Fatalf("unexpected candidate %+v", cand)
+	}
+	// Inspecting must not leave files behind next to the backup.
+	for _, sfx := range []string{"-wal", "-shm", "-journal"} {
+		if _, err := os.Stat(backup + sfx); err == nil {
+			t.Fatalf("inspection created %s", backup+sfx)
+		}
+	}
+
+	notSQLite := filepath.Join(dir, "notes.txt")
+	if err := os.WriteFile(notSQLite, []byte("hello, this is not a database"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	otherDB := filepath.Join(dir, "other.sqlite")
+	odb, err := sql.Open("sqlite3", config.SQLiteFileDSN(otherDB))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := odb.Exec(`CREATE TABLE things (id INTEGER)`); err != nil {
+		t.Fatal(err)
+	}
+	_ = odb.Close()
+	withWAL := filepath.Join(dir, "live-copy.sqlite")
+	if res := svc.RunSync(ctx, withWAL); res.Error != "" {
+		t.Fatal(res.Error)
+	}
+	if err := os.WriteFile(withWAL+"-wal", []byte("pending"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, path := range map[string]string{
+		"empty":          "",
+		"relative":       "backup.sqlite",
+		"missing":        filepath.Join(dir, "nope.sqlite"),
+		"folder":         dir,
+		"open archive":   src,
+		"archive wal":    src + "-wal",
+		"not sqlite":     notSQLite,
+		"not an archive": otherDB,
+		"pending wal":    withWAL,
+	} {
+		if _, err := svc.InspectRestoreCandidate(ctx, path); err == nil {
+			t.Errorf("%s: expected rejection for %q", name, path)
+		}
+	}
+}

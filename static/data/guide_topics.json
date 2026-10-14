@@ -91,7 +91,7 @@
           "position": "middle-left"
         },
         {
-          "text": "Multi-Source Search — find related content across emails, messages, and posts by concept, not just keywords.",
+          "text": "Search by Meaning — find related content across emails, messages, and posts by concept, not just keywords.",
           "glow": "#message-similarity-sidebar-btn",
           "navigate_action": "closeOpenDialog;pause0_5s;openMultiSourceSearch",
           "position": "middle-left"
@@ -869,14 +869,14 @@
     },
     {
       "key": "SimilaritySearch",
-      "title": "Multi-Source Similarity search",
+      "title": "Search by Meaning",
       "description": "Find semantically related messages, emails, photos, and posts using AI embedding search.",
       "category": "Daily Use",
       "QA":"OK",
       "dismiss_navigate_action": "closeOpenDialog",
       "steps": [
         {
-          "text": "Open Multi-Source Search from the left sidebar. This uses AI embeddings to find content that is conceptually similar to your query — not just keyword matches.",
+          "text": "Open Search by Meaning from the left sidebar. This uses AI embeddings to find content that is conceptually similar to your query — not just keyword matches.",
           "glow": "#message-similarity-sidebar-btn",
           "position": "middle-center"
         },

@@ -5948,8 +5948,6 @@ const App = (() => {
                 if (e.target === visitorHintsModal) closeVisitorHintsModal();
             });
         }
-
-        window.onbeforeunload = () => { SSE.close(); };
     }
     return {
         init,

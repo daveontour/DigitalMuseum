@@ -122,6 +122,10 @@
                     <i class="fas fa-hdd" aria-hidden="true"></i>
                     <span id="backup-reminder-label">Back up your archive</span>
                 </button>
+                <button id="museum-health-btn" class="museum-health-btn" type="button" hidden>
+                    <i id="museum-health-icon" class="fas fa-list-check" aria-hidden="true"></i>
+                    <span id="museum-health-label">Finish setup</span>
+                </button>
                 <button id="guide-sidebar-btn" class="top-bar-guide-btn" type="button" title="Guide">
                     <i class="fas fa-question-circle"></i>
                      <span style="margin-left:4px; font-size:var(--text-sm);">Guide</span>
@@ -154,9 +158,14 @@
                                 <i class="fas fa-sync-alt" style="margin-right:6px;"></i>Reload Guide Topics
                             </button>
                         </div>
+                        <div id="account-system-status-section" style="display:none; border-bottom:1px solid var(--color-border); padding-bottom:4px; margin-bottom:4px;">
+                            <button type="button" id="account-system-status-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
+                                <i class="fas fa-heart-pulse" style="margin-right:6px;"></i>Setup &amp; System Status&hellip;
+                            </button>
+                        </div>
                         <div id="account-backup-section" style="display:none; border-bottom:1px solid var(--color-border); padding-bottom:4px; margin-bottom:4px;">
                             <button type="button" id="account-backup-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
-                                <i class="fas fa-hdd" style="margin-right:6px;"></i>Back Up Archive&hellip;
+                                <i class="fas fa-hdd" style="margin-right:6px;"></i>Back Up or Restore&hellip;
                             </button>
                         </div>
                         <button type="button" id="account-about-btn" class="account-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; background:none; border:none; color:#fff; cursor:pointer; font-size:var(--text-md);">
@@ -204,8 +213,8 @@
                     <button type="button" class="more-options-btn" id="artefacts-sidebar-btn">
                         <i class="fas fa-box-open"></i> Artefacts
                     </button>
-                    <button type="button" class="more-options-btn" id="message-similarity-sidebar-btn">
-                        <i class="fas fa-search"></i> Multi Source Search
+                    <button type="button" class="more-options-btn" id="message-similarity-sidebar-btn" title="Find messages, emails, photos and posts about a topic, even when they don't use your exact words. For exact words, use Search (Ctrl+K) at the top.">
+                        <i class="fas fa-search"></i> Search by Meaning
                     </button>
                     <p id="sidebar-explore-empty-hint" class="sidebar-empty-hint" hidden>Nothing imported yet. Use <strong>Source Data</strong> below to add emails, messages or photos.</p>
 
@@ -364,6 +373,12 @@
                 <button id="interview-end-btn" class="stop-btn"><i class="fas fa-stop"></i> End Interview</button>
             </div>
 
+            <div id="chat-tools-off-banner" class="chat-tools-off-banner" role="alert" hidden>
+                <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                <span class="chat-tools-off-text">The AI can't look at your archive yet &mdash; no AI tools are turned on, so it can only answer from general knowledge.</span>
+                <button type="button" id="chat-tools-off-enable-btn" class="modal-btn modal-btn-primary">Turn on recommended tools</button>
+                <button type="button" id="chat-tools-off-dismiss-btn" class="chat-tools-off-dismiss" aria-label="Hide this message" title="Hide">&times;</button>
+            </div>
             <div id="chat-context-status-bar" class="chat-context-status-bar" role="status" aria-live="polite">
                 <span class="chat-context-status-bar-inner">
                     <span class="chat-context-status-seg chat-context-status-clickable" id="chat-context-status-tools-seg" role="button" tabindex="0" title="Open Configuration → Tools Access (owner master key required)">
@@ -463,11 +478,11 @@
         <div id="message-similarity-modal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:1140px; width:94vw; max-height:90vh; display:flex; flex-direction:column;" onclick="event.stopPropagation()">
                 <div class="modal-header">
-                    <h2><i class="fas fa-search"></i> Multi Source Search</h2>
+                    <h2><i class="fas fa-search"></i> Search by Meaning</h2>
                     <button class="modal-close-btn" id="close-message-similarity-modal">&times;</button>
                 </div>
                 <div class="modal-body email-gallery-search-section message-similarity-modal-body" style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column;">
-                    <textarea id="message-similarity-text" rows="3" class="email-gallery-input" placeholder="Search messages, emails, images, artefacts, Facebook posts, and Facebook albums..."></textarea>
+                    <textarea id="message-similarity-text" rows="3" class="email-gallery-input" placeholder="Describe what you're looking for, e.g. &quot;the day we moved house&quot; — finds related messages, emails, photos, artefacts and Facebook posts even when they use different words"></textarea>
                     <div class="message-similarity-sensitivity-row">
                         <label for="message-similarity-sensitivity" class="email-gallery-sort-label">Match sensitivity</label>
                         <div class="message-similarity-sensitivity-slider">
@@ -650,6 +665,7 @@
                     <p id="post-import-modal-summary" class="post-import-modal-summary">After each import, Digital Museum prepares the new data so you can search it, browse photos, and ask the AI about it.</p>
                     <ol id="post-import-steps-list" class="post-import-steps-list"></ol>
                     <div class="post-import-modal-actions">
+                        <button type="button" class="modal-btn modal-btn-secondary" id="post-import-open-status-btn" hidden><i class="fas fa-heart-pulse" aria-hidden="true"></i> Why were steps skipped?</button>
                         <button type="button" class="modal-btn modal-btn-secondary" id="post-import-open-jobs-btn"><i class="fas fa-tasks" aria-hidden="true"></i> Scheduled jobs</button>
                         <button type="button" class="modal-btn modal-btn-secondary" id="post-import-stop-btn" hidden><i class="fas fa-stop" aria-hidden="true"></i> Stop</button>
                         <button type="button" class="modal-btn modal-btn-primary" id="post-import-close-btn">Close</button>
@@ -667,6 +683,25 @@
                     <button type="button" class="modal-close-btn" id="close-timeline-modal">&times;</button>
                 </div>
                 <div class="timeline-body">
+                    <form id="timeline-filter-form" class="timeline-filter" role="search" aria-label="Filter the timeline">
+                        <label class="timeline-filter-field" id="timeline-filter-person-field" for="timeline-filter-person" title="Only show things involving this person">
+                            <i class="fas fa-user" aria-hidden="true"></i>
+                            <input type="text" id="timeline-filter-person" list="timeline-filter-person-list" placeholder="Person" autocomplete="off" aria-label="Person">
+                        </label>
+                        <datalist id="timeline-filter-person-list"></datalist>
+                        <label class="timeline-filter-field timeline-filter-field--wide" for="timeline-filter-keywords" title="Every word must appear. Use &quot;quotes&quot; for a phrase.">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="search" id="timeline-filter-keywords" placeholder="Keywords" autocomplete="off" aria-label="Keywords">
+                        </label>
+                        <label class="timeline-filter-field" for="timeline-filter-tag" title="Photo tag — shows only photos">
+                            <i class="fas fa-tag" aria-hidden="true"></i>
+                            <input type="text" id="timeline-filter-tag" list="timeline-filter-tag-list" placeholder="Photo tag" autocomplete="off" aria-label="Photo tag">
+                        </label>
+                        <datalist id="timeline-filter-tag-list"></datalist>
+                        <button type="submit" class="modal-btn modal-btn-primary" id="timeline-filter-apply-btn">Filter</button>
+                        <button type="button" class="modal-btn modal-btn-secondary" id="timeline-filter-clear-btn" hidden>Clear</button>
+                    </form>
+                    <p id="timeline-filter-status" class="timeline-filter-status" hidden></p>
                     <div id="timeline-years" class="timeline-years" role="tablist" aria-label="Years"></div>
                     <div id="timeline-months" class="timeline-months" aria-label="Months"></div>
                     <div class="timeline-month-header">
@@ -697,7 +732,7 @@
         <div id="backup-modal" class="modal" style="display:none; z-index: 4100;">
             <div class="modal-content backup-modal-content" style="max-width:560px; width:92vw;" onclick="event.stopPropagation()">
                 <div class="modal-header">
-                    <h2><i class="fas fa-hdd"></i> Back up your archive</h2>
+                    <h2><i class="fas fa-hdd"></i> Back up or restore your archive</h2>
                     <button type="button" class="modal-close-btn" id="close-backup-modal">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -716,7 +751,6 @@
                         <li>You can keep using the app while the backup runs.</li>
                         <li>Encrypted items stay encrypted in the backup &mdash; you'll need your master password to open them.</li>
                         <li>Photos added with &ldquo;Link to Images on Disk&rdquo; stay in their original folders and aren't copied; back those folders up too.</li>
-                        <li>To restore, close Digital Museum and copy the backup file over your archive file (shown above), keeping the archive&rsquo;s file name.</li>
                     </ul>
                     <p id="backup-modal-unavailable" class="backup-modal-unavailable" hidden>Backups can only be made from the Digital Museum desktop app.</p>
                     <div class="backup-modal-actions">
@@ -724,6 +758,47 @@
                         <button type="button" class="modal-btn modal-btn-secondary" id="backup-close-btn">Close</button>
                         <button type="button" class="modal-btn modal-btn-primary" id="backup-start-btn"><i class="fas fa-save" aria-hidden="true"></i> Choose location &amp; back up</button>
                     </div>
+                    <section id="backup-restore-section" class="backup-restore-section" aria-labelledby="backup-restore-heading" hidden>
+                        <h3 id="backup-restore-heading" class="backup-restore-heading">Restore from a backup</h3>
+                        <p class="backup-restore-text">Replaces this archive with a backup file. Your current archive isn&rsquo;t deleted &mdash; it&rsquo;s kept as a safety copy in the same folder. Digital Museum restarts and you&rsquo;ll need to sign in again.</p>
+                        <div id="backup-restore-progress" class="backup-modal-progress" hidden>
+                            <i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+                            <span>Restoring &mdash; Digital Museum is restarting&hellip;</span>
+                        </div>
+                        <button type="button" class="modal-btn modal-btn-secondary" id="backup-restore-btn"><i class="fas fa-undo" aria-hidden="true"></i> Restore from a backup&hellip;</button>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- Setup & System Status (system-status.js) -->
+        <div id="system-status-modal" class="modal" style="display:none; z-index: 4100;">
+            <div class="modal-content system-status-modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-heart-pulse"></i> Setup &amp; System Status</h2>
+                    <button type="button" class="modal-close-btn" id="close-system-status-modal">&times;</button>
+                </div>
+                <div class="system-status-tabs" role="tablist" aria-label="Setup and system status">
+                    <button type="button" role="tab" id="system-status-tab-setup" class="system-status-tab system-status-tab--active" data-sys-tab="setup" aria-selected="true" aria-controls="system-status-panel-setup">Getting started <span id="system-status-setup-count" class="system-status-tab-badge"></span></button>
+                    <button type="button" role="tab" id="system-status-tab-health" class="system-status-tab" data-sys-tab="health" aria-selected="false" aria-controls="system-status-panel-health">System status <span id="system-status-health-badge" class="system-status-tab-badge"></span></button>
+                </div>
+                <div class="modal-body system-status-body">
+                    <section id="system-status-panel-setup" role="tabpanel" aria-labelledby="system-status-tab-setup">
+                        <p id="system-status-setup-lead" class="system-status-lead"></p>
+                        <div class="system-status-progress" aria-hidden="true"><div id="system-status-progress-bar" class="system-status-progress-bar"></div></div>
+                        <ol id="system-status-setup-list" class="system-status-list"></ol>
+                        <label class="system-status-dismiss" for="system-status-setup-dismiss-checkbox">
+                            <input type="checkbox" id="system-status-setup-dismiss-checkbox">
+                            <span>Don't show the setup reminder in the top bar</span>
+                        </label>
+                    </section>
+                    <section id="system-status-panel-health" role="tabpanel" aria-labelledby="system-status-tab-health" hidden>
+                        <div class="system-status-health-head">
+                            <p id="system-status-health-summary" class="system-status-lead"></p>
+                            <button type="button" class="modal-btn modal-btn-secondary" id="system-status-recheck-btn"><i class="fas fa-rotate" aria-hidden="true"></i> Check again</button>
+                        </div>
+                        <ul id="system-status-health-list" class="system-status-list"></ul>
+                    </section>
                 </div>
             </div>
         </div>
@@ -916,7 +991,7 @@
                         <button id="config-tab-btn-ai-models-config" type="button" class="config-tab-button" data-tab="ai-models-config">
                             <i class="fas fa-robot"></i> AI Models
                         </button>
-                        <button id="config-tab-btn-model-catalog" type="button" class="config-tab-button" data-tab="model-catalog">
+                        <button id="config-tab-btn-model-catalog" type="button" class="config-tab-button config-tab-advanced" data-tab="model-catalog">
                             <i class="fas fa-list"></i> Model Catalog
                         </button>
                         <button id="config-tab-btn-ai-setup-config" type="button" class="config-tab-button" data-tab="ai-setup-config">
@@ -925,36 +1000,40 @@
                         <button id="config-tab-btn-subject-configuration" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="subject-configuration">
                             <i class="fas fa-user"></i> Subject Configuration
                         </button>
-                        <button id="config-tab-btn-regions-config" type="button" class="config-tab-button" data-tab="regions-config">
+                        <button id="config-tab-btn-regions-config" type="button" class="config-tab-button config-tab-advanced" data-tab="regions-config">
                             <i class="fas fa-globe-americas"></i> Regions
                         </button>
-                        <button id="config-tab-btn-suggestions-config" type="button" class="config-tab-button" data-tab="suggestions-config">
+                        <button id="config-tab-btn-suggestions-config" type="button" class="config-tab-button config-tab-advanced" data-tab="suggestions-config">
                             <i class="fas fa-lightbulb"></i> Suggestions
                         </button>
-                        <button id="config-tab-btn-guide-topics-config" type="button" class="config-tab-button" data-tab="guide-topics-config">
+                        <button id="config-tab-btn-guide-topics-config" type="button" class="config-tab-button config-tab-advanced" data-tab="guide-topics-config">
                             <i class="fas fa-map-signs"></i> Guide Topics
                         </button>
-                        <button id="config-tab-btn-file-dupe" type="button" class="config-tab-button" data-tab="file-dupe">
+                        <button id="config-tab-btn-file-dupe" type="button" class="config-tab-button config-tab-advanced" data-tab="file-dupe">
                             <i class="fas fa-clone"></i> Duplicate File Tool
                         </button>
-                        <button id="config-tab-btn-email-personal-score" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="email-personal-score">
+                        <button id="config-tab-btn-email-personal-score" type="button" class="config-tab-button config-tab-advanced config-sidebar-requires-master" data-tab="email-personal-score">
                             <i class="fas fa-envelope-open-text"></i> Email Personal Score
                         </button>
-                        <button id="config-tab-btn-custom-voices" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="custom-voices">
+                        <button id="config-tab-btn-custom-voices" type="button" class="config-tab-button config-tab-advanced config-sidebar-requires-master" data-tab="custom-voices">
                             <i class="fas fa-microphone-alt"></i> Custom Voices
                         </button>
                         <button id="config-tab-btn-manage-keys" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="manage-keys">
                             <i class="fas fa-key"></i> Manage Visitor Keys
                         </button>
-                        <button id="config-tab-btn-mcp-servers-config" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="mcp-servers-config">
+                        <button id="config-tab-btn-mcp-servers-config" type="button" class="config-tab-button config-tab-advanced config-sidebar-requires-master" data-tab="mcp-servers-config">
                             <i class="fas fa-server"></i> MCP Servers
                         </button>
-                        <button id="config-tab-btn-tools-access" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tools-access">
+                        <button id="config-tab-btn-tools-access" type="button" class="config-tab-button config-tab-advanced config-sidebar-requires-master" data-tab="tools-access">
                             <i class="fas fa-wrench"></i> Tools Access
                         </button>
-                        <button id="config-tab-btn-tool-test" type="button" class="config-tab-button config-sidebar-requires-master" data-tab="tool-test">
+                        <button id="config-tab-btn-tool-test" type="button" class="config-tab-button config-tab-advanced config-sidebar-requires-master" data-tab="tool-test">
                             <i class="fas fa-vial"></i> Tool Test
                         </button>
+                        <label class="config-advanced-toggle" for="config-show-advanced-checkbox" title="Model catalog, regions, suggestions and guide editors, duplicate files, email scoring, custom voices, MCP servers and AI tool settings">
+                            <input type="checkbox" id="config-show-advanced-checkbox" role="switch">
+                            <span>Show advanced settings</span>
+                        </label>
                     </div>
                     <div class="config-content">
                 <div class="config-tab-content active" id="settings-tab">
@@ -1806,6 +1885,7 @@
                         <div style="margin-top:16px; display:flex; gap:8px;">
                             <button type="button" id="llm-tools-access-save" class="modal-btn modal-btn-primary">Save</button>
                             <button type="button" id="llm-tools-access-refresh" class="modal-btn">Refresh Tools</button>
+                            <button type="button" id="llm-tools-access-recommended" class="modal-btn" title="Turns on the standard read-only archive tools for your own sessions. Leaves visitor access, sensitive documents, web search and tools from other servers unchanged.">Turn On Recommended Tools</button>
                         </div>
                     </section>
                 </div>
@@ -1993,7 +2073,92 @@
                                     </label>
                                     <span id="post-import-auto-status" class="post-import-auto-status" aria-live="polite"></span>
                                 </div>
-                                <div class="data-import-cards-grid">
+                                <div id="import-wizard" class="import-wizard">
+                                    <div id="import-wizard-pick" class="import-wizard-pick">
+                                        <h3 class="import-wizard-heading">What would you like to add?</h3>
+                                        <div class="import-wizard-tiles" role="list">
+                                            <button type="button" role="listitem" class="import-wizard-tile" id="import-wizard-tile-email" data-wizard-source="email"><i class="fas fa-envelope" aria-hidden="true"></i><span class="import-wizard-tile-name">Email</span><span class="import-wizard-tile-sub">Gmail or any IMAP mailbox</span><span class="import-wizard-tile-count" id="import-wizard-count-email"></span></button>
+                                            <button type="button" role="listitem" class="import-wizard-tile" id="import-wizard-tile-whatsapp" data-wizard-source="whatsapp"><i class="fab fa-whatsapp" aria-hidden="true"></i><span class="import-wizard-tile-name">WhatsApp</span><span class="import-wizard-tile-sub">Chats and their photos</span><span class="import-wizard-tile-count" id="import-wizard-count-whatsapp"></span></button>
+                                            <button type="button" role="listitem" class="import-wizard-tile" id="import-wizard-tile-facebook" data-wizard-source="facebook"><i class="fab fa-facebook" aria-hidden="true"></i><span class="import-wizard-tile-name">Facebook</span><span class="import-wizard-tile-sub">Messenger, albums, posts, places</span><span class="import-wizard-tile-count" id="import-wizard-count-facebook"></span></button>
+                                            <button type="button" role="listitem" class="import-wizard-tile" id="import-wizard-tile-instagram" data-wizard-source="instagram"><i class="fab fa-instagram" aria-hidden="true"></i><span class="import-wizard-tile-name">Instagram</span><span class="import-wizard-tile-sub">Messages and posts</span><span class="import-wizard-tile-count" id="import-wizard-count-instagram"></span></button>
+                                            <button type="button" role="listitem" class="import-wizard-tile" id="import-wizard-tile-imessage" data-wizard-source="imessage"><i class="fas fa-comment-dots" aria-hidden="true"></i><span class="import-wizard-tile-name">iMessage &amp; SMS</span><span class="import-wizard-tile-sub">Texts from an iPhone</span><span class="import-wizard-tile-count" id="import-wizard-count-imessage"></span></button>
+                                            <button type="button" role="listitem" class="import-wizard-tile" id="import-wizard-tile-photos" data-wizard-source="photos"><i class="fas fa-images" aria-hidden="true"></i><span class="import-wizard-tile-name">Photos</span><span class="import-wizard-tile-sub">Folders of photos on this computer</span><span class="import-wizard-tile-count" id="import-wizard-count-photos"></span></button>
+                                            <button type="button" role="listitem" class="import-wizard-tile" id="import-wizard-tile-documents" data-wizard-source="documents"><i class="fas fa-book" aria-hidden="true"></i><span class="import-wizard-tile-name">Documents</span><span class="import-wizard-tile-sub">PDFs, Word, text for the AI to read</span><span class="import-wizard-tile-count" id="import-wizard-count-documents"></span></button>
+                                        </div>
+                                        <div class="import-wizard-pick-footer">
+                                            <button type="button" class="import-wizard-link" id="import-wizard-other-btn" data-wizard-source="other">Something else?</button>
+                                            <button type="button" class="import-wizard-link" id="import-wizard-show-all-btn">Show all import options</button>
+                                        </div>
+                                    </div>
+                                    <div id="import-wizard-source" class="import-wizard-source" hidden>
+                                        <div class="import-wizard-source-header">
+                                            <button type="button" class="modal-btn modal-btn-secondary" id="import-wizard-back-btn"><i class="fas fa-arrow-left" aria-hidden="true"></i> All sources</button>
+                                            <h3 class="import-wizard-heading" id="import-wizard-source-title"></h3>
+                                        </div>
+                                        <details class="import-wizard-howto" id="import-wizard-howto" open>
+                                            <summary id="import-wizard-howto-summary">How do I get this export?</summary>
+                                            <div class="import-wizard-howto-body" data-wizard-howto="email" hidden>
+                                                <ul>
+                                                    <li><strong>Gmail:</strong> no export needed. Click <strong>Import</strong> on the Gmail card below and sign in with Google.</li>
+                                                    <li><strong>Any other provider</strong> (iCloud, Yahoo, your internet provider, a work mailbox&hellip;): use the IMAP card. You'll need the provider's IMAP server name &mdash; search the web for &ldquo;<em>your provider</em> IMAP settings&rdquo; &mdash; plus your email address and password.</li>
+                                                    <li>If your account uses two-step verification, most providers want an <strong>app password</strong> instead of your normal one. Create it in your account's security settings.</li>
+                                                </ul>
+                                            </div>
+                                            <div class="import-wizard-howto-body" data-wizard-howto="whatsapp" hidden>
+                                                <ol>
+                                                    <li>Install <strong>iMazing</strong> on this computer and connect your iPhone with a cable.</li>
+                                                    <li>In iMazing, select your phone, then <strong>WhatsApp</strong>.</li>
+                                                    <li>Select the chats you want (or all of them) and export them <strong>to CSV</strong>, including attachments, into an empty folder.</li>
+                                                    <li>Click <strong>Import</strong> below and choose that folder (or a ZIP of it).</li>
+                                                </ol>
+                                                <p class="import-wizard-note">Digital Museum reads iMazing's CSV export. The text files from WhatsApp's own &ldquo;Export chat&rdquo; option aren't supported yet.</p>
+                                            </div>
+                                            <div class="import-wizard-howto-body" data-wizard-howto="facebook" hidden>
+                                                <ol>
+                                                    <li>On a computer, log in to Facebook and open <strong>Settings &amp; privacy &rarr; Settings &rarr; Accounts Center</strong>.</li>
+                                                    <li>Choose <strong>Your information and permissions &rarr; Download your information</strong>, then create an export of your Facebook profile, <strong>to your device</strong>.</li>
+                                                    <li>Pick <strong>All of your information</strong> (or just the parts you want), set <strong>Format: JSON</strong> &mdash; not HTML &mdash; and <strong>Date range: All time</strong>.</li>
+                                                    <li>Create the files. Facebook emails you when they're ready &mdash; this can take hours or a few days for a large account.</li>
+                                                    <li>Download the ZIP file(s), click <strong>Import</strong> below and choose the ZIP.</li>
+                                                </ol>
+                                                <p class="import-wizard-note">Menu names move around from time to time; if you can't find them, search Facebook's Help Center for &ldquo;download your information&rdquo;.</p>
+                                            </div>
+                                            <div class="import-wizard-howto-body" data-wizard-howto="instagram" hidden>
+                                                <ol>
+                                                    <li>On a computer, log in to Instagram and open <strong>More (&#9776;) &rarr; Settings &rarr; Accounts Center</strong>.</li>
+                                                    <li>Choose <strong>Your information and permissions &rarr; Download your information</strong>, then create an export of your Instagram profile, <strong>to your device</strong>.</li>
+                                                    <li>Pick <strong>All of your information</strong> (or just the parts you want), set <strong>Format: JSON</strong> &mdash; not HTML &mdash; and <strong>Date range: All time</strong>.</li>
+                                                    <li>Create the files. Instagram emails you when they're ready &mdash; this can take hours or a few days.</li>
+                                                    <li>Download the ZIP file(s), click <strong>Import</strong> below and choose the ZIP.</li>
+                                                </ol>
+                                                <p class="import-wizard-note">Menu names move around from time to time; if you can't find them, search Instagram's Help Center for &ldquo;download your information&rdquo;.</p>
+                                            </div>
+                                            <div class="import-wizard-howto-body" data-wizard-howto="imessage" hidden>
+                                                <ol>
+                                                    <li>Install <strong>iMazing</strong> on this computer and connect your iPhone with a cable.</li>
+                                                    <li>In iMazing, select your phone, then <strong>Messages</strong>.</li>
+                                                    <li>Select the conversations you want (or all of them) and export them <strong>to CSV</strong>, including attachments, into an empty folder.</li>
+                                                    <li>Click <strong>Import</strong> below and choose that folder (or a ZIP of it).</li>
+                                                </ol>
+                                            </div>
+                                            <div class="import-wizard-howto-body" data-wizard-howto="photos" hidden>
+                                                <p>No export needed &mdash; just choose a folder on this computer. Pick the option that suits you:</p>
+                                                <ul>
+                                                    <li><strong>Upload Photos from Device</strong> copies the photos into the archive file. Your archive is self-contained and its backup includes the photos, but it grows by the size of the photos.</li>
+                                                    <li><strong>Link to Images on Disk</strong> only remembers where each photo is and stores a thumbnail (unless you tick the option to copy them in too). The archive stays small, but the photos must stay in that folder, and they aren't part of an archive backup.</li>
+                                                </ul>
+                                                <p class="import-wizard-note">Photos on a phone or in iCloud/Google Photos need to be copied to a folder on this computer first.</p>
+                                            </div>
+                                            <div class="import-wizard-howto-body" data-wizard-howto="documents" hidden>
+                                                <p>Add PDFs, Word documents, text, CSV or JSON files &mdash; a eulogy, a CV, family notes, letters. The AI can read them when answering questions. Click <strong>Manage</strong> below to add files.</p>
+                                            </div>
+                                            <div class="import-wizard-howto-body" data-wizard-howto="other" hidden>
+                                                <p>Have data from somewhere not listed here? Get in touch using the details on the card below.</p>
+                                            </div>
+                                        </details>
+                                    </div>
+                                </div>
+                                <div class="data-import-cards-grid" id="data-import-import-cards-grid">
                                 <article class="data-import-card data-import-row" data-import="email_processing">
                                     <div class="data-import-card-header">
                                         <h3 class="data-import-card-title"><i class="fas fa-envelope"></i> Import Mail from Gmail (Oauth2 Authentication)</h3>
@@ -5147,6 +5312,9 @@
     <script src="/static/js/museum/images-grid.js?v={{ static_images_grid_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/post-import-status.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/sidebar-sources.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/import-wizard.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/config-advanced.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/system-status.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/archive-backup.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/timeline.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/quick-search.js?v={{ static_app_js_cache_bust }}" defer></script>
@@ -6062,6 +6230,9 @@
                 </div>
                 <section class="info-box-onboarding-controls" aria-label="Getting started controls">
                     <div class="info-box-onboarding-actions">
+                        <button type="button" id="welcome-setup-checklist-btn" class="modal-btn modal-btn-primary" hidden>
+                            <i class="fas fa-list-check"></i> <span id="welcome-setup-checklist-label">Setup checklist</span>
+                        </button>
                         <button type="button" id="welcome-identity-profile-btn" class="modal-btn modal-btn-primary">
                             <i class="fas fa-id-card"></i> Enter Profile Information
                         </button>

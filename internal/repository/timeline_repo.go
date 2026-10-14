@@ -46,8 +46,13 @@ const (
 	quickSearchMinLength = 2
 )
 
-// MonthlyCounts returns per-month counts for every month that has anything, oldest first.
-func (r *TimelineRepo) MonthlyCounts(ctx context.Context, src TimelineSources) ([]model.TimelineMonth, error) {
+// MonthlyCounts returns per-month counts for every month that has anything (matching f), oldest
+// first, plus the sources f leaves out entirely (see TimelineFilter).
+func (r *TimelineRepo) MonthlyCounts(ctx context.Context, src TimelineSources, f TimelineFilter) ([]model.TimelineMonth, []string, error) {
+	conds, err := r.timelineConditions(ctx, f)
+	if err != nil {
+		return nil, nil, err
+	}
 	uid := uidFromCtx(ctx)
 	byMonth := map[string]*model.TimelineMonth{}
 	get := func(m string) *model.TimelineMonth {
@@ -78,32 +83,32 @@ func (r *TimelineRepo) MonthlyCounts(ctx context.Context, src TimelineSources) (
 		return rows.Err()
 	}
 
-	if src.Messages {
-		q, args := addUIDFilter(`SELECT substr(message_date, 1, 7), COUNT(*) FROM messages
+	if src.Messages && !conds.messages.skip {
+		q, args := conds.messages.where(`SELECT substr(message_date, 1, 7), COUNT(*) FROM messages
 			WHERE message_date GLOB `+timelineDateGlob, nil, uid)
 		if err := collect(q+` GROUP BY 1`, args, func(t *model.TimelineMonth, n int64) { t.Messages = n }); err != nil {
-			return nil, fmt.Errorf("timeline messages: %w", err)
+			return nil, nil, fmt.Errorf("timeline messages: %w", err)
 		}
 	}
-	if src.Emails {
-		q, args := addUIDFilter(`SELECT substr(date, 1, 7), COUNT(*) FROM emails
+	if src.Emails && !conds.emails.skip {
+		q, args := conds.emails.where(`SELECT substr(date, 1, 7), COUNT(*) FROM emails
 			WHERE COALESCE(user_deleted, 0) = 0 AND date GLOB `+timelineDateGlob, nil, uid)
 		if err := collect(q+` GROUP BY 1`, args, func(t *model.TimelineMonth, n int64) { t.Emails = n }); err != nil {
-			return nil, fmt.Errorf("timeline emails: %w", err)
+			return nil, nil, fmt.Errorf("timeline emails: %w", err)
 		}
 	}
-	{
-		q, args := addUIDFilter(`SELECT printf('%04d-%02d', year, month), COUNT(*) FROM media_items
+	if !conds.photos.skip {
+		q, args := conds.photos.where(`SELECT printf('%04d-%02d', year, month), COUNT(*) FROM media_items
 			WHERE media_type LIKE 'image/%' AND year > 0 AND month BETWEEN 1 AND 12`, nil, uid)
 		if err := collect(q+` GROUP BY year, month`, args, func(t *model.TimelineMonth, n int64) { t.Photos = n }); err != nil {
-			return nil, fmt.Errorf("timeline photos: %w", err)
+			return nil, nil, fmt.Errorf("timeline photos: %w", err)
 		}
 	}
-	{
-		q, args := addUIDFilter(`SELECT substr(timestamp, 1, 7), COUNT(*) FROM facebook_posts
+	if !conds.posts.skip {
+		q, args := conds.posts.where(`SELECT substr(timestamp, 1, 7), COUNT(*) FROM facebook_posts
 			WHERE timestamp GLOB `+timelineDateGlob, nil, uid)
 		if err := collect(q+` GROUP BY 1`, args, func(t *model.TimelineMonth, n int64) { t.Posts = n }); err != nil {
-			return nil, fmt.Errorf("timeline posts: %w", err)
+			return nil, nil, fmt.Errorf("timeline posts: %w", err)
 		}
 	}
 
@@ -112,7 +117,7 @@ func (r *TimelineRepo) MonthlyCounts(ctx context.Context, src TimelineSources) (
 		out = append(out, *t)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Month < out[j].Month })
-	return out, nil
+	return out, conds.excluded, nil
 }
 
 func monthBounds(year, month int) (lo, hi string) {
@@ -125,10 +130,14 @@ func monthBounds(year, month int) (lo, hi string) {
 	return lo, hi
 }
 
-// MonthDetail returns the items for one month, grouped for display.
-func (r *TimelineRepo) MonthDetail(ctx context.Context, year, month int, src TimelineSources) (*model.TimelineMonthDetail, error) {
+// MonthDetail returns the items for one month (matching f), grouped for display.
+func (r *TimelineRepo) MonthDetail(ctx context.Context, year, month int, src TimelineSources, f TimelineFilter) (*model.TimelineMonthDetail, error) {
 	if year < 1900 || year > 2100 || month < 1 || month > 12 {
 		return nil, fmt.Errorf("invalid month %04d-%02d", year, month)
+	}
+	conds, err := r.timelineConditions(ctx, f)
+	if err != nil {
+		return nil, err
 	}
 	uid := uidFromCtx(ctx)
 	lo, hi := monthBounds(year, month)
@@ -145,11 +154,15 @@ func (r *TimelineRepo) MonthDetail(ctx context.Context, year, month int, src Tim
 			"photos":        timelineMaxPhotos,
 			"posts":         timelineMaxPosts,
 		},
-		Hidden: []string{},
+		Hidden:   []string{},
+		Filtered: f.Active(),
+		Excluded: conds.excluded,
 	}
 
-	if src.Messages {
-		q, args := addUIDFilter(`SELECT substr(message_date, 1, 10), COALESCE(chat_session, ''), COUNT(*), MIN(id)
+	if !src.Messages {
+		out.Hidden = append(out.Hidden, "messages")
+	} else if !conds.messages.skip {
+		q, args := conds.messages.where(`SELECT substr(message_date, 1, 10), COALESCE(chat_session, ''), COUNT(*), MIN(id)
 			FROM messages WHERE message_date >= ? AND message_date < ?`, []any{lo, hi}, uid)
 		q += ` GROUP BY 1, 2 ORDER BY 1, 3 DESC LIMIT ?`
 		args = append(args, timelineMaxConvDays)
@@ -169,16 +182,16 @@ func (r *TimelineRepo) MonthDetail(ctx context.Context, year, month int, src Tim
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
-		cq, cargs := addUIDFilter(`SELECT COUNT(*) FROM messages WHERE message_date >= ? AND message_date < ?`, []any{lo, hi}, uid)
+		cq, cargs := conds.messages.where(`SELECT COUNT(*) FROM messages WHERE message_date >= ? AND message_date < ?`, []any{lo, hi}, uid)
 		if err := r.pool.QueryRowContext(ctx, cq, cargs...).Scan(&out.Totals.Messages); err != nil {
 			return nil, err
 		}
-	} else {
-		out.Hidden = append(out.Hidden, "messages")
 	}
 
-	if src.Emails {
-		q, args := addUIDFilter(`SELECT id, substr(date, 1, 10), substr(date, 12, 5), COALESCE(subject, ''), COALESCE(from_address, '')
+	if !src.Emails {
+		out.Hidden = append(out.Hidden, "emails")
+	} else if !conds.emails.skip {
+		q, args := conds.emails.where(`SELECT id, substr(date, 1, 10), substr(date, 12, 5), COALESCE(subject, ''), COALESCE(from_address, '')
 			FROM emails WHERE COALESCE(user_deleted, 0) = 0 AND date >= ? AND date < ?`, []any{lo, hi}, uid)
 		q += ` ORDER BY date LIMIT ?`
 		args = append(args, timelineMaxEmails)
@@ -198,16 +211,14 @@ func (r *TimelineRepo) MonthDetail(ctx context.Context, year, month int, src Tim
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
-		cq, cargs := addUIDFilter(`SELECT COUNT(*) FROM emails WHERE COALESCE(user_deleted, 0) = 0 AND date >= ? AND date < ?`, []any{lo, hi}, uid)
+		cq, cargs := conds.emails.where(`SELECT COUNT(*) FROM emails WHERE COALESCE(user_deleted, 0) = 0 AND date >= ? AND date < ?`, []any{lo, hi}, uid)
 		if err := r.pool.QueryRowContext(ctx, cq, cargs...).Scan(&out.Totals.Emails); err != nil {
 			return nil, err
 		}
-	} else {
-		out.Hidden = append(out.Hidden, "emails")
 	}
 
-	{
-		q, args := addUIDFilter(`SELECT id, COALESCE(day, 0), COALESCE(title, '')
+	if !conds.photos.skip {
+		q, args := conds.photos.where(`SELECT id, COALESCE(day, 0), COALESCE(title, '')
 			FROM media_items WHERE media_type LIKE 'image/%' AND year = ? AND month = ?`, []any{year, month}, uid)
 		q += ` ORDER BY COALESCE(day, 0), id LIMIT ?`
 		args = append(args, timelineMaxPhotos)
@@ -227,14 +238,14 @@ func (r *TimelineRepo) MonthDetail(ctx context.Context, year, month int, src Tim
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
-		cq, cargs := addUIDFilter(`SELECT COUNT(*) FROM media_items WHERE media_type LIKE 'image/%' AND year = ? AND month = ?`, []any{year, month}, uid)
+		cq, cargs := conds.photos.where(`SELECT COUNT(*) FROM media_items WHERE media_type LIKE 'image/%' AND year = ? AND month = ?`, []any{year, month}, uid)
 		if err := r.pool.QueryRowContext(ctx, cq, cargs...).Scan(&out.Totals.Photos); err != nil {
 			return nil, err
 		}
 	}
 
-	{
-		q, args := addUIDFilter(`SELECT id, substr(timestamp, 1, 10), COALESCE(title, ''), COALESCE(post_text, '')
+	if !conds.posts.skip {
+		q, args := conds.posts.where(`SELECT id, substr(timestamp, 1, 10), COALESCE(title, ''), COALESCE(post_text, '')
 			FROM facebook_posts WHERE timestamp >= ? AND timestamp < ?`, []any{lo, hi}, uid)
 		q += ` ORDER BY timestamp LIMIT ?`
 		args = append(args, timelineMaxPosts)
@@ -255,7 +266,7 @@ func (r *TimelineRepo) MonthDetail(ctx context.Context, year, month int, src Tim
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
-		cq, cargs := addUIDFilter(`SELECT COUNT(*) FROM facebook_posts WHERE timestamp >= ? AND timestamp < ?`, []any{lo, hi}, uid)
+		cq, cargs := conds.posts.where(`SELECT COUNT(*) FROM facebook_posts WHERE timestamp >= ? AND timestamp < ?`, []any{lo, hi}, uid)
 		if err := r.pool.QueryRowContext(ctx, cq, cargs...).Scan(&out.Totals.Posts); err != nil {
 			return nil, err
 		}

@@ -12,7 +12,7 @@
  */
 const SidebarSources = (() => {
     // Buttons that are always useful regardless of counts are not listed here
-    // (Artefacts, Multi Source Search).
+    // (Artefacts, Search by Meaning).
     const RULES = [
         { id: 'timeline-sidebar-btn', has: c => c.messages + c.emails + c.images + c.fbPosts > 0 },
         { id: 'sms-messages-sidebar-btn', has: c => c.messages > 0 },

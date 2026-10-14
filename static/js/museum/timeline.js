@@ -5,6 +5,9 @@
  * photos and Facebook posts. Data: GET /api/timeline (per-month counts) and
  * GET /api/timeline/{year}/{month} (internal/handler/timeline_handler.go).
  *
+ * Optional filter (person / keywords / photo tag) is passed to both as ?person=&q=&tag=; the
+ * year/month bars then count only matching items, so navigation skips months with no matches.
+ *
  * Items open in their existing viewers via Chat.openSource (chat.js).
  * Loaded after app.js, so it self-initialises at the bottom of the file.
  */
@@ -18,6 +21,9 @@ const Timeline = (() => {
     let selectedYear = null;
     let selectedMonth = null; // "YYYY-MM"
     let loadGen = 0;
+    let filter = { personId: null, personLabel: '', q: '', tag: '' };
+    let personIds = null;     // Map label → contact id (null until loaded)
+    let suggestionsPromise = null;
 
     function el(id) { return document.getElementById(id); }
 
@@ -35,22 +41,162 @@ const Timeline = (() => {
         }
     }
 
+    function filterActive() {
+        return !!(filter.personId || filter.q || filter.tag);
+    }
+
+    function filterQuery() {
+        const p = new URLSearchParams();
+        if (filter.personId) p.set('person', String(filter.personId));
+        if (filter.q) p.set('q', filter.q);
+        if (filter.tag) p.set('tag', filter.tag);
+        const s = p.toString();
+        return s ? `?${s}` : '';
+    }
+
+    async function errorText(res) {
+        try {
+            const body = await res.json();
+            if (body && (body.detail || body.error)) return body.detail || body.error;
+        } catch (_) { /* not JSON */ }
+        return `HTTP ${res.status}`;
+    }
+
+    function setStatus(text, isError) {
+        const st = el('timeline-filter-status');
+        if (!st) return;
+        st.textContent = text || '';
+        st.hidden = !text;
+        st.classList.toggle('timeline-filter-status--error', !!isError);
+    }
+
+    function describeFilter(excluded) {
+        if (!filterActive()) return '';
+        const parts = [];
+        if (filter.personId) parts.push(`involving ${filter.personLabel}`);
+        if (filter.q) parts.push(`containing ${filter.q}`);
+        if (filter.tag) parts.push(`tagged “${filter.tag}”`);
+        const n = months.reduce((acc, m) => acc + total(m), 0);
+        let text = `Showing ${plural(n, 'item', 'items')} ${parts.join(', ')}` +
+            (months.length ? ` across ${plural(months.length, 'month', 'months')}.` : '.');
+        if (Array.isArray(excluded) && excluded.length) {
+            text += ` A photo tag filter leaves out ${excluded.join(', ')}.`;
+        }
+        if (filter.personId) {
+            text += ' Photos match people named in People in Photos; posts match mentions of the name.';
+        }
+        return text;
+    }
+
+    function loadSuggestions() {
+        if (!suggestionsPromise) suggestionsPromise = fetchSuggestions();
+        return suggestionsPromise;
+    }
+
+    async function fetchSuggestions() {
+        const fill = (listId, labels) => {
+            const list = el(listId);
+            if (!list) return;
+            list.innerHTML = '';
+            labels.forEach(l => {
+                const o = document.createElement('option');
+                o.value = l;
+                list.appendChild(o);
+            });
+        };
+        try {
+            const res = await fetch('/contacts/names', { credentials: 'same-origin' });
+            if (res.status === 403) {
+                // Visitor key without contacts — no person filter.
+                const field = el('timeline-filter-person-field');
+                if (field) field.hidden = true;
+            } else if (res.ok) {
+                const data = await res.json();
+                const contacts = (Array.isArray(data.contacts) ? data.contacts : [])
+                    .filter(c => c && c.id && (c.name || '').trim());
+                const counts = new Map();
+                contacts.forEach(c => counts.set(c.name.trim(), (counts.get(c.name.trim()) || 0) + 1));
+                personIds = new Map();
+                contacts.forEach(c => {
+                    const name = c.name.trim();
+                    personIds.set(counts.get(name) > 1 ? `${name} (#${c.id})` : name, c.id);
+                });
+                fill('timeline-filter-person-list', [...personIds.keys()].sort((a, b) => a.localeCompare(b)));
+            }
+        } catch (_) { /* suggestions are optional */ }
+        try {
+            const res = await fetch('/images/tags', { credentials: 'same-origin' });
+            if (res.ok) {
+                const data = await res.json();
+                fill('timeline-filter-tag-list', Array.isArray(data.tags) ? data.tags : []);
+            }
+        } catch (_) { /* suggestions are optional */ }
+    }
+
+    // Returns the contact id for a label, null for an empty box, undefined when it isn't a contact.
+    function resolvePerson(label) {
+        if (!label) return null;
+        if (!personIds) return undefined;
+        if (personIds.has(label)) return personIds.get(label);
+        const lower = label.toLowerCase();
+        for (const [k, id] of personIds) {
+            if (k.toLowerCase() === lower) return id;
+        }
+        return undefined;
+    }
+
+    async function applyFilter() {
+        const personLabel = (el('timeline-filter-person')?.value || '').trim();
+        if (personLabel) await loadSuggestions();
+        const personId = resolvePerson(personLabel);
+        if (personId === undefined) {
+            setStatus(`No contact is called “${personLabel}”. Pick a name from the list.`, true);
+            return;
+        }
+        filter = {
+            personId,
+            personLabel,
+            q: (el('timeline-filter-keywords')?.value || '').trim(),
+            tag: (el('timeline-filter-tag')?.value || '').trim(),
+        };
+        void open();
+    }
+
+    function clearFilter() {
+        ['timeline-filter-person', 'timeline-filter-keywords', 'timeline-filter-tag'].forEach(id => {
+            const input = el(id);
+            if (input) input.value = '';
+        });
+        filter = { personId: null, personLabel: '', q: '', tag: '' };
+        void open();
+    }
+
     async function open(targetMonth) {
         const modal = el('timeline-modal');
         if (!modal) return;
         modal.style.display = 'flex';
+        void loadSuggestions();
+        const clearBtn = el('timeline-filter-clear-btn');
+        if (clearBtn) clearBtn.hidden = !filterActive();
+        setStatus('');
         el('timeline-days').innerHTML = '<p class="timeline-empty"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading your timeline…</p>';
+        const gen = ++loadGen;
+        let excluded = [];
         try {
-            const res = await fetch('/api/timeline', { credentials: 'same-origin' });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const res = await fetch(`/api/timeline${filterQuery()}`, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(await errorText(res));
             const data = await res.json();
+            if (gen !== loadGen) return; // the filter changed meanwhile
             months = Array.isArray(data.months) ? data.months.filter(m => total(m) > 0) : [];
+            excluded = data.excluded || [];
         } catch (err) {
+            if (gen !== loadGen) return;
             el('timeline-days').innerHTML = '';
             el('timeline-days').appendChild(emptyMessage(`Couldn't load the timeline: ${err.message}`));
             return;
         }
         byMonth = new Map(months.map(m => [m.month, m]));
+        setStatus(describeFilter(excluded));
         if (months.length === 0) {
             el('timeline-years').innerHTML = '';
             el('timeline-months').innerHTML = '';
@@ -59,7 +205,9 @@ const Timeline = (() => {
             el('timeline-prev-btn').disabled = true;
             el('timeline-next-btn').disabled = true;
             el('timeline-days').innerHTML = '';
-            el('timeline-days').appendChild(emptyMessage('Nothing with a date has been imported yet. Use Source Data to add messages, emails or photos.'));
+            el('timeline-days').appendChild(emptyMessage(filterActive()
+                ? 'Nothing matches this filter. Try fewer keywords, or Clear to see everything.'
+                : 'Nothing with a date has been imported yet. Use Source Data to add messages, emails or photos.'));
             return;
         }
         const target = (targetMonth && byMonth.has(targetMonth)) ? targetMonth
@@ -173,8 +321,8 @@ const Timeline = (() => {
         el('timeline-month-summary').textContent = '';
         let d;
         try {
-            const res = await fetch(`/api/timeline/${year}/${month}`, { credentials: 'same-origin' });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const res = await fetch(`/api/timeline/${year}/${month}${filterQuery()}`, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(await errorText(res));
             d = await res.json();
         } catch (err) {
             if (gen !== loadGen) return;
@@ -332,6 +480,8 @@ const Timeline = (() => {
         el('close-timeline-modal')?.addEventListener('click', close);
         el('timeline-prev-btn')?.addEventListener('click', () => step(-1));
         el('timeline-next-btn')?.addEventListener('click', () => step(1));
+        el('timeline-filter-form')?.addEventListener('submit', (e) => { e.preventDefault(); void applyFilter(); });
+        el('timeline-filter-clear-btn')?.addEventListener('click', clearFilter);
         const modal = el('timeline-modal');
         modal?.addEventListener('click', (e) => { if (e.target === modal) close(); });
         document.addEventListener('keydown', onKeydown);
