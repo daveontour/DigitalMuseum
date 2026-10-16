@@ -10,6 +10,9 @@ Modals.GuideTopicsConfig = (() => {
     const NAV_ACTIONS = [
         '',
         'showGettingStartedDialog',
+        'openTimeline',
+        'openOnThisDay',
+        'openMemoryChallenge',
         'openSmsMessages',
         'openEmailGallery',
         'openImageGallery',

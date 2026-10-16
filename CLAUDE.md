@@ -1211,6 +1211,7 @@ UI typography is centralised in `static/css/museum_of.css` under `:root` (same f
 | System status / setup checklist | `internal/handler/system_status_handler.go`, `static/js/museum/system-status.js` |
 | Recommended AI tools | `internal/ai/tool_recommended.go`, `internal/handler/llm_tools_access_handler.go` |
 | Timeline & quick search | `internal/repository/timeline_repo.go`, `internal/handler/timeline_handler.go`, `static/js/museum/timeline.js`, `static/js/museum/quick-search.js` |
+| On This Day & Memory Challenge (Trivia) | `internal/repository/on_this_day_repo.go`, `internal/repository/trivia_repo.go`, `internal/handler/memories_handler.go`, `static/js/museum/on-this-day.js`, `static/js/museum/trivia.js` |
 | Sidebar empty-source hiding | `static/js/museum/sidebar-sources.js` |
 | Import source picker / advanced config tabs | `static/js/museum/import-wizard.js`, `static/js/museum/config-advanced.js` |
 | Frontend AI Tool Access / Tool Test UI | `static/js/museum/modals-settings.js` (`Modals.LLMToolsAccess`), `static/js/museum/modals-tool-test.js` |

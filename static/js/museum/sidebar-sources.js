@@ -15,6 +15,7 @@ const SidebarSources = (() => {
     // (Artefacts, Search by Meaning).
     const RULES = [
         { id: 'timeline-sidebar-btn', has: c => c.messages + c.emails + c.images + c.fbPosts > 0 },
+        { id: 'on-this-day-sidebar-btn', has: c => c.messages + c.emails + c.images + c.fbPosts > 0 },
         { id: 'sms-messages-sidebar-btn', has: c => c.messages > 0 },
         { id: 'email-gallery-sidebar-btn', has: c => c.emails > 0 },
         { id: 'fb-albums-sidebar-btn', has: c => c.fbAlbums > 0 },

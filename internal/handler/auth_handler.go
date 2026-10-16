@@ -81,7 +81,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "username and password are required")
 		return
 	}
-	password := strings.ToLower(req.Password)
+	password := req.Password
 	if req.DisplayName == "" {
 		writeError(w, http.StatusBadRequest, "first name is required")
 		return
@@ -255,19 +255,19 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			vis = &repository.UserLLMStored{}
 		}
 		out["llm_settings"] = map[string]any{
-			"session_scoped":               true,
-			"openrouter_api_key_set":       vis.OpenRouterAPIKey != "",
-			"tavily_api_key_set":           vis.TavilyAPIKey != "",
-			"runpod_api_key_set":           vis.RunpodAPIKey != "",
-			"elevenlabs_api_key_set":       vis.ElevenLabsAPIKey != "",
-			"runpod_endpoint_id":           vis.RunpodEndpointID,
-			"runpod_workers":               vis.RunpodWorkers,
+			"session_scoped":                 true,
+			"openrouter_api_key_set":         vis.OpenRouterAPIKey != "",
+			"tavily_api_key_set":             vis.TavilyAPIKey != "",
+			"runpod_api_key_set":             vis.RunpodAPIKey != "",
+			"elevenlabs_api_key_set":         vis.ElevenLabsAPIKey != "",
+			"runpod_endpoint_id":             vis.RunpodEndpointID,
+			"runpod_workers":                 vis.RunpodWorkers,
 			"subject_openrouter_api_key_set": owner.OpenRouterAPIKey != "",
-			"subject_tavily_key_set":       owner.TavilyAPIKey != "",
-			"subject_runpod_key_set":       owner.RunpodAPIKey != "",
-			"subject_elevenlabs_key_set":   owner.ElevenLabsAPIKey != "",
-			"subject_runpod_endpoint_id":   owner.RunpodEndpointID,
-			"subject_runpod_workers":       owner.RunpodWorkers,
+			"subject_tavily_key_set":         owner.TavilyAPIKey != "",
+			"subject_runpod_key_set":         owner.RunpodAPIKey != "",
+			"subject_elevenlabs_key_set":     owner.ElevenLabsAPIKey != "",
+			"subject_runpod_endpoint_id":     owner.RunpodEndpointID,
+			"subject_runpod_workers":         owner.RunpodWorkers,
 		}
 	} else {
 		out["llm_settings"] = map[string]any{

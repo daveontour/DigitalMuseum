@@ -135,6 +135,9 @@ const Guide = {
         pause2s: () => Guide._pauseNavActions(2000),
         pause5s: () => Guide._pauseNavActions(5000),
         // Left sidebar — explore
+        openTimeline: () => Guide._clickSidebarButton('timeline-sidebar-btn'),
+        openOnThisDay: () => Guide._clickSidebarButton('on-this-day-sidebar-btn'),
+        openMemoryChallenge: () => Guide._clickSidebarButton('trivia-sidebar-btn'),
         openSmsMessages: () => Guide._clickSidebarButton('sms-messages-sidebar-btn'),
         openEmailGallery: () => Guide._clickSidebarButton('email-gallery-sidebar-btn'),
         openImageGallery: () => Guide._clickSidebarButton('new-image-gallery-sidebar-btn'),

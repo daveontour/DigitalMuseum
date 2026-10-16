@@ -189,6 +189,9 @@
                     <button type="button" class="more-options-btn" id="timeline-sidebar-btn" title="Browse everything by year, month and day">
                         <i class="fas fa-stream"></i> Timeline
                     </button>
+                    <button type="button" class="more-options-btn" id="on-this-day-sidebar-btn" title="Memories and moments from this day in past years">
+                        <i class="fas fa-calendar-day"></i> On This Day
+                    </button>
                     <button type="button" class="more-options-btn" id="sms-messages-sidebar-btn">
                         <i class="fas fa-comment-dots"></i> Messages and Chats
                     </button>
@@ -424,6 +427,9 @@
                 <div class="more-options-buttons" id="sidebar-ask-buttons">
                     <button type="button" class="more-options-btn" id="chatbot-sidebar-btn">
                         <i class="fas fa-robot"></i> ChatBot
+                    </button>
+                    <button type="button" class="more-options-btn" id="trivia-sidebar-btn" title="Test how well you remember people, places, messages and photos">
+                        <i class="fas fa-brain"></i> Memory Challenge
                     </button>
                     <button type="button" class="more-options-btn" id="suggestions-sidebar-btn">
                         <i class="fas fa-lightbulb"></i> Suggestions
@@ -711,6 +717,57 @@
                         <span id="timeline-month-summary" class="timeline-month-summary"></span>
                     </div>
                     <div id="timeline-days" class="timeline-days" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- On This Day — on-this-day.js -->
+        <div id="on-this-day-modal" class="modal" style="display:none;">
+            <div class="modal-content on-this-day-modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-calendar-day"></i> On This Day</h2>
+                    <button type="button" class="modal-close-btn" id="close-on-this-day-modal">&times;</button>
+                </div>
+                <div class="on-this-day-body">
+                    <div class="on-this-day-controls">
+                        <div class="on-this-day-heading-group">
+                            <h3 id="on-this-day-title" class="on-this-day-title">On This Day</h3>
+                            <span id="on-this-day-summary" class="on-this-day-summary"></span>
+                        </div>
+                        <div class="on-this-day-nav-group">
+                            <button type="button" class="modal-btn modal-btn-secondary" id="on-this-day-prev-btn" title="Previous day" aria-label="Previous day">
+                                <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                            </button>
+                            <input type="date" id="on-this-day-date-picker" class="on-this-day-date-input" aria-label="Choose date">
+                            <button type="button" class="modal-btn modal-btn-secondary" id="on-this-day-today-btn" title="Jump to today">Today</button>
+                            <button type="button" class="modal-btn modal-btn-secondary" id="on-this-day-next-btn" title="Next day" aria-label="Next day">
+                                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="on-this-day-years" class="on-this-day-years" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Memory Challenge (Interactive Personal Trivia) — trivia.js -->
+        <div id="trivia-modal" class="modal" style="display:none;">
+            <div class="modal-content trivia-modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-brain"></i> Memory Challenge</h2>
+                    <button type="button" class="modal-close-btn" id="close-trivia-modal">&times;</button>
+                </div>
+                <div class="trivia-body">
+                    <div id="trivia-header-bar" class="trivia-header-bar" style="display:none;">
+                        <div class="trivia-header-top">
+                            <span id="trivia-question-counter" class="trivia-question-counter">Question 1 of 10</span>
+                            <span id="trivia-score-badge" class="trivia-score-badge">Score: 0</span>
+                        </div>
+                        <div class="trivia-progress-bar" role="progressbar" aria-label="Challenge progress">
+                            <div id="trivia-progress-fill" class="trivia-progress-fill"></div>
+                        </div>
+                    </div>
+                    <div id="trivia-card" class="trivia-card" aria-live="polite"></div>
                 </div>
             </div>
         </div>
@@ -5317,6 +5374,8 @@
     <script src="/static/js/museum/system-status.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/archive-backup.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/timeline.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/on-this-day.js?v={{ static_app_js_cache_bust }}" defer></script>
+    <script src="/static/js/museum/trivia.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script src="/static/js/museum/quick-search.js?v={{ static_app_js_cache_bust }}" defer></script>
     <script>
     window.__uploadImportSelectedPath = '';

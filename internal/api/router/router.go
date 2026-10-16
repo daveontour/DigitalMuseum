@@ -421,8 +421,13 @@ func New(pool *sql.DB, billingPool *sql.DB, cfg *config.Config) (http.Handler, *
 	systemStatusHandler.RegisterRoutes(r)
 
 	// ── Timeline + quick search (cross-source, date-ordered views) ────────────
-	timelineHandler := handler.NewTimelineHandler(repository.NewTimelineRepo(pool))
+	timelineRepo := repository.NewTimelineRepo(pool)
+	timelineHandler := handler.NewTimelineHandler(timelineRepo)
 	timelineHandler.RegisterRoutes(r)
+
+	// ── On This Day + Memory Challenge (nostalgia features, plain queries — no LLM) ──
+	memoriesHandler := handler.NewMemoriesHandler(timelineRepo, repository.NewTriviaRepo(pool))
+	memoriesHandler.RegisterRoutes(r)
 
 	// ── Share tokens ──────────────────────────────────────────────────────────
 	shareRepo := repository.NewArchiveShareRepo(pool)
